@@ -40,6 +40,7 @@
     "clsx": "^2.1.1",
     "cookies-next": "^6.1.1",
     "cross-env": "^10.1.0",
+    "dayjs": "^1.11.20",
     "framer-motion": "^12.23.26",
     "jwt-decode": "^4.0.0",
     "lucide-react": "^0.544.0",

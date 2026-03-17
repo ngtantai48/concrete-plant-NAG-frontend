@@ -19,26 +19,23 @@ export default function InitAuth() {
         if (initPromise) return;
 
         const init = async () => {
-            // TODO: enable refresh khi backend có HTTPS domain
-            // try {
-            //     const res = await authApi.refreshToken();
-            //     store.dispatch(
-            //         loginSuccess({
-            //             user_id: res.data.user_id,
-            //             role: res.data.role,
-            //             role_id: res.data.role_id,
-            //             accessToken: res.data.accessToken,
-            //             user_full_name: res.data.user_full_name,
-            //         })
-            //     );
-            // } catch {
-            //     store.dispatch(logoutSuccess());
-            // } finally {
-            //     store.dispatch(authInitialized());
-            //     initPromise = null;
-            // }
-            store.dispatch(authInitialized());
-            initPromise = null;
+            try {
+                const res = await authApi.refreshToken();
+                store.dispatch(
+                    loginSuccess({
+                        user_id: res.data.user_id,
+                        role: res.data.role,
+                        role_id: res.data.role_id,
+                        accessToken: res.data.accessToken,
+                        user_full_name: res.data.user_full_name,
+                    })
+                );
+            } catch {
+                store.dispatch(logoutSuccess());
+            } finally {
+                store.dispatch(authInitialized());
+                initPromise = null;
+            }
         };
 
         initPromise = init();
