@@ -9,6 +9,7 @@ export const ADMIN = {
   VEHICLE_TYPES: "/admin/vehicle-types",
   USER_VEHICLES: "/admin/user-vehicles",
   STATIONS: "/admin/stations",
+  VEHICLE_MAINTENANCES: "/admin/vehicle-maintenances",
   PROFILE: "/profile",
 };
 
