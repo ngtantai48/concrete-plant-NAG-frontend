@@ -1,38 +1,38 @@
 "use client";
 
-import driverApi from "@/services/driver.service";
-import type { Driver } from "@/services/driver.service";
-import vehicleApi from "@/services/vehicle.service";
-import type { Vehicle } from "@/services/vehicle.service";
 import stationApi from "@/services/station.service";
 import type { Station } from "@/services/station.service";
-import userVehicleApi from "@/services/user-vehicle.service";
-import type { UserVehicle } from "@/services/user-vehicle.service";
-import { Skeleton, Table, Tooltip } from "antd";
+import { Skeleton, Tooltip } from "antd";
 import {
   MapPin,
-  ArrowRight,
   RefreshCw,
-  Car,
-  CircleCheck,
-  Users,
   Building2,
-  Truck,
-  Navigation,
+  Radar,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import DashboardCard from "@/components/features/admin/dashboard/DashboardCard";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useNearbyVehicles } from "@/hooks/useNearbyVehicles";
+import dynamic from "next/dynamic";
+
+const StationMap = dynamic(
+  () => import("@/components/features/admin/dashboard/StationMap"),
+  { 
+    ssr: false,
+    loading: () => (
+      <div className="w-full h-full bg-slate-50 flex items-center justify-center">
+        <RefreshCw className="w-5 h-5 text-slate-300 animate-spin" />
+      </div>
+    )
+  }
+);
 
 export default function AdminDashboard() {
   const t = useTranslations("DashboardPage");
   const tCommon = useTranslations("Common");
 
-  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
-  const [drivers, setDrivers] = useState<Driver[]>([]);
   const [stations, setStations] = useState<Station[]>([]);
-  const [assignments, setAssignments] = useState<UserVehicle[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshDisabled, setRefreshDisabled] = useState(0);
   const [clock, setClock] = useState("");
@@ -62,16 +62,8 @@ export default function AdminDashboard() {
   const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [vRes, dRes, sRes, aRes] = await Promise.all([
-        vehicleApi.getAll(),
-        driverApi.getAll(),
-        stationApi.getAll(),
-        userVehicleApi.getAll(),
-      ]);
-      setVehicles(vRes.data?.data || vRes.data || []);
-      setDrivers(dRes.data?.data || dRes.data || []);
+      const sRes = await stationApi.getAll();
       setStations(sRes.data?.data || sRes.data || []);
-      setAssignments(aRes.data?.data || aRes.data || []);
     } catch {
       //
     } finally {
@@ -98,126 +90,68 @@ export default function AdminDashboard() {
     }, 1000);
   };
 
-  const availableVehicles = useMemo(
-    () => vehicles.filter((v) => v.vehicle_status === "available"),
-    [vehicles],
-  );
-
-  const unavailableVehicles = useMemo(
-    () => vehicles.filter((v) => v.vehicle_status !== "available"),
-    [vehicles],
-  );
-
   const activeStations = useMemo(
-    () => stations.filter((s) => s.station_status === "active"),
+    () => stations.filter((s) => s.station_status === "operating"),
     [stations],
   );
 
-  const activeDrivers = useMemo(
-    () =>
-      drivers.filter(
-        (d) => d.user_status === "online" && d.role === "driver",
-      ),
-    [drivers],
+  const geofenceStation = useMemo(
+    () => stations.find((s) => s.station_types?.station_type_id === 2),
+    [stations],
   );
 
-  const getDriverName = (userId: number) => {
-    const d = drivers.find((dr) => dr.user_id === userId);
-    return d?.user_full_name || `#${userId}`;
-  };
+  const { vehicles: vtrackingVehicles, inRangeCount, loading: nearbyLoading, lastUpdated, error: nearbyError } = useNearbyVehicles(
+    geofenceStation?.station_gps || null,
+    geofenceStation?.station_gps_geofencing || 500,
+  );
 
-  const getVehiclePlate = (vehicleId: number) => {
-    const v = vehicles.find((ve) => ve.vehicle_id === vehicleId);
-    return v?.vehicle_license_plate || `#${vehicleId}`;
-  };
+  const [filter, setFilter] = useState<"all" | "run" | "park" | "offline" | "inRange">("all");
 
-  const vehicleColumns = [
-    {
-      title: "#",
-      key: "index",
-      width: 36,
-      align: "center" as const,
-      render: (_: unknown, __: unknown, idx: number) => (
-        <span className="text-slate-400 text-[11px] tabular-nums">
-          {String(idx + 1).padStart(2, "0")}
-        </span>
-      ),
-    },
-    {
-      title: t("plate"),
-      dataIndex: "vehicle_license_plate",
-      key: "plate",
-      render: (val: string) => (
-        <span className="font-semibold text-slate-800 tracking-wider text-xs uppercase">
-          {val}
-        </span>
-      ),
-    },
-  ];
-
-  const assignmentColumns = [
-    {
-      title: "#",
-      key: "index",
-      width: 36,
-      align: "center" as const,
-      render: (_: unknown, __: unknown, idx: number) => (
-        <span className="text-slate-400 text-[11px] tabular-nums">
-          {String(idx + 1).padStart(2, "0")}
-        </span>
-      ),
-    },
-    {
-      title: t("plate"),
-      dataIndex: "vehicle_id",
-      key: "plate",
-      render: (val: number) => (
-        <span className="font-semibold text-slate-800 tracking-wider text-xs uppercase">
-          {getVehiclePlate(val)}
-        </span>
-      ),
-    },
-    {
-      title: t("driver"),
-      dataIndex: "user_id",
-      key: "driver",
-      render: (val: number) => (
-        <span className="text-xs text-slate-600">{getDriverName(val)}</span>
-      ),
-    },
-  ];
+  const filteredVehicles = useMemo(() => {
+    switch (filter) {
+      case "run":
+        return vtrackingVehicles.filter(v => v.status === "run");
+      case "park":
+        return vtrackingVehicles.filter(v => v.status === "park");
+      case "offline":
+        return vtrackingVehicles.filter(v => v.status !== "run" && v.status !== "park");
+      case "inRange":
+        return vtrackingVehicles.filter(v => v.inRange);
+      default:
+        return vtrackingVehicles;
+    }
+  }, [vtrackingVehicles, filter]);
 
   if (loading) {
     return (
       <div className="m-4 md:m-6 lg:m-8 max-w-[1600px] lg:mx-auto space-y-6">
         <Skeleton active paragraph={{ rows: 1 }} />
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          {[1, 2, 3, 4].map((i) => (
+        <div className="grid grid-cols-3 gap-4">
+          {[1, 2, 3].map((i) => (
             <div key={i} className="bg-white rounded-xl border border-slate-200 p-5">
               <Skeleton active paragraph={{ rows: 2 }} title={false} />
             </div>
           ))}
         </div>
-        <div className="grid grid-cols-12 gap-6">
-          <div className="col-span-12 lg:col-span-3">
-            <div className="bg-white rounded-xl border border-slate-200 p-4">
-              <Skeleton active paragraph={{ rows: 8 }} title={false} />
-            </div>
-          </div>
-          <div className="col-span-12 lg:col-span-6">
-            <div className="bg-white rounded-xl border border-slate-200 p-6">
-              <Skeleton active paragraph={{ rows: 10 }} />
-            </div>
-          </div>
-          <div className="col-span-12 lg:col-span-3">
-            <div className="bg-white rounded-xl border border-slate-200 p-4">
-              <Skeleton active paragraph={{ rows: 8 }} title={false} />
-            </div>
-          </div>
+        <div className="bg-white rounded-xl border border-slate-200 p-6">
+          <Skeleton active paragraph={{ rows: 10 }} />
         </div>
       </div>
     );
   }
+
+  const FilterButton = ({ value, label, count }: { value: typeof filter, label: string, count: number }) => (
+    <button
+      onClick={() => setFilter(value)}
+      className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+        filter === value 
+          ? "bg-slate-900 text-white shadow-sm" 
+          : "bg-white text-slate-600 hover:bg-slate-50 border border-slate-200"
+      }`}
+    >
+      {label} <span className={`ml-1 px-1.5 py-0.5 rounded text-[10px] ${filter === value ? "bg-slate-700 text-white" : "bg-slate-100 text-slate-500"}`}>{count}</span>
+    </button>
+  );
 
   return (
     <div className="m-4 md:m-6 lg:m-8 max-w-[1600px] lg:mx-auto">
@@ -245,167 +179,156 @@ export default function AdminDashboard() {
         </Tooltip>
       </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <DashboardCard
-          label={t("totalVehicles")}
-          value={vehicles.length}
-          icon={<Car className="w-5 h-5" />}
-          accent="blue"
-          index={0}
-        />
-        <DashboardCard
-          label={t("readyVehicles")}
-          value={availableVehicles.length}
-          icon={<CircleCheck className="w-5 h-5" />}
-          accent="emerald"
-          subtitle={`${vehicles.length > 0 ? Math.round((availableVehicles.length / vehicles.length) * 100) : 0}%`}
-          index={1}
-        />
-        <DashboardCard
-          label={t("activeDrivers")}
-          value={activeDrivers.length}
-          icon={<Users className="w-5 h-5" />}
-          accent="amber"
-          subtitle={`/ ${drivers.filter((d) => d.role === "driver").length} ${t("totalDrivers")}`}
-          index={2}
-        />
+      <div className="grid grid-cols-3 gap-4 mb-8">
         <DashboardCard
           label={t("activeStationsCard")}
           value={activeStations.length}
           icon={<Building2 className="w-5 h-5" />}
           accent="slate"
           subtitle={`/ ${stations.length} ${t("totalStationsLabel")}`}
-          index={3}
+          index={0}
+        />
+        <DashboardCard
+          label="Tổng xe"
+          value={vtrackingVehicles.length}
+          icon={<Radar className="w-5 h-5" />}
+          accent="blue"
+          index={1}
+        />
+        <DashboardCard
+          label="Trong bán kính"
+          value={inRangeCount}
+          icon={<MapPin className="w-5 h-5" />}
+          accent="emerald"
+          subtitle={geofenceStation ? `Bán kính ${geofenceStation.station_gps_geofencing}m` : ""}
+          index={2}
         />
       </div>
 
       <div className="grid grid-cols-12 gap-4 lg:gap-6">
         <div
-          className="col-span-12 lg:col-span-3 space-y-4 animate-slide-up"
+          className="col-span-12 lg:col-span-8 space-y-4 animate-slide-up"
           style={{ animationDelay: "350ms", animationFillMode: "both" }}
         >
-          <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-            <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
-              <h2 className="text-xs font-semibold uppercase tracking-widest text-emerald-700">
-                {t("readyVehicles")}
-              </h2>
-              <span className="text-[11px] font-bold bg-emerald-600 text-white w-6 h-6 rounded-full flex items-center justify-center tabular-nums">
-                {availableVehicles.length}
-              </span>
-            </div>
-            <Table
-              columns={vehicleColumns}
-              dataSource={availableVehicles}
-              rowKey="vehicle_id"
-              pagination={false}
-              size="small"
-              scroll={{ y: 260 }}
-            />
-          </div>
+          {geofenceStation && (
+            <div className="bg-white rounded-xl border border-slate-200 p-6 flex flex-col h-[700px]">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-4">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 bg-violet-50 rounded-lg flex items-center justify-center shrink-0">
+                    <Radar className="w-4 h-4 text-violet-600" />
+                  </div>
+                  <div>
+                    <h2 className="text-xs font-semibold uppercase tracking-widest text-slate-500">
+                      Giám sát khu vực
+                    </h2>
+                    <p className="text-[10px] text-slate-400 mt-0.5">
+                      {geofenceStation.station_name} - Bán kính {geofenceStation.station_gps_geofencing}m
+                    </p>
+                  </div>
+                </div>
 
-          <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-            <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
-              <h2 className="text-xs font-semibold uppercase tracking-widest text-red-700">
-                {t("inactiveVehicles")}
-              </h2>
-              <span className="text-[11px] font-bold bg-red-600 text-white w-6 h-6 rounded-full flex items-center justify-center tabular-nums">
-                {unavailableVehicles.length}
-              </span>
-            </div>
-            {unavailableVehicles.length === 0 ? (
-              <div className="py-10 text-center">
-                <CircleCheck className="w-8 h-8 text-emerald-300 mx-auto mb-2" />
-                <p className="text-sm text-slate-500">{t("allVehiclesReady")}</p>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <FilterButton value="all" label="Tất cả" count={vtrackingVehicles.length} />
+                  <FilterButton value="run" label="Chạy" count={vtrackingVehicles.filter(v => v.status === "run").length} />
+                  <FilterButton value="park" label="Dừng" count={vtrackingVehicles.filter(v => v.status === "park").length} />
+                  <FilterButton value="offline" label="Mất K/N" count={vtrackingVehicles.filter(v => v.status !== "run" && v.status !== "park").length} />
+                  <FilterButton value="inRange" label="Gần trạm" count={inRangeCount} />
+                </div>
+
+                <div className="flex items-center gap-2 ml-auto">
+                  {nearbyLoading && (
+                    <RefreshCw className="w-3.5 h-3.5 text-slate-300 animate-spin" />
+                  )}
+                  <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                    <span className="text-[10px] font-semibold text-emerald-700 uppercase">Live</span>
+                  </span>
+                </div>
               </div>
-            ) : (
-              <Table
-                columns={vehicleColumns}
-                dataSource={unavailableVehicles}
-                rowKey="vehicle_id"
-                pagination={false}
-                size="small"
-                scroll={{ y: 180 }}
-              />
-            )}
-          </div>
+
+              {nearbyError && (
+                <div className="mb-3 px-3 py-2 rounded-lg bg-red-50 border border-red-200 shrink-0">
+                  <p className="text-xs text-red-600">{nearbyError}</p>
+                </div>
+              )}
+
+              <div className="flex-1 grid grid-cols-1 lg:grid-cols-5 gap-4 min-h-0">
+                {/* Danh sách xe */}
+                <div className="lg:col-span-2 bg-slate-50 border border-slate-200 rounded-lg overflow-hidden flex flex-col">
+                  {filteredVehicles.length === 0 && !nearbyError ? (
+                    <div className="py-12 text-center m-auto px-6 opacity-80">
+                      <div className="w-12 h-12 bg-white rounded-2xl shadow-sm border border-slate-100 flex items-center justify-center mx-auto mb-4">
+                        <Radar className="w-6 h-6 text-slate-300" />
+                      </div>
+                      <p className="text-sm font-medium text-slate-600 mb-1">Không có xe phù hợp</p>
+                      <p className="text-xs text-slate-400">Thử thay đổi bộ lọc hoặc chờ cập nhật (3s).</p>
+                    </div>
+                  ) : (
+                    <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
+                      {filteredVehicles.map((v, idx) => (
+                        <div
+                          key={v.device_id}
+                          className={`flex items-center gap-3 px-3 py-2 rounded-lg bg-white border hover:bg-slate-50 transition-colors ${
+                            v.inRange ? "border-emerald-200 shadow-sm" : "border-slate-100/50"
+                          }`}
+                        >
+                          <div className="min-w-0 flex-1">
+                            <span className="font-semibold text-xs text-slate-800 uppercase tracking-wider block">
+                              {v.license_plate}
+                            </span>
+                            <span className="text-[10px] text-slate-400 block truncate">
+                              {v.vehicle_name}
+                            </span>
+                          </div>
+                          
+                          <div className="text-right shrink-0">
+                            <span
+                              className={`text-[9px] font-semibold px-2 py-0.5 rounded-full inline-block mb-1.5 ${
+                                v.status === "run"
+                                  ? "bg-emerald-100/80 text-emerald-700 border border-emerald-200"
+                                  : v.status === "park"
+                                    ? "bg-amber-100/80 text-amber-700 border border-amber-200"
+                                    : "bg-slate-100 text-slate-500 border border-slate-200"
+                              }`}
+                            >
+                              {v.status === "run" ? `Đang chạy: ${v.speed}km/h` : v.status === "park" ? "Đang dừng" : "Mất K/N"}
+                            </span>
+                            <div className="flex items-center justify-end gap-1.5">
+                              {v.inRange && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />}
+                              <span className="text-[10px] text-slate-500 tabular-nums font-medium">
+                                {v.distance >= 1000 ? `${(v.distance / 1000).toFixed(1)}km` : `${v.distance}m`}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Bản đồ */}
+                <div className="lg:col-span-3 rounded-lg overflow-hidden border border-slate-200 min-h-[300px]">
+                  <StationMap 
+                    stationGps={geofenceStation.station_gps} 
+                    radius={geofenceStation.station_gps_geofencing}
+                    vehicles={filteredVehicles}
+                  />
+                </div>
+              </div>
+
+              {lastUpdated && (
+                <p className="text-[10px] uppercase tracking-wider font-semibold text-slate-300 mt-4 text-right tabular-nums shrink-0">
+                  Cập nhật: {lastUpdated.toLocaleTimeString("vi-VN")}
+                </p>
+              )}
+            </div>
+          )}
         </div>
 
         <div
-          className="col-span-12 lg:col-span-6 space-y-4 animate-slide-up"
+          className="col-span-12 lg:col-span-4 animate-slide-up"
           style={{ animationDelay: "420ms", animationFillMode: "both" }}
         >
-          <div className="bg-white rounded-xl border border-slate-200 p-6">
-            <div className="flex items-center justify-between mb-5">
-              <div>
-                <h2 className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-1">
-                  {t("totalTrips")}
-                </h2>
-                <div className="flex items-center gap-1.5">
-                  {String(assignments.length)
-                    .padStart(3, "0")
-                    .split("")
-                    .map((digit, i) => (
-                      <span
-                        key={i}
-                        className="inline-flex items-center justify-center w-9 h-11 bg-slate-900 text-white text-lg font-bold rounded-md tabular-nums"
-                      >
-                        {digit}
-                      </span>
-                    ))}
-                </div>
-              </div>
-              <div className="w-12 h-12 bg-slate-100 rounded-xl flex items-center justify-center">
-                <Navigation className="w-5 h-5 text-slate-600" />
-              </div>
-            </div>
-
-            <div className="border-t border-slate-100 pt-5">
-              <h3 className="text-[11px] font-semibold text-slate-400 uppercase tracking-widest mb-3">
-                {t("activeRoutes")}
-              </h3>
-              {assignments.length === 0 ? (
-                <div className="py-8 text-center">
-                  <Truck className="w-10 h-10 text-slate-200 mx-auto mb-3" />
-                  <p className="text-sm font-medium text-slate-500">
-                    {t("noActiveRoutes")}
-                  </p>
-                  <p className="text-xs text-slate-400 mt-1">
-                    {t("noRoutesHint")}
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {assignments.slice(0, 6).map((a, idx) => (
-                    <div
-                      key={a.user_vehicle_id}
-                      className="flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-slate-50 group/row"
-                      style={{
-                        animation: `slide-up 0.5s cubic-bezier(0.25, 1, 0.5, 1) both`,
-                        animationDelay: `${500 + idx * 60}ms`,
-                      }}
-                    >
-                      <span className="text-[11px] text-slate-400 tabular-nums w-5">
-                        {String(idx + 1).padStart(2, "0")}
-                      </span>
-                      <span className="font-semibold text-sm text-slate-800 uppercase tracking-wider min-w-[100px]">
-                        {getVehiclePlate(a.vehicle_id)}
-                      </span>
-                      <ArrowRight className="w-3.5 h-3.5 text-blue-400 shrink-0 group-hover/row:translate-x-0.5" />
-                      <span className="text-sm text-slate-600 truncate">
-                        {getDriverName(a.user_id)}
-                      </span>
-                    </div>
-                  ))}
-                  {assignments.length > 6 && (
-                    <p className="text-xs text-slate-400 text-center pt-1">
-                      +{assignments.length - 6} {t("more")}
-                    </p>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-
           <div className="bg-white rounded-xl border border-slate-200 p-6">
             <h2 className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-4">
               {t("stationStatus")}
@@ -421,7 +344,7 @@ export default function AdminDashboard() {
                 </p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              <div className="space-y-3">
                 {activeStations.map((station, idx) => (
                   <div
                     key={station.station_id}
@@ -450,37 +373,6 @@ export default function AdminDashboard() {
                   </div>
                 ))}
               </div>
-            )}
-          </div>
-        </div>
-
-        <div
-          className="col-span-12 lg:col-span-3 animate-slide-up"
-          style={{ animationDelay: "480ms", animationFillMode: "both" }}
-        >
-          <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
-            <div className="px-4 py-3 border-b border-slate-100 flex items-center justify-between">
-              <h2 className="text-xs font-semibold uppercase tracking-widest text-blue-700">
-                {t("assignedVehicles")}
-              </h2>
-              <span className="text-[11px] font-bold bg-blue-600 text-white w-6 h-6 rounded-full flex items-center justify-center tabular-nums">
-                {assignments.length}
-              </span>
-            </div>
-            {assignments.length === 0 ? (
-              <div className="py-10 text-center">
-                <Users className="w-8 h-8 text-slate-200 mx-auto mb-2" />
-                <p className="text-sm text-slate-500">{t("noAssignments")}</p>
-              </div>
-            ) : (
-              <Table
-                columns={assignmentColumns}
-                dataSource={assignments}
-                rowKey="user_vehicle_id"
-                pagination={false}
-                size="small"
-                scroll={{ y: 500 }}
-              />
             )}
           </div>
         </div>
