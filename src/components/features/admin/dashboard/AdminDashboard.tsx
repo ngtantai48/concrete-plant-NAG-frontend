@@ -1,29 +1,19 @@
 "use client";
 
-import driverApi from "@/services/driver.service";
-import type { Driver } from "@/services/driver.service";
-import vehicleApi from "@/services/vehicle.service";
-import type { Vehicle } from "@/services/vehicle.service";
-import stationApi from "@/services/station.service";
-import type { Station } from "@/services/station.service";
-import userVehicleApi from "@/services/user-vehicle.service";
-import type { UserVehicle } from "@/services/user-vehicle.service";
-import { Skeleton, Table, Tooltip } from "antd";
-import {
-  MapPin,
-  ArrowRight,
-  RefreshCw,
-  Car,
-  CircleCheck,
-  Users,
-  Building2,
-  Truck,
-  Navigation,
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
 import DashboardCard from "@/components/features/admin/dashboard/DashboardCard";
+import { Button } from "@/components/ui/button";
+import type { Driver } from "@/services/driver.service";
+import driverApi from "@/services/driver.service";
+import type { Station } from "@/services/station.service";
+import stationApi from "@/services/station.service";
+import type { UserVehicle } from "@/services/user-vehicle.service";
+import userVehicleApi from "@/services/user-vehicle.service";
+import type { Vehicle } from "@/services/vehicle.service";
+import vehicleApi from "@/services/vehicle.service";
+import { Skeleton, Table, Tooltip } from "antd";
+import { ArrowRight, Building2, Car, CircleCheck, Factory, Navigation, RefreshCw, Truck, Users } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 export default function AdminDashboard() {
   const t = useTranslations("DashboardPage");
@@ -37,6 +27,31 @@ export default function AdminDashboard() {
   const [refreshDisabled, setRefreshDisabled] = useState(0);
   const [clock, setClock] = useState("");
   const clockRef = useRef<ReturnType<typeof setInterval>>(null);
+
+  // Station operational status: "operating" | "stopped" | "incident"
+  // This will be replaced with socket.io real-time updates later
+  const [stationStatuses, setStationStatuses] = useState<Record<number, string>>({});
+  // Mock: which vehicle plate is at each station
+  const [stationVehicles, setStationVehicles] = useState<Record<number, string>>({});
+
+  const getStationStatus = (stationId: number) => stationStatuses[stationId] || "stopped";
+
+  const setStationStatus = (stationId: number, status: string) => {
+    setStationStatuses((prev) => ({ ...prev, [stationId]: status }));
+  };
+
+  // Initialize mock station vehicles when stations & vehicles load
+  useEffect(() => {
+    if (stations.length > 0 && vehicles.length > 0) {
+      const mockMap: Record<number, string> = {};
+      stations.forEach((s, idx) => {
+        if (vehicles[idx]) {
+          mockMap[s.station_id] = vehicles[idx].vehicle_license_plate;
+        }
+      });
+      setStationVehicles(mockMap);
+    }
+  }, [stations, vehicles]);
 
   useEffect(() => {
     const tick = () => {
@@ -62,16 +77,16 @@ export default function AdminDashboard() {
   const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
-      const [vRes, dRes, sRes, aRes] = await Promise.all([
+      const [vRes, dRes, sRes, aRes] = await Promise.allSettled([
         vehicleApi.getAll(),
         driverApi.getAll(),
         stationApi.getAll(),
         userVehicleApi.getAll(),
       ]);
-      setVehicles(vRes.data?.data || vRes.data || []);
-      setDrivers(dRes.data?.data || dRes.data || []);
-      setStations(sRes.data?.data || sRes.data || []);
-      setAssignments(aRes.data?.data || aRes.data || []);
+      if (vRes.status === "fulfilled") setVehicles(vRes.value.data?.data || vRes.value.data || []);
+      if (dRes.status === "fulfilled") setDrivers(dRes.value.data?.data || dRes.value.data || []);
+      if (sRes.status === "fulfilled") setStations(sRes.value.data?.data || sRes.value.data || []);
+      if (aRes.status === "fulfilled") setAssignments(aRes.value.data?.data || aRes.value.data || []);
     } catch {
       //
     } finally {
@@ -110,6 +125,11 @@ export default function AdminDashboard() {
 
   const activeStations = useMemo(
     () => stations.filter((s) => s.station_status === "active"),
+    [stations],
+  );
+
+  const workingStations = useMemo(
+    () => stations.filter((s) => s.station_types?.station_type_name === "working_station"),
     [stations],
   );
 
@@ -407,12 +427,17 @@ export default function AdminDashboard() {
           </div>
 
           <div className="bg-white rounded-xl border border-slate-200 p-6">
-            <h2 className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-4">
-              {t("stationStatus")}
-            </h2>
-            {activeStations.length === 0 ? (
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-xs font-semibold uppercase tracking-widest text-slate-400">
+                {t("stationControlPanel")}
+              </h2>
+              <span className="text-[11px] font-bold bg-slate-700 text-white px-2.5 py-1 rounded-full tabular-nums">
+                {workingStations.length} {t("totalStationsLabel")}
+              </span>
+            </div>
+            {workingStations.length === 0 ? (
               <div className="py-8 text-center">
-                <MapPin className="w-10 h-10 text-slate-200 mx-auto mb-3" />
+                <Factory className="w-10 h-10 text-slate-200 mx-auto mb-3" />
                 <p className="text-sm font-medium text-slate-500">
                   {t("noStations")}
                 </p>
@@ -421,34 +446,123 @@ export default function AdminDashboard() {
                 </p>
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {activeStations.map((station, idx) => (
-                  <div
-                    key={station.station_id}
-                    className="border border-slate-200 rounded-xl p-4 hover:border-blue-200"
-                    style={{
-                      animation: `slide-up 0.5s cubic-bezier(0.25, 1, 0.5, 1) both`,
-                      animationDelay: `${550 + idx * 60}ms`,
-                      transition:
-                        "border-color 0.2s cubic-bezier(0.25, 1, 0.5, 1)",
-                    }}
-                  >
-                    <div className="flex items-start justify-between mb-2">
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center shrink-0">
-                          <MapPin className="w-4 h-4 text-blue-600" />
-                        </div>
-                        <h3 className="text-sm font-semibold text-slate-800 truncate">
-                          {station.station_name}
-                        </h3>
+              <div className="flex flex-wrap gap-5">
+                {workingStations.map((station, idx) => {
+                  const status = getStationStatus(station.station_id);
+                  const plate = stationVehicles[station.station_id];
+                  const statusColor =
+                    status === "operating"
+                      ? "bg-emerald-500"
+                      : status === "incident"
+                        ? "bg-red-500"
+                        : "bg-slate-400";
+
+                  return (
+                    <React.Fragment key={station.station_id}>
+                      {idx > 0 && (
+                        <div className="w-px self-stretch bg-slate-200/80 my-2" />
+                      )}
+                      <div
+                        className="relative flex flex-col items-center min-w-[160px] flex-1 max-w-[220px]"
+                      style={{
+                        animation: `slide-up 0.5s cubic-bezier(0.25, 1, 0.5, 1) both`,
+                        animationDelay: `${550 + idx * 80}ms`,
+                      }}
+                    >
+                      {/* Vehicle plate */}
+                      <div className="mb-3">
+                        {plate ? (
+                          <span className="inline-block text-[11px] font-bold text-slate-800 bg-slate-100 border-2 border-slate-300 rounded px-2.5 py-0.5 uppercase tracking-wider">
+                            {plate}
+                          </span>
+                        ) : (
+                          <span className="inline-block text-[10px] text-slate-400 italic">
+                            {t("stationNoVehicle")}
+                          </span>
+                        )}
                       </div>
-                      <span className="w-2 h-2 rounded-full bg-emerald-500 mt-2 shrink-0" />
+
+                      {/* Control buttons + Icon + Status dot */}
+                      <div className="flex items-center gap-3">
+                        {/* Status buttons */}
+                        <div className="flex flex-col gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => setStationStatus(station.station_id, "operating")}
+                            className={`text-[11px] font-semibold px-3 py-1.5 rounded border-2 transition-all duration-200 cursor-pointer ${status === "operating"
+                                ? "bg-blue-500 text-white border-blue-600 shadow-sm shadow-blue-200"
+                                : "bg-white text-slate-600 border-slate-200 hover:border-blue-300 hover:text-blue-600"
+                              }`}
+                          >
+                            {t("stationOperating")}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setStationStatus(station.station_id, "stopped")}
+                            className={`text-[11px] font-semibold px-3 py-1.5 rounded border-2 transition-all duration-200 cursor-pointer ${status === "stopped"
+                                ? "bg-red-500 text-white border-red-600 shadow-sm shadow-red-200"
+                                : "bg-white text-slate-600 border-slate-200 hover:border-red-300 hover:text-red-600"
+                              }`}
+                          >
+                            {t("stationStopped")}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setStationStatus(station.station_id, "incident")}
+                            className={`text-[11px] font-semibold px-3 py-1.5 rounded border-2 transition-all duration-200 cursor-pointer ${status === "incident"
+                                ? "bg-amber-500 text-white border-amber-600 shadow-sm shadow-amber-200"
+                                : "bg-white text-slate-600 border-slate-200 hover:border-amber-300 hover:text-amber-600"
+                              }`}
+                          >
+                            {t("stationIncident")}
+                          </button>
+                        </div>
+
+                        {/* Concrete mixer icon */}
+                        <div className="relative">
+                          <svg
+                            width="64"
+                            height="56"
+                            viewBox="0 0 64 56"
+                            fill="none"
+                            xmlns="http://www.w3.org/2000/svg"
+                            className="text-slate-800"
+                          >
+                            {/* Truck body */}
+                            <rect x="8" y="16" width="40" height="22" rx="3" fill="currentColor" />
+                            {/* Cabin */}
+                            <rect x="44" y="20" width="14" height="18" rx="2" fill="currentColor" />
+                            {/* Window */}
+                            <rect x="47" y="23" width="8" height="8" rx="1" fill="#dbeafe" />
+                            {/* Mixer drum */}
+                            <ellipse cx="28" cy="22" rx="14" ry="10" fill="#475569" />
+                            <ellipse cx="28" cy="22" rx="10" ry="7" fill="#64748b" />
+                            <rect x="10" y="20" width="6" height="10" rx="1" fill="#94a3b8" />
+                            {/* Wheels */}
+                            <circle cx="18" cy="42" r="5" fill="#1e293b" />
+                            <circle cx="18" cy="42" r="2.5" fill="#94a3b8" />
+                            <circle cx="48" cy="42" r="5" fill="#1e293b" />
+                            <circle cx="48" cy="42" r="2.5" fill="#94a3b8" />
+                            {/* Exhaust */}
+                            <rect x="5" y="12" width="3" height="8" rx="1.5" fill="#94a3b8" />
+                          </svg>
+
+                          {/* Status indicator dot */}
+                          <span
+                            className={`absolute -top-1 -right-1 w-4 h-4 rounded-full border-2 border-white shadow-sm ${statusColor
+                              } ${status === "operating" ? "animate-pulse" : ""}`}
+                          />
+                        </div>
+                      </div>
+
+                      {/* Station name */}
+                      <p className="mt-3 text-xs font-semibold text-slate-700 text-center truncate max-w-full">
+                        {station.station_name}
+                      </p>
                     </div>
-                    <p className="text-[11px] text-slate-500 line-clamp-1 pl-[42px]">
-                      {station.station_address || "-"}
-                    </p>
-                  </div>
-                ))}
+                    </React.Fragment>
+                  );
+                })}
               </div>
             )}
           </div>
