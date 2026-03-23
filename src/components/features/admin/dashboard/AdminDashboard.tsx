@@ -38,6 +38,31 @@ export default function AdminDashboard() {
   const [clock, setClock] = useState("");
   const clockRef = useRef<ReturnType<typeof setInterval>>(null);
 
+  // Station operational status: "operating" | "stopped" | "incident"
+  // This will be replaced with socket.io real-time updates later
+  const [stationStatuses, setStationStatuses] = useState<Record<number, string>>({});
+  // Mock: which vehicle plate is at each station
+  const [stationVehicles, setStationVehicles] = useState<Record<number, string>>({});
+
+  const getStationStatus = (stationId: number) => stationStatuses[stationId] || "stopped";
+
+  const setStationStatus = (stationId: number, status: string) => {
+    setStationStatuses((prev) => ({ ...prev, [stationId]: status }));
+  };
+
+  // Initialize mock station vehicles when stations & vehicles load
+  useEffect(() => {
+    if (stations.length > 0 && vehicles.length > 0) {
+      const mockMap: Record<number, string> = {};
+      stations.forEach((s, idx) => {
+        if (vehicles[idx]) {
+          mockMap[s.station_id] = vehicles[idx].vehicle_license_plate;
+        }
+      });
+      setStationVehicles(mockMap);
+    }
+  }, [stations, vehicles]);
+
   useEffect(() => {
     const tick = () => {
       setClock(
@@ -330,12 +355,17 @@ export default function AdminDashboard() {
           style={{ animationDelay: "420ms", animationFillMode: "both" }}
         >
           <div className="bg-white rounded-xl border border-slate-200 p-6">
-            <h2 className="text-xs font-semibold uppercase tracking-widest text-slate-400 mb-4">
-              {t("stationStatus")}
-            </h2>
-            {activeStations.length === 0 ? (
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-xs font-semibold uppercase tracking-widest text-slate-400">
+                {t("stationControlPanel")}
+              </h2>
+              <span className="text-[11px] font-bold bg-slate-700 text-white px-2.5 py-1 rounded-full tabular-nums">
+                {workingStations.length} {t("totalStationsLabel")}
+              </span>
+            </div>
+            {workingStations.length === 0 ? (
               <div className="py-8 text-center">
-                <MapPin className="w-10 h-10 text-slate-200 mx-auto mb-3" />
+                <Factory className="w-10 h-10 text-slate-200 mx-auto mb-3" />
                 <p className="text-sm font-medium text-slate-500">
                   {t("noStations")}
                 </p>
@@ -361,17 +391,16 @@ export default function AdminDashboard() {
                         <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center shrink-0">
                           <MapPin className="w-4 h-4 text-blue-600" />
                         </div>
-                        <h3 className="text-sm font-semibold text-slate-800 truncate">
-                          {station.station_name}
-                        </h3>
                       </div>
-                      <span className="w-2 h-2 rounded-full bg-emerald-500 mt-2 shrink-0" />
+
+                      {/* Station name */}
+                      <p className="mt-3 text-xs font-semibold text-slate-700 text-center truncate max-w-full">
+                        {station.station_name}
+                      </p>
                     </div>
-                    <p className="text-[11px] text-slate-500 line-clamp-1 pl-[42px]">
-                      {station.station_address || "-"}
-                    </p>
-                  </div>
-                ))}
+                    </React.Fragment>
+                  );
+                })}
               </div>
             )}
           </div>
