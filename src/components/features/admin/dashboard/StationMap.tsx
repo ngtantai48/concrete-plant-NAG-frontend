@@ -90,7 +90,7 @@ export default function StationMap({ stationGps, radius, vehicles }: StationMapP
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
-        
+
         <MapUpdater stationLat={stationLat} stationLng={stationLng} />
 
         {/* Vị trí trạm */}
@@ -114,22 +114,21 @@ export default function StationMap({ stationGps, radius, vehicles }: StationMapP
         {/* Các xe */}
         {vehicles.map((v) => {
           const icon = v.status === "run" ? runIcon : v.status === "park" ? parkIcon : offlineIcon;
-          
+
           return (
             <Marker key={v.device_id} position={[v.latitude, v.longitude]} icon={icon}>
               <Popup>
                 <div className="font-sans min-w-[200px] p-0.5">
                   <strong className="text-sm font-bold text-slate-800 uppercase tracking-widest">{v.license_plate}</strong>
                   <p className="text-[11px] text-slate-500 mb-3 truncate max-w-[200px] leading-relaxed">{v.vehicle_name}</p>
-                  
+
                   <div className="space-y-2 border-t border-slate-100 pt-3 mt-1">
                     <div className="flex justify-between items-center text-xs">
                       <span className="text-slate-400">Trạng thái</span>
-                      <span className={`font-semibold px-2 py-0.5 rounded-full text-[10px] ${
-                        v.status === "run" ? "bg-emerald-50 text-emerald-700 border border-emerald-100" :
-                        v.status === "park" ? "bg-amber-50 text-amber-700 border border-amber-100" :
-                        "bg-slate-50 text-slate-500 border border-slate-100"
-                      }`}>
+                      <span className={`font-semibold px-2 py-0.5 rounded-full text-[10px] ${v.status === "run" ? "bg-emerald-50 text-emerald-700 border border-emerald-100" :
+                          v.status === "park" ? "bg-amber-50 text-amber-700 border border-amber-100" :
+                            "bg-slate-50 text-slate-500 border border-slate-100"
+                        }`}>
                         {v.status === "run" ? "Đang chạy" : v.status === "park" ? "Đang dừng" : "Mất kết nối"}
                       </span>
                     </div>
