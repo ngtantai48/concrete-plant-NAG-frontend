@@ -1,37 +1,20 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import vehicleMaintenanceApi from "@/services/vehicle-maintenance.service";
-import type { VehicleMaintenance } from "@/services/vehicle-maintenance.service";
-import vehicleApi from "@/services/vehicle.service";
-import type { Vehicle } from "@/services/vehicle.service";
 import { useNavigationStore } from "@/hooks/use-navigation-store";
+import type { VehicleMaintenance } from "@/services/vehicle-maintenance.service";
+import vehicleMaintenanceApi from "@/services/vehicle-maintenance.service";
+import type { Vehicle } from "@/services/vehicle.service";
+import vehicleApi from "@/services/vehicle.service";
 import {
-  DatePicker,
-  Form,
-  Input,
-  InputNumber,
-  Modal,
-  Pagination,
-  Select,
-  Space,
-  Table,
-  Tooltip,
-  Popconfirm,
+  DatePicker, Form, Input, InputNumber, Modal, Pagination,
+  Popconfirm, Select, Space, Table, Tooltip,
 } from "antd";
-import {
-  Plus,
-  RefreshCw,
-  Wrench,
-  PenSquare,
-  Trash2,
-  ClipboardList,
-  Calendar,
-} from "lucide-react";
+import dayjs from "dayjs";
+import { Calendar, ClipboardList, PenSquare, Plus, RefreshCw, Trash2, Wrench } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import dayjs from "dayjs";
 
 const { RangePicker } = DatePicker;
 const { TextArea } = Input;
@@ -100,7 +83,7 @@ export default function TableVehicleMaintenances() {
       const matchStatus = statusFilter === "all" || status === statusFilter;
       return matchSearch && matchStatus;
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [maintenances, statusFilter, searchText, vehicles]);
 
   const handleRefresh = () => {

@@ -200,7 +200,23 @@
     "requiredCapacity": "Enter maximum payload",
     "emptyTitle": "No vehicles found in the system",
     "emptyHint": "Click 'Add Vehicle' to register a new vehicle",
-    "total": "Total"
+    "total": "Total",
+    "documentSection": "Documents & Papers",
+    "documentName": "Document name",
+    "documentDescription": "Document description",
+    "documentDescriptionPlaceholder": "Enter document description...",
+    "uploadFile": "Upload",
+    "uploading": "Uploading...",
+    "uploadHint": "Click or drag files here",
+    "uploadSuccess": "Document uploaded successfully",
+    "uploadFailed": "Failed to upload document",
+    "deleteDocument": "Delete document",
+    "confirmDeleteDocument": "Are you sure you want to delete this document?",
+    "deleteDocumentSuccess": "Document deleted successfully",
+    "deleteDocumentFailed": "Unable to delete document",
+    "noDocuments": "No documents yet",
+    "download": "Download",
+    "pendingUpload": "Will upload after saving"
   },
   "VehicleTypePage": {
     "title": "Vehicle Type Management",
@@ -297,7 +313,12 @@
     "noAssignments": "No assignments yet",
     "noRoutesHint": "Routes will appear when vehicles are assigned",
     "noStationsHint": "Add stations in station management",
-    "more": "more"
+    "more": "more",
+    "stationOperating": "Operating",
+    "stationStopped": "Stopped",
+    "stationIncident": "Incident",
+    "stationControlPanel": "Concrete Station Control Panel",
+    "stationNoVehicle": "No vehicle"
   },
   "VehicleMaintenancePage": {
     "title": "Vehicle Maintenance",

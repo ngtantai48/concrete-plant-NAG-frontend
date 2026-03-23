@@ -9,6 +9,11 @@ export interface Station {
     station_status: string;
     station_description: string;
     station_type_id: number;
+    station_types?: {
+        station_type_id: number;
+        station_type_name: string;
+        station_type_description: string;
+    };
 }
 
 const stationApi = {

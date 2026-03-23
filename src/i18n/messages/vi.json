@@ -200,7 +200,23 @@
     "requiredCapacity": "Nhập tải trọng tối đa",
     "emptyTitle": "Chưa có phương tiện nào trong hệ thống",
     "emptyHint": "Nhấn 'Thêm phương tiện' để tạo hồ sơ xe mới",
-    "total": "Tổng"
+    "total": "Tổng",
+    "documentSection": "Hồ sơ & Giấy tờ",
+    "documentName": "Tên tài liệu",
+    "documentDescription": "Mô tả tài liệu",
+    "documentDescriptionPlaceholder": "Nhập mô tả tài liệu...",
+    "uploadFile": "Tải lên",
+    "uploading": "Đang tải lên...",
+    "uploadHint": "Chọn hoặc kéo thả file vào đây",
+    "uploadSuccess": "Tải lên tài liệu thành công",
+    "uploadFailed": "Tải lên tài liệu thất bại",
+    "deleteDocument": "Xoá tài liệu",
+    "confirmDeleteDocument": "Bạn có chắc chắn muốn xoá tài liệu này?",
+    "deleteDocumentSuccess": "Đã xoá tài liệu thành công",
+    "deleteDocumentFailed": "Không thể xoá tài liệu",
+    "noDocuments": "Chưa có giấy tờ nào",
+    "download": "Tải xuống",
+    "pendingUpload": "Sẽ tải lên sau khi lưu"
   },
   "VehicleTypePage": {
     "title": "Quản lý loại phương tiện",
@@ -297,7 +313,12 @@
     "noAssignments": "Chưa có phân công nào",
     "noRoutesHint": "Các tuyến sẽ hiển thị khi có xe được phân công",
     "noStationsHint": "Thêm trạm trong phần quản lý trạm",
-    "more": "khác"
+    "more": "khác",
+    "stationOperating": "Vận hành",
+    "stationStopped": "Dừng",
+    "stationIncident": "Sự cố",
+    "stationControlPanel": "Bảng điều khiển trạm bê tông",
+    "stationNoVehicle": "Chưa có xe"
   },
   "VehicleMaintenancePage": {
     "title": "Bảo trì & Bảo dưỡng xe",
