@@ -122,6 +122,7 @@ export default function TableVehicles() {
       vehicle_license_plate: record.vehicle_license_plate,
       vehicle_status: record.vehicle_status,
       vehicle_description: record.vehicle_description,
+      vehicle_rfid: record.vehicle_rfid,
       vehicle_type_id: record.vehicle_type_id,
     });
     setPendingFiles([]);
@@ -369,6 +370,19 @@ export default function TableVehicles() {
           {text}
         </div>
       ),
+    },
+    {
+      title: t("rfid"),
+      dataIndex: "vehicle_rfid",
+      key: "vehicle_rfid",
+      render: (val: string | null) =>
+        val ? (
+          <span className="font-mono text-xs bg-indigo-50 text-indigo-700 px-2 py-1 rounded border border-indigo-200">
+            {val}
+          </span>
+        ) : (
+          <span className="text-slate-400 italic">-</span>
+        ),
     },
     {
       title: t("vehicleType"),
@@ -631,6 +645,18 @@ export default function TableVehicles() {
                     placeholder={t("descriptionPlaceholder")}
                     size="large"
                     className="rounded-lg"
+                  />
+                </Form.Item>
+
+                <Form.Item
+                  label={<span className="font-medium text-slate-700">{t("rfidLabel")}</span>}
+                  name="vehicle_rfid"
+                  className="mb-0"
+                >
+                  <Input
+                    placeholder={t("rfidPlaceholder")}
+                    size="large"
+                    className="rounded-lg font-mono tracking-wider"
                   />
                 </Form.Item>
 
