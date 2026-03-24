@@ -8,6 +8,7 @@ import {
   RefreshCw,
   Building2,
   Radar,
+  Factory,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import DashboardCard from "@/components/features/admin/dashboard/DashboardCard";
@@ -38,30 +39,7 @@ export default function AdminDashboard() {
   const [clock, setClock] = useState("");
   const clockRef = useRef<ReturnType<typeof setInterval>>(null);
 
-  // Station operational status: "operating" | "stopped" | "incident"
-  // This will be replaced with socket.io real-time updates later
-  const [stationStatuses, setStationStatuses] = useState<Record<number, string>>({});
-  // Mock: which vehicle plate is at each station
-  const [stationVehicles, setStationVehicles] = useState<Record<number, string>>({});
 
-  const getStationStatus = (stationId: number) => stationStatuses[stationId] || "stopped";
-
-  const setStationStatus = (stationId: number, status: string) => {
-    setStationStatuses((prev) => ({ ...prev, [stationId]: status }));
-  };
-
-  // Initialize mock station vehicles when stations & vehicles load
-  useEffect(() => {
-    if (stations.length > 0 && vehicles.length > 0) {
-      const mockMap: Record<number, string> = {};
-      stations.forEach((s, idx) => {
-        if (vehicles[idx]) {
-          mockMap[s.station_id] = vehicles[idx].vehicle_license_plate;
-        }
-      });
-      setStationVehicles(mockMap);
-    }
-  }, [stations, vehicles]);
 
   useEffect(() => {
     const tick = () => {
@@ -360,10 +338,10 @@ export default function AdminDashboard() {
                 {t("stationControlPanel")}
               </h2>
               <span className="text-[11px] font-bold bg-slate-700 text-white px-2.5 py-1 rounded-full tabular-nums">
-                {workingStations.length} {t("totalStationsLabel")}
+                {activeStations.length} {t("totalStationsLabel")}
               </span>
             </div>
-            {workingStations.length === 0 ? (
+            {activeStations.length === 0 ? (
               <div className="py-8 text-center">
                 <Factory className="w-10 h-10 text-slate-200 mx-auto mb-3" />
                 <p className="text-sm font-medium text-slate-500">
@@ -398,9 +376,8 @@ export default function AdminDashboard() {
                         {station.station_name}
                       </p>
                     </div>
-                    </React.Fragment>
-                  );
-                })}
+                  </div>
+                ))}
               </div>
             )}
           </div>
