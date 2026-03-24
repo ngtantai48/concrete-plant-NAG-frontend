@@ -8,6 +8,7 @@ export interface Vehicle {
   vehicle_license_plate: string;
   vehicle_status: string;
   vehicle_description: string | null;
+  vehicle_rfid: string | null;
   vehicle_type_id: number;
   updated_at?: string;
   updated_by?: number;
