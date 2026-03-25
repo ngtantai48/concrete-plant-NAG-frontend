@@ -3,7 +3,6 @@
 import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { useSocket } from "@/context/socket-context";
 import { useAppSelector } from "@/hooks/use-app-selector";
 import { UserOutlined } from "@ant-design/icons";
 import { Avatar, Dropdown, Layout, MenuProps, Space } from "antd";
@@ -32,7 +31,6 @@ const AppHeader: React.FC<AppHeaderProps> = ({
     const isAuthenticated = useAppSelector((state: any) => state.auth.isAuthenticated);
     const authLoading = useAppSelector((state: any) => state.auth.loading);
     const [localUserName, setLocalUserName] = useState<string | undefined>(userName);
-    const { unreadCount } = useSocket();
     const [isPopoverOpen, setIsPopoverOpen] = useState(false);
 
     useEffect(() => {
@@ -95,13 +93,6 @@ const AppHeader: React.FC<AppHeaderProps> = ({
                             <PopoverTrigger asChild>
                                 <Button variant="ghost" size="icon" className="relative hover:bg-gray-300">
                                     <BellRing />
-                                    {unreadCount > 0 && (
-                                        <span
-                                            className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 rounded-full bg-red-500 text-[10px] text-white ring-2 ring-white animate-pulse"
-                                        >
-                                            {unreadCount > 99 ? '99+' : unreadCount}
-                                        </span>
-                                    )}
                                 </Button>
                             </PopoverTrigger>
                             <PopoverContent align="end" className="z-1000 p-4 w-[320px] shadow-lg" sideOffset={5}>

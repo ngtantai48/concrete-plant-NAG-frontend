@@ -410,7 +410,7 @@
     "days": "days"
   },
   "DriverDisplayPage": {
-    "title": "CONCRETE TRUCK COORDINATION",
+    "title": "VEHICLE DISPATCH SCHEDULE",
     "collectingStatus": "CONCRETE SUPPLY STATION",
     "pendingQueue": "VEHICLES IN QUEUE",
     "emptyStation": "EMPTY STATION",
@@ -422,6 +422,10 @@
     "refresh": "Refresh",
     "stationStopped": "STOPPED",
     "stationIncident": "INCIDENT",
-    "collectingAction": "SUPPLYING CONCRETE"
+    "collectingAction": "SUPPLYING CONCRETE",
+    "socketConnected": "Connected",
+    "socketDisconnected": "Disconnected",
+    "nextVehicle": "NEXT IN QUEUE",
+    "waitingList": "WAITING"
   }
 }
