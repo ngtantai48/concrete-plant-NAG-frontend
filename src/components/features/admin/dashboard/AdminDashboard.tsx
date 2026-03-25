@@ -2,20 +2,29 @@
 
 import stationApi from "@/services/station.service";
 import type { Station } from "@/services/station.service";
-import { Skeleton, Tooltip } from "antd";
+import vehicleApi from "@/services/vehicle.service";
+import type { Vehicle } from "@/services/vehicle.service";
+import orderApi from "@/services/order.service";
+import type { Order } from "@/services/order.service";
+import { Skeleton, Tooltip, Tabs } from "antd";
 import {
   MapPin,
   RefreshCw,
   Building2,
   Radar,
   Factory,
+  Wifi,
+  WifiOff,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import DashboardCard from "@/components/features/admin/dashboard/DashboardCard";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNearbyVehicles } from "@/hooks/useNearbyVehicles";
+import { useRealtimeUpdates } from "@/hooks/useRealtimeUpdates";
 import dynamic from "next/dynamic";
+
+import StationStatusPanel from "./StationStatusPanel";
+import ActivityFlow from "./ActivityFlow";
 
 const StationMap = dynamic(
   () => import("@/components/features/admin/dashboard/StationMap"),
@@ -34,8 +43,9 @@ export default function AdminDashboard() {
   const tCommon = useTranslations("Common");
 
   const [stations, setStations] = useState<Station[]>([]);
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
-  const [refreshDisabled, setRefreshDisabled] = useState(0);
   const [clock, setClock] = useState("");
   const clockRef = useRef<ReturnType<typeof setInterval>>(null);
 
@@ -62,11 +72,35 @@ export default function AdminDashboard() {
     };
   }, []);
 
-  const fetchAll = useCallback(async () => {
-    setLoading(true);
+  const fetchOrders = useCallback(async () => {
     try {
-      const sRes = await stationApi.getAll();
-      setStations(sRes.data?.data || sRes.data || []);
+      const res = await orderApi.getAll();
+      setOrders(res.data?.data || res.data || []);
+    } catch {
+      //
+    }
+  }, []);
+
+  const fetchAll = useCallback(async () => {
+    try {
+      const results = await Promise.allSettled([
+        stationApi.getAll(),
+        vehicleApi.getAll(),
+        orderApi.getAll()
+      ]);
+
+      if (results[0].status === 'fulfilled') {
+        const sRes = results[0].value;
+        setStations(sRes.data?.data || sRes.data || []);
+      }
+      if (results[1].status === 'fulfilled') {
+        const vRes = results[1].value;
+        setVehicles(vRes.data?.data || vRes.data || []);
+      }
+      if (results[2].status === 'fulfilled') {
+        const oRes = results[2].value;
+        setOrders(oRes.data?.data || oRes.data || []);
+      }
     } catch {
       //
     } finally {
@@ -78,52 +112,37 @@ export default function AdminDashboard() {
     fetchAll();
   }, [fetchAll]);
 
-  const handleRefresh = () => {
-    if (refreshDisabled > 0) return;
-    fetchAll();
-    setRefreshDisabled(15);
-    const interval = setInterval(() => {
-      setRefreshDisabled((prev) => {
-        if (prev <= 1) {
-          clearInterval(interval);
-          return 0;
-        }
-        return prev - 1;
-      });
-    }, 1000);
+  const handleRefresh = async () => {
+    await fetchAll();
   };
 
   const activeStations = useMemo(
-    () => stations.filter((s) => s.station_status === "operating"),
+    () => stations.filter((s) => s.station_types?.station_type_id === 1 && s.station_status === "operating"),
     [stations],
   );
 
   const geofenceStation = useMemo(
-    () => stations.find((s) => s.station_types?.station_type_id === 2),
+    () => stations.find((s) => s.station_gps) || stations[0] || null,
     [stations],
   );
 
-  const { vehicles: vtrackingVehicles, inRangeCount, loading: nearbyLoading, lastUpdated, error: nearbyError } = useNearbyVehicles(
+  const { vehicles: vtrackingVehicles, inRangeCount, loading: nearbyLoading, lastUpdated, error: nearbyError, refetch: refetchVehicles } = useNearbyVehicles(
     geofenceStation?.station_gps || null,
     geofenceStation?.station_gps_geofencing || 500,
   );
 
-  const [filter, setFilter] = useState<"all" | "run" | "park" | "offline" | "inRange">("all");
+  const { isConnected: socketConnected, lastSignal, lastSignalTime } = useRealtimeUpdates(fetchAll);
 
-  const filteredVehicles = useMemo(() => {
-    switch (filter) {
-      case "run":
-        return vtrackingVehicles.filter(v => v.status === "run");
-      case "park":
-        return vtrackingVehicles.filter(v => v.status === "park");
-      case "offline":
-        return vtrackingVehicles.filter(v => v.status !== "run" && v.status !== "park");
-      case "inRange":
-        return vtrackingVehicles.filter(v => v.inRange);
-      default:
-        return vtrackingVehicles;
-    }
-  }, [vtrackingVehicles, filter]);
+  const readyVehicles = useMemo(() => vehicles.filter(v => v.vehicle_status === "available"), [vehicles]);
+  const inactiveVehicles = useMemo(() => vehicles.filter(v => v.vehicle_status !== "available"), [vehicles]);
+  const outsideVehicles = useMemo(() => vehicles.filter(v => v.vehicle_status === "running" || v.vehicle_status === "transporting"), [vehicles]);
+
+  const ordersAtStation = useMemo(() => orders.filter(o => o.order_status === "collecting"), [orders]);
+  const ordersPending = useMemo(() => orders.filter(o => o.order_status === "pending"), [orders]);
+  const ordersInTransit = useMemo(() => orders.filter(o => o.order_status === "transporting" || o.order_status === "running"), [orders]);
+  const ordersCompleted = useMemo(() => orders.filter(o => o.order_status === "completed"), [orders]);
+
+  const [activeTab, setActiveTab] = useState("1");
 
   if (loading) {
     return (
@@ -143,246 +162,227 @@ export default function AdminDashboard() {
     );
   }
 
-  const FilterButton = ({ value, label, count }: { value: typeof filter, label: string, count: number }) => (
-    <button
-      onClick={() => setFilter(value)}
-      className={`px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
-        filter === value 
-          ? "bg-slate-900 text-white shadow-sm" 
-          : "bg-white text-slate-600 hover:bg-slate-50 border border-slate-200"
-      }`}
-    >
-      {label} <span className={`ml-1 px-1.5 py-0.5 rounded text-[10px] ${filter === value ? "bg-slate-700 text-white" : "bg-slate-100 text-slate-500"}`}>{count}</span>
-    </button>
-  );
-
   return (
-    <div className="m-4 md:m-6 lg:m-8 max-w-[1600px] lg:mx-auto">
-      <div className="flex items-end justify-between mb-8">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-slate-900">
-            {t("title")}
-          </h1>
-          <p className="text-slate-400 mt-1.5 text-sm tabular-nums">{clock}</p>
-        </div>
-        <Tooltip title={tCommon("refreshData")}>
-          <Button
-            variant="outline"
-            onClick={handleRefresh}
-            disabled={refreshDisabled > 0}
-            className="min-w-[120px] gap-2"
-          >
-            <RefreshCw
-              className={`w-4 h-4 ${refreshDisabled > 0 ? "animate-spin" : ""}`}
-            />
-            {refreshDisabled > 0
-              ? `${refreshDisabled}s`
-              : tCommon("refresh")}
-          </Button>
-        </Tooltip>
-      </div>
-
-      <div className="grid grid-cols-3 gap-4 mb-8">
-        <DashboardCard
-          label={t("activeStationsCard")}
-          value={activeStations.length}
-          icon={<Building2 className="w-5 h-5" />}
-          accent="slate"
-          subtitle={`/ ${stations.length} ${t("totalStationsLabel")}`}
-          index={0}
-        />
-        <DashboardCard
-          label="Tổng xe"
-          value={vtrackingVehicles.length}
-          icon={<Radar className="w-5 h-5" />}
-          accent="blue"
-          index={1}
-        />
-        <DashboardCard
-          label="Trong bán kính"
-          value={inRangeCount}
-          icon={<MapPin className="w-5 h-5" />}
-          accent="emerald"
-          subtitle={geofenceStation ? `Bán kính ${geofenceStation.station_gps_geofencing}m` : ""}
-          index={2}
-        />
-      </div>
-
-      <div className="grid grid-cols-12 gap-4 lg:gap-6">
-        <div
-          className="col-span-12 lg:col-span-8 space-y-4 animate-slide-up"
-          style={{ animationDelay: "350ms", animationFillMode: "both" }}
-        >
-          {geofenceStation && (
-            <div className="bg-white rounded-xl border border-slate-200 p-6 flex flex-col h-[700px]">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-4">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 bg-violet-50 rounded-lg flex items-center justify-center shrink-0">
-                    <Radar className="w-4 h-4 text-violet-600" />
-                  </div>
-                  <div>
-                    <h2 className="text-xs font-semibold uppercase tracking-widest text-slate-500">
-                      Giám sát khu vực
-                    </h2>
-                    <p className="text-[10px] text-slate-400 mt-0.5">
-                      {geofenceStation.station_name} - Bán kính {geofenceStation.station_gps_geofencing}m
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2 flex-wrap">
-                  <FilterButton value="all" label="Tất cả" count={vtrackingVehicles.length} />
-                  <FilterButton value="run" label="Chạy" count={vtrackingVehicles.filter(v => v.status === "run").length} />
-                  <FilterButton value="park" label="Dừng" count={vtrackingVehicles.filter(v => v.status === "park").length} />
-                  <FilterButton value="offline" label="Mất K/N" count={vtrackingVehicles.filter(v => v.status !== "run" && v.status !== "park").length} />
-                  <FilterButton value="inRange" label="Gần trạm" count={inRangeCount} />
-                </div>
-
-                <div className="flex items-center gap-2 ml-auto">
-                  {nearbyLoading && (
-                    <RefreshCw className="w-3.5 h-3.5 text-slate-300 animate-spin" />
-                  )}
-                  <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-emerald-50 border border-emerald-200">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                    <span className="text-[10px] font-semibold text-emerald-700 uppercase">Live</span>
+    <div className="min-h-screen bg-slate-50 font-sans tracking-tight">
+      <div className="p-4 md:p-8 max-w-[1800px] mx-auto">
+        
+        {/* Header - Industrial Control Panel Style */}
+        <div className="flex flex-col md:flex-row md:items-end justify-between border-b-4 border-slate-900 pb-6 mb-8 gap-4">
+          <div>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="h-4 w-4 bg-yellow-400 border border-slate-900" />
+              <h1 className="text-3xl md:text-5xl font-black uppercase tracking-tighter text-slate-900 leading-none">
+                {t("title")}
+              </h1>
+            </div>
+            <p className="text-slate-500 font-mono text-sm uppercase tracking-widest pl-7">GIỜ HỆ THỐNG: {clock}</p>
+          </div>
+          
+          <div className="flex items-stretch gap-4">
+            <div className="flex flex-col items-end justify-between">
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">MẠNG</span>
+              <Tooltip title={socketConnected ? "Socket realtime connected" : "Socket disconnected"}>
+                <div className={`flex items-center gap-2 px-4 py-2 border-2 ${
+                  socketConnected
+                    ? "border-emerald-500 bg-emerald-50 text-emerald-700"
+                    : "border-red-500 bg-red-50 text-red-700"
+                }`}>
+                  {socketConnected
+                    ? <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                    : <div className="h-2 w-2 rounded-full bg-red-500" />
+                  }
+                  <span className="font-mono text-sm font-bold uppercase">
+                    {socketConnected ? "KẾT NỐI" : "MẤT KẾT NỐI"}
                   </span>
                 </div>
-              </div>
-
-              {nearbyError && (
-                <div className="mb-3 px-3 py-2 rounded-lg bg-red-50 border border-red-200 shrink-0">
-                  <p className="text-xs text-red-600">{nearbyError}</p>
-                </div>
-              )}
-
-              <div className="flex-1 grid grid-cols-1 lg:grid-cols-5 gap-4 min-h-0">
-                {/* Danh sách xe */}
-                <div className="lg:col-span-2 bg-slate-50 border border-slate-200 rounded-lg overflow-hidden flex flex-col">
-                  {filteredVehicles.length === 0 && !nearbyError ? (
-                    <div className="py-12 text-center m-auto px-6 opacity-80">
-                      <div className="w-12 h-12 bg-white rounded-2xl shadow-sm border border-slate-100 flex items-center justify-center mx-auto mb-4">
-                        <Radar className="w-6 h-6 text-slate-300" />
-                      </div>
-                      <p className="text-sm font-medium text-slate-600 mb-1">Không có xe phù hợp</p>
-                      <p className="text-xs text-slate-400">Thử thay đổi bộ lọc hoặc chờ cập nhật (3s).</p>
-                    </div>
-                  ) : (
-                    <div className="flex-1 overflow-y-auto p-2 space-y-1.5">
-                      {filteredVehicles.map((v, idx) => (
-                        <div
-                          key={v.device_id}
-                          className={`flex items-center gap-3 px-3 py-2 rounded-lg bg-white border hover:bg-slate-50 transition-colors ${
-                            v.inRange ? "border-emerald-200 shadow-sm" : "border-slate-100/50"
-                          }`}
-                        >
-                          <div className="min-w-0 flex-1">
-                            <span className="font-semibold text-xs text-slate-800 uppercase tracking-wider block">
-                              {v.license_plate}
-                            </span>
-                            <span className="text-[10px] text-slate-400 block truncate">
-                              {v.vehicle_name}
-                            </span>
-                          </div>
-                          
-                          <div className="text-right shrink-0">
-                            <span
-                              className={`text-[9px] font-semibold px-2 py-0.5 rounded-full inline-block mb-1.5 ${
-                                v.status === "run"
-                                  ? "bg-emerald-100/80 text-emerald-700 border border-emerald-200"
-                                  : v.status === "park"
-                                    ? "bg-amber-100/80 text-amber-700 border border-amber-200"
-                                    : "bg-slate-100 text-slate-500 border border-slate-200"
-                              }`}
-                            >
-                              {v.status === "run" ? `Đang chạy: ${v.speed}km/h` : v.status === "park" ? "Đang dừng" : "Mất K/N"}
-                            </span>
-                            <div className="flex items-center justify-end gap-1.5">
-                              {v.inRange && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />}
-                              <span className="text-[10px] text-slate-500 tabular-nums font-medium">
-                                {v.distance >= 1000 ? `${(v.distance / 1000).toFixed(1)}km` : `${v.distance}m`}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Bản đồ */}
-                <div className="lg:col-span-3 rounded-lg overflow-hidden border border-slate-200 min-h-[300px]">
-                  <StationMap 
-                    stationGps={geofenceStation.station_gps} 
-                    radius={geofenceStation.station_gps_geofencing}
-                    vehicles={filteredVehicles}
-                  />
-                </div>
-              </div>
-
-              {lastUpdated && (
-                <p className="text-[10px] uppercase tracking-wider font-semibold text-slate-300 mt-4 text-right tabular-nums shrink-0">
-                  Cập nhật: {lastUpdated.toLocaleTimeString("vi-VN")}
-                </p>
-              )}
+              </Tooltip>
             </div>
-          )}
+            
+            <div className="flex flex-col items-end justify-between">
+              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">DỮ LIỆU</span>
+              <Button
+                variant="outline"
+                onClick={handleRefresh}
+                className="rounded-none border-2 border-slate-900 hover:bg-slate-900 hover:text-white transition-colors gap-2 h-auto py-2 font-bold uppercase"
+              >
+                <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+                ĐỒNG BỘ
+              </Button>
+            </div>
+          </div>
         </div>
 
-        <div
-          className="col-span-12 lg:col-span-4 animate-slide-up"
-          style={{ animationDelay: "420ms", animationFillMode: "both" }}
-        >
-          <div className="bg-white rounded-xl border border-slate-200 p-6">
-            <div className="flex items-center justify-between mb-5">
-              <h2 className="text-xs font-semibold uppercase tracking-widest text-slate-400">
-                {t("stationControlPanel")}
-              </h2>
-              <span className="text-[11px] font-bold bg-slate-700 text-white px-2.5 py-1 rounded-full tabular-nums">
-                {activeStations.length} {t("totalStationsLabel")}
-              </span>
-            </div>
-            {activeStations.length === 0 ? (
-              <div className="py-8 text-center">
-                <Factory className="w-10 h-10 text-slate-200 mx-auto mb-3" />
-                <p className="text-sm font-medium text-slate-500">
-                  {t("noStations")}
-                </p>
-                <p className="text-xs text-slate-400 mt-1">
-                  {t("noStationsHint")}
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {activeStations.map((station, idx) => (
-                  <div
-                    key={station.station_id}
-                    className="border border-slate-200 rounded-xl p-4 hover:border-blue-200"
-                    style={{
-                      animation: `slide-up 0.5s cubic-bezier(0.25, 1, 0.5, 1) both`,
-                      animationDelay: `${550 + idx * 60}ms`,
-                      transition:
-                        "border-color 0.2s cubic-bezier(0.25, 1, 0.5, 1)",
-                    }}
-                  >
-                    <div className="flex items-start justify-between mb-2">
-                      <div className="flex items-center gap-2.5 min-w-0">
-                        <div className="w-8 h-8 bg-blue-50 rounded-lg flex items-center justify-center shrink-0">
-                          <MapPin className="w-4 h-4 text-blue-600" />
+        <Tabs 
+          activeKey={activeTab} 
+          onChange={setActiveTab}
+          className="industrial-tabs"
+          items={[
+            {
+              key: "1",
+              label: <span className="font-bold tracking-widest uppercase text-sm">BÀN ĐIỀU KHIỂN</span>,
+              children: (
+                <div className="mt-6">
+                  {/* Master Data Metrics Row */}
+                  <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
+                    <div className="border-2 border-slate-900 bg-white p-4 flex flex-col justify-between group hover:bg-yellow-400 transition-colors">
+                      <span className="font-mono text-xs uppercase font-bold text-slate-500 group-hover:text-amber-900">HOÀN THÀNH</span>
+                      <div className="text-5xl font-black tracking-tighter mt-2">{ordersCompleted.length.toString().padStart(3, '0')}</div>
+                    </div>
+                    <div className="border-2 border-slate-900 bg-white p-4 flex flex-col justify-between">
+                      <span className="font-mono text-xs uppercase font-bold text-slate-500">ĐANG CHỜ</span>
+                      <div className="text-5xl font-black tracking-tighter mt-2 text-amber-500">{ordersPending.length.toString().padStart(2, '0')}</div>
+                    </div>
+                    <div className="border-2 border-slate-900 bg-white p-4 flex flex-col justify-between">
+                      <span className="font-mono text-xs uppercase font-bold text-slate-500">ĐANG NHẬN</span>
+                      <div className="text-5xl font-black tracking-tighter mt-2 text-cyan-600">{ordersAtStation.length.toString().padStart(2, '0')}</div>
+                    </div>
+                    <div className="border-2 border-slate-900 bg-white p-4 flex flex-col justify-between">
+                      <span className="font-mono text-xs uppercase font-bold text-slate-500">VẬN CHUYỂN</span>
+                      <div className="text-5xl font-black tracking-tighter mt-2 text-blue-600">{ordersInTransit.length.toString().padStart(2, '0')}</div>
+                    </div>
+                    <div className="border-2 border-slate-900 bg-white p-4 flex flex-col justify-between">
+                      <span className="font-mono text-xs uppercase font-bold text-slate-500">TRẠM HĐ</span>
+                      <div className="text-5xl font-black tracking-tighter mt-2">{activeStations.length}/{stations.filter(s => s.station_types?.station_type_id === 1).length}</div>
+                    </div>
+                  </div>
+
+                  {/* Operational Layout Grid */}
+                  <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+                    
+                    {/* Left: Vehicle Availability Lists */}
+                    <div className="lg:col-span-3 space-y-6">
+                      <div className="border-2 border-slate-900 bg-white flex flex-col h-[400px]">
+                        <div className="bg-slate-900 text-white px-4 py-2 font-bold uppercase text-sm tracking-widest flex justify-between items-center">
+                          <span>XE SẴN SÀNG</span>
+                          <span className="bg-emerald-500 text-black px-2 py-0.5 text-xs">{readyVehicles.length}</span>
+                        </div>
+                        <div className="overflow-y-auto p-0 flex-1">
+                          {readyVehicles.length === 0 ? (
+                            <div className="p-4 text-slate-400 font-mono text-sm uppercase">KHÔNG CÓ XE SẴN SÀNG</div>
+                          ) : (
+                            <ul className="divide-y divide-slate-100">
+                              {readyVehicles.map((v) => (
+                                <li key={v.vehicle_id} className="p-3 hover:bg-slate-50 flex items-center gap-3">
+                                  <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                                  <span className="font-mono font-bold text-slate-800 text-lg">{v.vehicle_license_plate}</span>
+                                </li>
+                              ))}
+                            </ul>
+                          )}
                         </div>
                       </div>
 
-                      {/* Station name */}
-                      <p className="mt-3 text-xs font-semibold text-slate-700 text-center truncate max-w-full">
-                        {station.station_name}
-                      </p>
+                      <div className="border-2 border-slate-900 bg-white flex flex-col h-[280px]">
+                        <div className="bg-slate-200 text-slate-900 border-b-2 border-slate-900 px-4 py-2 font-bold uppercase text-sm tracking-widest flex justify-between items-center">
+                          <span>DỪNG / BẢO TRÌ</span>
+                          <span className="bg-red-500 text-white px-2 py-0.5 text-xs">{inactiveVehicles.length}</span>
+                        </div>
+                        <div className="overflow-y-auto p-0 flex-1 bg-slate-50">
+                          {inactiveVehicles.length === 0 ? (
+                            <div className="p-4 text-slate-400 font-mono text-sm uppercase">TRỐNG</div>
+                          ) : (
+                            <ul className="divide-y divide-slate-200">
+                              {inactiveVehicles.map((v) => (
+                                <li key={v.vehicle_id} className="p-3 flex items-center justify-between">
+                                  <span className="font-mono font-bold text-slate-600 opacity-70">{v.vehicle_license_plate}</span>
+                                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 border border-slate-300 px-1">CHỜ</span>
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Center: System Operations Flow */}
+                    <div className="lg:col-span-6 flex flex-col h-full space-y-8 relative">
+                      <div className="absolute inset-0 pointer-events-none opacity-[0.03]" 
+                           style={{ backgroundImage: 'linear-gradient(slate-900 1px, transparent 1px), linear-gradient(90deg, slate-900 1px, transparent 1px)', backgroundSize: '16px 16px' }} />
+                      
+                      <div className="flex-1">
+                         <ActivityFlow 
+                            stations={stations} 
+                            vehicles={vehicles} 
+                            orders={orders}
+                         />
+                      </div>
+                      
+                      <div className="pt-4 border-t-2 border-dashed border-slate-300">
+                         <div className="mb-4 flex items-center gap-2">
+                           <div className="w-2 h-2 bg-slate-900" />
+                           <h3 className="font-bold uppercase tracking-widest text-sm">CỤM TRẠM ĐIỀU PHỐI</h3>
+                         </div>
+                         <StationStatusPanel stations={stations} orders={orders} onStationUpdated={fetchAll} />
+                      </div>
+                    </div>
+
+                    {/* Right: En Route / Outside */}
+                    <div className="lg:col-span-3 h-[704px]">
+                      <div className="border-2 border-slate-900 bg-white flex flex-col h-full border-r-8">
+                        <div className="bg-amber-400 border-b-2 border-slate-900 px-4 py-2 font-black uppercase text-sm tracking-widest text-black flex justify-between items-center">
+                          <span>LƯU THÔNG / NGOÀI TRẠM</span>
+                          <span className="bg-slate-900 text-white px-2 py-0.5 text-xs">{ordersInTransit.length}</span>
+                        </div>
+                        <div className="flex-1 overflow-y-auto">
+                          {ordersInTransit.length === 0 ? (
+                            <div className="flex items-center justify-center h-full">
+                              <div className="border border-dashed border-slate-300 px-6 py-4 bg-white/50">
+                                <p className="font-mono text-sm tracking-widest text-slate-400 uppercase text-center">- ĐANG CHỜ TÍN HIỆU -</p>
+                              </div>
+                            </div>
+                          ) : (
+                            <ul className="flex flex-col gap-2 p-2">
+                              {ordersInTransit.map((o) => (
+                                <li key={o.order_id} className="bg-white border-2 border-slate-900 p-3 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
+                                  <div className="flex justify-between items-end">
+                                    <span className="font-mono font-black text-lg">{o.vehicles?.vehicle_license_plate || `#${o.order_id}`}</span>
+                                    <span className={`text-[10px] uppercase font-bold tracking-wider ${o.order_status === 'transporting' ? 'text-indigo-600' : 'text-amber-600'}`}>
+                                      {o.order_status === 'transporting' ? 'VẬN CHUYỂN' : 'ĐANG CHẠY'}
+                                    </span>
+                                  </div>
+                                  <div className="text-[10px] font-mono text-slate-400 mt-1 uppercase">{o.stations?.station_name || '---'}</div>
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   </div>
-                ))}
-              </div>
-            )}
-          </div>
+                </div>
+              ),
+            },
+            {
+              key: "2",
+              label: <span className="font-bold tracking-widest uppercase text-sm">BẢN ĐỒ KHU VỰC</span>,
+              children: (
+                <div className="bg-white p-2 border-2 border-slate-900 mt-6 h-[700px]">
+                  <StationMap
+                    stationGps={geofenceStation?.station_gps || null}
+                    radius={geofenceStation?.station_gps_geofencing || 500}
+                    vehicles={vtrackingVehicles}
+                  />
+                </div>
+              ),
+            },
+          ]}
+        />
+        
+        {/* Brutalist Footer */}
+        <div className="mt-8 border-t-4 border-slate-900 pt-4 flex flex-col md:flex-row justify-between items-baseline gap-4 mb-20 whitespace-nowrap">
+           <div className="flex gap-4 font-mono text-xs font-bold text-slate-500 uppercase tracking-widest items-center">
+             <span className="bg-yellow-400 text-black px-2 py-0.5 pointer-events-none shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] flex items-center gap-2">
+               <div className="w-1.5 h-1.5 bg-black rounded-full animate-ping" />
+               TÍN HIỆU HỆ THỐNG
+             </span>
+             <span>ĐANG LIÊN TỤC LẮNG NGHE DATA TỪ THIẾT BỊ...</span>
+           </div>
+           <p className="font-mono text-xs uppercase tracking-widest text-slate-400">
+              KẾT NỐI ỔN ĐỊNH • TRẠM BÊ TÔNG NAG
+           </p>
         </div>
       </div>
     </div>
   );
-}
+};
+

@@ -16,7 +16,7 @@ export interface Vehicle {
 }
 
 const vehicleApi = {
-  getAll: () => http.get("/vehicles"),
+  getAll: () => http.get("/vehicles?limit=1000"),
   getById: (id: number) => http.get(`/vehicles/${id}`),
   create: (data: Partial<Vehicle>) => http.post("/vehicles", data),
   update: (id: number, data: Partial<Vehicle>) => http.put(`/vehicles/${id}`, data),

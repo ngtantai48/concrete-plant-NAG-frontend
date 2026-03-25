@@ -286,24 +286,42 @@ export default function TableVehicles() {
     switch (status) {
       case "available":
         return (
-          <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/60">
+          <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/60 uppercase">
             {t("active")}
           </span>
         );
       case "maintenance":
         return (
-          <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200/60">
+          <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200/60 uppercase">
             {t("maintenance")}
           </span>
         );
-      case "unavailable":
+      case "running":
         return (
-          <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-slate-100 text-slate-600 border border-slate-200">
-            {t("inactive")}
+          <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200/60 uppercase">
+            Đang chạy
+          </span>
+        );
+      case "transporting":
+        return (
+          <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200/60 uppercase">
+            Đang giao
+          </span>
+        );
+      case "collecting":
+        return (
+          <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-cyan-50 text-cyan-700 border border-cyan-200/60 uppercase">
+            Đang nhận
+          </span>
+        );
+      case "incident":
+        return (
+          <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-red-50 text-red-700 border border-red-200/60 uppercase">
+            Sự cố
           </span>
         );
       default:
-        return <span className="text-slate-500">{status}</span>;
+        return <span className="text-slate-500 uppercase">{status}</span>;
     }
   };
 
@@ -497,8 +515,11 @@ export default function TableVehicles() {
             options={[
               { value: "all", label: t("all") },
               { value: "available", label: t("active") },
+              { value: "running", label: "Đang chạy" },
+              { value: "transporting", label: "Đang giao" },
+              { value: "collecting", label: "Đang nhận" },
               { value: "maintenance", label: t("maintenance") },
-              { value: "unavailable", label: t("inactiveOption") },
+              { value: "incident", label: "Sự cố" },
             ]}
           />
         </div>
@@ -668,8 +689,11 @@ export default function TableVehicles() {
                 >
                   <Select size="large" className="rounded-lg">
                     <Select.Option value="available">{t("activeOption")}</Select.Option>
+                    <Select.Option value="running">Đang chạy</Select.Option>
+                    <Select.Option value="transporting">Đang giao</Select.Option>
+                    <Select.Option value="collecting">Đang nhận</Select.Option>
                     <Select.Option value="maintenance">{t("maintenanceOption")}</Select.Option>
-                    <Select.Option value="unavailable">{t("inactiveOption")}</Select.Option>
+                    <Select.Option value="incident">Sự cố</Select.Option>
                   </Select>
                 </Form.Item>
               </div>

@@ -84,7 +84,7 @@ export default function StationMap({ stationGps, radius, vehicles }: StationMapP
         center={[stationLat, stationLng]}
         zoom={15}
         scrollWheelZoom={true}
-        className="w-full h-full"
+        style={{ width: '100%', height: '100%' }}
       >
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
