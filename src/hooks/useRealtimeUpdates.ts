@@ -7,9 +7,13 @@ export interface UpdateSignal {
   update_id?: number;
 }
 
+const REFRESH_COOLDOWN_MS = 800;
+
 export function useRealtimeUpdates(onUpdate: () => void) {
   const socketRef = useRef<Socket | null>(null);
   const onUpdateRef = useRef(onUpdate);
+  const lastRefreshRef = useRef(0);
+  const pendingRefreshRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   onUpdateRef.current = onUpdate;
 
   const [isConnected, setIsConnected] = useState(false);
@@ -33,30 +37,100 @@ export function useRealtimeUpdates(onUpdate: () => void) {
       reconnectionDelay: 2000,
     });
 
+    const triggerRefresh = (signal: UpdateSignal) => {
+      setLastSignal(signal);
+      setLastSignalTime(new Date());
+
+      const now = Date.now();
+      const elapsed = now - lastRefreshRef.current;
+
+      if (elapsed >= REFRESH_COOLDOWN_MS) {
+        lastRefreshRef.current = now;
+        onUpdateRef.current();
+        return;
+      }
+
+      if (pendingRefreshRef.current) {
+        clearTimeout(pendingRefreshRef.current);
+      }
+
+      pendingRefreshRef.current = setTimeout(() => {
+        lastRefreshRef.current = Date.now();
+        onUpdateRef.current();
+        pendingRefreshRef.current = null;
+      }, REFRESH_COOLDOWN_MS - elapsed);
+    };
+
+    const normalizeSignal = (eventName: string, payload?: unknown): UpdateSignal | null => {
+      if (eventName === "update" && payload && typeof payload === "object") {
+        return payload as UpdateSignal;
+      }
+
+      if (eventName === "ping") {
+        if (payload && typeof payload === "object") {
+          return payload as UpdateSignal;
+        }
+
+        return { update_type: "ping" };
+      }
+
+      const lowerName = eventName.toLowerCase();
+      if (lowerName.includes("update") || lowerName.includes("refresh") || lowerName.includes("ping")) {
+        if (payload && typeof payload === "object") {
+          return payload as UpdateSignal;
+        }
+
+        return { update_type: eventName };
+      }
+
+      return null;
+    };
+
     socketRef.current = socket;
 
     socket.on("connect", () => {
-      console.log("[RealtimeUpdates] Đã kết nối tới /updates");
+      console.log("[RealtimeUpdates] Da ket noi toi /updates");
       setIsConnected(true);
     });
 
     socket.on("disconnect", (reason) => {
-      console.warn("[RealtimeUpdates] Bị ngắt kết nối:", reason);
+      console.warn("[RealtimeUpdates] Bi ngat ket noi:", reason);
       setIsConnected(false);
     });
 
     socket.on("connect_error", (error) => {
-      console.error("[RealtimeUpdates] Lỗi kết nối:", error.message);
+      console.error("[RealtimeUpdates] Loi ket noi:", error.message);
     });
 
     socket.on("update", (signal: UpdateSignal) => {
-      console.log("[RealtimeUpdates] Đã nhận tín hiệu:", signal);
-      setLastSignal(signal);
-      setLastSignalTime(new Date());
-      onUpdateRef.current();
+      console.log("[RealtimeUpdates] Nhan su kien update:", signal);
+      triggerRefresh(signal);
+    });
+
+    socket.on("ping", (signal?: UpdateSignal) => {
+      console.log("[RealtimeUpdates] Nhan su kien ping:", signal);
+      triggerRefresh(signal ?? { update_type: "ping" });
+    });
+
+    socket.onAny((eventName, payload) => {
+      if (eventName === "update" || eventName === "ping") {
+        return;
+      }
+
+      const signal = normalizeSignal(eventName, payload);
+      if (!signal) return;
+
+      console.log(`[RealtimeUpdates] Nhan su kien ${eventName}:`, payload);
+      triggerRefresh(signal);
     });
 
     return () => {
+      if (pendingRefreshRef.current) {
+        clearTimeout(pendingRefreshRef.current);
+        pendingRefreshRef.current = null;
+      }
+
+      socket.offAny();
       socket.removeAllListeners();
       socket.disconnect();
       socketRef.current = null;

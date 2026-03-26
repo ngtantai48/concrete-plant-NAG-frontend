@@ -5,13 +5,14 @@ import { Providers } from "@/store/providers";
 import InitAuth from "@/utils/init-auth";
 import type { Metadata } from "next";
 import { NextIntlClientProvider } from 'next-intl';
-import { Instrument_Sans } from "next/font/google";
+import { Barlow } from "next/font/google";
 import { Suspense } from "react";
 import "./globals.css";
 
-const instrumentSans = Instrument_Sans({
+const barlow = Barlow({
   subsets: ["latin"],
-  variable: "--font-instrument-sans",
+  variable: "--font-barlow",
+  weight: ["400", "500", "600", "700", "800"],
 });
 
 export const metadata: Metadata = {
@@ -29,7 +30,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
           <link rel="preconnect" href={new URL(process.env.NEXT_PUBLIC_API_URL).origin} />
         )}
       </head>
-      <body className={`${instrumentSans.variable} font-sans`}>
+      <body className={`${barlow.variable} font-sans`}>
         <Providers>
           <Suspense fallback={null}>
             <InitAuth />

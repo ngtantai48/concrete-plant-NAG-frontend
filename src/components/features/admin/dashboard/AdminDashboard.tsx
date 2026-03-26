@@ -17,7 +17,7 @@ import {
   WifiOff,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNearbyVehicles } from "@/hooks/useNearbyVehicles";
 import { useRealtimeUpdates } from "@/hooks/useRealtimeUpdates";
@@ -41,6 +41,7 @@ const StationMap = dynamic(
 export default function AdminDashboard() {
   const t = useTranslations("DashboardPage");
   const tCommon = useTranslations("Common");
+  const locale = useLocale();
 
   const [stations, setStations] = useState<Station[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
@@ -54,7 +55,7 @@ export default function AdminDashboard() {
   useEffect(() => {
     const tick = () => {
       setClock(
-        new Date().toLocaleString("vi-VN", {
+        new Date().toLocaleString(locale === 'vi' ? 'vi-VN' : 'en-US', {
           weekday: "long",
           day: "2-digit",
           month: "2-digit",
@@ -70,7 +71,7 @@ export default function AdminDashboard() {
     return () => {
       if (clockRef.current) clearInterval(clockRef.current);
     };
-  }, []);
+  }, [locale]);
 
   const fetchOrders = useCallback(async () => {
     try {
@@ -134,8 +135,11 @@ export default function AdminDashboard() {
   const { isConnected: socketConnected, lastSignal, lastSignalTime } = useRealtimeUpdates(fetchAll);
 
   const readyVehicles = useMemo(() => vehicles.filter(v => v.vehicle_status === "available"), [vehicles]);
-  const inactiveVehicles = useMemo(() => vehicles.filter(v => v.vehicle_status !== "available"), [vehicles]);
-  const outsideVehicles = useMemo(() => vehicles.filter(v => v.vehicle_status === "running" || v.vehicle_status === "transporting"), [vehicles]);
+  const canceledOrders = useMemo(() => orders.filter(o => o.order_status === "canceled"), [orders]);
+  const outsideOrders = useMemo(
+    () => orders.filter(o => o.order_status === "running" || o.order_status === "transporting"),
+    [orders],
+  );
 
   const ordersAtStation = useMemo(() => orders.filter(o => o.order_status === "collecting"), [orders]);
   const ordersPending = useMemo(() => orders.filter(o => o.order_status === "pending"), [orders]);
@@ -166,48 +170,72 @@ export default function AdminDashboard() {
     <div className="min-h-screen bg-slate-50 font-sans tracking-tight">
       <div className="p-4 md:p-8 max-w-[1800px] mx-auto">
         
-        {/* Header - Industrial Control Panel Style */}
-        <div className="flex flex-col md:flex-row md:items-end justify-between border-b-4 border-slate-900 pb-6 mb-8 gap-4">
-          <div>
-            <div className="flex items-center gap-3 mb-2">
-              <div className="h-4 w-4 bg-yellow-400 border border-slate-900" />
-              <h1 className="text-3xl md:text-5xl font-black uppercase tracking-tighter text-slate-900 leading-none">
-                {t("title")}
-              </h1>
+        <div className="mb-8 rounded-[20px] bg-[linear-gradient(135deg,rgba(255,255,255,1),rgba(248,250,252,1),rgba(254,242,242,0.82))] p-6 shadow-[0_0_0_1px_rgba(51,65,85,0.18),0_12px_28px_rgba(15,23,42,0.06)]">
+          <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+            <div>
+              <div className="mb-2 flex items-center gap-3">
+                <div className="h-3 w-3 rounded-full bg-red-500" />
+                <h1 className="text-3xl md:text-5xl font-black uppercase tracking-tighter text-slate-900 leading-none">
+                  {t("title")}
+                </h1>
+              </div>
+              <p className="pl-6 text-sm uppercase tracking-[0.24em] text-slate-500">{t('systemTime')}: {clock}</p>
             </div>
-            <p className="text-slate-500 font-mono text-sm uppercase tracking-widest pl-7">GIỜ HỆ THỐNG: {clock}</p>
+
+            <div className="flex items-stretch gap-4">
+              <div className="flex flex-col items-end justify-between">
+                <span className="mb-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500">{t('network')}</span>
+                <Tooltip title={socketConnected ? t('socketConnected') : t('socketDisconnected')}>
+                  <div className={`flex items-center gap-2 rounded-full px-4 py-2 ${
+                    socketConnected
+                      ? "bg-white text-slate-700"
+                      : "bg-red-50 text-red-500"
+                  }`}>
+                    {socketConnected
+                      ? <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                      : <div className="h-2 w-2 rounded-full bg-red-500" />
+                    }
+                    <span className="text-sm font-semibold uppercase tracking-[0.16em]">
+                      {socketConnected ? t('connected') : t('disconnected')}
+                    </span>
+                  </div>
+                </Tooltip>
+              </div>
+
+              <div className="flex flex-col items-end justify-between">
+                <span className="mb-1 text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500">{t('data')}</span>
+                <Button
+                  variant="outline"
+                  onClick={handleRefresh}
+                  className="h-auto gap-2 rounded-full bg-white px-5 py-2 font-semibold uppercase tracking-[0.14em] text-red-500 transition-colors hover:bg-red-500 hover:text-white"
+                >
+                  <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
+                  {t('sync')}
+                </Button>
+              </div>
+            </div>
           </div>
-          
-          <div className="flex items-stretch gap-4">
-            <div className="flex flex-col items-end justify-between">
-              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">MẠNG</span>
-              <Tooltip title={socketConnected ? "Socket realtime connected" : "Socket disconnected"}>
-                <div className={`flex items-center gap-2 px-4 py-2 border-2 ${
-                  socketConnected
-                    ? "border-emerald-500 bg-emerald-50 text-emerald-700"
-                    : "border-red-500 bg-red-50 text-red-700"
-                }`}>
-                  {socketConnected
-                    ? <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-                    : <div className="h-2 w-2 rounded-full bg-red-500" />
-                  }
-                  <span className="font-mono text-sm font-bold uppercase">
-                    {socketConnected ? "KẾT NỐI" : "MẤT KẾT NỐI"}
-                  </span>
-                </div>
-              </Tooltip>
+
+          <div className="mt-6 grid grid-cols-2 gap-4 md:grid-cols-5">
+            <div className="rounded-[20px] bg-[linear-gradient(180deg,rgba(255,255,255,1),rgba(248,250,252,1))] p-5 shadow-[0_0_0_1px_rgba(51,65,85,0.16),0_8px_20px_rgba(15,23,42,0.04)]">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{t('completed')}</span>
+              <div className="mt-3 text-5xl font-black tracking-tighter text-slate-900">{ordersCompleted.length.toString().padStart(3, '0')}</div>
             </div>
-            
-            <div className="flex flex-col items-end justify-between">
-              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">DỮ LIỆU</span>
-              <Button
-                variant="outline"
-                onClick={handleRefresh}
-                className="rounded-none border-2 border-slate-900 hover:bg-slate-900 hover:text-white transition-colors gap-2 h-auto py-2 font-bold uppercase"
-              >
-                <RefreshCw className={`w-4 h-4 ${loading ? "animate-spin" : ""}`} />
-                ĐỒNG BỘ
-              </Button>
+            <div className="rounded-[20px] bg-[linear-gradient(180deg,rgba(255,255,255,1),rgba(254,242,242,0.96))] p-5 shadow-[0_0_0_1px_rgba(127,29,29,0.14),0_8px_20px_rgba(15,23,42,0.04)]">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.22em] text-amber-500">{t('pending')}</span>
+              <div className="mt-3 text-5xl font-black tracking-tighter text-amber-500">{ordersPending.length.toString().padStart(2, '0')}</div>
+            </div>
+            <div className="rounded-[20px] bg-white p-5 shadow-[0_0_0_1px_rgba(51,65,85,0.16),0_8px_20px_rgba(15,23,42,0.04)]">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{t('collecting')}</span>
+              <div className="mt-3 text-5xl font-black tracking-tighter text-slate-900">{ordersAtStation.length.toString().padStart(2, '0')}</div>
+            </div>
+            <div className="rounded-[20px] bg-[linear-gradient(180deg,rgba(255,255,255,1),rgba(255,245,245,0.84))] p-5 shadow-[0_0_0_1px_rgba(127,29,29,0.14),0_8px_20px_rgba(15,23,42,0.04)]">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.22em] text-sky-600">{t('inTransit')}</span>
+              <div className="mt-3 text-5xl font-black tracking-tighter text-sky-600">{ordersInTransit.length.toString().padStart(2, '0')}</div>
+            </div>
+            <div className="rounded-[20px] bg-white p-5 shadow-[0_0_0_1px_rgba(51,65,85,0.16),0_8px_20px_rgba(15,23,42,0.04)]">
+              <span className="text-[11px] font-semibold uppercase tracking-[0.22em] text-slate-500">{t('activeStationsShort')}</span>
+              <div className="mt-3 text-5xl font-black tracking-tighter text-slate-900">{activeStations.length}/{stations.filter(s => s.station_types?.station_type_id === 1).length}</div>
             </div>
           </div>
         </div>
@@ -219,131 +247,109 @@ export default function AdminDashboard() {
           items={[
             {
               key: "1",
-              label: <span className="font-bold tracking-widest uppercase text-sm">BÀN ĐIỀU KHIỂN</span>,
+              label: <span className="font-bold tracking-widest uppercase text-sm">{t('controlDashboard')}</span>,
               children: (
                 <div className="mt-6">
-                  {/* Master Data Metrics Row */}
-                  <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-6">
-                    <div className="border-2 border-slate-900 bg-white p-4 flex flex-col justify-between group hover:bg-yellow-400 transition-colors">
-                      <span className="font-mono text-xs uppercase font-bold text-slate-500 group-hover:text-amber-900">HOÀN THÀNH</span>
-                      <div className="text-5xl font-black tracking-tighter mt-2">{ordersCompleted.length.toString().padStart(3, '0')}</div>
+                  <div className="mb-6 overflow-hidden rounded-[20px] bg-[linear-gradient(180deg,rgba(255,255,255,1),rgba(250,250,250,0.98))] p-5 shadow-[0_0_0_1px_rgba(51,65,85,0.18),0_12px_28px_rgba(15,23,42,0.05)] md:p-6">
+                    <div className="mb-5 flex flex-col gap-3 pb-4 md:flex-row md:items-end md:justify-between">
+                      <div>
+                        <h3 className="mt-2 text-2xl font-semibold tracking-tight text-slate-900">
+                          {t('dispatchStations')}
+                        </h3>
+                      </div>
                     </div>
-                    <div className="border-2 border-slate-900 bg-white p-4 flex flex-col justify-between">
-                      <span className="font-mono text-xs uppercase font-bold text-slate-500">ĐANG CHỜ</span>
-                      <div className="text-5xl font-black tracking-tighter mt-2 text-amber-500">{ordersPending.length.toString().padStart(2, '0')}</div>
-                    </div>
-                    <div className="border-2 border-slate-900 bg-white p-4 flex flex-col justify-between">
-                      <span className="font-mono text-xs uppercase font-bold text-slate-500">ĐANG NHẬN</span>
-                      <div className="text-5xl font-black tracking-tighter mt-2 text-cyan-600">{ordersAtStation.length.toString().padStart(2, '0')}</div>
-                    </div>
-                    <div className="border-2 border-slate-900 bg-white p-4 flex flex-col justify-between">
-                      <span className="font-mono text-xs uppercase font-bold text-slate-500">VẬN CHUYỂN</span>
-                      <div className="text-5xl font-black tracking-tighter mt-2 text-blue-600">{ordersInTransit.length.toString().padStart(2, '0')}</div>
-                    </div>
-                    <div className="border-2 border-slate-900 bg-white p-4 flex flex-col justify-between">
-                      <span className="font-mono text-xs uppercase font-bold text-slate-500">TRẠM HĐ</span>
-                      <div className="text-5xl font-black tracking-tighter mt-2">{activeStations.length}/{stations.filter(s => s.station_types?.station_type_id === 1).length}</div>
-                    </div>
+                    <StationStatusPanel stations={stations} orders={orders} onStationUpdated={fetchAll} />
                   </div>
 
                   {/* Operational Layout Grid */}
                   <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
                     
                     {/* Left: Vehicle Availability Lists */}
-                    <div className="lg:col-span-3 space-y-6">
-                      <div className="border-2 border-slate-900 bg-white flex flex-col h-[400px]">
-                        <div className="bg-slate-900 text-white px-4 py-2 font-bold uppercase text-sm tracking-widest flex justify-between items-center">
-                          <span>XE SẴN SÀNG</span>
-                          <span className="bg-emerald-500 text-black px-2 py-0.5 text-xs">{readyVehicles.length}</span>
-                        </div>
-                        <div className="overflow-y-auto p-0 flex-1">
-                          {readyVehicles.length === 0 ? (
-                            <div className="p-4 text-slate-400 font-mono text-sm uppercase">KHÔNG CÓ XE SẴN SÀNG</div>
-                          ) : (
-                            <ul className="divide-y divide-slate-100">
-                              {readyVehicles.map((v) => (
-                                <li key={v.vehicle_id} className="p-3 hover:bg-slate-50 flex items-center gap-3">
-                                  <div className="w-2 h-2 rounded-full bg-emerald-500" />
-                                  <span className="font-mono font-bold text-slate-800 text-lg">{v.vehicle_license_plate}</span>
-                                </li>
-                              ))}
-                            </ul>
-                          )}
-                        </div>
-                      </div>
+                     <div className="lg:col-span-3 space-y-6">
+                        <div className="flex h-[400px] flex-col overflow-hidden rounded-[20px] bg-white shadow-[0_0_0_1px_rgba(51,65,85,0.18),0_10px_24px_rgba(15,23,42,0.04)]">
+                          <div className="flex items-center justify-between bg-slate-50 px-4 py-3 text-sm font-semibold uppercase tracking-[0.18em] text-slate-700">
+                            <span>{t('readyVehiclesPanel')}</span>
+                            <span className="bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">{readyVehicles.length}</span>
+                          </div>
+                         <div className="overflow-y-auto p-0 flex-1">
+                           {readyVehicles.length === 0 ? (
+                              <div className="p-4 text-sm font-medium text-slate-400">{t('noReadyVehicles')}</div>
+                           ) : (
+                             <ul className="divide-y divide-slate-100">
+                               {readyVehicles.map((v) => (
+                                  <li key={v.vehicle_id} className="flex items-center gap-3 p-4 hover:bg-slate-50">
+                                     <div className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
+                                    <span className="text-lg font-semibold text-slate-900">{v.vehicle_license_plate}</span>
+                                  </li>
+                               ))}
+                             </ul>
+                           )}
+                         </div>
+                       </div>
 
-                      <div className="border-2 border-slate-900 bg-white flex flex-col h-[280px]">
-                        <div className="bg-slate-200 text-slate-900 border-b-2 border-slate-900 px-4 py-2 font-bold uppercase text-sm tracking-widest flex justify-between items-center">
-                          <span>DỪNG / BẢO TRÌ</span>
-                          <span className="bg-red-500 text-white px-2 py-0.5 text-xs">{inactiveVehicles.length}</span>
-                        </div>
-                        <div className="overflow-y-auto p-0 flex-1 bg-slate-50">
-                          {inactiveVehicles.length === 0 ? (
-                            <div className="p-4 text-slate-400 font-mono text-sm uppercase">TRỐNG</div>
-                          ) : (
-                            <ul className="divide-y divide-slate-200">
-                              {inactiveVehicles.map((v) => (
-                                <li key={v.vehicle_id} className="p-3 flex items-center justify-between">
-                                  <span className="font-mono font-bold text-slate-600 opacity-70">{v.vehicle_license_plate}</span>
-                                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 border border-slate-300 px-1">CHỜ</span>
-                                </li>
-                              ))}
-                            </ul>
+                        <div className="flex h-[280px] flex-col overflow-hidden rounded-[20px] bg-white shadow-[0_0_0_1px_rgba(51,65,85,0.18),0_10px_24px_rgba(15,23,42,0.04)]">
+                          <div className="flex items-center justify-between bg-slate-50 px-4 py-3 text-sm font-semibold uppercase tracking-[0.18em] text-slate-700">
+                            <span>{t('stoppedMaintenance')}</span>
+                            <span className="bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">{canceledOrders.length}</span>
+                          </div>
+                         <div className="flex-1 overflow-y-auto bg-white p-0">
+                            {canceledOrders.length === 0 ? (
+                               <div className="p-4 text-sm font-medium text-slate-400">{t('empty')}</div>
+                            ) : (
+                              <ul className="divide-y divide-slate-200">
+                                {canceledOrders.map((o) => (
+                                  <li key={o.order_id} className="flex items-center justify-between p-4">
+                                    <span className="font-semibold text-slate-700">{o.vehicles?.vehicle_license_plate || `#${o.order_id}`}</span>
+                                      <span className="rounded-lg bg-amber-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-600">{t('canceled')}</span>
+                                   </li>
+                                ))}
+                              </ul>
                           )}
                         </div>
                       </div>
                     </div>
 
                     {/* Center: System Operations Flow */}
-                    <div className="lg:col-span-6 flex flex-col h-full space-y-8 relative">
-                      <div className="absolute inset-0 pointer-events-none opacity-[0.03]" 
-                           style={{ backgroundImage: 'linear-gradient(slate-900 1px, transparent 1px), linear-gradient(90deg, slate-900 1px, transparent 1px)', backgroundSize: '16px 16px' }} />
-                      
-                      <div className="flex-1">
-                         <ActivityFlow 
-                            stations={stations} 
-                            vehicles={vehicles} 
-                            orders={orders}
-                         />
+                     <div className="lg:col-span-6 flex flex-col h-full space-y-8 relative">
+                       <div className="flex-1">
+                           <ActivityFlow 
+                              stations={stations} 
+                             vehicles={vehicles} 
+                             orders={orders}
+                             onOrdersUpdated={fetchAll}
+                          />
                       </div>
                       
-                      <div className="pt-4 border-t-2 border-dashed border-slate-300">
-                         <div className="mb-4 flex items-center gap-2">
-                           <div className="w-2 h-2 bg-slate-900" />
-                           <h3 className="font-bold uppercase tracking-widest text-sm">CỤM TRẠM ĐIỀU PHỐI</h3>
-                         </div>
-                         <StationStatusPanel stations={stations} orders={orders} onStationUpdated={fetchAll} />
-                      </div>
                     </div>
 
                     {/* Right: En Route / Outside */}
-                    <div className="lg:col-span-3 h-[704px]">
-                      <div className="border-2 border-slate-900 bg-white flex flex-col h-full border-r-8">
-                        <div className="bg-amber-400 border-b-2 border-slate-900 px-4 py-2 font-black uppercase text-sm tracking-widest text-black flex justify-between items-center">
-                          <span>LƯU THÔNG / NGOÀI TRẠM</span>
-                          <span className="bg-slate-900 text-white px-2 py-0.5 text-xs">{ordersInTransit.length}</span>
-                        </div>
-                        <div className="flex-1 overflow-y-auto">
-                          {ordersInTransit.length === 0 ? (
-                            <div className="flex items-center justify-center h-full">
-                              <div className="border border-dashed border-slate-300 px-6 py-4 bg-white/50">
-                                <p className="font-mono text-sm tracking-widest text-slate-400 uppercase text-center">- ĐANG CHỜ TÍN HIỆU -</p>
+                     <div className="lg:col-span-3 h-[704px]">
+                        <div className="flex h-full flex-col overflow-hidden rounded-[20px] bg-white shadow-[0_0_0_1px_rgba(51,65,85,0.18),0_10px_24px_rgba(15,23,42,0.04)]">
+                          <div className="flex items-center justify-between bg-slate-50 px-4 py-3 text-sm font-semibold uppercase tracking-[0.18em] text-slate-700">
+                            <span>{t('outsideStation')}</span>
+                            <span className="bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-700">{outsideOrders.length}</span>
+                          </div>
+                         <div className="flex-1 overflow-y-auto">
+                            {outsideOrders.length === 0 ? (
+                              <div className="flex items-center justify-center h-full">
+                                 <div className="rounded-2xl bg-slate-50 px-6 py-4">
+                                   <p className="text-sm font-medium text-slate-400 text-center">{t('waitingSignal')}</p>
+                                </div>
                               </div>
-                            </div>
-                          ) : (
-                            <ul className="flex flex-col gap-2 p-2">
-                              {ordersInTransit.map((o) => (
-                                <li key={o.order_id} className="bg-white border-2 border-slate-900 p-3 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]">
-                                  <div className="flex justify-between items-end">
-                                    <span className="font-mono font-black text-lg">{o.vehicles?.vehicle_license_plate || `#${o.order_id}`}</span>
-                                    <span className={`text-[10px] uppercase font-bold tracking-wider ${o.order_status === 'transporting' ? 'text-indigo-600' : 'text-amber-600'}`}>
-                                      {o.order_status === 'transporting' ? 'VẬN CHUYỂN' : 'ĐANG CHẠY'}
-                                    </span>
-                                  </div>
-                                  <div className="text-[10px] font-mono text-slate-400 mt-1 uppercase">{o.stations?.station_name || '---'}</div>
-                                </li>
-                              ))}
-                            </ul>
+                            ) : (
+                              <ul className="flex flex-col gap-3 p-3">
+                                {outsideOrders.map((o) => (
+                                    <li key={o.order_id} className="rounded-2xl bg-[linear-gradient(180deg,rgba(255,255,255,1),rgba(250,250,250,0.96))] p-4 shadow-[0_0_0_1px_rgba(51,65,85,0.14),0_8px_18px_rgba(15,23,42,0.04)]">
+                                     <div className="flex justify-between items-end">
+                                       <span className="text-lg font-semibold text-slate-900">{o.vehicles?.vehicle_license_plate || `#${o.order_id}`}</span>
+                                       <span className={`rounded-lg px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] ${o.order_status === 'transporting' ? 'bg-sky-100 text-sky-700' : 'bg-amber-100 text-amber-600'}`}>
+                                         {o.order_status === 'transporting' ? t('transporting') : t('running')}
+                                       </span>
+                                     </div>
+                                    <div className="mt-2 text-xs font-medium uppercase tracking-[0.16em] text-slate-400">{o.stations?.station_name || t('unassigned')}</div>
+                                  </li>
+                                ))}
+                             </ul>
                           )}
                         </div>
                       </div>
@@ -354,10 +360,10 @@ export default function AdminDashboard() {
             },
             {
               key: "2",
-              label: <span className="font-bold tracking-widest uppercase text-sm">BẢN ĐỒ KHU VỰC</span>,
+              label: <span className="font-bold tracking-widest uppercase text-sm">{t('areaMap')}</span>,
               children: (
-                <div className="bg-white p-2 border-2 border-slate-900 mt-6 h-[700px]">
-                  <StationMap
+                 <div className="mt-6 h-[700px] overflow-hidden rounded-[20px] bg-white p-2 shadow-[0_0_0_1px_rgba(51,65,85,0.18),0_12px_28px_rgba(15,23,42,0.05)]">
+                   <StationMap
                     stationGps={geofenceStation?.station_gps || null}
                     radius={geofenceStation?.station_gps_geofencing || 500}
                     vehicles={vtrackingVehicles}
@@ -368,18 +374,17 @@ export default function AdminDashboard() {
           ]}
         />
         
-        {/* Brutalist Footer */}
-        <div className="mt-8 border-t-4 border-slate-900 pt-4 flex flex-col md:flex-row justify-between items-baseline gap-4 mb-20 whitespace-nowrap">
-           <div className="flex gap-4 font-mono text-xs font-bold text-slate-500 uppercase tracking-widest items-center">
-             <span className="bg-yellow-400 text-black px-2 py-0.5 pointer-events-none shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] flex items-center gap-2">
-               <div className="w-1.5 h-1.5 bg-black rounded-full animate-ping" />
-               TÍN HIỆU HỆ THỐNG
-             </span>
-             <span>ĐANG LIÊN TỤC LẮNG NGHE DATA TỪ THIẾT BỊ...</span>
-           </div>
-           <p className="font-mono text-xs uppercase tracking-widest text-slate-400">
-              KẾT NỐI ỔN ĐỊNH • TRẠM BÊ TÔNG NAG
-           </p>
+         <div className="mb-20 mt-8 flex flex-col justify-between gap-4 border-t border-slate-200 pt-4 md:flex-row md:items-baseline whitespace-nowrap">
+            <div className="flex items-center gap-4 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+              <span className="flex items-center gap-2 rounded-full bg-red-50 px-3 py-1 text-red-500">
+                <div className="h-1.5 w-1.5 rounded-full bg-red-500 animate-ping" />
+                {t('systemSignal')}
+              </span>
+              <span>{t('systemListening')}</span>
+            </div>
+            <p className="text-xs uppercase tracking-[0.18em] text-slate-400">
+               {t('connectionStable')} • {t('plantName')}
+            </p>
         </div>
       </div>
     </div>
