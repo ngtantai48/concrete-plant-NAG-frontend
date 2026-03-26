@@ -3,7 +3,7 @@
 import { useSocket } from "@/context/socket-context";
 import orderApi, { Order } from "@/services/order.service";
 import stationApi, { Station } from "@/services/station.service";
-import { AlertTriangle, Ban, ChevronDown, ChevronUp, Clock, Factory, Maximize, Minimize, Truck } from "lucide-react";
+import { AlertTriangle, Ban, ChevronDown, ChevronUp, Factory, SquareX, Truck } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -11,7 +11,7 @@ export default function DriverDisplay() {
   const t = useTranslations("DriverDisplayPage");
   const [orders, setOrders] = useState<Order[]>([]);
   const [stations, setStations] = useState<Station[]>([]);
-  const [isFullscreen, setIsFullscreen] = useState(false);
+  // const [isFullscreen, setIsFullscreen] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
   const containerRef = useRef<HTMLDivElement>(null);
   const { isConnected, onSocketEvent } = useSocket();
@@ -59,21 +59,21 @@ export default function DriverDisplay() {
   }, [onSocketEvent, fetchData]);
 
   // Fullscreen toggle — operates on the container element
-  const toggleFullscreen = useCallback(async () => {
-    if (!document.fullscreenElement) {
-      await containerRef.current?.requestFullscreen().catch((err) => {
-        console.error("Fullscreen error:", err.message);
-      });
-    } else {
-      await document.exitFullscreen?.();
-    }
-  }, []);
+  // const toggleFullscreen = useCallback(async () => {
+  //   if (!document.fullscreenElement) {
+  //     await containerRef.current?.requestFullscreen().catch((err) => {
+  //       console.error("Fullscreen error:", err.message);
+  //     });
+  //   } else {
+  //     await document.exitFullscreen?.();
+  //   }
+  // }, []);
 
-  useEffect(() => {
-    const handler = () => setIsFullscreen(!!document.fullscreenElement);
-    document.addEventListener("fullscreenchange", handler);
-    return () => document.removeEventListener("fullscreenchange", handler);
-  }, []);
+  // useEffect(() => {
+  //   const handler = () => setIsFullscreen(!!document.fullscreenElement);
+  //   document.addEventListener("fullscreenchange", handler);
+  //   return () => document.removeEventListener("fullscreenchange", handler);
+  // }, []);
 
   // ── Derived data ──────────────────────────────────────────
   const collectingOrders = useMemo(
@@ -106,10 +106,8 @@ export default function DriverDisplay() {
       {/* ─── Header ─── */}
       <div className="bg-white border-b-4 border-blue-600 px-8 py-4 grid grid-cols-3 items-center shadow-sm shrink-0">
         {/* Left: Title + Socket Status */}
-        <div className="flex flex-col">
-          <h1 className="text-6xl font-black text-slate-800 tracking-tight uppercase">
-            {t("title")}
-          </h1>
+        <div className="flex">
+          <h1 className="me-10 text-6xl font-black text-slate-800 tracking-tight uppercase">{t("title")}</h1>
           {/* Socket Status Indicator */}
           <div
             className={`mt-2 inline-flex items-center gap-2 px-3 py-1 rounded-full border-2 w-fit ${isConnected
@@ -117,10 +115,8 @@ export default function DriverDisplay() {
               : "bg-red-50 border-red-200 text-red-600 animate-pulse"
               }`}
           >
-            <div
-              className={`w-3 h-3 rounded-full ${isConnected ? "bg-emerald-500" : "bg-red-500"}`}
-            />
-            <span className="text-sm font-bold uppercase tracking-wider">
+            <div className={`w-3 h-3 rounded-full ${isConnected ? "bg-emerald-500" : "bg-red-500"}`} />
+            <span className="text-2xl font-extrabold uppercase">
               {isConnected ? t("socketConnected") : t("socketDisconnected")}
             </span>
           </div>
@@ -258,11 +254,11 @@ function StationColumn({ station, collectingOrder, pendingOrders, t }: StationCo
       </div>
 
       {/* Pending Vehicles List */}
-      <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-3">
+      <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
         {pendingOrders.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-8 text-slate-300">
-            <Truck className="w-12 h-12 mb-3" />
-            <p className="text-xl font-bold uppercase">Không có xe chờ</p>
+          <div className="flex flex-col items-center justify-center py-8 text-slate-500">
+            <Truck className="w-24 h-24 mb-3" />
+            <p className="text-6xl font-bold uppercase">Không có xe chờ</p>
           </div>
         ) : (
           <>
@@ -272,19 +268,9 @@ function StationColumn({ station, collectingOrder, pendingOrders, t }: StationCo
             {hasMore && (
               <button
                 onClick={() => setExpanded(!expanded)}
-                className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl border-2 border-dashed border-slate-300 text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors font-bold text-lg uppercase"
+                className="cursor-pointer w-full flex items-center justify-center gap-2 py-3 rounded-2xl border-2 border-dashed border-slate-300 text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors font-bold text-lg uppercase"
               >
-                {expanded ? (
-                  <>
-                    <ChevronUp className="w-6 h-6" />
-                    Thu gọn
-                  </>
-                ) : (
-                  <>
-                    <ChevronDown className="w-6 h-6" />
-                    Xem thêm {hiddenCount} xe
-                  </>
-                )}
+                {expanded ? (<><ChevronUp />Thu gọn</>) : (<><ChevronDown />Xem thêm {hiddenCount} xe</>)}
               </button>
             )}
           </>
@@ -302,25 +288,25 @@ function StationStatusCard({ station, collectingOrder, t }: {
 }) {
   if (collectingOrder || station.station_status === "collecting") {
     return (
-      <div className="w-full bg-blue-50 border-4 border-blue-500 rounded-2xl p-6 flex flex-col items-center animate-pulse">
-        <span className="bg-blue-500 text-white text-sm font-bold uppercase px-3 py-1 rounded-full mb-3">
+      <div className="w-full h-56 lg:h-64 bg-blue-50 border-4 border-blue-500 rounded-2xl p-2 gap-2 flex flex-col items-center justify-center animate-pulse shrink-0">
+        <span className="bg-blue-500 text-white text-4xl font-bold uppercase px-3 py-1 rounded-full mb-3">
           {t("collectingAction")}
         </span>
-        <span className="text-5xl lg:text-6xl font-black text-blue-700 tracking-tighter text-center">
+        <span className="text-5xl lg:text-9xl font-black text-blue-700 tracking-tighter text-center">
           {collectingOrder?.vehicles?.vehicle_license_plate || "N/A"}
         </span>
-        <span className="text-xl font-bold text-blue-600/80 mt-1 uppercase">
+        {/* <span className="text-xl font-bold text-blue-600/80 mt-1 uppercase">
           {collectingOrder?.users?.user_full_name}
-        </span>
+        </span> */}
       </div>
     );
   }
 
   if (station.station_status === "stopped") {
     return (
-      <div className="w-full bg-amber-50 border-4 border-dashed border-amber-300 rounded-2xl p-6 flex flex-col items-center">
-        <Ban className="w-12 h-12 text-amber-500 mb-2" />
-        <span className="text-2xl font-black text-amber-600 uppercase tracking-widest text-center">
+      <div className="w-full h-56 lg:h-64 bg-amber-50 border-4 border-dashed border-amber-300 rounded-2xl p-6 flex flex-col items-center justify-center shrink-0">
+        <Ban className="w-16 h-16 text-amber-500 mb-2" />
+        <span className="text-5xl font-black text-amber-600 uppercase tracking-widest text-center">
           {t("stationStopped")}
         </span>
       </div>
@@ -329,9 +315,9 @@ function StationStatusCard({ station, collectingOrder, t }: {
 
   if (station.station_status === "incident") {
     return (
-      <div className="w-full bg-red-50 border-4 border-dashed border-red-300 rounded-2xl p-6 flex flex-col items-center">
-        <AlertTriangle className="w-12 h-12 text-red-500 mb-2" />
-        <span className="text-2xl font-black text-red-600 uppercase tracking-widest text-center">
+      <div className="w-full h-56 lg:h-64 bg-red-50 border-4 border-dashed border-red-300 rounded-2xl p-6 flex flex-col items-center justify-center shrink-0">
+        <AlertTriangle className="w-16 h-16 text-red-500 mb-2" />
+        <span className="text-5xl font-black text-red-600 uppercase tracking-widest text-center">
           {t("stationIncident")}
         </span>
       </div>
@@ -340,9 +326,11 @@ function StationStatusCard({ station, collectingOrder, t }: {
 
   // Operating / empty
   return (
-    <div className="w-full bg-[#6F6E73]/10 border-4 border-dashed border-[#6F6E73]/40 rounded-2xl p-6 flex flex-col items-center">
-      <Truck className="w-12 h-12 text-[#6F6E73] mb-2" />
-      <span className="text-2xl font-black text-[#6F6E73] uppercase tracking-widest text-center">
+    <div className="w-full h-56 lg:h-64 bg-[#6F6E73]/10 border-4 border-dashed border-[#6F6E73]/40 rounded-2xl p-5 flex flex-col items-center justify-center shrink-0">
+      {/* <Truck className="w-12 h-12 text-[#6F6E73] mb-2" /> */}
+      <SquareX className="w-16 h-16 text-[#6F6E73] mb-2" />
+      {/* <Image src={carConcreteIcon} alt="car concrete" className="w-16 h-16 mb-2 opacity-75" /> */}
+      <span className="text-5xl font-black text-[#6F6E73] uppercase tracking-widest text-center">
         {t("emptyStation")}
       </span>
     </div>
@@ -383,7 +371,7 @@ function PendingOrderRow({ order, index, t }: {
 
   return (
     <Card className={baseClass + cardClass}>
-      <CardContent className="flex flex-col items-center justify-center p-5 gap-2">
+      <CardContent className="flex flex-col items-center justify-center p-2 gap-2">
         {/* Top row: Order Number + Next Badge */}
         <div className="flex items-center gap-3">
           {/* <Badge
@@ -393,8 +381,9 @@ function PendingOrderRow({ order, index, t }: {
             #{index + 1}
           </Badge> */}
           {isNext && (
-            <Badge className="text-3xl px-3 py-1 bg-emerald-500 hover:bg-emerald-500 animate-pulse">
-              {t("nextVehicle")}
+            <Badge className="text-4xl px-3 py-1 font-bold bg-emerald-500 hover:bg-emerald-500 animate-pulse uppercase">
+              {/* bg-blue-500 text-white text-3xl font-bold uppercase px-3 py-1 rounded-full mb-3 */}
+              XE TIẾP THEO VÀO {order.stations?.station_name}
             </Badge>
           )}
           {/* {!isNext && (
@@ -405,16 +394,15 @@ function PendingOrderRow({ order, index, t }: {
         </div>
 
         {/* License Plate — centered, very large */}
-        <span className={`text-5xl lg:text-8xl font-bold tracking-tight text-center leading-tight ${textClass}`}>
+        <span className={`text-5xl lg:text-9xl font-bold tracking-tight text-center leading-tight ${textClass}`}>
           {order.vehicles?.vehicle_license_plate || "N/A"}
         </span>
 
         {/* Debug: order_id */}
-        <span className={`italic text-base font-semibold tracking-tight ${debugClass}`}>
+        {/* <span className={`italic text-base font-semibold tracking-tight ${debugClass}`}>
           order_id: {order.order_id}
-        </span>
+        </span> */}
       </CardContent>
     </Card>
   );
 }
-
