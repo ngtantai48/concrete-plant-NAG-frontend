@@ -101,7 +101,7 @@ export default function DriverDisplay() {
   return (
     <div
       ref={containerRef}
-      className="h-[calc(100vh-80px)] bg-slate-50 overflow-hidden flex flex-col font-sans"
+      className="fixed inset-0 z-[100] bg-slate-50 overflow-hidden flex flex-col font-sans"
     >
       {/* ─── Header ─── */}
       <div className="bg-white border-b-4 border-blue-600 px-8 py-4 grid grid-cols-3 items-center shadow-sm shrink-0">
@@ -128,17 +128,9 @@ export default function DriverDisplay() {
 
         {/* Center: Clock */}
         <div className="flex items-center justify-center gap-3">
-          <Clock size={65} className="text-blue-500" />
+          {/* <Clock size={75} className="text-blue-500" /> */}
           <div className="flex flex-col items-center">
-            <span className="text-4xl font-bold text-slate-500 tracking-wide">
-              {currentTime.toLocaleString("vi-VN", {
-                weekday: "long",
-                day: "2-digit",
-                month: "2-digit",
-                year: "numeric",
-              })}
-            </span>
-            <span className="text-5xl font-black text-red-500 tabular-nums tracking-widest">
+            <span className="text-8xl font-black text-red-500 tabular-nums tracking-widest">
               {currentTime.toLocaleString("vi-VN", {
                 hour: "2-digit",
                 minute: "2-digit",
@@ -149,7 +141,7 @@ export default function DriverDisplay() {
         </div>
 
         {/* Right: Fullscreen Button */}
-        <div className="flex justify-end">
+        {/* <div className="flex justify-end">
           <button
             onClick={toggleFullscreen}
             className="flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition-colors shadow-lg shadow-blue-600/20"
@@ -159,6 +151,17 @@ export default function DriverDisplay() {
               {isFullscreen ? t("exitFullscreen") : t("fullscreen")}
             </span>
           </button>
+        </div> */}
+
+        <div className="flex justify-end">
+          <span className="text-7xl font-bold text-slate-500 tracking-wide">
+            {currentTime.toLocaleString("vi-VN", {
+              weekday: "long",
+              day: "2-digit",
+              month: "2-digit",
+              year: "numeric",
+            })}
+          </span>
         </div>
       </div>
 
@@ -202,7 +205,8 @@ export default function DriverDisplay() {
 // ─── Sub-component: Station Column ──────────────────────────
 const STATUS_COLORS: Record<string, string> = {
   collecting: "bg-blue-600",
-  operating: "bg-emerald-600",
+  // operating: "bg-emerald-600",
+  operating: "bg-[#6F6E73]",
   stopped: "bg-amber-500",
   incident: "bg-red-600",
 };
@@ -291,11 +295,7 @@ function StationColumn({ station, collectingOrder, pendingOrders, t }: StationCo
 }
 
 // ─── Sub-component: Station Status Card ─────────────────────
-function StationStatusCard({
-  station,
-  collectingOrder,
-  t,
-}: {
+function StationStatusCard({ station, collectingOrder, t }: {
   station: Station;
   collectingOrder?: Order;
   t: ReturnType<typeof useTranslations>;
@@ -340,9 +340,9 @@ function StationStatusCard({
 
   // Operating / empty
   return (
-    <div className="w-full bg-emerald-50 border-4 border-dashed border-emerald-400 rounded-2xl p-6 flex flex-col items-center">
-      <Truck className="w-12 h-12 text-emerald-400 mb-2" />
-      <span className="text-2xl font-black text-emerald-500 uppercase tracking-widest text-center">
+    <div className="w-full bg-[#6F6E73]/10 border-4 border-dashed border-[#6F6E73]/40 rounded-2xl p-6 flex flex-col items-center">
+      <Truck className="w-12 h-12 text-[#6F6E73] mb-2" />
+      <span className="text-2xl font-black text-[#6F6E73] uppercase tracking-widest text-center">
         {t("emptyStation")}
       </span>
     </div>
@@ -353,24 +353,36 @@ function StationStatusCard({
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 
-function PendingOrderRow({
-  order,
-  index,
-  t,
-}: {
+function PendingOrderRow({ order, index, t }: {
   order: Order;
   index: number;
   t: ReturnType<typeof useTranslations>;
 }) {
   const isNext = index === 0;
+  const isSecond = index === 1;
+  const isThird = index === 2;
+
+  let baseClass = "transition-all ";
+  let cardClass = "border-2 border-slate-200 shadow-sm bg-white";
+  let textClass = "text-slate-800";
+  let debugClass = "text-slate-400";
+
+  if (isNext) {
+    cardClass = "border-4 border-emerald-500 shadow-lg shadow-emerald-100 bg-emerald-50";
+    textClass = "text-emerald-700";
+    debugClass = "text-emerald-600/60";
+  } else if (isSecond) {
+    cardClass = "border-4 border-[#F2CB05] shadow-lg shadow-[#F2CB05]/20 bg-[#F2CB05]/10";
+    textClass = "text-[#a38803]"; // Darker text for readability
+    debugClass = "text-[#cca900]";
+  } else if (isThird) {
+    cardClass = "border-4 border-[#6CC5D9] shadow-lg shadow-[#6CC5D9]/20 bg-[#6CC5D9]/10";
+    textClass = "text-[#2d879e]"; // Darker text for readability
+    debugClass = "text-[#4caec4]";
+  }
 
   return (
-    <Card
-      className={`transition-all ${isNext
-        ? "border-4 border-emerald-500 shadow-lg shadow-emerald-100 bg-emerald-50"
-        : "border-2 border-slate-200 shadow-sm bg-white"
-        }`}
-    >
+    <Card className={baseClass + cardClass}>
       <CardContent className="flex flex-col items-center justify-center p-5 gap-2">
         {/* Top row: Order Number + Next Badge */}
         <div className="flex items-center gap-3">
@@ -393,16 +405,12 @@ function PendingOrderRow({
         </div>
 
         {/* License Plate — centered, very large */}
-        <span
-          className={`text-5xl lg:text-8xl font-bold tracking-tight text-center leading-tight ${isNext ? "text-emerald-700" : "text-slate-800"}`}
-        >
+        <span className={`text-5xl lg:text-8xl font-bold tracking-tight text-center leading-tight ${textClass}`}>
           {order.vehicles?.vehicle_license_plate || "N/A"}
         </span>
 
         {/* Debug: order_id */}
-        <span
-          className={`italic text-base font-semibold tracking-tight ${isNext ? "text-emerald-600/60" : "text-slate-400"}`}
-        >
+        <span className={`italic text-base font-semibold tracking-tight ${debugClass}`}>
           order_id: {order.order_id}
         </span>
       </CardContent>
