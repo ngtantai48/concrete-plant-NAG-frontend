@@ -7,7 +7,6 @@ export const ADMIN = {
   DRIVERS: "/admin/drivers",
   VEHICLES: "/admin/vehicles",
   VEHICLE_TYPES: "/admin/vehicle-types",
-  USER_VEHICLES: "/admin/user-vehicles",
   STATIONS: "/admin/stations",
   VEHICLE_MAINTENANCES: "/admin/vehicle-maintenances",
   PROFILE: "/profile",

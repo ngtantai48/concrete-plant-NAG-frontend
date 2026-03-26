@@ -103,7 +103,7 @@ const TableStations: React.FC = () => {
       station_gps_geofencing: station.station_gps_geofencing,
       station_status: station.station_status,
       station_description: station.station_description,
-      station_type_id: station.station_type_id,
+      station_type_id: station.station_type_id || station.station_types?.station_type_id,
     });
     setModalOpen(true);
   };
@@ -177,8 +177,26 @@ const TableStations: React.FC = () => {
   const getStatusDisplay = (status: string) => {
     if (status === "operating")
       return (
-        <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200/60">
+        <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/60">
           {t("active")}
+        </span>
+      );
+    if (status === "stopped")
+      return (
+        <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200/60">
+          Dừng HĐ
+        </span>
+      );
+    if (status === "incident")
+      return (
+        <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-red-50 text-red-700 border border-red-200/60">
+          Sự cố
+        </span>
+      );
+    if (status === "collecting")
+      return (
+        <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-cyan-50 text-cyan-700 border border-cyan-200/60">
+          Đang nhận
         </span>
       );
     return (
@@ -326,6 +344,9 @@ const TableStations: React.FC = () => {
             options={[
               { value: "all", label: t("all") },
               { value: "operating", label: t("active") },
+              { value: "stopped", label: "Dừng HĐ" },
+              { value: "incident", label: "Sự cố" },
+              { value: "collecting", label: "Đang nhận" },
             ]}
           />
         </div>
@@ -511,6 +532,9 @@ const TableStations: React.FC = () => {
                     className="rounded-lg"
                     options={[
                       { value: "operating", label: t("active") },
+                      { value: "stopped", label: "Dừng HĐ" },
+                      { value: "incident", label: "Sự cố" },
+                      { value: "collecting", label: "Đang nhận" },
                     ]}
                   />
                 </Form.Item>
