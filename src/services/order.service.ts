@@ -43,7 +43,7 @@ export interface OrderCheck {
 export interface Order {
   order_id: number;
   order_number: number;
-  order_status: "pending" | "collecting" | "transporting" | "running" | "completed" | "cancelled";
+  order_status: "pending" | "collecting" | "transporting" | "running" | "completed" | "canceled";
   order_init_datetime: string;
   order_start_datetime: string | null;
   order_end_datetime: string | null;
