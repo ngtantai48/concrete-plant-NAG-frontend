@@ -367,7 +367,10 @@
     "fromDate": "Start Date",
     "toDate": "End Date",
     "dateRange": "Maintenance Period",
-    "dateRangePlaceholder": ["From date", "To date"],
+    "dateRangePlaceholder": [
+      "From date",
+      "To date"
+    ],
     "distanceCovered": "Distance Covered (km)",
     "distancePlaceholder": "e.g. 15000",
     "description": "Work Description",
@@ -405,5 +408,24 @@
     "km": "km",
     "duration": "Duration",
     "days": "days"
+  },
+  "DriverDisplayPage": {
+    "title": "VEHICLE DISPATCH SCHEDULE",
+    "collectingStatus": "CONCRETE SUPPLY STATION",
+    "pendingQueue": "VEHICLES IN QUEUE",
+    "emptyStation": "EMPTY STATION",
+    "orderNumber": "#",
+    "truck": "TRUCK",
+    "destination": "DESTINATION",
+    "fullscreen": "Fullscreen",
+    "exitFullscreen": "Exit Fullscreen",
+    "refresh": "Refresh",
+    "stationStopped": "STOPPED",
+    "stationIncident": "INCIDENT",
+    "collectingAction": "SUPPLYING CONCRETE",
+    "socketConnected": "Connected",
+    "socketDisconnected": "Disconnected",
+    "nextVehicle": "NEXT IN QUEUE",
+    "waitingList": "WAITING"
   }
 }

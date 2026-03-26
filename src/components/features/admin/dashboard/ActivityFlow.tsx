@@ -158,9 +158,9 @@ export default function ActivityFlow({ stations: _stations, vehicles, orders, on
                         </div>
 
                         <div className="flex items-center gap-3">
-                          <span className="text-xs font-medium text-slate-500">
+                          {/* <span className="text-xs font-medium text-slate-500">
                             {order.users?.user_full_name || '---'}
-                          </span>
+                          </span> */}
                           <div className="flex items-center gap-1">
                             <button
                               type="button"
