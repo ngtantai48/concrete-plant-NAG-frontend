@@ -26,7 +26,7 @@ function haversineDistance(
 export function useNearbyVehicles(
   stationGps: string | null,
   radiusMeters: number,
-  intervalMs = 3000,
+  intervalMs = 60000,
 ) {
   const [vehicles, setVehicles] = useState<NearbyVehicle[]>([]);
   const [loading, setLoading] = useState(false);
