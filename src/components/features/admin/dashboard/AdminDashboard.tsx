@@ -1,21 +1,13 @@
 "use client";
 
 import stationApi from "@/services/station.service";
-import type { Station } from "@/services/station.service";
+import type { Station } from "@/types/station";
 import vehicleApi from "@/services/vehicle.service";
-import type { Vehicle } from "@/services/vehicle.service";
+import type { Vehicle } from "@/types/vehicle";
 import orderApi from "@/services/order.service";
-import type { Order } from "@/services/order.service";
+import type { Order } from "@/types/order";
 import { Skeleton, Tooltip, Tabs } from "antd";
-import {
-  MapPin,
-  RefreshCw,
-  Building2,
-  Radar,
-  Factory,
-  Wifi,
-  WifiOff,
-} from "lucide-react";
+import { MapPin, RefreshCw, Building2, Radar, Factory, Wifi, WifiOff } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useLocale, useTranslations } from "next-intl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -29,7 +21,7 @@ import ActivityFlow from "./ActivityFlow";
 
 const StationMap = dynamic(
   () => import("@/components/features/admin/dashboard/StationMap"),
-  { 
+  {
     ssr: false,
     loading: () => (
       <div className="w-full h-full bg-slate-50 flex items-center justify-center">
@@ -246,8 +238,8 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        <Tabs 
-          activeKey={activeTab} 
+        <Tabs
+          activeKey={activeTab}
           onChange={setActiveTab}
           className="industrial-tabs"
           items={[
@@ -269,7 +261,7 @@ export default function AdminDashboard() {
 
                   {/* Operational Layout Grid */}
                   <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
-                    
+
                     {/* Left: Vehicle Availability Lists */}
                      <div className="lg:col-span-3 space-y-6">
                         <div className="flex h-[400px] flex-col border border-slate-300 bg-white">
@@ -316,16 +308,16 @@ export default function AdminDashboard() {
                     </div>
 
                     {/* Center: System Operations Flow */}
-                     <div className="lg:col-span-6 flex flex-col h-full space-y-8 relative">
-                       <div className="flex-1">
-                           <ActivityFlow 
-                              stations={stations} 
-                             vehicles={vehicles} 
-                             orders={orders}
-                             onOrdersUpdated={fetchAll}
-                          />
+                    <div className="lg:col-span-6 flex flex-col h-full space-y-8 relative">
+                      <div className="flex-1">
+                        <ActivityFlow
+                          stations={stations}
+                          vehicles={vehicles}
+                          orders={orders}
+                          onOrdersUpdated={fetchAll}
+                        />
                       </div>
-                      
+
                     </div>
 
                     {/* Right: En Route / Outside */}

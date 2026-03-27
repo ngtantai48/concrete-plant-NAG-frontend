@@ -2,9 +2,6 @@ import { useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { ArrowRight, ChevronDown, ChevronUp } from 'lucide-react';
 import { toast } from 'sonner';
-import type { Station } from '@/services/station.service';
-import type { Vehicle } from '@/services/vehicle.service';
-import orderApi, { type Order } from '@/services/order.service';
 
 interface ActivityFlowProps {
   stations: Station[];
