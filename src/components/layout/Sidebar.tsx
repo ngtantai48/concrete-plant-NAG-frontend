@@ -6,7 +6,7 @@ import { useAppSelector } from "@/hooks/use-app-selector";
 import { DoubleLeftOutlined, DoubleRightOutlined } from "@ant-design/icons";
 import { createSelector } from "@reduxjs/toolkit";
 import { Avatar, Button, Layout, Menu, MenuProps } from "antd";
-import { Car, Gauge, Layers, MapPin, Truck, User, Wrench } from "lucide-react";
+import { Car, Gauge, Layers, Link2, MapPin, Truck, User, Wrench, Monitor } from "lucide-react";
 import { useTranslations } from "next-intl";
 import Image from "next/image";
 import Link from "next/link";
@@ -118,6 +118,7 @@ export default function Sidebar() {
       { key: ADMIN.STATIONS, label: t("stations"), icon: <MapPin />, roles: ["admin"] },
       { key: USER.DASHBOARD, label: t("dashboard"), icon: <Gauge />, roles: ["user"] },
       { key: CUSTOMER.DASHBOARD, label: t("dashboard"), icon: <Gauge />, roles: ["customer"] },
+      { key: ADMIN.DRIVER_DISPLAY, label: t("driverDisplay"), icon: <Monitor />, roles: ["admin"] },
     ],
     [t]
   );
