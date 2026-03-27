@@ -290,7 +290,13 @@ function StationStatusCard({ station, collectingOrder, t }: {
         <span className="bg-blue-500 text-white text-4xl font-bold uppercase px-3 py-1 rounded-full mb-3">
           {t("collectingAction")}
         </span>
-        <span className="text-5xl lg:text-9xl font-black text-blue-700 tracking-tighter text-center">
+        <span
+          className="text-shadow-lg/30 contrast-500 text-5xl lg:text-9xl font-black text-blue-700 tracking-tighter text-center"
+          style={{
+            WebkitTextStrokeWidth: "4px",
+            paintOrder: "stroke fill",
+          }}
+        >
           {collectingOrder?.vehicles?.vehicle_license_plate || "N/A"}
         </span>
         {/* <LicensePlateDisplay
@@ -396,7 +402,13 @@ function PendingOrderRow({ order, index, t }: {
         </div>
 
         {/* License Plate — format characters with borders */}
-        <span className={`text-5xl lg:text-9xl font-bold tracking-tight text-center leading-tight ${textClass}`}>
+        <span
+          className={`text-shadow-lg/30 contrast-500 text-5xl lg:text-9xl font-bold tracking-tight text-center leading-tight ${textClass}`}
+          style={{
+            WebkitTextStrokeWidth: "4px",
+            paintOrder: "stroke fill",
+          }}
+        >
           {order.vehicles?.vehicle_license_plate || "N/A"}
         </span>
         {/* <LicensePlateDisplay
