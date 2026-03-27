@@ -293,6 +293,10 @@ function StationStatusCard({ station, collectingOrder, t }: {
         <span className="text-5xl lg:text-9xl font-black text-blue-700 tracking-tighter text-center">
           {collectingOrder?.vehicles?.vehicle_license_plate || "N/A"}
         </span>
+        {/* <LicensePlateDisplay
+          plate={collectingOrder?.vehicles?.vehicle_license_plate}
+          className="text-5xl lg:text-9xl font-black text-blue-700 tracking-tighter text-center"
+        /> */}
         {/* <span className="text-xl font-bold text-blue-600/80 mt-1 uppercase">
           {collectingOrder?.users?.user_full_name}
         </span> */}
@@ -391,10 +395,14 @@ function PendingOrderRow({ order, index, t }: {
           )} */}
         </div>
 
-        {/* License Plate — centered, very large */}
+        {/* License Plate — format characters with borders */}
         <span className={`text-5xl lg:text-9xl font-bold tracking-tight text-center leading-tight ${textClass}`}>
           {order.vehicles?.vehicle_license_plate || "N/A"}
         </span>
+        {/* <LicensePlateDisplay
+          plate={order.vehicles?.vehicle_license_plate}
+          className={`text-5xl lg:text-9xl font-bold tracking-tight text-center leading-tight ${textClass}`}
+        /> */}
 
         {/* Debug: order_id */}
         {/* <span className={`italic text-base font-semibold tracking-tight ${debugClass}`}>
@@ -404,3 +412,26 @@ function PendingOrderRow({ order, index, t }: {
     </Card>
   );
 }
+
+// ─── Sub-component: License Plate Display ───────────────────
+// function LicensePlateDisplay({ plate, className }: { plate?: string; className?: string }) {
+//   const text = plate || "N/A";
+//   if (text === "N/A") {
+//     return <span className={className}>N/A</span>;
+//   }
+
+//   return (
+//     <div className={`flex items-center justify-center ${className}`}>
+//       <span
+//         className="drop-shadow-2xl"
+//         style={{
+//           WebkitTextStrokeWidth: "10px",
+//           WebkitTextFillColor: "white",
+//           paintOrder: "stroke fill",
+//         }}
+//       >
+//         {text}
+//       </span>
+//     </div>
+//   );
+// }
