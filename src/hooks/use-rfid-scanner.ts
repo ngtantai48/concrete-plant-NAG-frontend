@@ -2,7 +2,6 @@ import { useState, useCallback, useRef } from "react";
 
 /**
  * RFID Scanner Hook for UHF Even Reader V1.1
- * Communicates via WebHID API
  */
 function calculateCrc16(data: Uint8Array): number {
   let crc = 0xffff;
