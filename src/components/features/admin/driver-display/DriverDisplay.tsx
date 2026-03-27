@@ -109,7 +109,7 @@ export default function DriverDisplay() {
       <div className="bg-white border-b-4 border-blue-600 px-8 py-4 grid grid-cols-3 items-center shadow-sm shrink-0">
         {/* Left: Title + Socket Status */}
         <div className="flex">
-          <h1 className="me-10 text-6xl font-black text-slate-800 tracking-tight uppercase">{t("title")}</h1>
+          <h1 className="text-shadow-lg/20 me-10 text-6xl font-black text-slate-800 tracking-tight uppercase">{t("title")}</h1>
           {/* Socket Status Indicator */}
           <div
             className={`mt-2 inline-flex items-center gap-2 px-3 py-1 rounded-full border-2 w-fit ${isConnected
@@ -128,7 +128,7 @@ export default function DriverDisplay() {
         <div className="flex items-center justify-center gap-3">
           {/* <Clock size={75} className="text-blue-500" /> */}
           <div className="flex flex-col items-center">
-            <span className="text-8xl font-black text-red-500 tabular-nums tracking-widest">
+            <span className="text-8xl font-black text-red-500 tracking-widest">
               {currentTime.toLocaleString("vi-VN", {
                 hour: "2-digit",
                 minute: "2-digit",
@@ -152,7 +152,7 @@ export default function DriverDisplay() {
         </div> */}
 
         <div className="flex justify-end">
-          <span className="text-7xl font-bold text-slate-500 tracking-wide">
+          <span className="text-shadow-lg/30 text-7xl font-bold text-slate-500 tracking-wide">
             {currentTime.toLocaleString("vi-VN", {
               weekday: "long",
               day: "2-digit",
@@ -224,7 +224,7 @@ function StationColumn({ station, collectingOrder, pendingOrders, t }: StationCo
     <div className="bg-white rounded-3xl border-2 border-slate-200 shadow-sm flex flex-col overflow-hidden">
       {/* Station Header */}
       <div className={`${headerBg} px-6 py-5 flex flex-col items-center shrink-0`}>
-        <h2 className="text-5xl font-black text-white uppercase tracking-wider text-center">
+        <h2 className="text-shadow-lg/90 text-5xl font-black text-white uppercase tracking-wider text-center">
           {station.station_name}
         </h2>
       </div>
@@ -242,7 +242,7 @@ function StationColumn({ station, collectingOrder, pendingOrders, t }: StationCo
       <div className="px-4">
         <div className="border-t-2 border-slate-200" />
       </div>
-      <div className="px-6 py-3 flex items-center justify-between shrink-0">
+      <div className="text-shadow-lg/10 px-6 py-3 flex items-center justify-between shrink-0">
         <h3 className="text-2xl font-black text-slate-500 uppercase tracking-wider">
           {t("pendingQueue")}
         </h3>
@@ -286,16 +286,11 @@ function StationStatusCard({ station, collectingOrder, t }: {
 }) {
   if (collectingOrder || station.station_status === "collecting") {
     return (
-      <div className="w-full h-56 lg:h-64 bg-blue-50 border-4 border-blue-500 rounded-2xl p-2 gap-2 flex flex-col items-center justify-center animate-pulse shrink-0">
-        <span className="bg-blue-500 text-white text-4xl font-bold uppercase px-3 py-1 rounded-full mb-3">
-          {t("collectingAction")}
-        </span>
+      <div className="text-shadow-lg/100 w-full h-56 lg:h-64 bg-blue-100 border-4 border-blue-200 rounded-2xl p-2 gap-2 flex flex-col items-center justify-center animate-pulse shrink-0">
+        <span className="bg-blue-700 text-white text-4xl font-bold uppercase px-3 py-1 rounded-full mb-3">{t("collectingAction")}</span>
         <span
-          className="text-shadow-lg/30 contrast-500 text-5xl lg:text-9xl font-black text-blue-700 tracking-tighter text-center"
-          style={{
-            WebkitTextStrokeWidth: "4px",
-            paintOrder: "stroke fill",
-          }}
+          className="text-5xl lg:text-9xl font-bold text-blue-700 text-center"
+          style={{ WebkitTextStrokeWidth: "5px", paintOrder: "stroke fill" }}
         >
           {collectingOrder?.vehicles?.vehicle_license_plate || "N/A"}
         </span>
@@ -312,9 +307,9 @@ function StationStatusCard({ station, collectingOrder, t }: {
 
   if (station.station_status === "stopped") {
     return (
-      <div className="w-full h-56 lg:h-64 bg-amber-50 border-4 border-dashed border-amber-300 rounded-2xl p-6 flex flex-col items-center justify-center shrink-0">
+      <div className="text-shadow-lg/30 w-full h-56 lg:h-64 bg-amber-50 border-4 border-dashed border-amber-300 rounded-2xl p-6 flex flex-col items-center justify-center shrink-0">
         <Ban className="w-16 h-16 text-amber-500 mb-2" />
-        <span className="text-5xl font-black text-amber-600 uppercase tracking-widest text-center">
+        <span className="text-6xl font-black text-amber-600 uppercase tracking-widest text-center">
           {t("stationStopped")}
         </span>
       </div>
@@ -323,9 +318,9 @@ function StationStatusCard({ station, collectingOrder, t }: {
 
   if (station.station_status === "incident") {
     return (
-      <div className="w-full h-56 lg:h-64 bg-red-50 border-4 border-dashed border-red-300 rounded-2xl p-6 flex flex-col items-center justify-center shrink-0">
+      <div className="text-shadow-lg/30 w-full h-56 lg:h-64 bg-red-50 border-4 border-dashed border-red-300 rounded-2xl p-6 flex flex-col items-center justify-center shrink-0">
         <AlertTriangle className="w-16 h-16 text-red-500 mb-2" />
-        <span className="text-5xl font-black text-red-600 uppercase tracking-widest text-center">
+        <span className="text-6xl font-black text-red-600 uppercase tracking-widest text-center">
           {t("stationIncident")}
         </span>
       </div>
@@ -334,11 +329,11 @@ function StationStatusCard({ station, collectingOrder, t }: {
 
   // Operating / empty
   return (
-    <div className="w-full h-56 lg:h-64 bg-[#6F6E73]/10 border-4 border-dashed border-[#6F6E73]/40 rounded-2xl p-5 flex flex-col items-center justify-center shrink-0">
+    <div className="text-shadow-lg/30 w-full h-56 lg:h-64 bg-[#6F6E73]/10 border-4 border-dashed border-[#6F6E73]/40 rounded-2xl p-5 flex flex-col items-center justify-center shrink-0">
       {/* <Truck className="w-12 h-12 text-[#6F6E73] mb-2" /> */}
       <SquareX className="w-16 h-16 text-[#6F6E73] mb-2" />
       {/* <Image src={carConcreteIcon} alt="car concrete" className="w-16 h-16 mb-2 opacity-75" /> */}
-      <span className="text-5xl font-black text-[#6F6E73] uppercase tracking-widest text-center">
+      <span className="text-6xl font-black text-[#6F6E73] uppercase tracking-widest text-center">
         {t("emptyStation")}
       </span>
     </div>
@@ -389,7 +384,7 @@ function PendingOrderRow({ order, index, t }: {
             #{index + 1}
           </Badge> */}
           {isNext && (
-            <Badge className="text-4xl px-3 py-1 font-bold bg-emerald-500 hover:bg-emerald-500 animate-pulse uppercase">
+            <Badge className="text-shadow-lg/100 text-4xl px-3 py-1 font-bold bg-emerald-700 animate-pulse uppercase">
               {/* bg-blue-500 text-white text-3xl font-bold uppercase px-3 py-1 rounded-full mb-3 */}
               XE TIẾP THEO VÀO {order.stations?.station_name}
             </Badge>
@@ -403,11 +398,8 @@ function PendingOrderRow({ order, index, t }: {
 
         {/* License Plate — format characters with borders */}
         <span
-          className={`text-shadow-lg/30 contrast-500 text-5xl lg:text-9xl font-bold tracking-tight text-center leading-tight ${textClass}`}
-          style={{
-            WebkitTextStrokeWidth: "4px",
-            paintOrder: "stroke fill",
-          }}
+          className={`text-shadow-lg/100 contrast-300 text-5xl lg:text-9xl font-bold tracking-tight text-center leading-tight ${textClass}`}
+          style={{ WebkitTextStrokeWidth: "5px", paintOrder: "stroke fill" }}
         >
           {order.vehicles?.vehicle_license_plate || "N/A"}
         </span>
