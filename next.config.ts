@@ -23,7 +23,7 @@ const nextConfig: NextConfig = {
   },
 
   experimental: {
-    turbopackFileSystemCacheForDev: false,
+    turbopackFileSystemCacheForBuild: true,
     optimizePackageImports: ['antd', '@ant-design/icons', 'lucide-react', '@fortawesome/fontawesome-svg-core'],
     authInterrupts: true,
   },

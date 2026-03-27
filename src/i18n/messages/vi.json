@@ -347,7 +347,7 @@
     "moveDown": "Đưa xuống",
     "deleteOrder": "Xóa lệnh",
     "confirmDeleteOrder": "Bạn có chắc chắn muốn xóa lệnh này khỏi hàng đợi?",
-    "confirmPauseStation": "Bạn có chắc chắn muốn tạm dừng trạm này?",
+    "confirmPauseStation": "Dừng trạm này?",
     "reorderSuccess": "Cập nhật thứ tự lệnh thành công",
     "reorderFailed": "Không thể cập nhật thứ tự lệnh",
     "deleteOrderSuccess": "Đã xóa lệnh khỏi hàng đợi",

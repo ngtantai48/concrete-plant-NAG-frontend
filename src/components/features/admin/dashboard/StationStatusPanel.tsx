@@ -1,8 +1,10 @@
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import type { DeviceStationStatus } from '@/hooks/useDeviceHeartbeat';
 import stationApi from '@/services/station.service';
 import type { Order } from '@/types/order';
 import type { Station } from '@/types/station';
-import type { DeviceStationStatus } from '@/hooks/useDeviceHeartbeat';
-import { Input, Modal } from 'antd';
 import { ArrowUp, LoaderCircle } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useMemo, useState } from 'react';
@@ -33,6 +35,7 @@ export default function StationStatusPanel({ stations, orders, deviceStationStat
   const [incidentStation, setIncidentStation] = useState<Station | null>(null);
   const [incidentDesc, setIncidentDesc] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [stationToPause, setStationToPause] = useState<Station | null>(null);
 
   const vehiclesByStation = useMemo(() => {
     const map: Record<number, { license_plate: string; status: string; order_number: number }[]> = {};
@@ -81,13 +84,8 @@ export default function StationStatusPanel({ stations, orders, deviceStationStat
     return map;
   }, [orders]);
 
-  const handleToggleStatus = async (station: Station) => {
+  const performToggleStatus = async (station: Station) => {
     const nextStatus = station.station_status === 'operating' ? 'stopped' : 'operating';
-
-    if (nextStatus === 'stopped' && !window.confirm(t('confirmPauseStation'))) {
-      return;
-    }
-
     setTogglingId(station.station_id);
 
     try {
@@ -105,6 +103,15 @@ export default function StationStatusPanel({ stations, orders, deviceStationStat
       toast.error(t('stationStatusUpdateFailed'), { position: 'top-right' });
     } finally {
       setTogglingId(null);
+      setStationToPause(null);
+    }
+  };
+
+  const handleToggleStatus = (station: Station) => {
+    if (station.station_status === 'operating') {
+      setStationToPause(station);
+    } else {
+      performToggleStatus(station);
     }
   };
 
@@ -302,64 +309,84 @@ export default function StationStatusPanel({ stations, orders, deviceStationStat
         })}
       </div>
 
-      <Modal
-        title={
-          <div className="flex items-center gap-3 border-b-2 border-slate-900 pb-3">
-            <div className="h-4 w-4 bg-slate-900" />
-            <div>
-              <h2 className="text-lg font-black uppercase tracking-wider text-slate-900">{t('incidentReportTitle')}</h2>
-              <p className="mt-0.5 text-sm font-bold text-slate-500">{incidentStation?.station_name}</p>
-            </div>
-          </div>
-        }
+      <Dialog
         open={!!incidentStation}
-        onCancel={() => {
-          setIncidentStation(null);
-          setIncidentDesc('');
+        onOpenChange={(isOpen) => {
+          if (!isOpen) {
+            setIncidentStation(null);
+            setIncidentDesc('');
+          }
         }}
-        closable={false}
-        footer={
-          <div className="mt-6 flex justify-end gap-3 border-t-2 border-slate-900 pt-4">
-            <button
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <div className="flex items-center gap-3 border-b border-slate-200 pb-3">
+              {/* <div className="h-3 w-3 shrink-0 border border-slate-900 bg-red-500" /> */}
+              <div className="text-left">
+                <DialogTitle className="text-xl font-bold uppercase text-slate-900">
+                  {t('incidentReportTitle')}
+                </DialogTitle>
+                <DialogDescription className="mt-0.5 text-lg font-bold text-slate-500">
+                  {incidentStation?.station_name}
+                </DialogDescription>
+              </div>
+            </div>
+          </DialogHeader>
+          <div className="py-2">
+            <label className="mb-2 block text-md font-bold uppercase text-slate-700">
+              {t('incidentDescription')}
+            </label>
+            <Textarea
+              value={incidentDesc}
+              onChange={(e) => setIncidentDesc(e.target.value)}
+              placeholder={t('incidentPlaceholder')}
+              rows={4}
+              className="font-mono bg-white"
+            />
+          </div>
+          <DialogFooter className="mt-2 flex gap-3 sm:justify-end">
+            <Button
+              variant="outline"
               onClick={() => {
                 setIncidentStation(null);
                 setIncidentDesc('');
               }}
-              className="border border-slate-300 bg-white px-6 py-2.5 text-xs font-bold uppercase tracking-wider text-slate-900 transition-colors hover:bg-slate-100"
+              disabled={submitting}
             >
               {t('cancel')}
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="destructive"
               onClick={handleSubmitIncident}
-              disabled={submitting}
-              className="border border-slate-900 bg-slate-900 px-6 py-2.5 text-xs font-bold uppercase tracking-wider text-white transition-colors hover:bg-slate-800 disabled:opacity-50 flex items-center gap-2"
+              disabled={!incidentDesc.trim() || submitting}
+              className="font-bold uppercase"
             >
-              {submitting ? <LoaderCircle className="h-4 w-4 animate-spin" /> : null}
-              {t('sendAndStop')}
-            </button>
-          </div>
-        }
-        className="[&_.ant-modal-content]:rounded-none [&_.ant-modal-content]:p-6 [&_.ant-modal-content]:border-2 [&_.ant-modal-content]:border-slate-900"
-        styles={{
-          header: { marginBottom: 0 },
-          body: { paddingTop: '16px' }
-        }}
-        destroyOnClose
-      >
-        <div>
-          <label className="mb-2 block text-sm font-bold uppercase tracking-wider text-slate-700">
-            {t('incidentDescription')}
-          </label>
-          <Input.TextArea
-            value={incidentDesc}
-            onChange={(e) => setIncidentDesc(e.target.value)}
-            placeholder={t('incidentPlaceholder')}
-            rows={4}
-            className="rounded-none border-slate-300 font-mono shadow-none outline-none hover:border-slate-900 focus:border-slate-900 focus:shadow-[0_0_0_1px_rgba(15,23,42,1)] transition-none"
-            autoFocus
-          />
-        </div>
-      </Modal>
+              {submitting ? "Đang xử lý..." : t('sendAndStop')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!stationToPause} onOpenChange={(isOpen) => !isOpen && setStationToPause(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold uppercase text-slate-900">{t('confirmPauseStation')}</DialogTitle>
+            <DialogDescription className="text-base text-slate-500">
+              Bạn có chắc chắn muốn báo <strong>{stationToPause?.station_name}</strong> dừng hoạt động không? Hành động này sẽ khiến trạm tạm thời không nhận thêm xe đổ bê tông.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="mt-4 flex gap-3 sm:justify-end">
+            <Button variant="outline" onClick={() => setStationToPause(null)}>{t('cancel')}</Button>
+            <Button
+              variant="destructive"
+              onClick={() => stationToPause && performToggleStatus(stationToPause)}
+              disabled={togglingId === stationToPause?.station_id}
+            >
+              {togglingId === stationToPause?.station_id ? 'Đang xử lý...' : t('stopped')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
