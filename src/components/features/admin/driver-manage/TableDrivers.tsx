@@ -2,19 +2,8 @@
 
 import { Button } from "@/components/ui/button";
 import driverApi from "@/services/driver.service";
-import type { Driver } from "@/services/driver.service";
-import {
-  Modal,
-  Pagination,
-  Popconfirm,
-  Space,
-  Table,
-  Tag,
-  Tooltip,
-  Form,
-  Input,
-  Select,
-} from "antd";
+import type { Driver } from "@/types/driver";
+import { Modal, Pagination, Popconfirm, Space, Table, Tag, Tooltip, Form, Input, Select } from "antd";
 import { PencilLine, Plus, Save, Trash, Truck, X, RefreshCw } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useState, useMemo, useEffect, useCallback } from "react";

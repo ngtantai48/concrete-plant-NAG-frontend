@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from "react";
 import vtrackingApi from "@/services/vtracking.service";
-import type { VtrackingVehicle } from "@/services/vtracking.service";
+import type { VtrackingVehicle } from "@/types/vtracking";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 export interface NearbyVehicle extends VtrackingVehicle {
   distance: number;
