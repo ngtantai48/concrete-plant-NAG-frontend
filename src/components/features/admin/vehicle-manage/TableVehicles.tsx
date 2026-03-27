@@ -1,18 +1,18 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import vehicleApi from "@/services/vehicle.service";
-import type { Vehicle, VehicleMedia } from "@/services/vehicle.service";
-import vehicleTypeApi from "@/services/vehicle-type.service";
-import type { VehicleType } from "@/services/vehicle-type.service";
-import mediaApi from "@/services/media.service";
 import { useNavigationStore } from "@/hooks/use-navigation-store";
-import { Form, Input, Modal, Pagination, Select, Space, Table, Tooltip, Popconfirm, Upload, Divider, Image } from "antd";
-import { useRfidScanner } from "@/hooks/use-rfid-scanner";
-import { Plus, RefreshCw, CarFront, PenSquare, Trash2, Hash, FileText, Upload as UploadIcon, Download, X, FileArchive, Scan } from "lucide-react";
+import mediaApi from "@/services/media.service";
+import vehicleTypeApi from "@/services/vehicle-type.service";
+import vehicleApi from "@/services/vehicle.service";
+import type { VehicleMedia } from "@/types/media";
+import type { Vehicle, VehicleType } from "@/types/vehicle";
+import { Divider, Form, Image, Input, Modal, Pagination, Popconfirm, Select, Space, Table, Tooltip } from "antd";
+import { CarFront, Download, FileArchive, FileText, Hash, PenSquare, Plus, RefreshCw, Trash2, Upload as UploadIcon, X, Scan } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
+import { useRfidScanner } from "@/hooks/use-rfid-scanner";
 
 interface PendingFile {
   file: File;
@@ -689,7 +689,7 @@ export default function TableVehicles() {
                     className="rounded-lg"
                   />
                 </Form.Item>
-                {/* rfid */}
+
                 <Form.Item
                   label={<span className="font-medium text-slate-700">{t("rfidLabel")}</span>}
                   name="vehicle_rfid"
