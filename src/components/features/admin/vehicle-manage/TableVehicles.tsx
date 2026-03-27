@@ -689,7 +689,7 @@ export default function TableVehicles() {
                     className="rounded-lg"
                   />
                 </Form.Item>
-
+                {/* rfid */}
                 <Form.Item
                   label={<span className="font-medium text-slate-700">{t("rfidLabel")}</span>}
                   name="vehicle_rfid"
