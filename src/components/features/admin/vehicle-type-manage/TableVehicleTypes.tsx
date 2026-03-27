@@ -1,11 +1,11 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import vehicleTypeApi from "@/services/vehicle-type.service";
-import type { VehicleType } from "@/services/vehicle-type.service";
 import { useNavigationStore } from "@/hooks/use-navigation-store";
-import { Form, Input, Modal, Pagination, Space, Table, Tooltip, Popconfirm } from "antd";
-import { Plus, RefreshCw, Layers, PenSquare, Trash2, Tag } from "lucide-react";
+import vehicleTypeApi from "@/services/vehicle-type.service";
+import type { VehicleType } from "@/types/vehicle";
+import { Form, Input, Modal, Pagination, Popconfirm, Space, Table, Tooltip } from "antd";
+import { Layers, PenSquare, Plus, RefreshCw, Tag, Trash2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";

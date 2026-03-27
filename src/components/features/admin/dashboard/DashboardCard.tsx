@@ -38,19 +38,11 @@ const accentMap = {
   },
 };
 
-export default function DashboardCard({
-  label,
-  value,
-  icon,
-  accent,
-  subtitle,
-  index = 0,
-}: DashboardCardProps) {
+export default function DashboardCard({ label, value, icon, accent, subtitle, index = 0 }: DashboardCardProps) {
   const colors = accentMap[accent];
 
   return (
-    <div
-      className="relative bg-white rounded-xl border border-slate-200 overflow-hidden group hover:border-slate-300 animate-slide-up"
+    <div className="relative bg-white rounded-xl border border-slate-200 overflow-hidden group hover:border-slate-300 animate-slide-up"
       style={{
         animationDelay: `${index * 80}ms`,
         animationFillMode: "both",
@@ -62,24 +54,16 @@ export default function DashboardCard({
       <div className="p-5 pt-6">
         <div className="flex items-start justify-between gap-4">
           <div className="space-y-1.5 min-w-0">
-            <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">
-              {label}
-            </p>
+            <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">{label}</p>
             <div className="flex items-baseline gap-2">
-              <p className="text-3xl font-bold tracking-tight text-slate-900 tabular-nums">
-                {value}
-              </p>
+              <p className="text-3xl font-bold tracking-tight text-slate-900 tabular-nums">{value}</p>
               {subtitle && (
-                <span className={`text-xs font-medium ${colors.subtitleColor}`}>
-                  {subtitle}
-                </span>
+                <span className={`text-xs font-medium ${colors.subtitleColor}`}>{subtitle}</span>
               )}
             </div>
           </div>
 
-          <div
-            className={`w-10 h-10 rounded-lg ${colors.iconBg} flex items-center justify-center shrink-0`}
-          >
+          <div className={`w-10 h-10 rounded-lg ${colors.iconBg} flex items-center justify-center shrink-0`}>
             <div className={colors.iconColor}>{icon}</div>
           </div>
         </div>

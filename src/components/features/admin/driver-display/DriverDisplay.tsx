@@ -1,8 +1,10 @@
 "use client";
 
 import { useSocket } from "@/context/socket-context";
-import orderApi, { Order } from "@/services/order.service";
-import stationApi, { Station } from "@/services/station.service";
+import orderApi from "@/services/order.service";
+import stationApi from "@/services/station.service";
+import type { Order } from "@/types/order";
+import type { Station } from "@/types/station";
 import { AlertTriangle, Ban, ChevronDown, ChevronUp, Factory, SquareX, Truck } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -183,12 +185,8 @@ export default function DriverDisplay() {
             <StationColumn
               key={station.station_id}
               station={station}
-              collectingOrder={collectingOrders.find(
-                (o) => o.stations?.station_id === station.station_id
-              )}
-              pendingOrders={pendingOrders.filter(
-                (o) => o.stations?.station_id === station.station_id
-              )}
+              collectingOrder={collectingOrders.find((o) => o.stations?.station_id === station.station_id)}
+              pendingOrders={pendingOrders.filter((o) => o.stations?.station_id === station.station_id)}
               t={t}
             />
           ))

@@ -2,33 +2,11 @@
 
 import { Button } from "@/components/ui/button";
 import stationApi from "@/services/station.service";
-import type { Station } from "@/services/station.service";
+import type { Station } from "@/types/station";
 import stationTypeApi from "@/services/station-type.service";
-import type { StationType } from "@/services/station-type.service";
-import {
-  Modal,
-  Pagination,
-  Popconfirm,
-  Space,
-  Table,
-  Tag,
-  Tooltip,
-  Form,
-  Input,
-  InputNumber,
-  Select,
-} from "antd";
-import {
-  Building2,
-  MapPin,
-  PencilLine,
-  Plus,
-  Radar,
-  Save,
-  Trash,
-  X,
-  RefreshCw,
-} from "lucide-react";
+import type { StationType } from "@/types/station";
+import { Modal, Pagination, Popconfirm, Space, Table, Tag, Tooltip, Form, Input, InputNumber, Select } from "antd";
+import { Building2, MapPin, PencilLine, Plus, Radar, Save, Trash, X, RefreshCw } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { toast } from "sonner";
@@ -159,11 +137,7 @@ const TableStations: React.FC = () => {
   const handleDelete = async (station: Station) => {
     try {
       await stationApi.delete(station.station_id);
-      toast.success(
-        <>
-          Trạm <b>{station.station_name}</b> đã bị xoá
-        </>
-      );
+      toast.success(<>Trạm <b>{station.station_name}</b> đã bị xoá</>);
       fetchStations();
     } catch (error) {
       const message =
@@ -266,11 +240,7 @@ const TableStations: React.FC = () => {
           </Tooltip>
           <Popconfirm
             title="Xác nhận"
-            description={
-              <span>
-                {t("confirmDelete")} <b>{record.station_name}</b>?
-              </span>
-            }
+            description={<span> {t("confirmDelete")} <b>{record.station_name}</b>?</span>}
             okText="Xoá"
             cancelText="Huỷ"
             placement="leftBottom"
@@ -287,8 +257,6 @@ const TableStations: React.FC = () => {
       ),
     },
   ];
-
-
 
   return (
     <>

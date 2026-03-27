@@ -1,14 +1,14 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import vehicleApi from "@/services/vehicle.service";
-import type { Vehicle, VehicleMedia } from "@/services/vehicle.service";
-import vehicleTypeApi from "@/services/vehicle-type.service";
-import type { VehicleType } from "@/services/vehicle-type.service";
-import mediaApi from "@/services/media.service";
 import { useNavigationStore } from "@/hooks/use-navigation-store";
-import { Form, Input, Modal, Pagination, Select, Space, Table, Tooltip, Popconfirm, Upload, Divider, Image } from "antd";
-import { Plus, RefreshCw, CarFront, PenSquare, Trash2, Hash, FileText, Upload as UploadIcon, Download, X, FileArchive } from "lucide-react";
+import mediaApi from "@/services/media.service";
+import vehicleTypeApi from "@/services/vehicle-type.service";
+import vehicleApi from "@/services/vehicle.service";
+import type { VehicleMedia } from "@/types/media";
+import type { Vehicle, VehicleType } from "@/types/vehicle";
+import { Divider, Form, Image, Input, Modal, Pagination, Popconfirm, Select, Space, Table, Tooltip } from "antd";
+import { CarFront, Download, FileArchive, FileText, Hash, PenSquare, Plus, RefreshCw, Trash2, Upload as UploadIcon, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -333,9 +333,9 @@ export default function TableVehicles() {
       const src = typeof urlOrFile === "string" ? urlOrFile : URL.createObjectURL(urlOrFile);
       return (
         <div className="w-10 h-10 shrink-0 rounded-md overflow-hidden bg-slate-100 border border-slate-200 flex items-center justify-center [&_.ant-image]:w-full [&_.ant-image]:h-full [&_.ant-image-img]:w-full [&_.ant-image-img]:h-full">
-          <Image 
-            src={src} 
-            alt={name} 
+          <Image
+            src={src}
+            alt={name}
             className="object-cover"
             preview={{
               mask: <div className="text-[10px] text-white">Xem</div>

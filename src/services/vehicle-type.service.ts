@@ -1,12 +1,5 @@
 import http from "@/lib/http";
-
-export interface VehicleType {
-  vehicle_type_id: number;
-  vehicle_type_name: string;
-  vehicle_type_description: string | null;
-  updated_at?: string;
-  updated_by?: number;
-}
+import type { VehicleType } from "@/types/vehicle";
 
 const vehicleTypeApi = {
   getAll: () => http.get("/vehicle-types"),
