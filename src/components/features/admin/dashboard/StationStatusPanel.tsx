@@ -1,10 +1,10 @@
-import { useMemo, useState } from 'react';
-import { useTranslations } from 'next-intl';
-import { ArrowUp, LoaderCircle } from 'lucide-react';
-import type { Station } from '@/services/station.service';
-import type { Order } from '@/services/order.service';
 import stationApi from '@/services/station.service';
+import type { Order } from '@/types/order';
+import type { Station } from '@/types/station';
 import { Input, Modal } from 'antd';
+import { ArrowUp, LoaderCircle } from 'lucide-react';
+import { useTranslations } from 'next-intl';
+import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 interface StationStatusPanelProps {

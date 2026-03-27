@@ -2,14 +2,10 @@
 
 import { Button } from "@/components/ui/button";
 import { useNavigationStore } from "@/hooks/use-navigation-store";
-import type { VehicleMaintenance } from "@/services/vehicle-maintenance.service";
 import vehicleMaintenanceApi from "@/services/vehicle-maintenance.service";
-import type { Vehicle } from "@/services/vehicle.service";
 import vehicleApi from "@/services/vehicle.service";
-import {
-  DatePicker, Form, Input, InputNumber, Modal, Pagination,
-  Popconfirm, Select, Space, Table, Tooltip,
-} from "antd";
+import type { Vehicle, VehicleMaintenance } from "@/types/vehicle";
+import { DatePicker, Form, Input, InputNumber, Modal, Pagination, Popconfirm, Select, Space, Table, Tooltip } from "antd";
 import dayjs from "dayjs";
 import { Calendar, ClipboardList, PenSquare, Plus, RefreshCw, Trash2, Wrench } from "lucide-react";
 import { useTranslations } from "next-intl";

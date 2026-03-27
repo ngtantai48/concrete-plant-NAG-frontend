@@ -1,13 +1,6 @@
 // Mock service for vehicle maintenance — will be replaced with real API later
 
-export interface VehicleMaintenance {
-  vehicle_maintenance_id: number;
-  vehicle_maintenance_from_datetime: string;
-  vehicle_maintenance_to_datetime: string;
-  vehicle_distance_covered: number;
-  vehicle_maintenance_description: string;
-  vehicle_id: number;
-}
+import type { VehicleMaintenance } from "@/types/vehicle";
 
 const MOCK_DATA: VehicleMaintenance[] = [
   {

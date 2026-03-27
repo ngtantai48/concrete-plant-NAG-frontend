@@ -1,10 +1,11 @@
-import { useMemo, useState } from 'react';
-import { useTranslations } from 'next-intl';
+import orderApi from '@/services/order.service';
+import type { Order } from '@/types/order';
+import type { Station } from '@/types/station';
+import type { Vehicle } from '@/types/vehicle';
 import { ArrowRight, ChevronDown, ChevronUp, Trash2 } from 'lucide-react';
+import { useTranslations } from 'next-intl';
+import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import type { Station } from '@/services/station.service';
-import type { Vehicle } from '@/services/vehicle.service';
-import orderApi, { type Order } from '@/services/order.service';
 
 interface ActivityFlowProps {
   stations: Station[];

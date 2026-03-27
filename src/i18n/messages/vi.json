@@ -92,10 +92,10 @@
     "fullscreen": "Toàn màn hình",
     "exitFullscreen": "Thoát toàn màn hình",
     "refresh": "Làm mới",
-    "stationStopped": "DỪNG HOẠT ĐỘNG",
+    "stationStopped": "TẠM DỪNG",
     "stationIncident": "SỰ CỐ",
     "collectingAction": "TRẠM ĐANG CUNG CẤP HÀNG",
-    "socketConnected": "Đã kết nối",
+    "socketConnected": "Hoạt động",
     "socketDisconnected": "Mất kết nối",
     "nextVehicle": "XE TIẾP THEO VÀO TRẠM",
     "waitingList": "ĐANG CHỜ"
