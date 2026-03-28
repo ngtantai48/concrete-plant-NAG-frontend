@@ -6,7 +6,7 @@ import type { Station } from "@/types/station";
 import stationTypeApi from "@/services/station-type.service";
 import type { StationType } from "@/types/station";
 import { Modal, Pagination, Popconfirm, Space, Table, Tag, Tooltip, Form, Input, InputNumber, Select } from "antd";
-import { Building2, MapPin, PencilLine, Plus, Radar, Save, Trash, X, RefreshCw } from "lucide-react";
+import { Building2, MapPin, PencilLine, Plus, Radar, Save, Trash, X, RefreshCw, Wifi } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { toast } from "sonner";
@@ -73,12 +73,14 @@ const TableStations: React.FC = () => {
     form.setFieldsValue({
       station_name: station.station_name,
       station_address: station.station_address,
-      longitude: station.station_gps_longitude ?? undefined,
-      latitude: station.station_gps_latitude ?? undefined,
+      station_gps_longitude: station.station_gps_longitude,
+      station_gps_latitude: station.station_gps_latitude,
       station_gps_geofencing: station.station_gps_geofencing,
       station_status: station.station_status,
       station_description: station.station_description,
       station_type_id: station.station_type_id || station.station_types?.station_type_id,
+      station_ip_address: station.station_ip_address,
+      station_port: station.station_port,
     });
     setModalOpen(true);
   };
@@ -102,14 +104,16 @@ const TableStations: React.FC = () => {
     try {
       const values = await form.validateFields();
       setSaving(true);
-      const { longitude, latitude, ...rest } = values;
       const payload = {
-        ...rest,
-        station_gps_longitude: longitude || null,
-        station_gps_latitude: latitude || null,
-        station_description: rest.station_description || null,
+        ...values,
+        station_description: values.station_description || null,
+        station_ip_address: values.station_ip_address || null,
+        station_port: values.station_port || null,
+        station_gps_longitude: values.station_gps_longitude || null,
+        station_gps_latitude: values.station_gps_latitude || null,
       };
       if (editingStation) {
+        console.log("UPDATE payload:", JSON.stringify(payload, null, 2));
         await stationApi.update(editingStation.station_id, payload);
       } else {
         await stationApi.create(payload);
@@ -196,7 +200,12 @@ const TableStations: React.FC = () => {
       title: t("stationType"),
       dataIndex: "station_type_id",
       key: "station_type_id",
-      render: (val: number | null) => getTypeName(val),
+      render: (_: number | null, record: Station) => {
+        if (record.station_types) {
+          return record.station_types.station_type_description || record.station_types.station_type_name;
+        }
+        return getTypeName(record.station_type_id);
+      },
     },
     {
       title: t("address"),
@@ -205,16 +214,16 @@ const TableStations: React.FC = () => {
       render: (val: string | null) => val || "-",
     },
     {
-      title: t("longitude"),
+      title: "Kinh độ",
       dataIndex: "station_gps_longitude",
       key: "station_gps_longitude",
-      render: (val: number | null) => val != null ? val : "-",
+      render: (val: number | null) => val ?? "-",
     },
     {
-      title: t("latitude"),
+      title: "Vĩ độ",
       dataIndex: "station_gps_latitude",
       key: "station_gps_latitude",
-      render: (val: number | null) => val != null ? val : "-",
+      render: (val: number | null) => val ?? "-",
     },
     {
       title: t("geofencing"),
@@ -222,6 +231,20 @@ const TableStations: React.FC = () => {
       key: "station_gps_geofencing",
       align: "center" as const,
       render: (val: number | null) => (val ? `${val} m` : "-"),
+    },
+    {
+      title: "IP Address",
+      dataIndex: "station_ip_address",
+      key: "station_ip_address",
+      render: (val: string | null) => val || "-",
+    },
+    {
+      title: "Port",
+      dataIndex: "station_port",
+      key: "station_port",
+      align: "center" as const,
+      width: 100,
+      render: (val: number | null) => val || "-",
     },
     {
       title: t("status"),
@@ -524,11 +547,11 @@ const TableStations: React.FC = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
                 <Form.Item
                   label={<span className="font-medium text-slate-700">{t("longitude")}</span>}
-                  name="longitude"
+                  name="station_gps_longitude"
                   rules={[
                     {
                       validator: (_, value) => {
-                        if (!value) return Promise.resolve();
+                        if (value === undefined || value === null || value === '') return Promise.resolve();
                         const num = Number(value);
                         if (isNaN(num)) return Promise.reject("Kinh độ phải là số hợp lệ");
                         if (num < -180 || num > 180)
@@ -539,16 +562,16 @@ const TableStations: React.FC = () => {
                   ]}
                   className="mb-0"
                 >
-                  <Input placeholder="VD: 108.2022" size="large" className="rounded-lg" />
+                  <InputNumber placeholder="VD: 108.2022" size="large" className="rounded-lg" style={{ width: '100%' }} />
                 </Form.Item>
 
                 <Form.Item
                   label={<span className="font-medium text-slate-700">{t("latitude")}</span>}
-                  name="latitude"
+                  name="station_gps_latitude"
                   rules={[
                     {
                       validator: (_, value) => {
-                        if (!value) return Promise.resolve();
+                        if (value === undefined || value === null || value === '') return Promise.resolve();
                         const num = Number(value);
                         if (isNaN(num)) return Promise.reject("Vĩ độ phải là số hợp lệ");
                         if (num < -90 || num > 90) return Promise.reject("Vĩ độ từ -90 đến 90");
@@ -558,7 +581,7 @@ const TableStations: React.FC = () => {
                   ]}
                   className="mb-0"
                 >
-                  <Input placeholder="VD: 16.0544" size="large" className="rounded-lg" />
+                  <InputNumber placeholder="VD: 16.0544" size="large" className="rounded-lg" style={{ width: '100%' }} />
                 </Form.Item>
 
                 <Form.Item
@@ -574,6 +597,43 @@ const TableStations: React.FC = () => {
                     min={0}
                     addonAfter={<span className="text-slate-500 font-medium px-2">mét</span>}
                   />
+                </Form.Item>
+              </div>
+            </div>
+
+            {/* Section 3: Kết nối RFID */}
+            <div className="pt-2">
+              <div className="flex items-center gap-2 mb-4 pb-2 border-b border-slate-100">
+                <Wifi className="w-5 h-5 text-purple-600" />
+                <h3 className="text-base font-medium text-slate-800">
+                  Kết nối RFID Reader
+                </h3>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+                <Form.Item
+                  label={<span className="font-medium text-slate-700">IP Address</span>}
+                  name="station_ip_address"
+                  rules={[
+                    {
+                      validator: (_, value) => {
+                        if (!value) return Promise.resolve();
+                        const ipRegex = /^(\d{1,3}\.){3}\d{1,3}$/;
+                        if (!ipRegex.test(value)) return Promise.reject("Địa chỉ IP không hợp lệ");
+                        return Promise.resolve();
+                      },
+                    },
+                  ]}
+                  className="mb-0"
+                >
+                  <Input placeholder="VD: 192.168.1.101" size="large" className="rounded-lg" />
+                </Form.Item>
+
+                <Form.Item
+                  label={<span className="font-medium text-slate-700">Port</span>}
+                  name="station_port"
+                  className="mb-0"
+                >
+                  <Input placeholder="VD: 2022" size="large" className="rounded-lg" />
                 </Form.Item>
               </div>
             </div>
