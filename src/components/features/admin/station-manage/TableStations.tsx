@@ -625,7 +625,7 @@ const TableStations: React.FC = () => {
                   ]}
                   className="mb-0"
                 >
-                  <Input placeholder="VD: 192.168.1.100" size="large" className="rounded-lg" />
+                  <Input placeholder="VD: 192.168.1.101" size="large" className="rounded-lg" />
                 </Form.Item>
 
                 <Form.Item

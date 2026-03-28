@@ -16,7 +16,6 @@ export interface Station {
     station_type_description: string;
   };
 }
-
 export interface StationType {
   station_type_id: number;
   station_type_name: string;
