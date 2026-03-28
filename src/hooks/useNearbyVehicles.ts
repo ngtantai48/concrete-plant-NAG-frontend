@@ -24,7 +24,8 @@ function haversineDistance(
 }
 
 export function useNearbyVehicles(
-  stationGps: string | null,
+  stationLongitude: number | null,
+  stationLatitude: number | null,
   radiusMeters: number,
   intervalMs = 60000,
 ) {
@@ -35,14 +36,10 @@ export function useNearbyVehicles(
   const timerRef = useRef<ReturnType<typeof setInterval>>(null);
 
   const fetchAndFilter = useCallback(async () => {
-    if (!stationGps) return;
+    if (stationLongitude == null || stationLatitude == null) return;
 
-    const parts = stationGps.split(",").map((s) => s.trim());
-    if (parts.length < 2) return;
-
-    const stationLng = parseFloat(parts[0]);
-    const stationLat = parseFloat(parts[1]);
-    if (isNaN(stationLng) || isNaN(stationLat)) return;
+    const stationLng = stationLongitude;
+    const stationLat = stationLatitude;
 
     setLoading(true);
     setError(null);
@@ -77,7 +74,7 @@ export function useNearbyVehicles(
     } finally {
       setLoading(false);
     }
-  }, [stationGps, radiusMeters]);
+  }, [stationLongitude, stationLatitude, radiusMeters]);
 
   useEffect(() => {
     fetchAndFilter();

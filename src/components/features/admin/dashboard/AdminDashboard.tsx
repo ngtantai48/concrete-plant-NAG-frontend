@@ -119,12 +119,13 @@ export default function AdminDashboard() {
   );
 
   const geofenceStation = useMemo(
-    () => stations.find((s) => s.station_gps) || stations[0] || null,
+    () => stations.find((s) => s.station_gps_longitude != null && s.station_gps_latitude != null) || stations[0] || null,
     [stations],
   );
 
   const { vehicles: vtrackingVehicles, inRangeCount, loading: nearbyLoading, lastUpdated, error: nearbyError, refetch: refetchVehicles } = useNearbyVehicles(
-    geofenceStation?.station_gps || null,
+    geofenceStation?.station_gps_longitude ?? null,
+    geofenceStation?.station_gps_latitude ?? null,
     geofenceStation?.station_gps_geofencing || 500,
   );
 
@@ -362,7 +363,8 @@ export default function AdminDashboard() {
               children: (
                  <div className="mt-6 h-[700px] overflow-hidden rounded-[20px] bg-white p-2 shadow-[0_0_0_1px_rgba(51,65,85,0.18),0_12px_28px_rgba(15,23,42,0.05)]">
                    <StationMap
-                    stationGps={geofenceStation?.station_gps || null}
+                    stationLongitude={geofenceStation?.station_gps_longitude ?? null}
+                    stationLatitude={geofenceStation?.station_gps_latitude ?? null}
                     radius={geofenceStation?.station_gps_geofencing || 500}
                     vehicles={vtrackingVehicles}
                   />
