@@ -41,7 +41,8 @@ const offlineIcon = L.divIcon({
 });
 
 interface StationMapProps {
-  stationGps: string | null;
+  stationLongitude: number | null;
+  stationLatitude: number | null;
   radius: number;
   vehicles: NearbyVehicle[];
 }
@@ -55,14 +56,14 @@ function MapUpdater({ stationLat, stationLng }: { stationLat: number; stationLng
   return null;
 }
 
-export default function StationMap({ stationGps, radius, vehicles }: StationMapProps) {
+export default function StationMap({ stationLongitude, stationLatitude, radius, vehicles }: StationMapProps) {
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  if (!mounted || !stationGps) {
+  if (!mounted || stationLongitude == null || stationLatitude == null) {
     return (
       <div className="w-full h-full bg-slate-50 flex items-center justify-center rounded-lg border border-slate-200">
         <p className="text-sm text-slate-400 animate-pulse">Đang tải bản đồ...</p>
@@ -70,13 +71,8 @@ export default function StationMap({ stationGps, radius, vehicles }: StationMapP
     );
   }
 
-  const parts = stationGps.split(",").map((s) => s.trim());
-  if (parts.length < 2) return null;
-
-  const stationLng = parseFloat(parts[0]);
-  const stationLat = parseFloat(parts[1]);
-
-  if (isNaN(stationLng) || isNaN(stationLat)) return null;
+  const stationLng = stationLongitude;
+  const stationLat = stationLatitude;
 
   return (
     <div className="w-full h-full relative z-0 rounded-lg overflow-hidden border border-slate-200">

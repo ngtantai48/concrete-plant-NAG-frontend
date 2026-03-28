@@ -70,14 +70,11 @@ const TableStations: React.FC = () => {
 
   const openEditModal = (station: Station) => {
     setEditingStation(station);
-    const [lng, lat] = station.station_gps
-      ? station.station_gps.split(",").map((v) => v.trim())
-      : ["", ""];
     form.setFieldsValue({
       station_name: station.station_name,
       station_address: station.station_address,
-      longitude: lng ? Number(lng) : undefined,
-      latitude: lat ? Number(lat) : undefined,
+      longitude: station.station_gps_longitude ?? undefined,
+      latitude: station.station_gps_latitude ?? undefined,
       station_gps_geofencing: station.station_gps_geofencing,
       station_status: station.station_status,
       station_description: station.station_description,
@@ -108,7 +105,8 @@ const TableStations: React.FC = () => {
       const { longitude, latitude, ...rest } = values;
       const payload = {
         ...rest,
-        station_gps: longitude && latitude ? `${longitude},${latitude}` : null,
+        station_gps_longitude: longitude || null,
+        station_gps_latitude: latitude || null,
         station_description: rest.station_description || null,
       };
       if (editingStation) {
@@ -207,10 +205,16 @@ const TableStations: React.FC = () => {
       render: (val: string | null) => val || "-",
     },
     {
-      title: t("gps"),
-      dataIndex: "station_gps",
-      key: "station_gps",
-      render: (val: string | null) => val || "-",
+      title: t("longitude"),
+      dataIndex: "station_gps_longitude",
+      key: "station_gps_longitude",
+      render: (val: number | null) => val != null ? val : "-",
+    },
+    {
+      title: t("latitude"),
+      dataIndex: "station_gps_latitude",
+      key: "station_gps_latitude",
+      render: (val: number | null) => val != null ? val : "-",
     },
     {
       title: t("geofencing"),
