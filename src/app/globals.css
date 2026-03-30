@@ -1,3 +1,4 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
 @import "tailwindcss";
 @import "tw-animate-css";
 
@@ -123,6 +124,287 @@
   --sidebar-ring: oklch(0.556 0 0);
 }
 
+/* ═══════════════════════════════════════════════════════
+   DASHBOARD CLEAN LIGHT THEME (scoped)
+   ═══════════════════════════════════════════════════════ */
+.dashboard-light {
+  --dd-bg-primary: #f8fafc;
+  --dd-bg-secondary: #f1f5f9;
+  --dd-bg-card: #ffffff;
+  --dd-bg-card-hover: #fcfcfd;
+  --dd-bg-surface: #f8fafc;
+  --dd-bg-header: #ffffff;
+  --dd-border: rgba(148, 163, 184, 0.4);
+  --dd-border-hover: rgba(148, 163, 184, 0.6);
+  --dd-border-accent: rgba(148, 163, 184, 0.8);
+  --dd-text-primary: #0f172a;
+  --dd-text-secondary: #334155;
+  --dd-text-muted: #64748b;
+  --dd-text-accent: #0284c7;
+  --dd-cyan: #0284c7;
+  --dd-cyan-glow: rgba(2, 132, 199, 0.1);
+  --dd-emerald: #059669;
+  --dd-emerald-glow: rgba(5, 150, 105, 0.1);
+  --dd-amber: #d97706;
+  --dd-amber-glow: rgba(217, 119, 6, 0.1);
+  --dd-red: #dc2626;
+  --dd-red-glow: rgba(220, 38, 38, 0.1);
+  --dd-sky: #0284c7;
+  --dd-violet: #6d28d9;
+}
+
+/* ── Clean Light Dashboard - Base ── */
+.dashboard-light {
+  /* Soft Light Gradient */
+  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+  color: var(--dd-text-primary);
+  min-height: 100vh;
+  font-family: 'Inter', sans-serif;
+  letter-spacing: 0.01em;
+}
+
+/* ── Clean White Card ── */
+.dd-card {
+  background: #ffffff;
+  border: 1px solid var(--dd-border);
+  border-radius: 20px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04), 0 1px 3px rgba(0, 0, 0, 0.02);
+  transition: all 0.2s ease-in-out;
+}
+
+.dd-card:hover {
+  border-color: var(--dd-border-hover);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.06), 0 4px 6px rgba(0, 0, 0, 0.03);
+}
+
+/* ── Stat Cards Clean ── */
+.dd-stat-card {
+  background: #ffffff;
+  border: 1px solid var(--dd-border);
+  border-radius: 16px;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.03);
+  transition: all 0.2s ease-in-out;
+}
+
+.dd-stat-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 16px;
+  padding: 2px;
+  background: linear-gradient(135deg, var(--accent-color, var(--dd-cyan)), transparent);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: 0.15;
+  pointer-events: none;
+}
+
+.dd-stat-card:hover {
+  border-color: var(--dd-border-hover);
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.05);
+  transform: translateY(-2px);
+}
+
+/* ── Header Panel Clean ── */
+.dd-header {
+  background: #ffffff;
+  border: 1px solid var(--dd-border);
+  border-radius: 24px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.03);
+}
+
+/* ── Glow Border Accent ── */
+.dd-glow-border {
+  position: relative;
+}
+
+.dd-glow-border::after {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(135deg, var(--dd-cyan), var(--dd-violet), var(--dd-cyan));
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+
+.dd-glow-border:hover::after {
+  opacity: 0.5;
+}
+
+/* ── Status Chip Dark ── */
+.dd-chip {
+  border-radius: 20px;
+  padding: 4px 14px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dd-chip-emerald {
+  background: rgba(16, 185, 129, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  color: #34d399;
+}
+
+.dd-chip-amber {
+  background: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.25);
+  color: #fbbf24;
+}
+
+.dd-chip-red {
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  color: #f87171;
+}
+
+.dd-chip-sky {
+  background: rgba(56, 189, 248, 0.12);
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  color: #38bdf8;
+}
+
+.dd-chip-slate {
+  background: rgba(100, 116, 139, 0.12);
+  border: 1px solid rgba(100, 116, 139, 0.2);
+  color: #94a3b8;
+}
+
+.dd-chip-violet {
+  background: rgba(139, 92, 246, 0.12);
+  border: 1px solid rgba(139, 92, 246, 0.25);
+  color: #a78bfa;
+}
+
+/* ── Dark Scrollbar ── */
+.dashboard-light ::-webkit-scrollbar {
+  width: 6px;
+}
+
+.dashboard-light ::-webkit-scrollbar-track {
+  background: rgba(15, 20, 40, 0.5);
+  border-radius: 3px;
+}
+
+.dashboard-light ::-webkit-scrollbar-thumb {
+  background: rgba(56, 189, 248, 0.15);
+  border-radius: 3px;
+}
+
+.dashboard-light ::-webkit-scrollbar-thumb:hover {
+  background: rgba(56, 189, 248, 0.3);
+}
+
+/* ── Dark Button Styles ── */
+.dd-btn {
+  padding: 10px 16px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+.dd-btn-primary {
+  background: linear-gradient(135deg, rgba(6, 182, 212, 0.2), rgba(6, 182, 212, 0.08));
+  border: 1px solid rgba(6, 182, 212, 0.3);
+  color: #22d3ee;
+}
+
+.dd-btn-primary:hover {
+  background: linear-gradient(135deg, rgba(6, 182, 212, 0.35), rgba(6, 182, 212, 0.15));
+  border-color: rgba(6, 182, 212, 0.5);
+  box-shadow: 0 0 20px rgba(6, 182, 212, 0.15);
+}
+
+.dd-btn-danger {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.15), rgba(239, 68, 68, 0.05));
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  color: #f87171;
+}
+
+.dd-btn-danger:hover {
+  background: linear-gradient(135deg, rgba(239, 68, 68, 0.3), rgba(239, 68, 68, 0.1));
+  border-color: rgba(239, 68, 68, 0.4);
+  box-shadow: 0 0 20px rgba(239, 68, 68, 0.12);
+}
+
+.dd-btn-ghost {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--dd-border);
+  color: var(--dd-text-secondary);
+}
+
+.dd-btn-ghost:hover {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: var(--dd-border-hover);
+  color: var(--dd-text-primary);
+}
+
+/* ── Ant Design Tabs Dark Override ── */
+.dashboard-light .ant-tabs {
+  color: var(--dd-text-secondary) !important;
+}
+
+.dashboard-light .ant-tabs-tab {
+  color: var(--dd-text-muted) !important;
+  transition: color 0.25s ease !important;
+}
+
+.dashboard-light .ant-tabs-tab:hover {
+  color: var(--dd-text-primary) !important;
+}
+
+.dashboard-light .ant-tabs-tab-active .ant-tabs-tab-btn {
+  color: var(--dd-text-accent) !important;
+}
+
+.dashboard-light .ant-tabs-ink-bar {
+  background: linear-gradient(90deg, var(--dd-cyan), var(--dd-violet)) !important;
+  height: 2px !important;
+}
+
+.dashboard-light .ant-tabs-nav::before {
+  border-bottom: 1px solid var(--dd-border) !important;
+}
+
+/* ── Ant Design Skeleton Dark ── */
+.dashboard-light .ant-skeleton-content .ant-skeleton-title,
+.dashboard-light .ant-skeleton-content .ant-skeleton-paragraph>li {
+  background: linear-gradient(90deg, rgba(30, 40, 70, 0.6), rgba(50, 60, 90, 0.4), rgba(30, 40, 70, 0.6)) !important;
+  background-size: 200% 100% !important;
+  animation: dd-shimmer 1.5s infinite !important;
+}
+
+/* ── Panel Surface Clean ── */
+.dd-surface {
+  background: #f8fafc;
+  border: 1px solid var(--dd-border);
+  border-radius: 16px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+}
+
+/* ── Divider ── */
+.dd-divider {
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--dd-border-accent), transparent);
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
@@ -241,8 +523,8 @@
 
   .transition-smooth {
     transition: transform 0.3s cubic-bezier(0.25, 1, 0.5, 1),
-               opacity 0.3s cubic-bezier(0.25, 1, 0.5, 1),
-               box-shadow 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+      opacity 0.3s cubic-bezier(0.25, 1, 0.5, 1),
+      box-shadow 0.3s cubic-bezier(0.25, 1, 0.5, 1);
   }
 
   .animate-flow-arrow {
@@ -258,6 +540,7 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
+
     .animate-flow-arrow,
     .animate-flow-arrow-up,
     .animate-soft-spin {
@@ -267,7 +550,7 @@
 
   .ant-card {
     transition: box-shadow 0.3s cubic-bezier(0.25, 1, 0.5, 1),
-               transform 0.3s cubic-bezier(0.25, 1, 0.5, 1);
+      transform 0.3s cubic-bezier(0.25, 1, 0.5, 1);
   }
 
   .ant-card:hover {
@@ -283,7 +566,105 @@
   .ant-btn-primary {
     @apply shadow-sm;
     transition: transform 0.15s cubic-bezier(0.25, 1, 0.5, 1),
-               opacity 0.15s cubic-bezier(0.25, 1, 0.5, 1),
-               box-shadow 0.15s cubic-bezier(0.25, 1, 0.5, 1);
+      opacity 0.15s cubic-bezier(0.25, 1, 0.5, 1),
+      box-shadow 0.15s cubic-bezier(0.25, 1, 0.5, 1);
   }
+}
+
+/* ── Dark Dashboard Keyframes ── */
+@keyframes dd-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+@keyframes dd-glow-pulse {
+
+  0%,
+  100% {
+    box-shadow: 0 0 4px rgba(6, 182, 212, 0.2);
+  }
+
+  50% {
+    box-shadow: 0 0 12px rgba(6, 182, 212, 0.4);
+  }
+}
+
+@keyframes dd-border-glow {
+
+  0%,
+  100% {
+    border-color: rgba(6, 182, 212, 0.15);
+  }
+
+  50% {
+    border-color: rgba(6, 182, 212, 0.35);
+  }
+}
+
+.animate-dd-glow {
+  animation: dd-glow-pulse 2s ease-in-out infinite;
+}
+
+.animate-dd-border-glow {
+  animation: dd-border-glow 3s ease-in-out infinite;
+}
+
+/* ── Pro Premium Animations ── */
+@keyframes fade-up {
+  0% { opacity: 0; transform: translateY(20px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-up {
+  animation: fade-up 0.6s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  opacity: 0; /* starts hidden */
+}
+
+@keyframes radar-pulse {
+  0% { transform: scale(0.5); opacity: 0.6; }
+  100% { transform: scale(2.5); opacity: 0; border-width: 1px; }
+}
+.animate-radar {
+  animation: radar-pulse 2s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+}
+
+@keyframes danger-blink {
+  0% { opacity: 1; box-shadow: 0 0 0px rgba(239, 68, 68, 0); }
+  50% { opacity: 0.6; box-shadow: 0 0 15px rgba(239, 68, 68, 0.5); }
+  100% { opacity: 1; box-shadow: 0 0 0px rgba(239, 68, 68, 0); }
+}
+.animate-danger-blink {
+  animation: danger-blink 1s ease-in-out infinite;
+}
+
+@keyframes drive-idle {
+  0% { transform: translateY(0px) translateX(0px); }
+  50% { transform: translateY(-2px) translateX(1px); }
+  100% { transform: translateY(0px) translateX(0px); }
+}
+.animate-drive-idle {
+  animation: drive-idle 2s ease-in-out infinite;
+}
+
+@keyframes drive-run {
+  0% { transform: translateX(0px) translateY(0px); }
+  25% { transform: translateX(4px) translateY(-1px); }
+  50% { transform: translateX(8px) translateY(0px); }
+  75% { transform: translateX(4px) translateY(1px); }
+  100% { transform: translateX(0px) translateY(0px); }
+}
+.animate-drive-run {
+  animation: drive-run 1.2s ease-in-out infinite;
+}
+
+@keyframes flash-bg {
+  0% { background-color: rgba(52, 211, 153, 0.4); box-shadow: 0 0 20px rgba(52, 211, 153, 0.6); }
+  100% { background-color: transparent; box-shadow: none; }
+}
+.animate-flash-bg {
+  animation: flash-bg 0.8s ease-out forwards;
 }

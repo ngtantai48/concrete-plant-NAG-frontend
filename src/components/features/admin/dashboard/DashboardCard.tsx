@@ -6,35 +6,41 @@ interface DashboardCardProps {
   label: string;
   value: number | string;
   icon: ReactNode;
-  accent: "blue" | "emerald" | "amber" | "slate";
+  accent: "blue" | "emerald" | "amber" | "slate" | "cyan" | "violet";
   subtitle?: string;
   index?: number;
 }
 
 const accentMap = {
   blue: {
-    iconBg: "bg-blue-100",
-    iconColor: "text-blue-600",
-    bar: "bg-blue-500",
-    subtitleColor: "text-blue-600",
+    color: '#38bdf8',
+    glow: 'rgba(56, 189, 248, 0.12)',
+    border: 'rgba(56, 189, 248, 0.2)',
+  },
+  cyan: {
+    color: '#22d3ee',
+    glow: 'rgba(6, 182, 212, 0.12)',
+    border: 'rgba(6, 182, 212, 0.25)',
   },
   emerald: {
-    iconBg: "bg-emerald-100",
-    iconColor: "text-emerald-600",
-    bar: "bg-emerald-500",
-    subtitleColor: "text-emerald-600",
+    color: '#34d399',
+    glow: 'rgba(16, 185, 129, 0.12)',
+    border: 'rgba(16, 185, 129, 0.2)',
   },
   amber: {
-    iconBg: "bg-amber-100",
-    iconColor: "text-amber-600",
-    bar: "bg-amber-500",
-    subtitleColor: "text-amber-600",
+    color: '#fbbf24',
+    glow: 'rgba(245, 158, 11, 0.12)',
+    border: 'rgba(245, 158, 11, 0.2)',
+  },
+  violet: {
+    color: '#a78bfa',
+    glow: 'rgba(139, 92, 246, 0.12)',
+    border: 'rgba(139, 92, 246, 0.2)',
   },
   slate: {
-    iconBg: "bg-slate-200",
-    iconColor: "text-slate-600",
-    bar: "bg-slate-500",
-    subtitleColor: "text-slate-600",
+    color: '#94a3b8',
+    glow: 'rgba(100, 116, 139, 0.12)',
+    border: 'rgba(100, 116, 139, 0.15)',
   },
 };
 
@@ -42,29 +48,34 @@ export default function DashboardCard({ label, value, icon, accent, subtitle, in
   const colors = accentMap[accent];
 
   return (
-    <div className="relative bg-white rounded-xl border border-slate-200 overflow-hidden group hover:border-slate-300 animate-slide-up"
+    <div className="dd-stat-card animate-slide-up overflow-hidden"
       style={{
         animationDelay: `${index * 80}ms`,
         animationFillMode: "both",
-        transition: "border-color 0.2s cubic-bezier(0.25, 1, 0.5, 1)",
-      }}
+        '--accent-color': colors.color,
+      } as React.CSSProperties}
     >
-      <div className={`absolute top-0 left-0 w-full h-[3px] ${colors.bar}`} />
-
       <div className="p-5 pt-6">
         <div className="flex items-start justify-between gap-4">
           <div className="space-y-1.5 min-w-0">
-            <p className="text-[11px] font-semibold uppercase tracking-widest text-slate-400">{label}</p>
+            <p className="text-[11px] font-semibold uppercase tracking-widest"
+               style={{ color: 'var(--dd-text-muted)' }}>
+              {label}
+            </p>
             <div className="flex items-baseline gap-2">
-              <p className="text-3xl font-bold tracking-tight text-slate-900 tabular-nums">{value}</p>
+              <p className="text-3xl font-bold tracking-tight tabular-nums"
+                 style={{ color: colors.color }}>
+                {value}
+              </p>
               {subtitle && (
-                <span className={`text-xs font-medium ${colors.subtitleColor}`}>{subtitle}</span>
+                <span className="text-xs font-medium" style={{ color: colors.color, opacity: 0.7 }}>{subtitle}</span>
               )}
             </div>
           </div>
 
-          <div className={`w-10 h-10 rounded-lg ${colors.iconBg} flex items-center justify-center shrink-0`}>
-            <div className={colors.iconColor}>{icon}</div>
+          <div className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0"
+               style={{ background: colors.glow, border: `1px solid ${colors.border}` }}>
+            <div style={{ color: colors.color }}>{icon}</div>
           </div>
         </div>
       </div>

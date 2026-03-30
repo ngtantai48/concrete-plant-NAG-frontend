@@ -5,7 +5,7 @@ import type { DeviceStationStatus } from '@/hooks/useDeviceHeartbeat';
 import stationApi from '@/services/station.service';
 import type { Order } from '@/types/order';
 import type { Station } from '@/types/station';
-import { ArrowUp, LoaderCircle } from 'lucide-react';
+import { AlertTriangle, ArrowUp, LoaderCircle, Pause, Play } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -137,22 +137,19 @@ export default function StationStatusPanel({ stations, orders, deviceStationStat
     }
   };
 
-  const openIncidentModal = (station: Station) => {
-    setIncidentStation(station);
-    setIncidentDesc('');
-  };
-
   const getButtonConfig = (station: Station) => {
     if (station.station_status === 'operating' || station.station_status === 'collecting') {
       return {
         label: t('stopped'),
-        style: 'border border-slate-300 bg-white text-slate-900 hover:bg-slate-100',
+        icon: <Pause className="mr-1.5 h-3.5 w-3.5" />,
+        className: 'dd-btn dd-btn-ghost',
       };
     }
 
     return {
       label: t('restore'),
-      style: 'border border-slate-900 bg-slate-900 text-white hover:bg-slate-800',
+      icon: <Play className="mr-1.5 h-3.5 w-3.5" />,
+      className: 'dd-btn dd-btn-primary',
     };
   };
 
@@ -160,44 +157,54 @@ export default function StationStatusPanel({ stations, orders, deviceStationStat
     if (status === 'operating') {
       return {
         label: t('operating'),
-        tone: 'text-emerald-700',
-        dot: 'bg-emerald-500',
-        chip: 'border border-emerald-500 bg-emerald-50 text-emerald-700',
+        tone: '#34d399',
+        dot: '#10b981',
+        dotGlow: 'rgba(16, 185, 129, 0.5)',
+        chipClass: 'dd-chip dd-chip-emerald',
+        borderGlow: 'rgba(16, 185, 129, 0.2)',
       };
     }
 
     if (status === 'stopped') {
       return {
         label: t('stopped'),
-        tone: 'text-amber-700',
-        dot: 'bg-amber-500',
-        chip: 'border border-amber-500 bg-amber-50 text-amber-700',
+        tone: '#fbbf24',
+        dot: '#f59e0b',
+        dotGlow: 'rgba(245, 158, 11, 0.5)',
+        chipClass: 'dd-chip dd-chip-amber',
+        borderGlow: 'rgba(245, 158, 11, 0.15)',
       };
     }
 
     if (status === 'incident') {
       return {
         label: t('incident'),
-        tone: 'text-red-700',
-        dot: 'bg-red-500',
-        chip: 'border-2 border-red-500 bg-red-50 text-red-700',
+        tone: '#f87171',
+        dot: '#ef4444',
+        dotGlow: 'rgba(239, 68, 68, 0.5)',
+        chipClass: 'dd-chip dd-chip-red',
+        borderGlow: 'rgba(239, 68, 68, 0.2)',
       };
     }
 
     if (status === 'collecting') {
       return {
         label: t('collecting'),
-        tone: 'text-sky-700',
-        dot: 'bg-sky-500',
-        chip: 'border border-sky-500 bg-sky-50 text-sky-700',
+        tone: '#38bdf8',
+        dot: '#0ea5e9',
+        dotGlow: 'rgba(14, 165, 233, 0.5)',
+        chipClass: 'dd-chip dd-chip-sky',
+        borderGlow: 'rgba(14, 165, 233, 0.2)',
       };
     }
 
     return {
       label: t('unknown'),
-      tone: 'text-slate-500',
-      dot: 'bg-slate-300',
-      chip: 'border border-slate-300 bg-white text-slate-500',
+      tone: '#94a3b8',
+      dot: '#64748b',
+      dotGlow: 'rgba(100, 116, 139, 0.3)',
+      chipClass: 'dd-chip dd-chip-slate',
+      borderGlow: 'rgba(100, 116, 139, 0.1)',
     };
   };
 
@@ -219,87 +226,134 @@ export default function StationStatusPanel({ stations, orders, deviceStationStat
           return (
             <div
               key={station.station_id}
-              className="flex min-h-[280px] flex-col border border-slate-300 bg-white transition-colors hover:border-slate-900"
+              className="dd-card dd-glow-border flex min-h-[280px] flex-col overflow-hidden"
+              style={{ borderColor: theme.borderGlow }}
             >
-              <div className="flex items-start justify-between gap-4 border-b border-slate-300 bg-slate-50 px-5 py-4">
+              {/* Header */}
+              <div className="flex items-start justify-between gap-4 px-5 py-4 rounded-t-[19px]"
+                style={{ background: 'var(--dd-bg-header)', borderBottom: '1px solid var(--dd-border)' }}>
                 <div>
-                  <p className="text-[11px] font-bold uppercase tracking-[0.24em] text-slate-500">{t('dispatchStationLabel')}</p>
-                  <h3 className="mt-2 text-2xl font-black tracking-tight text-slate-900">{station.station_name}</h3>
-                  <div className="mt-3 inline-flex items-center gap-2 border border-slate-300 bg-white px-3 py-1 text-[11px] font-bold uppercase tracking-[0.16em] text-slate-700">
-                    <span className={`h-2 w-2 ${deviceStatus === 'connected' ? 'bg-emerald-500 animate-pulse' : 'bg-red-500'}`} />
+                  <p className="text-xs font-bold uppercase tracking-[0.24em]"
+                    style={{ color: 'var(--dd-text-muted)' }}>
+                    {t('dispatchStationLabel')}
+                  </p>
+                  <h3 className="mt-2 text-2xl font-black tracking-tight" style={{ color: 'var(--dd-text-primary)' }}>
+                    {station.station_name}
+                  </h3>
+                  <div className={`mt-3 dd-chip ${deviceStatus === 'connected' ? '' : 'animate-danger-blink'}`}
+                    style={{
+                      background: deviceStatus === 'connected' ? 'var(--dd-emerald-glow)' : 'var(--dd-red-glow)',
+                      border: `1px solid ${deviceStatus === 'connected' ? 'var(--dd-emerald)' : 'var(--dd-red)'}`,
+                      color: deviceStatus === 'connected' ? 'var(--dd-emerald)' : 'var(--dd-red)',
+                    }}>
+                    <span className="h-2 w-2 rounded-sm"
+                      style={{
+                        background: deviceStatus === 'connected' ? '#10b981' : '#ef4444',
+                        boxShadow: `0 0 6px ${deviceStatus === 'connected' ? 'rgba(16, 185, 129, 0.5)' : 'rgba(239, 68, 68, 0.5)'}`,
+                        display: 'inline-block',
+                      }} />
                     RFID {deviceStatus === 'connected' ? t('connected') : t('disconnected')}
                   </div>
                 </div>
 
-                <div className={`inline-flex items-center gap-2 px-3 py-1 text-xs font-bold uppercase tracking-wider ${theme.chip}`}>
-                  <span className={`h-2 w-2 ${theme.dot}`} />
+                <div className={theme.chipClass}>
+                  <span className="h-2 w-2 rounded-full" style={{ background: theme.dot, boxShadow: `0 0 6px ${theme.dotGlow}`, display: 'inline-block' }} />
                   {theme.label}
                 </div>
               </div>
 
-              <div className="grid flex-1 gap-3 bg-white px-5 py-4">
-                <div className="border border-slate-300 bg-slate-50 px-4 py-3">
+              {/* Content */}
+              <div className="grid flex-1 gap-3 px-5 py-4">
+                {/* Active Vehicle */}
+                <div className="rounded-2xl p-4 shadow-sm" style={{ background: 'var(--dd-bg-surface)', border: '1px solid var(--dd-border)' }}>
                   <div className="mb-2 flex items-center justify-between gap-3">
-                    <span className="text-[11px] font-bold uppercase tracking-[0.22em] text-slate-500">{t('vehicleUnloading')}</span>
-                    <span className={`text-xs font-bold uppercase tracking-wider ${theme.tone}`}>{activeVehicle ? t('processing') : t('empty')}</span>
+                    <span className="text-xs font-bold uppercase tracking-[0.22em]" style={{ color: 'var(--dd-text-muted)' }}>
+                      {t('vehicleUnloading')}
+                    </span>
+                    <span className="text-xs font-bold uppercase tracking-wider" style={{ color: theme.tone }}>
+                      {activeVehicle ? t('processing') : t('empty')}
+                    </span>
                   </div>
 
                   {activeVehicle ? (
                     <div className="flex items-center justify-between gap-3">
-                      <span className="inline-flex items-center gap-2 border border-slate-900 bg-slate-900 px-3 py-2 text-sm font-bold tracking-widest text-white">
+                      <span className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-bold tracking-widest"
+                        style={{
+                          background: 'var(--dd-cyan-glow)',
+                          border: '1px solid var(--dd-border-accent)',
+                          color: 'var(--dd-text-accent)',
+                        }}>
                         <LoaderCircle className="h-4 w-4 animate-soft-spin" />
                         {activeVehicle.license_plate}
                       </span>
                       {remainingVehicles > 0 && (
-                        <span className="border border-slate-300 bg-white px-3 py-2 text-sm font-bold text-slate-900">
+                        <span className="dd-chip dd-chip-slate">
                           +{remainingVehicles} {t('vehicleCount')}
                         </span>
                       )}
                     </div>
                   ) : (
-                    <p className="text-sm font-bold text-slate-400">{t('noVehicleAtStation')}</p>
+                    <p className="text-sm font-bold italic" style={{ color: 'var(--dd-text-muted)', opacity: 0.6 }}>{t('noVehicleAtStation')}</p>
                   )}
                 </div>
 
-                <div className="flex items-center justify-center gap-3 px-2 text-slate-300">
-                  <span className="h-px flex-1 bg-slate-300" />
-                  <span className="flex h-8 w-8 items-center justify-center border border-slate-300 bg-white text-slate-900">
+                {/* Divider Arrow */}
+                <div className="flex items-center justify-center gap-3 px-2">
+                  <span className="h-px flex-1" style={{ background: 'var(--dd-border)' }} />
+                  <span className="flex h-8 w-8 items-center justify-center rounded-full"
+                    style={{
+                      background: 'var(--dd-bg-surface)',
+                      border: '1px solid var(--dd-border)',
+                      color: 'var(--dd-text-accent)',
+                    }}>
                     {nextVehicle ? <ArrowUp className="h-4 w-4 animate-flow-arrow-up" /> : <LoaderCircle className="h-4 w-4 animate-soft-spin" />}
                   </span>
-                  <span className="h-px flex-1 bg-slate-300" />
+                  <span className="h-px flex-1" style={{ background: 'var(--dd-border)' }} />
                 </div>
 
-                <div className="border border-slate-300 bg-white px-4 py-3">
+                {/* Next Vehicle */}
+                <div className="rounded-2xl p-4 shadow-sm" style={{ background: 'var(--dd-bg-surface)', border: '1px solid var(--dd-border)' }}>
                   <div className="mb-2 flex items-center justify-between gap-3">
-                    <span className="text-[11px] font-bold uppercase tracking-[0.22em] text-slate-900">{t('nextVehicle')}</span>
-                    <span className="text-xs font-bold uppercase tracking-wider text-slate-500">{t('nextTurn')}</span>
+                    <span className="text-xs font-bold uppercase tracking-[0.22em]" style={{ color: 'var(--dd-text-secondary)' }}>
+                      {t('nextVehicle')}
+                    </span>
+                    <span className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--dd-text-muted)' }}>
+                      {t('nextTurn')}
+                    </span>
                   </div>
 
                   {nextVehicle ? (
-                    <div className="flex items-center gap-2 text-slate-900">
-                      <ArrowUp className="h-4 w-4 animate-flow-arrow-up text-slate-900" />
+                    <div className="flex items-center gap-2" style={{ color: 'var(--dd-text-accent)' }}>
+                      <ArrowUp className="h-4 w-4 animate-flow-arrow-up" />
                       <span className="text-base font-black tracking-widest">{nextVehicle.license_plate}</span>
                     </div>
                   ) : (
-                    <span className="text-sm font-bold text-slate-400">{t('noNextVehicle')}</span>
+                      <span className="text-[13px] italic" style={{ color: 'var(--dd-text-muted)', opacity: 0.6 }}>{t('noNextVehicle')}</span>
                   )}
                 </div>
               </div>
 
-              <div className="flex gap-2 border-t border-slate-300 bg-slate-50 px-4 py-4">
+              {/* Footer Actions */}
+              <div className="flex gap-2 px-4 py-4 rounded-b-[19px]" style={{ background: 'var(--dd-bg-surface)', borderTop: '1px solid var(--dd-border)' }}>
                 <button
                   onClick={() => handleToggleStatus(station)}
                   disabled={isToggling}
-                  className={`flex-1 cursor-pointer py-2.5 text-sm font-bold uppercase tracking-wider transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${btnConfig.style}`}
+                  className={`flex items-center justify-center flex-1 disabled:cursor-not-allowed disabled:opacity-50 ${btnConfig.className}`}
                 >
-                  {isToggling ? '...' : btnConfig.label}
+                  {isToggling ? <LoaderCircle className="h-4 w-4 animate-soft-spin" /> : (
+                    <>
+                      {btnConfig.icon}
+                      {btnConfig.label}
+                    </>
+                  )}
                 </button>
 
                 {station.station_status !== 'incident' && (
                   <button
-                    onClick={() => openIncidentModal(station)}
-                    className="flex-1 cursor-pointer border border-slate-900 bg-white py-2.5 text-sm font-bold uppercase tracking-wider text-slate-900 transition-colors hover:bg-slate-900 hover:text-white"
+                    onClick={() => setIncidentStation(station)}
+                    className="flex items-center justify-center flex-1 dd-btn dd-btn-danger"
                   >
+                    <AlertTriangle className="mr-1.5 h-3.5 w-3.5" />
                     {t('reportIncident')}
                   </button>
                 )}
@@ -321,7 +375,6 @@ export default function StationStatusPanel({ stations, orders, deviceStationStat
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <div className="flex items-center gap-3 border-b border-slate-200 pb-3">
-              {/* <div className="h-3 w-3 shrink-0 border border-slate-900 bg-red-500" /> */}
               <div className="text-left">
                 <DialogTitle className="text-xl font-bold uppercase text-slate-900">
                   {t('incidentReportTitle')}
