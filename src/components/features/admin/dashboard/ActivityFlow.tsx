@@ -2,7 +2,7 @@ import orderApi from '@/services/order.service';
 import type { Order } from '@/types/order';
 import type { Station } from '@/types/station';
 import type { Vehicle } from '@/types/vehicle';
-import { ArrowRight, ChevronDown, ChevronUp } from 'lucide-react';
+import { ArrowRight, ChevronDown, ChevronUp, Clock, FileWarning, Hourglass, Loader2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -17,13 +17,28 @@ interface ActivityFlowProps {
 const getFlowStyle = (order: Order, isFirstPending: boolean, t: (key: string) => string) => {
   if (order.order_status === 'pending') {
     if (isFirstPending) {
-      return { text: `[ ${t('preparing')} ]`, color: 'text-sky-700', dot: 'bg-sky-500', chip: 'bg-sky-50 border-sky-500' };
+      return {
+        text: `LƯỢT TIẾP THEO...`,
+        chipClass: 'dd-chip dd-chip-sky animate-pulse',
+        dot: '#0ea5e9',
+        icon: <Loader2 className="h-3 w-3 animate-spin" />,
+      };
     }
 
-    return { text: `[ ${t('waitingStatus')} ]`, color: 'text-amber-700', dot: 'bg-amber-500', chip: 'bg-amber-50 border-amber-500' };
+    return {
+      text: `CHỜ ĐẾN LƯỢT`,
+      chipClass: 'dd-chip dd-chip-amber opacity-80',
+      dot: '#f59e0b',
+      icon: <Clock className="h-3 w-3" />,
+    };
   }
 
-  return { text: `[ ${order.order_status.toUpperCase()} ]`, color: 'text-slate-500', dot: 'bg-slate-400', chip: 'bg-white border-slate-300' };
+  return {
+    text: order.order_status.toUpperCase(),
+    chipClass: 'dd-chip dd-chip-slate',
+    dot: '#64748b',
+    icon: <ArrowRight className="h-3 w-3" />
+  };
 };
 
 export default function ActivityFlow({ stations: _stations, vehicles, orders, onOrdersUpdated }: ActivityFlowProps) {
@@ -86,27 +101,39 @@ export default function ActivityFlow({ stations: _stations, vehicles, orders, on
   void vehicles;
 
   return (
-    <div className="border border-slate-300 bg-white">
+    <div className="h-full w-full">
       {groupedByStation.length === 0 ? (
-        <div className="flex h-40 items-center justify-center">
-          <p className="text-center text-sm font-bold text-slate-400">{t('noVehiclesInFlow')}</p>
+        <div className="flex h-full min-h-[400px] items-center justify-center">
+          <div className="flex flex-col items-center gap-4">
+            <div className="h-16 w-16 rounded-full flex items-center justify-center animate-pulse" style={{ background: 'var(--dd-bg-surface)', border: '1px dashed var(--dd-border)' }}>
+              <ArrowRight className="h-6 w-6 text-sky-500/80" />
+            </div>
+            <span className="text-xs font-bold uppercase tracking-[0.3em]" style={{ color: 'var(--dd-text-muted)' }}>
+              {t('noVehiclesInFlow') || 'CHƯA CÓ DỮ LIỆU LUỒNG XE'}
+            </span>
+          </div>
         </div>
       ) : (
-        <div className="space-y-3 bg-slate-50 p-3">
+        <div className="space-y-3 p-3 bg-transparent">
           {groupedByStation.map((group) => {
             const expanded = expandedStations[group.stationId] ?? false;
             const visibleOrders = expanded ? group.orders : group.orders.slice(0, 3);
 
             return (
-              <div key={group.stationId} className="border border-slate-300 bg-white">
-                <div className="flex items-center justify-between border-b border-slate-300 bg-slate-100 px-5 py-3">
-                  <span className="text-sm font-bold uppercase tracking-[0.18em] text-slate-900">{group.stationName}</span>
-                  <span className="border border-slate-300 bg-white px-3 py-1 text-xs font-bold text-slate-900">
+              <div key={group.stationId} className="rounded-2xl overflow-hidden" style={{ border: '1px solid var(--dd-border)' }}>
+                {/* Station Header */}
+                <div className="flex items-center justify-between px-5 py-3"
+                  style={{ background: 'var(--dd-bg-header)', borderBottom: '1px solid var(--dd-border)' }}>
+                  <span className="text-sm font-bold uppercase tracking-[0.18em]" style={{ color: 'var(--dd-text-primary)' }}>
+                    {group.stationName}
+                  </span>
+                  <span className="dd-chip dd-chip-sky">
                     {group.orders.length} {t('vehicleCount')}
                   </span>
                 </div>
 
-                <div className="space-y-2 bg-white px-3 pb-3">
+                {/* Order Rows */}
+                <div className="space-y-2 px-3 pb-3 pt-3" style={{ background: 'var(--dd-bg-surface)' }}>
                   {visibleOrders.map((order, index) => {
                     const actualIndex = expanded ? index : index;
                     const isFirstPending = actualIndex === 0;
@@ -115,24 +142,37 @@ export default function ActivityFlow({ stations: _stations, vehicles, orders, on
                     const isBusy = reorderingKey === busyKey;
 
                     return (
-                      <div key={order.order_id} className="flex items-center justify-between gap-3 border border-slate-300 bg-white px-4 py-3 transition-colors hover:border-slate-900">
-                        <div className="flex min-w-[150px] items-center gap-2">
-                          <div className="text-[11px] font-bold tracking-[0.14em] text-slate-500">
+                      <div key={order.order_id}
+                        className="flex items-center justify-between gap-3 rounded-2xl px-4 py-3 transition-all relative overflow-hidden group shadow-sm"
+                        style={{
+                          background: 'var(--dd-bg-card)',
+                          border: '1px solid var(--dd-border)',
+                        }}
+                        onMouseEnter={e => {
+                          e.currentTarget.style.borderColor = 'var(--dd-border-hover)';
+                          e.currentTarget.style.background = 'var(--dd-bg-card-hover)';
+                        }}
+                        onMouseLeave={e => {
+                          e.currentTarget.style.borderColor = 'var(--dd-border)';
+                          e.currentTarget.style.background = 'var(--dd-bg-card)';
+                        }}
+                      >
+                        {/* Status scanline indicator */}
+                        <div className="absolute left-0 top-0 bottom-0 w-[3px]"
+                          style={{ background: style.dot, opacity: 0.8 }} />
+
+                        <div className="flex min-w-[150px] items-center gap-4 pl-2">
+                          <div className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-100 text-[11px] font-bold tracking-[0.05em] shadow-sm" style={{ color: 'var(--dd-text-secondary)', border: '1px solid var(--dd-border)' }}>
                             #{actualIndex + 1}
                           </div>
-                          <div className="text-sm font-black text-slate-900">
-                            {order.vehicles?.vehicle_license_plate || `#${order.order_id}`}
+                          <div className="text-base font-black tracking-widest" style={{ color: 'var(--dd-text-primary)' }}>
+                            {order.vehicles?.vehicle_license_plate || `ĐƠN: ${order.order_id}`}
                           </div>
                         </div>
 
-                        <div className={`flex items-center gap-2 border px-3 py-1 ${style.chip}`}>
-                          {isFirstPending && order.order_status === 'pending' && (
-                            <ArrowRight className="h-3.5 w-3.5" />
-                          )}
-                          <div className={`h-2 w-2 ${style.dot}`} />
-                          <span className={`text-[11px] font-bold uppercase tracking-[0.16em] ${style.color}`}>
-                            {style.text}
-                          </span>
+                        <div className={style.chipClass}>
+                          {style.icon}
+                          {style.text}
                         </div>
 
                         <div className="flex items-center gap-3">
@@ -142,7 +182,22 @@ export default function ActivityFlow({ stations: _stations, vehicles, orders, on
                               onClick={() => handleReorder(group.stationId, actualIndex, 'up')}
                               disabled={isBusy || actualIndex === 0}
                               title={t('moveUp')}
-                              className="flex h-8 w-8 items-center justify-center border border-slate-300 bg-white text-slate-900 transition-colors hover:bg-slate-900 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+                              className="flex h-8 w-8 items-center justify-center rounded-full transition-all disabled:cursor-not-allowed disabled:opacity-40"
+                              style={{
+                                background: 'var(--dd-bg-surface)',
+                                border: '1px solid var(--dd-border)',
+                                color: 'var(--dd-text-secondary)',
+                              }}
+                              onMouseEnter={e => {
+                                if (!e.currentTarget.disabled) {
+                                  e.currentTarget.style.borderColor = 'rgba(6, 182, 212, 0.3)';
+                                  e.currentTarget.style.color = '#22d3ee';
+                                }
+                              }}
+                              onMouseLeave={e => {
+                                e.currentTarget.style.borderColor = 'var(--dd-border)';
+                                e.currentTarget.style.color = 'var(--dd-text-secondary)';
+                              }}
                             >
                               <ChevronUp className="h-4 w-4" />
                             </button>
@@ -151,7 +206,22 @@ export default function ActivityFlow({ stations: _stations, vehicles, orders, on
                               onClick={() => handleReorder(group.stationId, actualIndex, 'down')}
                               disabled={isBusy || actualIndex === group.orders.length - 1}
                               title={t('moveDown')}
-                              className="flex h-8 w-8 items-center justify-center border border-slate-300 bg-white text-slate-900 transition-colors hover:bg-slate-900 hover:text-white disabled:cursor-not-allowed disabled:opacity-40"
+                              className="flex h-8 w-8 items-center justify-center rounded-full transition-all disabled:cursor-not-allowed disabled:opacity-40"
+                              style={{
+                                background: 'var(--dd-bg-surface)',
+                                border: '1px solid var(--dd-border)',
+                                color: 'var(--dd-text-secondary)',
+                              }}
+                              onMouseEnter={e => {
+                                if (!e.currentTarget.disabled) {
+                                  e.currentTarget.style.borderColor = 'rgba(6, 182, 212, 0.3)';
+                                  e.currentTarget.style.color = '#22d3ee';
+                                }
+                              }}
+                              onMouseLeave={e => {
+                                e.currentTarget.style.borderColor = 'var(--dd-border)';
+                                e.currentTarget.style.color = 'var(--dd-text-secondary)';
+                              }}
                             >
                               <ChevronDown className="h-4 w-4" />
                             </button>
@@ -165,7 +235,10 @@ export default function ActivityFlow({ stations: _stations, vehicles, orders, on
                     <button
                       type="button"
                       onClick={() => toggleExpanded(group.stationId)}
-                      className="flex items-center gap-2 px-2 pt-1 text-xs font-bold uppercase tracking-[0.16em] text-slate-500 transition-colors hover:text-slate-900"
+                      className="flex items-center gap-2 px-2 pt-1 text-xs font-bold uppercase tracking-[0.16em] transition-colors"
+                      style={{ color: 'var(--dd-text-muted)' }}
+                      onMouseEnter={e => e.currentTarget.style.color = 'var(--dd-text-accent)'}
+                      onMouseLeave={e => e.currentTarget.style.color = 'var(--dd-text-muted)'}
                     >
                       {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
                       {expanded ? t('hideMoreVehicles') : `+${group.orders.length - 3} ${t('moreVehicles')}`}

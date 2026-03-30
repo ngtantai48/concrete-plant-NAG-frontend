@@ -65,8 +65,8 @@ export default function StationMap({ stationLongitude, stationLatitude, radius, 
 
   if (!mounted || stationLongitude == null || stationLatitude == null) {
     return (
-      <div className="w-full h-full bg-slate-50 flex items-center justify-center rounded-lg border border-slate-200">
-        <p className="text-sm text-slate-400 animate-pulse">Đang tải bản đồ...</p>
+      <div className="w-full h-full flex items-center justify-center rounded-lg" style={{ background: 'rgba(10, 14, 30, 0.8)', border: '1px solid rgba(56, 189, 248, 0.08)' }}>
+        <p className="text-sm animate-pulse" style={{ color: '#22d3ee' }}>Đang tải bản đồ...</p>
       </div>
     );
   }
@@ -75,7 +75,7 @@ export default function StationMap({ stationLongitude, stationLatitude, radius, 
   const stationLat = stationLatitude;
 
   return (
-    <div className="w-full h-full relative z-0 rounded-lg overflow-hidden border border-slate-200">
+    <div className="w-full h-full relative z-0 rounded-lg overflow-hidden" style={{ border: '1px solid rgba(56, 189, 248, 0.1)' }}>
       <MapContainer
         center={[stationLat, stationLng]}
         zoom={15}
@@ -83,8 +83,8 @@ export default function StationMap({ stationLongitude, stationLatitude, radius, 
         style={{ width: '100%', height: '100%' }}
       >
         <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
-          url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>'
+          url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
         />
 
         <MapUpdater stationLat={stationLat} stationLng={stationLng} />
@@ -104,7 +104,7 @@ export default function StationMap({ stationLongitude, stationLatitude, radius, 
         <Circle
           center={[stationLat, stationLng]}
           radius={radius}
-          pathOptions={{ color: "#8b5cf6", fillColor: "#8b5cf6", fillOpacity: 0.1, weight: 1 }}
+          pathOptions={{ color: "#06b6d4", fillColor: "#06b6d4", fillOpacity: 0.08, weight: 1.5 }}
         />
 
         {/* Các xe */}
