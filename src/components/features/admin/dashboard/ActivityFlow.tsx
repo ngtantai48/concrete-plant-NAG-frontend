@@ -6,6 +6,21 @@ import { ArrowRight, ChevronDown, ChevronUp, Clock, FileWarning, Hourglass, Load
 import { useTranslations } from 'next-intl';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from '@dnd-kit/core';
+import type { DragEndEvent } from '@dnd-kit/core';
+import {
+  SortableContext,
+  sortableKeyboardCoordinates,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { SortableVehicleItem } from './SortableVehicleItem';
 
 interface ActivityFlowProps {
   stations: Station[];
@@ -45,6 +60,17 @@ export default function ActivityFlow({ stations: _stations, vehicles, orders, on
   const t = useTranslations('DashboardPage');
   const [expandedStations, setExpandedStations] = useState<Record<number, boolean>>({});
   const [reorderingKey, setReorderingKey] = useState<string | null>(null);
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
 
   const groupedByStation = useMemo(() => {
     const activeOrders = orders.filter((order) => order.order_status === 'pending');
@@ -98,10 +124,64 @@ export default function ActivityFlow({ stations: _stations, vehicles, orders, on
     }
   };
 
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+
+    let sourceGroupIndex = -1;
+    let targetGroupIndex = -1;
+    let oldIndex = -1;
+    let newIndex = -1;
+
+    for (let i = 0; i < groupedByStation.length; i++) {
+        const group = groupedByStation[i];
+        const aIndex = group.orders.findIndex(o => o.order_id === active.id);
+        const oIndex = group.orders.findIndex(o => o.order_id === over.id);
+        
+        if (aIndex !== -1) {
+            sourceGroupIndex = i;
+            oldIndex = aIndex;
+        }
+        if (oIndex !== -1) {
+            targetGroupIndex = i;
+            newIndex = oIndex;
+        }
+    }
+
+    if (sourceGroupIndex === -1 || targetGroupIndex === -1) return;
+    
+    if (sourceGroupIndex !== targetGroupIndex) {
+        toast.error('Giao diện hiện tại chỉ hỗ trợ kéo thả trong cùng 1 trạm!');
+        return;
+    }
+
+    const group = groupedByStation[sourceGroupIndex];
+    const currentOrder = group.orders[oldIndex];
+    const swapOrder = group.orders[newIndex];
+
+    const busyKey = `${group.stationId}-${currentOrder.order_id}`;
+    setReorderingKey(busyKey);
+
+    try {
+      await orderApi.update(currentOrder.order_id, { order_number: swapOrder.order_number });
+      toast.success(t('reorderSuccess') || 'Đã đổi vị trí luồng xe', { position: 'top-right' });
+      await onOrdersUpdated?.();
+    } catch {
+      toast.error(t('reorderFailed') || 'Lỗi khi đổi vị trí', { position: 'top-right' });
+    } finally {
+      setReorderingKey(null);
+    }
+  };
+
   void vehicles;
 
   return (
-    <div className="h-full w-full">
+    <DndContext 
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      onDragEnd={handleDragEnd}
+    >
+      <div className="h-full w-full">
       {groupedByStation.length === 0 ? (
         <div className="flex h-full min-h-[400px] items-center justify-center">
           <div className="flex flex-col items-center gap-4">
@@ -134,102 +214,33 @@ export default function ActivityFlow({ stations: _stations, vehicles, orders, on
 
                 {/* Order Rows */}
                 <div className="space-y-2 px-3 pb-3 pt-3" style={{ background: 'var(--dd-bg-surface)' }}>
-                  {visibleOrders.map((order, index) => {
-                    const actualIndex = expanded ? index : index;
-                    const isFirstPending = actualIndex === 0;
-                    const style = getFlowStyle(order, isFirstPending, t);
-                    const busyKey = `${group.stationId}-${order.order_id}`;
-                    const isBusy = reorderingKey === busyKey;
+                  <SortableContext 
+                    items={visibleOrders.map(o => o.order_id)} 
+                    strategy={verticalListSortingStrategy}
+                  >
+                    {visibleOrders.map((order, index) => {
+                      const actualIndex = expanded ? index : index;
+                      const isFirstPending = actualIndex === 0;
+                      const style = getFlowStyle(order, isFirstPending, t);
+                      const busyKey = `${group.stationId}-${order.order_id}`;
+                      const isBusy = reorderingKey === busyKey;
 
-                    return (
-                      <div key={order.order_id}
-                        className="flex items-center justify-between gap-3 rounded-2xl px-4 py-3 transition-all relative overflow-hidden group shadow-sm"
-                        style={{
-                          background: 'var(--dd-bg-card)',
-                          border: '1px solid var(--dd-border)',
-                        }}
-                        onMouseEnter={e => {
-                          e.currentTarget.style.borderColor = 'var(--dd-border-hover)';
-                          e.currentTarget.style.background = 'var(--dd-bg-card-hover)';
-                        }}
-                        onMouseLeave={e => {
-                          e.currentTarget.style.borderColor = 'var(--dd-border)';
-                          e.currentTarget.style.background = 'var(--dd-bg-card)';
-                        }}
-                      >
-                        {/* Status scanline indicator */}
-                        <div className="absolute left-0 top-0 bottom-0 w-[3px]"
-                          style={{ background: style.dot, opacity: 0.8 }} />
-
-                        <div className="flex min-w-[150px] items-center gap-4 pl-2">
-                          <div className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-100 text-xs font-bold shadow-sm" style={{ color: 'var(--dd-text-secondary)', border: '1px solid var(--dd-border)' }}>
-                            #{actualIndex + 1}
-                          </div>
-                          <div className="text-lg font-black" style={{ color: 'var(--dd-text-primary)' }}>
-                            {order.vehicles?.vehicle_license_plate || `ĐƠN: ${order.order_id}`}
-                          </div>
-                        </div>
-
-                        <div className={style.chipClass}>
-                          {style.icon}
-                          {style.text}
-                        </div>
-
-                        <div className="flex items-center gap-3">
-                          <div className="flex items-center gap-1">
-                            <button
-                              type="button"
-                              onClick={() => handleReorder(group.stationId, actualIndex, 'up')}
-                              disabled={isBusy || actualIndex === 0}
-                              title={t('moveUp')}
-                              className="flex h-8 w-8 items-center justify-center rounded-full transition-all disabled:cursor-not-allowed disabled:opacity-40"
-                              style={{
-                                background: 'var(--dd-bg-surface)',
-                                border: '1px solid var(--dd-border)',
-                                color: 'var(--dd-text-secondary)',
-                              }}
-                              onMouseEnter={e => {
-                                if (!e.currentTarget.disabled) {
-                                  e.currentTarget.style.borderColor = 'rgba(6, 182, 212, 0.3)';
-                                  e.currentTarget.style.color = '#22d3ee';
-                                }
-                              }}
-                              onMouseLeave={e => {
-                                e.currentTarget.style.borderColor = 'var(--dd-border)';
-                                e.currentTarget.style.color = 'var(--dd-text-secondary)';
-                              }}
-                            >
-                              <ChevronUp className="h-4 w-4" />
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleReorder(group.stationId, actualIndex, 'down')}
-                              disabled={isBusy || actualIndex === group.orders.length - 1}
-                              title={t('moveDown')}
-                              className="flex h-8 w-8 items-center justify-center rounded-full transition-all disabled:cursor-not-allowed disabled:opacity-40"
-                              style={{
-                                background: 'var(--dd-bg-surface)',
-                                border: '1px solid var(--dd-border)',
-                                color: 'var(--dd-text-secondary)',
-                              }}
-                              onMouseEnter={e => {
-                                if (!e.currentTarget.disabled) {
-                                  e.currentTarget.style.borderColor = 'rgba(6, 182, 212, 0.3)';
-                                  e.currentTarget.style.color = '#22d3ee';
-                                }
-                              }}
-                              onMouseLeave={e => {
-                                e.currentTarget.style.borderColor = 'var(--dd-border)';
-                                e.currentTarget.style.color = 'var(--dd-text-secondary)';
-                              }}
-                            >
-                              <ChevronDown className="h-4 w-4" />
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
+                      return (
+                        <SortableVehicleItem
+                          key={order.order_id}
+                          order={order}
+                          index={index}
+                          actualIndex={actualIndex}
+                          style={style}
+                          isBusy={isBusy}
+                          onReorder={(dir) => handleReorder(group.stationId, actualIndex, dir)}
+                          canMoveUp={actualIndex > 0}
+                          canMoveDown={actualIndex < group.orders.length - 1}
+                          t={t}
+                        />
+                      );
+                    })}
+                  </SortableContext>
 
                   {group.orders.length > 3 && (
                     <button
@@ -250,6 +261,7 @@ export default function ActivityFlow({ stations: _stations, vehicles, orders, on
           })}
         </div>
       )}
-    </div>
+      </div>
+    </DndContext>
   );
 }
