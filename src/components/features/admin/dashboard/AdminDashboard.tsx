@@ -145,25 +145,25 @@ export default function AdminDashboard() {
 
   const [coreView, setCoreView] = useState<'flow' | 'map'>('flow');
 
-  if (loading) {
-    return (
-      <div className="dashboard-dark">
-        <div className="m-4 md:m-6 lg:m-8 max-w-[1600px] lg:mx-auto space-y-6">
-          <Skeleton active paragraph={{ rows: 1 }} />
-          <div className="grid grid-cols-3 gap-4">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="dd-card p-5">
-                <Skeleton active paragraph={{ rows: 2 }} title={false} />
-              </div>
-            ))}
-          </div>
-          <div className="dd-card p-6">
-            <Skeleton active paragraph={{ rows: 10 }} />
-          </div>
-        </div>
-      </div>
-    );
-  }
+  // if (loading) {
+  //   return (
+  //     <div className="dashboard-dark">
+  //       <div className="m-10 max-w-[800px] lg:mx-auto space-y-6">
+  //         <Skeleton active paragraph={{ rows: 1 }} />
+  //         <div className="grid grid-cols-3 gap-4">
+  //           {[1, 2, 3].map((i) => (
+  //             <div key={i} className="dd-card p-5">
+  //               <Skeleton active paragraph={{ rows: 2 }} title={false} />
+  //             </div>
+  //           ))}
+  //         </div>
+  //         <div className="dd-card p-6">
+  //           <Skeleton active paragraph={{ rows: 10 }} />
+  //         </div>
+  //       </div>
+  //     </div>
+  //   );
+  // }
 
   const statCards = [
     {
@@ -199,21 +199,19 @@ export default function AdminDashboard() {
   ];
 
   return (
-    <div className={`dashboard-light tracking-tight bg-cover bg-center min-h-screen ${isFullScreen ? 'fixed inset-0 z-[100] overflow-y-auto bg-slate-50' : ''}`}>
-      <div className={`p-4 md:p-10 max-w-[1700px] mx-auto bg-transparent ${isFullScreen ? 'my-0' : 'my-4 md:my-8'}`}>
+    <div className={`dashboard-light bg-cover bg-center min-h-screen ${isFullScreen ? 'fixed inset-0 z-[100] overflow-y-auto bg-slate-50' : ''}`}>
+      <div className={`p-10 mx-auto bg-transparent`}>
 
         {/* ═══ HEADER ═══ */}
         <div className="dd-header mb-8 p-6">
-          <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+          <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between pt-4">
             <div>
               <div className="mb-2 flex items-center gap-3">
-                <div className="h-4 w-4" style={{ background: 'linear-gradient(135deg, #0ea5e9, #6366f1)' }} />
-                <h1 className="text-3xl md:text-5xl font-black uppercase tracking-tighter leading-none"
-                  style={{ color: 'var(--dd-text-primary)' }}>
+                <h1 className="text-4xl md:text-6xl font-black uppercase leading-none" style={{ color: 'var(--dd-text-primary)' }}>
                   {t("title")}
                 </h1>
               </div>
-              <p className="pl-7 text-sm font-bold uppercase tracking-[0.24em]"
+              <p className="pl-2 text-base font-bold uppercase"
                 style={{ color: 'var(--dd-text-muted)' }}>
                 {t('systemTime')}: {clock}
               </p>
@@ -222,7 +220,7 @@ export default function AdminDashboard() {
             <div className="flex items-stretch gap-4">
               {/* Network Status */}
               <div className="flex flex-col items-end justify-between">
-                <span className="mb-1 text-[11px] font-semibold uppercase tracking-[0.22em]"
+                <span className="mb-1 text-xs font-semibold uppercase"
                   style={{ color: 'var(--dd-text-muted)' }}>
                   {t('network')}
                 </span>
@@ -235,7 +233,7 @@ export default function AdminDashboard() {
                       ? <Radio className="h-4 w-4 text-emerald-500 animate-pulse" />
                       : <div className="h-2 w-2 rounded-full" style={{ background: '#f87171', boxShadow: '0 0 8px rgba(248, 113, 113, 0.5)' }} />
                     }
-                    <span className="text-sm font-bold uppercase tracking-[0.16em]">
+                    <span className="text-base font-bold uppercase">
                       {socketConnected ? 'TRỰC TUYẾN' : t('disconnected')}
                     </span>
                   </div>
@@ -244,7 +242,7 @@ export default function AdminDashboard() {
 
               {/* Sync Button */}
               <div className="flex flex-col items-end justify-between">
-                <span className="mb-1 text-[11px] font-semibold uppercase tracking-[0.22em]"
+                <span className="mb-1 text-xs font-semibold uppercase"
                   style={{ color: 'var(--dd-text-muted)' }}>
                   {t('data')}
                 </span>
@@ -260,13 +258,13 @@ export default function AdminDashboard() {
 
               {/* Fullscreen Toggle */}
               <div className="flex flex-col items-end justify-between ml-2 border-l pl-4" style={{ borderColor: 'var(--dd-border)' }}>
-                <span className="mb-1 text-[11px] font-semibold uppercase tracking-[0.22em]"
+                <span className="mb-1 text-xs font-semibold uppercase"
                   style={{ color: 'var(--dd-text-muted)' }}>
                   Giao diện
                 </span>
                 <button
                   onClick={() => setIsFullScreen(!isFullScreen)}
-                  className="flex items-center gap-2 rounded-lg px-4 py-2 transition-all font-bold uppercase tracking-[0.16em] text-sm"
+                  className="flex items-center gap-2 rounded-lg px-4 py-2 transition-all font-bold uppercase text-base"
                   style={{ background: isFullScreen ? 'var(--dd-bg-surface)' : 'var(--dd-sky)', color: isFullScreen ? 'var(--dd-text-primary)' : '#fff' }}
                   title={isFullScreen ? "Thu nhỏ" : "Toàn màn hình"}
                 >
@@ -288,11 +286,11 @@ export default function AdminDashboard() {
                   animationDelay: `${i * 0.1}s`
                 } as React.CSSProperties}
               >
-                <span className="text-xs font-bold uppercase tracking-[0.22em]"
+                <span className="text-sm font-bold uppercase"
                   style={{ color: 'var(--dd-text-muted)' }}>
                   {card.label}
                 </span>
-                <div className="mt-3 text-5xl font-black tracking-tighter"
+                <div className="mt-3 text-6xl font-black"
                   style={{ color: card.accentColor }}>
                   {card.value}
                 </div>
@@ -313,7 +311,7 @@ export default function AdminDashboard() {
           <div className="lg:col-span-3 space-y-6 animate-fade-up" style={{ animationDelay: '0.2s' }}>
             {/* Ready Vehicles */}
             <div className="flex h-[400px] flex-col overflow-hidden dd-card">
-              <div className="flex items-center justify-between px-4 py-3 text-sm font-semibold uppercase tracking-[0.18em]"
+              <div className="flex items-center justify-between px-4 py-3 text-base font-semibold uppercase"
                 style={{ background: 'var(--dd-bg-header)', color: 'var(--dd-text-primary)', borderBottom: '1px solid var(--dd-border)' }}>
                 <span>{t('readyVehiclesPanel')}</span>
                 <span className="dd-chip dd-chip-emerald">{readyVehicles.length}</span>
@@ -321,7 +319,7 @@ export default function AdminDashboard() {
               <div className="overflow-y-auto p-0 flex-1">
                 {readyVehicles.length === 0 ? (
                   <div className="flex h-full items-center justify-center p-4">
-                    <span className="text-xs font-bold uppercase tracking-[0.2em]" style={{ color: 'var(--dd-text-muted)' }}>{t('noReadyVehicles')}</span>
+                    <span className="text-sm font-bold uppercase" style={{ color: 'var(--dd-text-muted)' }}>{t('noReadyVehicles')}</span>
                   </div>
                 ) : (
                   <ul className="flex flex-col gap-2 p-3">
@@ -333,7 +331,7 @@ export default function AdminDashboard() {
                         <div className="h-8 w-8 rounded-full flex items-center justify-center shrink-0 border" style={{ background: 'rgba(16, 185, 129, 0.1)', borderColor: 'rgba(16, 185, 129, 0.3)' }}>
                           <Truck className="h-4 w-4 animate-drive-idle" style={{ color: 'var(--dd-emerald)' }} />
                         </div>
-                        <span className="text-sm font-bold tracking-wide" style={{ color: 'var(--dd-text-primary)' }}>{v.vehicle_license_plate}</span>
+                        <span className="text-base font-bold" style={{ color: 'var(--dd-text-primary)' }}>{v.vehicle_license_plate}</span>
                       </li>
                     ))}
                   </ul>
@@ -343,7 +341,7 @@ export default function AdminDashboard() {
 
             {/* Canceled / Stopped */}
             <div className="flex h-[280px] flex-col overflow-hidden dd-card" style={{ borderColor: 'rgba(245, 158, 11, 0.2)' }}>
-              <div className="flex items-center justify-between px-4 py-3 text-sm font-semibold uppercase tracking-[0.18em]"
+              <div className="flex items-center justify-between px-4 py-3 text-base font-semibold"
                 style={{ background: 'var(--dd-bg-header)', color: 'var(--dd-text-primary)', borderBottom: '1px solid var(--dd-border)' }}>
                 <span>{t('stoppedMaintenance')}</span>
                 <span className="dd-chip dd-chip-amber">{canceledOrders.length}</span>
@@ -351,14 +349,14 @@ export default function AdminDashboard() {
               <div className="flex-1 overflow-y-auto p-0">
                 {canceledOrders.length === 0 ? (
                   <div className="flex h-full items-center justify-center p-4">
-                    <span className="text-xs font-bold uppercase tracking-[0.2em]" style={{ color: 'var(--dd-text-muted)' }}>{t('empty')}</span>
+                    <span className="text-sm font-bold uppercase" style={{ color: 'var(--dd-text-muted)' }}>{t('empty')}</span>
                   </div>
                 ) : (
                   <ul className="flex flex-col gap-2 p-3">
                     {canceledOrders.map((o) => (
                       <li key={o.order_id} className="flex items-center justify-between p-3 rounded-xl border shadow-sm"
                         style={{ background: 'var(--dd-bg-surface)', borderColor: 'var(--dd-border)' }}>
-                        <span className="text-sm font-bold tracking-wide" style={{ color: 'var(--dd-text-primary)' }}>
+                        <span className="text-base font-bold" style={{ color: 'var(--dd-text-primary)' }}>
                           {o.vehicles?.vehicle_license_plate || `#${o.order_id}`}
                         </span>
                         <span className="dd-chip dd-chip-amber">{t('canceled')}</span>
@@ -379,7 +377,7 @@ export default function AdminDashboard() {
               style={{ background: 'var(--dd-bg-header)', borderBottom: '1px solid var(--dd-border)' }}>
               <div className="flex items-center gap-3 min-w-0 pr-2">
                 <div className="h-2 w-2 rounded-full animate-pulse shrink-0" style={{ background: '#0ea5e9', boxShadow: '0 0 10px rgba(14, 165, 233, 0.8)' }} />
-                <span className="text-base font-black uppercase tracking-[0.2em] truncate" style={{ color: 'var(--dd-text-primary)' }} title="TRUNG TÂM ĐIỀU PHỐI">
+                <span className="text-lg font-black uppercase truncate" style={{ color: 'var(--dd-text-primary)' }} title="TRUNG TÂM ĐIỀU PHỐI">
                   TRUNG TÂM ĐIỀU PHỐI
                 </span>
               </div>
@@ -389,9 +387,9 @@ export default function AdminDashboard() {
                 style={{ background: 'var(--dd-bg-surface)', border: '1px solid var(--dd-border)' }}>
                 <button
                   onClick={() => setCoreView('flow')}
-                  className={`flex items-center gap-2 px-3 py-1.5 text-xs font-bold uppercase tracking-[0.16em] transition-all rounded-md ${coreView === 'flow'
-                      ? 'bg-sky-500/20 text-sky-600 border border-sky-500/30'
-                      : 'text-slate-500 border border-transparent hover:text-slate-700'
+                  className={`flex items-center gap-2 px-3 py-1.5 text-sm font-bold uppercase transition-all rounded-md ${coreView === 'flow'
+                    ? 'bg-sky-500/20 text-sky-600 border border-sky-500/30'
+                    : 'text-slate-500 border border-transparent hover:text-slate-700'
                     }`}
                 >
                   <Activity className="h-3.5 w-3.5 shrink-0" /> <span className="hidden sm:inline">LUỒNG XE</span>
@@ -399,9 +397,9 @@ export default function AdminDashboard() {
                 <div className="w-[1px] h-4 mx-1 opacity-20" style={{ background: 'var(--dd-text-muted)' }} />
                 <button
                   onClick={() => setCoreView('map')}
-                  className={`flex items-center gap-2 px-3 py-1.5 text-xs font-bold uppercase tracking-[0.16em] transition-all rounded-md ${coreView === 'map'
-                      ? 'bg-indigo-500/20 text-indigo-600 border border-indigo-500/30'
-                      : 'text-slate-500 border border-transparent hover:text-slate-700'
+                  className={`flex items-center gap-2 px-3 py-1.5 text-sm font-bold uppercase transition-all rounded-md ${coreView === 'map'
+                    ? 'bg-indigo-500/20 text-indigo-600 border border-indigo-500/30'
+                    : 'text-slate-500 border border-transparent hover:text-slate-700'
                     }`}
                 >
                   <MapIcon className="h-3.5 w-3.5 shrink-0" /> <span className="hidden sm:inline">BẢN ĐỒ</span>
@@ -413,7 +411,7 @@ export default function AdminDashboard() {
             <div className="flex-1 overflow-hidden relative bg-transparent">
               {coreView === 'flow' ? (
                 <div className="h-full overflow-y-auto w-full scrollbar-hide">
-                  <div className="p-4 h-full">
+                  <div className=" h-full">
                     <ActivityFlow
                       stations={stations}
                       vehicles={vehicles}
@@ -441,7 +439,7 @@ export default function AdminDashboard() {
           {/* Right: Live Execution (col-span-3) */}
           <div className="lg:col-span-3 h-[704px] animate-fade-up" style={{ animationDelay: '0.6s' }}>
             <div className="flex h-full flex-col overflow-hidden dd-card" style={{ borderColor: 'rgba(56, 189, 248, 0.2)' }}>
-              <div className="flex items-center justify-between px-4 py-3 text-sm font-semibold uppercase tracking-[0.18em]"
+              <div className="flex items-center justify-between px-4 py-3 text-base font-semibold"
                 style={{ background: 'var(--dd-bg-header)', color: 'var(--dd-text-primary)', borderBottom: '1px solid var(--dd-border)' }}>
                 <span>{t('outsideStation')}</span>
                 <span className="dd-chip dd-chip-sky">{outsideOrders.length}</span>
@@ -458,7 +456,7 @@ export default function AdminDashboard() {
                         style={{ background: 'var(--dd-bg-surface)', border: '2px dashed var(--dd-border)' }}>
                         <Activity className="h-7 w-7 text-sky-500 animate-pulse" />
                       </div>
-                      <span className="mt-5 text-xs font-bold uppercase tracking-[0.24em] animate-pulse"
+                      <span className="mt-5 text-sm font-bold uppercase animate-pulse"
                         style={{ color: 'var(--dd-sky)' }}>
                         Đang quét dữ liệu...
                       </span>
@@ -478,7 +476,7 @@ export default function AdminDashboard() {
                         <div className="flex justify-between items-end pl-2">
                           <div className="flex items-center gap-3">
                             <Truck className={`w-5 h-5 ${o.order_status === 'transporting' ? 'text-sky-500 animate-drive-run' : 'text-amber-500 animate-drive-idle'}`} />
-                            <span className="text-lg font-bold tracking-tight" style={{ color: 'var(--dd-text-primary)' }}>
+                            <span className="text-xl font-bold" style={{ color: 'var(--dd-text-primary)' }}>
                               {o.vehicles?.vehicle_license_plate || `#${o.order_id}`}
                             </span>
                           </div>
@@ -487,7 +485,7 @@ export default function AdminDashboard() {
                           </span>
                         </div>
                         <div className="mt-3 pl-2 flex items-center justify-between">
-                          <div className="text-[11px] font-bold uppercase tracking-[0.2em]"
+                          <div className="text-xs font-bold uppercase"
                             style={{ color: 'var(--dd-text-muted)' }}>
                             TRẠM: {o.stations?.station_name || t('unassigned')}
                           </div>
@@ -508,9 +506,9 @@ export default function AdminDashboard() {
         </div>
 
         {/* ═══ FOOTER ═══ */}
-        <div className="mb-20 mt-8 flex flex-col justify-between gap-4 pt-4 md:flex-row md:items-baseline whitespace-nowrap"
+        <div className=" mt-8 flex flex-col justify-between gap-4 pt-4 md:flex-row md:items-baseline whitespace-nowrap"
           style={{ borderTop: '1px solid var(--dd-border)' }}>
-          <div className="flex items-center gap-4 text-xs font-semibold uppercase tracking-[0.18em]"
+          <div className="flex items-center gap-4 text-sm font-semibold uppercase"
             style={{ color: 'var(--dd-text-muted)' }}>
             <span className="dd-chip dd-chip-red flex items-center gap-2">
               <div className="h-1.5 w-1.5 rounded-full animate-ping" style={{ background: '#f87171' }} />
@@ -518,7 +516,7 @@ export default function AdminDashboard() {
             </span>
             <span>{t('systemListening')}</span>
           </div>
-          <p className="text-xs uppercase tracking-[0.18em]" style={{ color: 'var(--dd-text-muted)' }}>
+          <p className="text-sm uppercase" style={{ color: 'var(--dd-text-muted)' }}>
             {t('connectionStable')} • {t('plantName')}
           </p>
         </div>

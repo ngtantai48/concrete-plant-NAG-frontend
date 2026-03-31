@@ -233,11 +233,11 @@ export default function StationStatusPanel({ stations, orders, deviceStationStat
               <div className="flex items-start justify-between gap-4 px-5 py-4 rounded-t-[19px]"
                 style={{ background: 'var(--dd-bg-header)', borderBottom: '1px solid var(--dd-border)' }}>
                 <div>
-                  <p className="text-xs font-bold uppercase tracking-[0.24em]"
+                  <p className="text-sm font-bold uppercase"
                     style={{ color: 'var(--dd-text-muted)' }}>
                     {t('dispatchStationLabel')}
                   </p>
-                  <h3 className="mt-2 text-2xl font-black tracking-tight" style={{ color: 'var(--dd-text-primary)' }}>
+                  <h3 className="mt-2 text-3xl font-black" style={{ color: 'var(--dd-text-primary)' }}>
                     {station.station_name}
                   </h3>
                   <div className={`mt-3 dd-chip ${deviceStatus === 'connected' ? '' : 'animate-danger-blink'}`}
@@ -267,17 +267,17 @@ export default function StationStatusPanel({ stations, orders, deviceStationStat
                 {/* Active Vehicle */}
                 <div className="rounded-2xl p-4 shadow-sm" style={{ background: 'var(--dd-bg-surface)', border: '1px solid var(--dd-border)' }}>
                   <div className="mb-2 flex items-center justify-between gap-3">
-                    <span className="text-xs font-bold uppercase tracking-[0.22em]" style={{ color: 'var(--dd-text-muted)' }}>
+                    <span className="text-sm font-bold uppercase" style={{ color: 'var(--dd-text-muted)' }}>
                       {t('vehicleUnloading')}
                     </span>
-                    <span className="text-xs font-bold uppercase tracking-wider" style={{ color: theme.tone }}>
+                    <span className="text-sm font-bold uppercase" style={{ color: theme.tone }}>
                       {activeVehicle ? t('processing') : t('empty')}
                     </span>
                   </div>
 
                   {activeVehicle ? (
                     <div className="flex items-center justify-between gap-3">
-                      <span className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-bold tracking-widest"
+                      <span className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-base font-bold"
                         style={{
                           background: 'var(--dd-cyan-glow)',
                           border: '1px solid var(--dd-border-accent)',
@@ -293,7 +293,7 @@ export default function StationStatusPanel({ stations, orders, deviceStationStat
                       )}
                     </div>
                   ) : (
-                    <p className="text-sm font-bold italic" style={{ color: 'var(--dd-text-muted)', opacity: 0.6 }}>{t('noVehicleAtStation')}</p>
+                    <p className="text-base font-bold italic" style={{ color: 'var(--dd-text-muted)', opacity: 0.6 }}>{t('noVehicleAtStation')}</p>
                   )}
                 </div>
 
@@ -314,10 +314,10 @@ export default function StationStatusPanel({ stations, orders, deviceStationStat
                 {/* Next Vehicle */}
                 <div className="rounded-2xl p-4 shadow-sm" style={{ background: 'var(--dd-bg-surface)', border: '1px solid var(--dd-border)' }}>
                   <div className="mb-2 flex items-center justify-between gap-3">
-                    <span className="text-xs font-bold uppercase tracking-[0.22em]" style={{ color: 'var(--dd-text-secondary)' }}>
+                    <span className="text-sm font-bold uppercase" style={{ color: 'var(--dd-text-secondary)' }}>
                       {t('nextVehicle')}
                     </span>
-                    <span className="text-xs font-bold uppercase tracking-wider" style={{ color: 'var(--dd-text-muted)' }}>
+                    <span className="text-sm font-bold uppercase" style={{ color: 'var(--dd-text-muted)' }}>
                       {t('nextTurn')}
                     </span>
                   </div>
@@ -325,10 +325,10 @@ export default function StationStatusPanel({ stations, orders, deviceStationStat
                   {nextVehicle ? (
                     <div className="flex items-center gap-2" style={{ color: 'var(--dd-text-accent)' }}>
                       <ArrowUp className="h-4 w-4 animate-flow-arrow-up" />
-                      <span className="text-base font-black tracking-widest">{nextVehicle.license_plate}</span>
+                      <span className="text-lg font-black">{nextVehicle.license_plate}</span>
                     </div>
                   ) : (
-                      <span className="text-[13px] italic" style={{ color: 'var(--dd-text-muted)', opacity: 0.6 }}>{t('noNextVehicle')}</span>
+                    <span className="text-sm italic" style={{ color: 'var(--dd-text-muted)', opacity: 0.6 }}>{t('noNextVehicle')}</span>
                   )}
                 </div>
               </div>
@@ -376,17 +376,17 @@ export default function StationStatusPanel({ stations, orders, deviceStationStat
           <DialogHeader>
             <div className="flex items-center gap-3 border-b border-slate-200 pb-3">
               <div className="text-left">
-                <DialogTitle className="text-xl font-bold uppercase text-slate-900">
+                <DialogTitle className="text-2xl font-bold uppercase text-slate-900">
                   {t('incidentReportTitle')}
                 </DialogTitle>
-                <DialogDescription className="mt-0.5 text-lg font-bold text-slate-500">
+                <DialogDescription className="mt-0.5 text-xl font-bold text-slate-500">
                   {incidentStation?.station_name}
                 </DialogDescription>
               </div>
             </div>
           </DialogHeader>
           <div className="py-2">
-            <label className="mb-2 block text-md font-bold uppercase text-slate-700">
+            <label className="mb-2 block text-lg font-bold uppercase text-slate-700">
               {t('incidentDescription')}
             </label>
             <Textarea
@@ -424,7 +424,7 @@ export default function StationStatusPanel({ stations, orders, deviceStationStat
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="text-xl font-bold uppercase text-slate-900">{t('confirmPauseStation')}</DialogTitle>
-            <DialogDescription className="text-base text-slate-500">
+            <DialogDescription className="text-lg text-slate-500">
               Bạn có chắc chắn muốn báo <strong>{stationToPause?.station_name}</strong> dừng hoạt động không? Hành động này sẽ khiến trạm tạm thời không nhận thêm xe đổ bê tông.
             </DialogDescription>
           </DialogHeader>
