@@ -33,10 +33,8 @@ export default function DashboardLayoutClient({ children }: { children: React.Re
             <Layout className="min-h-screen">
                 <Sidebar />
                 <Layout id="main-content-layout" style={{ marginLeft: 270, transition: "margin-left 0.5s ease" }}>
-                    <AppHeader
-                        onLogout={handleLogout}
-                    />
-                    <Content className="bg-gray-50 p-6 min-h-[calc(100vh-64px)]">
+                    <AppHeader onLogout={handleLogout} />
+                    <Content className="bg-gray-50 min-h-[calc(100vh-64px)]">
                         {children}
                     </Content>
                 </Layout>
