@@ -108,7 +108,7 @@ export default function ActivityFlow({ stations: _stations, vehicles, orders, on
             <div className="h-16 w-16 rounded-full flex items-center justify-center animate-pulse" style={{ background: 'var(--dd-bg-surface)', border: '1px dashed var(--dd-border)' }}>
               <ArrowRight className="h-6 w-6 text-sky-500/80" />
             </div>
-            <span className="text-xs font-bold uppercase tracking-[0.3em]" style={{ color: 'var(--dd-text-muted)' }}>
+            <span className="text-sm font-bold uppercase" style={{ color: 'var(--dd-text-muted)' }}>
               {t('noVehiclesInFlow') || 'CHƯA CÓ DỮ LIỆU LUỒNG XE'}
             </span>
           </div>
@@ -124,7 +124,7 @@ export default function ActivityFlow({ stations: _stations, vehicles, orders, on
                 {/* Station Header */}
                 <div className="flex items-center justify-between px-5 py-3"
                   style={{ background: 'var(--dd-bg-header)', borderBottom: '1px solid var(--dd-border)' }}>
-                  <span className="text-sm font-bold uppercase tracking-[0.18em]" style={{ color: 'var(--dd-text-primary)' }}>
+                  <span className="text-base font-bold uppercase" style={{ color: 'var(--dd-text-primary)' }}>
                     {group.stationName}
                   </span>
                   <span className="dd-chip dd-chip-sky">
@@ -162,10 +162,10 @@ export default function ActivityFlow({ stations: _stations, vehicles, orders, on
                           style={{ background: style.dot, opacity: 0.8 }} />
 
                         <div className="flex min-w-[150px] items-center gap-4 pl-2">
-                          <div className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-100 text-[11px] font-bold tracking-[0.05em] shadow-sm" style={{ color: 'var(--dd-text-secondary)', border: '1px solid var(--dd-border)' }}>
+                          <div className="w-8 h-8 flex items-center justify-center rounded-full bg-slate-100 text-xs font-bold shadow-sm" style={{ color: 'var(--dd-text-secondary)', border: '1px solid var(--dd-border)' }}>
                             #{actualIndex + 1}
                           </div>
-                          <div className="text-base font-black tracking-widest" style={{ color: 'var(--dd-text-primary)' }}>
+                          <div className="text-lg font-black" style={{ color: 'var(--dd-text-primary)' }}>
                             {order.vehicles?.vehicle_license_plate || `ĐƠN: ${order.order_id}`}
                           </div>
                         </div>
@@ -235,7 +235,7 @@ export default function ActivityFlow({ stations: _stations, vehicles, orders, on
                     <button
                       type="button"
                       onClick={() => toggleExpanded(group.stationId)}
-                      className="flex items-center gap-2 px-2 pt-1 text-xs font-bold uppercase tracking-[0.16em] transition-colors"
+                      className="flex items-center gap-2 px-2 text-sm font-bold uppercase transition-colors"
                       style={{ color: 'var(--dd-text-muted)' }}
                       onMouseEnter={e => e.currentTarget.style.color = 'var(--dd-text-accent)'}
                       onMouseLeave={e => e.currentTarget.style.color = 'var(--dd-text-muted)'}
