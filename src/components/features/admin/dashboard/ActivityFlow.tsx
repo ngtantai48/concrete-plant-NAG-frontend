@@ -415,12 +415,12 @@ export default function ActivityFlow({ stations, vehicles, orders, onOrdersUpdat
 
     const unassignedGroup = ordersByStation.has(0)
       ? [
-          {
-            stationId: 0,
-            stationName: t('unassigned'),
-            orders: ordersByStation.get(0) ?? [],
-          },
-        ]
+        {
+          stationId: 0,
+          stationName: t('unassigned'),
+          orders: ordersByStation.get(0) ?? [],
+        },
+      ]
       : [];
 
     return [...unassignedGroup, ...stationGroups, ...missingGroups];
@@ -692,20 +692,20 @@ export default function ActivityFlow({ stations, vehicles, orders, onOrdersUpdat
               const isEligibleTarget = isDragMode && !isSourceStation;
               const placeholderIndex = isEligibleTarget && isActiveDropTarget
                 ? (() => {
-                    if (typeof dragOverOrderId === 'number') {
-                      const visibleIndex = visibleOrders.findIndex((order) => order.order_id === dragOverOrderId);
-                      if (visibleIndex !== -1) {
-                        return visibleIndex;
-                      }
-
-                      const absoluteIndex = group.orders.findIndex((order) => order.order_id === dragOverOrderId);
-                      if (absoluteIndex !== -1) {
-                        return Math.min(absoluteIndex, visibleOrders.length);
-                      }
+                  if (typeof dragOverOrderId === 'number') {
+                    const visibleIndex = visibleOrders.findIndex((order) => order.order_id === dragOverOrderId);
+                    if (visibleIndex !== -1) {
+                      return visibleIndex;
                     }
 
-                    return visibleOrders.length;
-                  })()
+                    const absoluteIndex = group.orders.findIndex((order) => order.order_id === dragOverOrderId);
+                    if (absoluteIndex !== -1) {
+                      return Math.min(absoluteIndex, visibleOrders.length);
+                    }
+                  }
+
+                  return visibleOrders.length;
+                })()
                 : null;
               const headerBadgeText = isActiveDropTarget
                 ? t('dropHereBadge')

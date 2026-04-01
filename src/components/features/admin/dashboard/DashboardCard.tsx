@@ -58,17 +58,17 @@ export default function DashboardCard({ label, value, icon, accent, subtitle, in
       <div className="p-5 pt-6">
         <div className="flex items-start justify-between gap-4">
           <div className="space-y-1.5 min-w-0">
-            <p className="text-[11px] font-semibold uppercase tracking-widest"
+            <p className="text-xs font-semibold uppercase"
                style={{ color: 'var(--dd-text-muted)' }}>
               {label}
             </p>
             <div className="flex items-baseline gap-2">
-              <p className="text-3xl font-bold tracking-tight tabular-nums"
+              <p className="text-4xl font-bold tabular-nums"
                  style={{ color: colors.color }}>
                 {value}
               </p>
               {subtitle && (
-                <span className="text-xs font-medium" style={{ color: colors.color, opacity: 0.7 }}>{subtitle}</span>
+                <span className="text-sm font-medium" style={{ color: colors.color, opacity: 0.7 }}>{subtitle}</span>
               )}
             </div>
           </div>
