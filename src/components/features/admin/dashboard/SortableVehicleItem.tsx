@@ -3,11 +3,12 @@
 import React from 'react';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { ChevronUp, ChevronDown, Truck, GripVertical } from 'lucide-react';
+import { ChevronUp, ChevronDown, GripVertical } from 'lucide-react';
 import type { Order } from '@/types/order';
 
 interface SortableVehicleItemProps {
   order: Order;
+  stationId: number;
   index: number;
   actualIndex: number;
   style: {
@@ -25,6 +26,7 @@ interface SortableVehicleItemProps {
 
 export function SortableVehicleItem({
   order,
+  stationId,
   actualIndex,
   style,
   isBusy,
@@ -40,14 +42,21 @@ export function SortableVehicleItem({
     transform,
     transition,
     isDragging,
-  } = useSortable({ id: order.order_id });
+  } = useSortable({
+    id: order.order_id,
+    data: {
+      type: 'order',
+      orderId: order.order_id,
+      stationId,
+    },
+  });
 
   const dndStyle = {
     transform: CSS.Transform.toString(transform),
     transition,
     zIndex: isDragging ? 100 : 'auto',
-    opacity: isDragging ? 0.6 : 1,
-    scale: isDragging ? 1.02 : 1,
+    opacity: isDragging ? 0.18 : 1,
+    scale: isDragging ? 0.98 : 1,
     background: 'var(--dd-bg-card)',
     border: '1px solid var(--dd-border)',
   };
