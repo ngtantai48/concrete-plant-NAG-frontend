@@ -729,11 +729,11 @@ export default function TableVehicles() {
                 >
                   <Select size="large" className="rounded-lg">
                     <Select.Option value="available">{t("activeOption")}</Select.Option>
-                    <Select.Option value="running">Đang chạy</Select.Option>
-                    <Select.Option value="transporting">Đang giao</Select.Option>
-                    <Select.Option value="collecting">Đang nhận</Select.Option>
+                    {/* <Select.Option value="running">{t("running")}</Select.Option>
+                    <Select.Option value="transporting">{t("transporting")}</Select.Option>
+                    <Select.Option value="collecting">{t("collecting")}</Select.Option> */}
                     <Select.Option value="maintenance">{t("maintenanceOption")}</Select.Option>
-                    <Select.Option value="incident">Sự cố</Select.Option>
+                    <Select.Option value="incident">{t("incident")}</Select.Option>
                   </Select>
                 </Form.Item>
               </div>
