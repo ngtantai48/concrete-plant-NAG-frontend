@@ -2,13 +2,40 @@
 
 import { Button } from "@/components/ui/button";
 import { useNavigationStore } from "@/hooks/use-navigation-store";
+import driverApi from "@/services/driver.service";
 import mediaApi from "@/services/media.service";
 import vehicleTypeApi from "@/services/vehicle-type.service";
 import vehicleApi from "@/services/vehicle.service";
+import type { Driver } from "@/types/driver";
 import type { VehicleMedia } from "@/types/media";
 import type { Vehicle, VehicleType } from "@/types/vehicle";
-import { Divider, Form, Image, Input, Modal, Pagination, Popconfirm, Select, Space, Table, Tooltip } from "antd";
-import { CarFront, Download, FileArchive, FileText, Hash, PenSquare, Plus, RefreshCw, Trash2, Upload as UploadIcon, X, Scan } from "lucide-react";
+import {
+  Divider,
+  Form,
+  Image,
+  Input,
+  Modal,
+  Pagination,
+  Popconfirm,
+  Select,
+  Space,
+  Table,
+  Tooltip,
+} from "antd";
+import {
+  CarFront,
+  Download,
+  FileArchive,
+  FileText,
+  Hash,
+  PenSquare,
+  Plus,
+  RefreshCw,
+  Trash2,
+  Upload as UploadIcon,
+  X,
+  Scan,
+} from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -21,6 +48,27 @@ interface PendingFile {
   uid: string;
 }
 
+const getDriversFromResponse = (payload: unknown): Driver[] => {
+  if (Array.isArray(payload)) {
+    return payload as Driver[];
+  }
+
+  if (!payload || typeof payload !== "object") {
+    return [];
+  }
+
+  const record = payload as Record<string, unknown>;
+  const candidates = [record.data, record.users, record.items, record.results];
+
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate)) {
+      return candidate as Driver[];
+    }
+  }
+
+  return [];
+};
+
 export default function TableVehicles() {
   const t = useTranslations("VehiclePage");
   const tCommon = useTranslations("Common");
@@ -29,7 +77,9 @@ export default function TableVehicles() {
   const [form] = Form.useForm();
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [vehicleTypes, setVehicleTypes] = useState<VehicleType[]>([]);
+  const [drivers, setDrivers] = useState<Driver[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingDrivers, setLoadingDrivers] = useState(false);
   const [searchText, setSearchText] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [refreshDisabled, setRefreshDisabled] = useState(0);
@@ -85,21 +135,53 @@ export default function TableVehicles() {
     }
   }, []);
 
+  const fetchDrivers = useCallback(async () => {
+    setLoadingDrivers(true);
+    try {
+      const res = await driverApi.getAll({ limit: 1000 });
+      const driverData = getDriversFromResponse(res.data);
+      setDrivers(
+        driverData
+          .filter(
+            (driver): driver is Driver => Boolean(driver?.user_id) && driver.role === "driver"
+          )
+          .sort((a, b) => a.user_full_name.localeCompare(b.user_full_name))
+      );
+    } catch {
+      setDrivers([]);
+    } finally {
+      setLoadingDrivers(false);
+    }
+  }, []);
+
   useEffect(() => {
     fetchVehicles();
     fetchVehicleTypes();
-  }, [fetchVehicles, fetchVehicleTypes]);
+    fetchDrivers();
+  }, [fetchVehicles, fetchVehicleTypes, fetchDrivers]);
 
   const filteredVehicles = useMemo(() => {
     return vehicles.filter((v) => {
+      const normalizedSearch = searchText.toLowerCase();
       const matchSearch =
         !searchText ||
-        v.vehicle_license_plate?.toLowerCase().includes(searchText.toLowerCase()) ||
-        v.vehicle_description?.toLowerCase().includes(searchText.toLowerCase());
+        v.vehicle_license_plate?.toLowerCase().includes(normalizedSearch) ||
+        v.vehicle_description?.toLowerCase().includes(normalizedSearch) ||
+        v.users?.user_full_name?.toLowerCase().includes(normalizedSearch) ||
+        v.users?.username?.toLowerCase().includes(normalizedSearch);
       const matchStatus = statusFilter === "all" || v.vehicle_status === statusFilter;
       return matchSearch && matchStatus;
     });
   }, [vehicles, statusFilter, searchText]);
+
+  const driverOptions = useMemo(
+    () =>
+      drivers.map((driver) => ({
+        value: driver.user_id,
+        label: `${driver.user_full_name}${driver.username ? ` (${driver.username})` : ""}`,
+      })),
+    [drivers]
+  );
 
   const handleRefresh = () => {
     if (refreshDisabled > 0) return;
@@ -145,6 +227,7 @@ export default function TableVehicles() {
       vehicle_description: record.vehicle_description,
       vehicle_rfid: record.vehicle_rfid,
       vehicle_type_id: record.vehicle_type_id,
+      user_id: record.user_id ?? record.users?.user_id,
     });
     setPendingFiles([]);
     setIsModalVisible(true);
@@ -181,13 +264,17 @@ export default function TableVehicles() {
   const handleSave = async () => {
     try {
       const values = await form.validateFields();
+      const payload = {
+        ...values,
+        user_id: values.user_id ?? null,
+      };
       setSaving(true);
       let vehicleId: number;
       if (editingVehicle) {
-        await vehicleApi.update(editingVehicle.vehicle_id, values);
+        await vehicleApi.update(editingVehicle.vehicle_id, payload);
         vehicleId = editingVehicle.vehicle_id;
       } else {
-        const res = await vehicleApi.create(values);
+        const res = await vehicleApi.create(payload);
         vehicleId = res.data?.data?.vehicle_id || res.data?.vehicle_id;
       }
 
@@ -274,10 +361,12 @@ export default function TableVehicles() {
     }
   };
 
-  const updatePendingFile = (uid: string, field: "media_name" | "media_description", value: string) => {
-    setPendingFiles((prev) =>
-      prev.map((p) => (p.uid === uid ? { ...p, [field]: value } : p))
-    );
+  const updatePendingFile = (
+    uid: string,
+    field: "media_name" | "media_description",
+    value: string
+  ) => {
+    setPendingFiles((prev) => prev.map((p) => (p.uid === uid ? { ...p, [field]: value } : p)));
   };
 
   const removePendingFile = (uid: string) => {
@@ -359,7 +448,7 @@ export default function TableVehicles() {
             alt={name}
             className="object-cover"
             preview={{
-              mask: <div className="text-[10px] text-white">Xem</div>
+              mask: <div className="text-[10px] text-white">Xem</div>,
             }}
           />
         </div>
@@ -431,6 +520,29 @@ export default function TableVehicles() {
       render: (val: number) => {
         const found = vehicleTypes.find((vt) => vt.vehicle_type_id === val);
         return found?.vehicle_type_name || `#${val}`;
+      },
+    },
+    {
+      title: t("assignedDriver"),
+      dataIndex: "user_id",
+      key: "user_id",
+      render: (value: number | null | undefined, record: Vehicle) => {
+        if (record.users?.user_full_name) {
+          return (
+            <div className="leading-tight">
+              <div className="font-medium text-slate-800">{record.users.user_full_name}</div>
+              {record.users.username && (
+                <div className="text-xs text-slate-500">@{record.users.username}</div>
+              )}
+            </div>
+          );
+        }
+
+        if (value) {
+          return <span className="text-xs text-slate-500">#{value}</span>;
+        }
+
+        return <span className="text-slate-400 italic">{t("unassigned")}</span>;
       },
     },
     {
@@ -679,6 +791,24 @@ export default function TableVehicles() {
                 </Form.Item>
 
                 <Form.Item
+                  label={<span className="font-medium text-slate-700">{t("assignedDriver")}</span>}
+                  name="user_id"
+                  className="mb-0"
+                >
+                  <Select
+                    size="large"
+                    className="rounded-lg"
+                    placeholder={t("driverPlaceholder")}
+                    allowClear
+                    loading={loadingDrivers}
+                    showSearch
+                    options={driverOptions}
+                    optionFilterProp="label"
+                    getPopupContainer={(triggerNode) => triggerNode.parentElement || document.body}
+                  />
+                </Form.Item>
+
+                <Form.Item
                   label={<span className="font-medium text-slate-700">{t("description")}</span>}
                   name="vehicle_description"
                   className="mb-0"
@@ -712,8 +842,9 @@ export default function TableVehicles() {
                           }}
                         >
                           <Scan
-                            className={`w-4 h-4 ${isScanning ? "text-blue-500 animate-pulse" : "text-slate-400"
-                              }`}
+                            className={`w-4 h-4 ${
+                              isScanning ? "text-blue-500 animate-pulse" : "text-slate-400"
+                            }`}
                           />
                         </Button>
                       </Tooltip>
@@ -795,20 +926,28 @@ export default function TableVehicles() {
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       <div>
-                        <label className="text-xs text-slate-500 mb-1 block">{t("documentName")}</label>
+                        <label className="text-xs text-slate-500 mb-1 block">
+                          {t("documentName")}
+                        </label>
                         <Input
                           size="small"
                           value={pending.media_name}
-                          onChange={(e) => updatePendingFile(pending.uid, "media_name", e.target.value)}
+                          onChange={(e) =>
+                            updatePendingFile(pending.uid, "media_name", e.target.value)
+                          }
                           placeholder={t("documentName")}
                         />
                       </div>
                       <div>
-                        <label className="text-xs text-slate-500 mb-1 block">{t("documentDescription")}</label>
+                        <label className="text-xs text-slate-500 mb-1 block">
+                          {t("documentDescription")}
+                        </label>
                         <Input
                           size="small"
                           value={pending.media_description}
-                          onChange={(e) => updatePendingFile(pending.uid, "media_description", e.target.value)}
+                          onChange={(e) =>
+                            updatePendingFile(pending.uid, "media_description", e.target.value)
+                          }
                           placeholder={t("documentDescriptionPlaceholder")}
                         />
                       </div>
@@ -844,7 +983,11 @@ export default function TableVehicles() {
                     key={media.media_id}
                     className="flex items-center gap-3 bg-slate-50 border border-slate-200 rounded-lg p-3 group hover:border-slate-300 transition-colors"
                   >
-                    {getFilePreview(media.media_name, media.media_url, media.media_type === "images")}
+                    {getFilePreview(
+                      media.media_name,
+                      media.media_url,
+                      media.media_type === "images"
+                    )}
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-slate-800 truncate">
                         {media.media_name}
