@@ -193,6 +193,7 @@
     "sectionTitle": "Vehicle Identification",
     "licensePlaceholder": "e.g. 29H-123.45",
     "typePlaceholder": "Select vehicle type",
+    "driverPlaceholder": "Select driver",
     "typeVan": "Cargo Van (Enclosed)",
     "typeTruck": "Truck (Canvas cover)",
     "typeRefrigerated": "Refrigerated Truck",
@@ -383,10 +384,7 @@
     "fromDate": "Start Date",
     "toDate": "End Date",
     "dateRange": "Maintenance Period",
-    "dateRangePlaceholder": [
-      "From date",
-      "To date"
-    ],
+    "dateRangePlaceholder": ["From date", "To date"],
     "distanceCovered": "Distance Covered (km)",
     "distancePlaceholder": "e.g. 15000",
     "description": "Work Description",

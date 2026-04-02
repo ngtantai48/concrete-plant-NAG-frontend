@@ -213,6 +213,7 @@
     "sectionTitle": "Định danh phương tiện",
     "licensePlaceholder": "VD: 29H-123.45",
     "typePlaceholder": "Chọn mẫu xe",
+    "driverPlaceholder": "Chọn tài xế",
     "typeVan": "Xe Tải Van (Mui kín)",
     "typeTruck": "Xe Tải (Thùng bạt)",
     "typeRefrigerated": "Xe Tải Lạnh",
@@ -403,10 +404,7 @@
     "fromDate": "Ngày bắt đầu",
     "toDate": "Ngày kết thúc",
     "dateRange": "Thời gian bảo trì",
-    "dateRangePlaceholder": [
-      "Từ ngày",
-      "Đến ngày"
-    ],
+    "dateRangePlaceholder": ["Từ ngày", "Đến ngày"],
     "distanceCovered": "Số km đã chạy",
     "distancePlaceholder": "VD: 15000",
     "description": "Mô tả công việc",
