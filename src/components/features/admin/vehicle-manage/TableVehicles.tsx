@@ -287,6 +287,7 @@ export default function TableVehicles() {
       form.resetFields();
       setExistingMedia([]);
       setPendingFiles([]);
+      setDirty(false);
       toast.success(editingVehicle ? t("updateSuccess") : t("createSuccess"), {
         position: "top-right",
       });
