@@ -144,6 +144,7 @@ export default function TableVehicleMaintenances() {
 
       setIsModalVisible(false);
       form.resetFields();
+      setDirty(false);
       toast.success(editingRecord ? t("updateSuccess") : t("createSuccess"), {
         position: "top-right",
       });

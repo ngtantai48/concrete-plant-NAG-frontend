@@ -33,7 +33,7 @@ const StationMap = dynamic(
 
 export default function AdminDashboard() {
   const t = useTranslations("DashboardPage");
-  const tCommon = useTranslations("Common");
+  const tVehiclePage = useTranslations("VehiclePage");
   const locale = useLocale();
 
   const [geofenceStation, setGeofenceStation] = useState<Station | null>(null);
@@ -132,7 +132,43 @@ export default function AdminDashboard() {
   const { stationStatusMap } = useDeviceHeartbeat();
 
   const readyVehicles = useMemo(() => vehicles.filter(v => v.vehicle_status === "available"), [vehicles]);
-  const canceledOrders = useMemo(() => orders.filter(o => o.order_status === "canceled"), [orders]);
+
+  const stoppedMaintenanceList = useMemo(() => {
+    const list: { id: string; label: string; statusLabel: string; chipClass: string }[] = [];
+
+    vehicles.forEach(v => {
+      if (v.vehicle_status === "incident" || v.vehicle_status === "maintenance") {
+        const isIncident = v.vehicle_status === "incident";
+        list.push({
+          id: `veh-${v.vehicle_id}`,
+          label: v.vehicle_license_plate,
+          statusLabel: isIncident ? (t('incident') || 'Sự cố') : (tVehiclePage('maintenanceOption') || 'Bảo dưỡng'),
+          chipClass: isIncident ? 'dd-chip-red' : 'dd-chip-amber'
+        });
+      }
+    });
+
+    // orders.filter(o => o.order_status === "canceled").forEach(o => {
+    //   const plate = o.vehicles?.vehicle_license_plate || `#${o.order_id}`;
+    //   if (!list.some(item => item.label === plate)) {
+    //     list.push({
+    //       id: `ord-${o.order_id}`,
+    //       label: plate,
+    //       statusLabel: t('canceled'),
+    //       chipClass: 'dd-chip-amber'
+    //     });
+    //   }
+    // });
+
+    return list;
+  }, [vehicles, orders, t, tVehiclePage]);
+
+  const activeFlowOrders = useMemo(() => {
+    return orders.filter(o => {
+      const vStatus = o.vehicles?.vehicle_status;
+      return vStatus !== 'maintenance' && vStatus !== 'incident';
+    });
+  }, [orders]);
   const outsideOrders = useMemo(
     () => orders.filter(o => o.order_status === "running" || o.order_status === "transporting"),
     [orders],
@@ -344,22 +380,22 @@ export default function AdminDashboard() {
               <div className="flex items-center justify-between px-4 py-3 text-base font-semibold"
                 style={{ background: 'var(--dd-bg-header)', color: 'var(--dd-text-primary)', borderBottom: '1px solid var(--dd-border)' }}>
                 <span>{t('stoppedMaintenance')}</span>
-                <span className="dd-chip dd-chip-amber">{canceledOrders.length}</span>
+                <span className="dd-chip dd-chip-amber">{stoppedMaintenanceList.length}</span>
               </div>
               <div className="flex-1 overflow-y-auto p-0">
-                {canceledOrders.length === 0 ? (
+                {stoppedMaintenanceList.length === 0 ? (
                   <div className="flex h-full items-center justify-center p-4">
                     <span className="text-sm font-bold uppercase" style={{ color: 'var(--dd-text-muted)' }}>{t('empty')}</span>
                   </div>
                 ) : (
                   <ul className="flex flex-col gap-2 p-3">
-                    {canceledOrders.map((o) => (
-                      <li key={o.order_id} className="flex items-center justify-between p-3 rounded-xl border shadow-sm"
+                    {stoppedMaintenanceList.map((item) => (
+                      <li key={item.id} className="flex items-center justify-between p-3 rounded-xl border shadow-sm cursor-default"
                         style={{ background: 'var(--dd-bg-surface)', borderColor: 'var(--dd-border)' }}>
                         <span className="text-base font-bold" style={{ color: 'var(--dd-text-primary)' }}>
-                          {o.vehicles?.vehicle_license_plate || `#${o.order_id}`}
+                          {item.label}
                         </span>
-                        <span className="dd-chip dd-chip-amber">{t('canceled')}</span>
+                        <span className={`dd-chip ${item.chipClass}`}>{item.statusLabel}</span>
                       </li>
                     ))}
                   </ul>
@@ -415,7 +451,7 @@ export default function AdminDashboard() {
                     <ActivityFlow
                       stations={stations}
                       vehicles={vehicles}
-                      orders={orders}
+                      orders={activeFlowOrders}
                       onOrdersUpdated={fetchAll}
                     />
                   </div>
