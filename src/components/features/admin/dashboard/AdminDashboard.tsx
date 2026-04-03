@@ -17,7 +17,7 @@ import { useRealtimeUpdates } from "@/hooks/useRealtimeUpdates";
 import dynamic from "next/dynamic";
 
 import StationStatusPanel from "./StationStatusPanel";
-import ActivityFlow from "./ActivityFlow";
+import ActivityFlow, { type DispatchMode } from "./ActivityFlow";
 
 const StationMap = dynamic(
   () => import("@/components/features/admin/dashboard/StationMap"),
@@ -179,7 +179,8 @@ export default function AdminDashboard() {
   const ordersInTransit = useMemo(() => orders.filter(o => o.order_status === "transporting" || o.order_status === "running"), [orders]);
   const ordersCompleted = useMemo(() => orders.filter(o => o.order_status === "completed"), [orders]);
 
-  const [coreView, setCoreView] = useState<'flow' | 'map'>('flow');
+  const [dispatchMode, setDispatchMode] = useState<DispatchMode>('auto');
+  const [showMap, setShowMap] = useState(true);
 
   // if (loading) {
   //   return (
@@ -422,43 +423,43 @@ export default function AdminDashboard() {
               <div className="flex items-center rounded-lg p-1 backdrop-blur-md shrink-0"
                 style={{ background: 'var(--dd-bg-surface)', border: '1px solid var(--dd-border)' }}>
                 <button
-                  onClick={() => setCoreView('flow')}
-                  className={`flex items-center gap-2 px-3 py-1.5 text-sm font-bold uppercase transition-all rounded-md ${coreView === 'flow'
+                  onClick={() => setDispatchMode('auto')}
+                  className={`flex items-center gap-2 px-3 py-1.5 text-sm font-bold uppercase transition-all rounded-md ${dispatchMode === 'auto'
                     ? 'bg-sky-500/20 text-sky-600 border border-sky-500/30'
                     : 'text-slate-500 border border-transparent hover:text-slate-700'
                     }`}
                 >
-                  <Activity className="h-3.5 w-3.5 shrink-0" /> <span className="hidden sm:inline">LUỒNG XE</span>
+                  <span className="hidden sm:inline">AUTO</span>
                 </button>
                 <div className="w-[1px] h-4 mx-1 opacity-20" style={{ background: 'var(--dd-text-muted)' }} />
                 <button
-                  onClick={() => setCoreView('map')}
-                  className={`flex items-center gap-2 px-3 py-1.5 text-sm font-bold uppercase transition-all rounded-md ${coreView === 'map'
+                  onClick={() => setDispatchMode('manual')}
+                  className={`flex items-center gap-2 px-3 py-1.5 text-sm font-bold uppercase transition-all rounded-md ${dispatchMode === 'manual'
                     ? 'bg-indigo-500/20 text-indigo-600 border border-indigo-500/30'
                     : 'text-slate-500 border border-transparent hover:text-slate-700'
                     }`}
                 >
-                  <MapIcon className="h-3.5 w-3.5 shrink-0" /> <span className="hidden sm:inline">BẢN ĐỒ</span>
+                  <span className="hidden sm:inline">MANUAL</span>
+                </button>
+                <div className="w-[1px] h-4 mx-1 opacity-20" style={{ background: 'var(--dd-text-muted)' }} />
+                <button
+                  onClick={() => setShowMap((previous) => !previous)}
+                  className={`flex items-center gap-2 px-3 py-1.5 text-sm font-bold uppercase transition-all rounded-md ${showMap
+                    ? 'bg-emerald-500/20 text-emerald-600 border border-emerald-500/30'
+                    : 'text-slate-500 border border-transparent hover:text-slate-700'
+                    }`}
+                >
+                  <MapIcon className="h-3.5 w-3.5 shrink-0" />
+                  <span className="hidden sm:inline">MAP</span>
                 </button>
               </div>
             </div>
 
             {/* Core Display Area */}
-            <div className="flex-1 overflow-hidden relative bg-transparent">
-              {coreView === 'flow' ? (
-                <div className="h-full overflow-y-auto w-full scrollbar-hide">
-                  <div className=" h-full">
-                    <ActivityFlow
-                      stations={stations}
-                      vehicles={vehicles}
-                      orders={activeFlowOrders}
-                      onOrdersUpdated={fetchAll}
-                    />
-                  </div>
-                </div>
-              ) : (
-                <div className="h-full w-full p-2">
-                  <div className="h-full w-full rounded-xl overflow-hidden"
+            <div className="flex-1 overflow-hidden relative bg-transparent p-2">
+              <div className="flex h-full flex-col gap-2">
+                {showMap && (
+                  <div className="h-[230px] w-full rounded-xl overflow-hidden shrink-0"
                     style={{ border: '1px solid rgba(99, 102, 241, 0.2)' }}>
                     <StationMap
                       stationLongitude={geofenceStation?.station_gps_longitude ?? null}
@@ -467,8 +468,20 @@ export default function AdminDashboard() {
                       vehicles={vtrackingVehicles}
                     />
                   </div>
+                )}
+
+                <div className="min-h-0 flex-1 overflow-y-auto w-full scrollbar-hide">
+                  <div className="h-full">
+                    <ActivityFlow
+                      stations={stations}
+                      vehicles={vehicles}
+                      orders={activeFlowOrders}
+                      dispatchMode={dispatchMode}
+                      onOrdersUpdated={fetchAll}
+                    />
+                  </div>
                 </div>
-              )}
+              </div>
             </div>
           </div>
 

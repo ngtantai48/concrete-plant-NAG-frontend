@@ -1,13 +1,47 @@
 "use client";
 
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
 import { useSocket } from "@/context/socket-context";
 import orderApi from "@/services/order.service";
 import stationApi from "@/services/station.service";
 import type { Order } from "@/types/order";
 import type { Station } from "@/types/station";
-import { AlertTriangle, Ban, ChevronDown, ChevronUp, Factory, SquareX, Truck } from "lucide-react";
+import { AlertTriangle, ArrowRight, Ban, Factory, SquareX, Truck } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+
+interface StationQueueGroup {
+  station: Station;
+  collectingOrder?: Order;
+  pendingOrders: Order[];
+}
+
+interface MergedQueueItem {
+  station: Station;
+  order: Order;
+  queueIndex: number;
+}
+
+const STATUS_COLORS: Record<string, string> = {
+  collecting: "bg-blue-600",
+  operating: "bg-[#6F6E73]",
+  stopped: "bg-amber-500",
+  incident: "bg-red-600",
+};
+
+const GRID_CARD_MIN_WIDTH_REM = 20;
+
+function getQueueGridStyle(columnCount: number) {
+  const safeColumnCount = Math.max(columnCount, 1);
+
+  return {
+    display: "grid",
+    gridTemplateColumns: `repeat(${safeColumnCount}, minmax(${GRID_CARD_MIN_WIDTH_REM}rem, 1fr))`,
+    gap: "1.5rem",
+    minWidth: `${safeColumnCount * GRID_CARD_MIN_WIDTH_REM}rem`,
+  };
+}
 
 export default function DriverDisplay() {
   const t = useTranslations("DriverDisplayPage");
@@ -99,6 +133,51 @@ export default function DriverDisplay() {
     [stations]
   );
 
+  const stationQueueGroups = useMemo<StationQueueGroup[]>(() => {
+    const collectingOrdersByStation = new Map<number, Order>();
+
+    collectingOrders.forEach((order) => {
+      const stationId = order.stations?.station_id;
+      if (typeof stationId === "number" && !collectingOrdersByStation.has(stationId)) {
+        collectingOrdersByStation.set(stationId, order);
+      }
+    });
+
+    return activeStations.map((station) => ({
+      station,
+      collectingOrder: collectingOrdersByStation.get(station.station_id),
+      pendingOrders: pendingOrders.filter((order) => order.stations?.station_id === station.station_id),
+    }));
+  }, [activeStations, collectingOrders, pendingOrders]);
+
+  const mergedPendingQueue = useMemo<MergedQueueItem[]>(() => {
+    const longestQueueLength = stationQueueGroups.reduce(
+      (longest, group) => Math.max(longest, group.pendingOrders.length),
+      0
+    );
+    const mergedQueue: MergedQueueItem[] = [];
+
+    for (let queueIndex = 0; queueIndex < longestQueueLength; queueIndex += 1) {
+      stationQueueGroups.forEach((group) => {
+        const order = group.pendingOrders[queueIndex];
+        if (order) {
+          mergedQueue.push({
+            station: group.station,
+            order,
+            queueIndex,
+          });
+        }
+      });
+    }
+
+    return mergedQueue;
+  }, [stationQueueGroups]);
+
+  const queueGridStyle = useMemo(
+    () => getQueueGridStyle(activeStations.length),
+    [activeStations.length]
+  );
+
   // ── Render ────────────────────────────────────────────────
   return (
     <div
@@ -163,116 +242,99 @@ export default function DriverDisplay() {
         </div>
       </div>
 
-      {/* ─── 3-Column Station Grid ─── */}
-      <div
-        className="flex-1 p-6 overflow-hidden h-full"
-        style={{
-          display: "grid",
-          gridTemplateColumns:
-            activeStations.length > 0
-              ? `repeat(${activeStations.length}, 1fr)`
-              : "1fr",
-          gap: "1.5rem",
-        }}
-      >
+      {/* ─── Station Overview + Merged Queue ─── */}
+      <div className="flex-1 p-6 overflow-hidden h-full">
         {activeStations.length === 0 ? (
-          <div className="flex flex-col items-center justify-center text-slate-400 col-span-full">
+          <div className="flex h-full flex-col items-center justify-center text-slate-400">
             <Factory className="w-32 h-32 mb-6 text-slate-200" />
             <p className="text-3xl font-bold">{t("emptyStation")}</p>
           </div>
         ) : (
-          activeStations.map((station) => (
-            <StationColumn
-              key={station.station_id}
-              station={station}
-              collectingOrder={collectingOrders.find((o) => o.stations?.station_id === station.station_id)}
-              pendingOrders={pendingOrders.filter((o) => o.stations?.station_id === station.station_id)}
-              t={t}
-            />
-          ))
+          <div className="flex h-full flex-col gap-6">
+            <div className="overflow-x-auto pb-1">
+              <div style={queueGridStyle}>
+                {stationQueueGroups.map((group) => (
+                  <StationOverviewCard
+                    key={group.station.station_id}
+                    station={group.station}
+                    collectingOrder={group.collectingOrder}
+                    pendingCount={group.pendingOrders.length}
+                    t={t}
+                  />
+                ))}
+              </div>
+            </div>
+
+            <div className="min-h-0 flex-1 overflow-hidden rounded-3xl border-2 border-slate-200 bg-white shadow-sm">
+              <div className="text-shadow-lg/10 px-6 py-4 flex items-center justify-between shrink-0">
+                <h3 className="text-3xl font-black text-slate-500 uppercase tracking-wider">
+                  {t("pendingQueue")}
+                </h3>
+                <span className="text-xl bg-slate-200 text-slate-600 font-extrabold px-3 py-1 rounded-full">
+                  {mergedPendingQueue.length} {t("truck")}
+                </span>
+              </div>
+
+              <div className="px-6 shrink-0">
+                <div className="border-t-2 border-slate-200" />
+              </div>
+
+              <div className="min-h-0 flex-1 overflow-auto px-4 py-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                {mergedPendingQueue.length === 0 ? (
+                  <div className="flex h-full flex-col items-center justify-center text-slate-500">
+                    <Truck className="w-24 h-24 mb-3" />
+                    <p className="text-4xl font-bold uppercase">Không có xe chờ</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {mergedPendingQueue.map(({ station, order, queueIndex }, displayIndex) => (
+                      <PendingOrderCard
+                        key={`${station.station_id}-${order.order_id}`}
+                        order={order}
+                        queueIndex={queueIndex}
+                        displayIndex={displayIndex}
+                        stationName={station.station_name}
+                        t={t}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </div>
   );
 }
 
-// ─── Sub-component: Station Column ──────────────────────────
-const STATUS_COLORS: Record<string, string> = {
-  collecting: "bg-blue-600",
-  // operating: "bg-emerald-600",
-  operating: "bg-[#6F6E73]",
-  stopped: "bg-amber-500",
-  incident: "bg-red-600",
-};
-
-interface StationColumnProps {
+interface StationOverviewCardProps {
   station: Station;
   collectingOrder?: Order;
-  pendingOrders: Order[];
+  pendingCount: number;
   t: ReturnType<typeof useTranslations>;
 }
 
-function StationColumn({ station, collectingOrder, pendingOrders, t }: StationColumnProps) {
+function StationOverviewCard({ station, collectingOrder, pendingCount, t }: StationOverviewCardProps) {
   const headerBg = STATUS_COLORS[station.station_status] || "bg-slate-600";
-  const [expanded, setExpanded] = useState(false);
-  const VISIBLE_LIMIT = 3;
-  const hasMore = pendingOrders.length > VISIBLE_LIMIT;
-  const visibleOrders = expanded ? pendingOrders : pendingOrders.slice(0, VISIBLE_LIMIT);
-  const hiddenCount = pendingOrders.length - VISIBLE_LIMIT;
 
   return (
     <div className="bg-white rounded-3xl border-2 border-slate-200 shadow-sm flex flex-col overflow-hidden">
-      {/* Station Header */}
-      <div className={`${headerBg} px-6 py-5 flex flex-col items-center shrink-0`}>
-        <h2 className="text-shadow-lg/90 text-5xl font-black text-white uppercase tracking-wider text-center">
+      <div className={`${headerBg} px-6 py-5 flex items-center justify-between gap-4 shrink-0`}>
+        <h2 className="text-shadow-lg/90 text-4xl font-black text-white uppercase tracking-wider text-center">
           {station.station_name}
         </h2>
+        <span className="rounded-full bg-white/15 px-4 py-1 text-xl font-extrabold text-white whitespace-nowrap">
+          {pendingCount} {t("truck")}
+        </span>
       </div>
 
-      {/* Station Status Card */}
       <div className="p-4 shrink-0">
         <StationStatusCard
           station={station}
           collectingOrder={collectingOrder}
           t={t}
         />
-      </div>
-
-      {/* Divider + Queue Title */}
-      <div className="px-4">
-        <div className="border-t-2 border-slate-200" />
-      </div>
-      <div className="text-shadow-lg/10 px-6 py-3 flex items-center justify-between shrink-0">
-        <h3 className="text-2xl font-black text-slate-500 uppercase tracking-wider">
-          {t("pendingQueue")}
-        </h3>
-        <span className="text-xl bg-slate-200 text-slate-600 font-extrabold px-3 py-1 rounded-full">
-          {pendingOrders.length} {t("truck")}
-        </span>
-      </div>
-
-      {/* Pending Vehicles List */}
-      <div className="flex-1 overflow-y-auto px-4 pb-4 space-y-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-        {pendingOrders.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-8 text-slate-500">
-            <Truck className="w-24 h-24 mb-3" />
-            <p className="text-6xl font-bold uppercase">Không có xe chờ</p>
-          </div>
-        ) : (
-          <>
-            {visibleOrders.map((order, idx) => (
-              <PendingOrderRow key={order.order_id} order={order} index={idx} t={t} />
-            ))}
-            {hasMore && (
-              <button
-                onClick={() => setExpanded(!expanded)}
-                className="cursor-pointer w-full flex items-center justify-center gap-2 py-3 rounded-2xl border-2 border-dashed border-slate-300 text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition-colors font-bold text-lg uppercase"
-              >
-                {expanded ? (<><ChevronUp />Thu gọn</>) : (<><ChevronDown />Xem thêm {hiddenCount} xe</>)}
-              </button>
-            )}
-          </>
-        )}
       </div>
     </div>
   );
@@ -286,30 +348,25 @@ function StationStatusCard({ station, collectingOrder, t }: {
 }) {
   if (collectingOrder || station.station_status === "collecting") {
     return (
-      <div className="text-shadow-lg/100 w-full h-56 lg:h-64 bg-blue-100 border-4 border-blue-200 rounded-2xl p-2 gap-2 flex flex-col items-center justify-center animate-pulse shrink-0">
-        <span className="bg-blue-700 text-white text-4xl font-bold uppercase px-3 py-1 rounded-full mb-3">{t("collectingAction")}</span>
+      <div className="text-shadow-lg/100 w-full h-44 lg:h-52 bg-blue-100 border-4 border-blue-200 rounded-2xl p-4 gap-2 flex flex-col items-center justify-center animate-pulse shrink-0">
+        <span className="bg-blue-700 text-white text-2xl lg:text-3xl font-bold uppercase px-3 py-1 rounded-full mb-2 text-center">
+          {t("collectingAction")}
+        </span>
         <span
-          className="text-5xl lg:text-9xl font-bold text-blue-700 text-center"
+          className="text-4xl lg:text-7xl font-bold text-blue-700 text-center leading-none"
           style={{ WebkitTextStrokeWidth: "5px", paintOrder: "stroke fill" }}
         >
           {collectingOrder?.vehicles?.vehicle_license_plate || "N/A"}
         </span>
-        {/* <LicensePlateDisplay
-          plate={collectingOrder?.vehicles?.vehicle_license_plate}
-          className="text-5xl lg:text-9xl font-black text-blue-700 tracking-tighter text-center"
-        /> */}
-        {/* <span className="text-xl font-bold text-blue-600/80 mt-1 uppercase">
-          {collectingOrder?.users?.user_full_name}
-        </span> */}
       </div>
     );
   }
 
   if (station.station_status === "stopped") {
     return (
-      <div className="text-shadow-lg/30 w-full h-56 lg:h-64 bg-amber-50 border-4 border-dashed border-amber-300 rounded-2xl p-6 flex flex-col items-center justify-center shrink-0">
+      <div className="text-shadow-lg/30 w-full h-44 lg:h-52 bg-amber-50 border-4 border-dashed border-amber-300 rounded-2xl p-6 flex flex-col items-center justify-center shrink-0">
         <Ban className="w-16 h-16 text-amber-500 mb-2" />
-        <span className="text-6xl font-black text-amber-600 uppercase tracking-widest text-center">
+        <span className="text-4xl lg:text-5xl font-black text-amber-600 uppercase tracking-widest text-center">
           {t("stationStopped")}
         </span>
       </div>
@@ -318,124 +375,87 @@ function StationStatusCard({ station, collectingOrder, t }: {
 
   if (station.station_status === "incident") {
     return (
-      <div className="text-shadow-lg/30 w-full h-56 lg:h-64 bg-red-50 border-4 border-dashed border-red-300 rounded-2xl p-6 flex flex-col items-center justify-center shrink-0">
+      <div className="text-shadow-lg/30 w-full h-44 lg:h-52 bg-red-50 border-4 border-dashed border-red-300 rounded-2xl p-6 flex flex-col items-center justify-center shrink-0">
         <AlertTriangle className="w-16 h-16 text-red-500 mb-2" />
-        <span className="text-6xl font-black text-red-600 uppercase tracking-widest text-center">
+        <span className="text-4xl lg:text-5xl font-black text-red-600 uppercase tracking-widest text-center">
           {t("stationIncident")}
         </span>
       </div>
     );
   }
 
-  // Operating / empty
   return (
-    <div className="text-shadow-lg/30 w-full h-56 lg:h-64 bg-[#6F6E73]/10 border-4 border-dashed border-[#6F6E73]/40 rounded-2xl p-5 flex flex-col items-center justify-center shrink-0">
-      {/* <Truck className="w-12 h-12 text-[#6F6E73] mb-2" /> */}
+    <div className="text-shadow-lg/30 w-full h-44 lg:h-52 bg-[#6F6E73]/10 border-4 border-dashed border-[#6F6E73]/40 rounded-2xl p-5 flex flex-col items-center justify-center shrink-0">
       <SquareX className="w-16 h-16 text-[#6F6E73] mb-2" />
-      {/* <Image src={carConcreteIcon} alt="car concrete" className="w-16 h-16 mb-2 opacity-75" /> */}
-      <span className="text-6xl font-black text-[#6F6E73] uppercase tracking-widest text-center">
+      <span className="text-4xl lg:text-5xl font-black text-[#6F6E73] uppercase tracking-widest text-center">
         {t("emptyStation")}
       </span>
     </div>
   );
 }
 
-// ─── Sub-component: Pending Order Row ───────────────────────
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
-
-function PendingOrderRow({ order, index, t }: {
+function PendingOrderCard({ order, queueIndex, displayIndex, stationName, t }: {
   order: Order;
-  index: number;
+  queueIndex: number;
+  displayIndex: number;
+  stationName: string;
   t: ReturnType<typeof useTranslations>;
 }) {
-  const isNext = index === 0;
-  const isSecond = index === 1;
-  const isThird = index === 2;
+  const isNext = queueIndex === 0;
+  const isSecond = queueIndex === 1;
+  const isThird = queueIndex === 2;
 
-  let baseClass = "transition-all ";
+  let baseClass = "transition-all h-full";
   let cardClass = "border-2 border-slate-200 shadow-sm bg-white";
   let textClass = "text-slate-800";
-  let debugClass = "text-slate-400";
+  let detailClass = "text-slate-500";
 
   if (isNext) {
     cardClass = "border-4 border-emerald-500 shadow-lg shadow-emerald-100 bg-emerald-50";
     textClass = "text-emerald-700";
-    debugClass = "text-emerald-600/60";
+    detailClass = "text-emerald-700/80";
   } else if (isSecond) {
     cardClass = "border-4 border-[#F2CB05] shadow-lg shadow-[#F2CB05]/20 bg-[#F2CB05]/10";
-    textClass = "text-[#a38803]"; // Darker text for readability
-    debugClass = "text-[#cca900]";
+    textClass = "text-[#a38803]";
+    detailClass = "text-[#a38803]/80";
   } else if (isThird) {
     cardClass = "border-4 border-[#6CC5D9] shadow-lg shadow-[#6CC5D9]/20 bg-[#6CC5D9]/10";
-    textClass = "text-[#2d879e]"; // Darker text for readability
-    debugClass = "text-[#4caec4]";
+    textClass = "text-[#2d879e]";
+    detailClass = "text-[#2d879e]/80";
   }
 
   return (
     <Card className={baseClass + cardClass}>
-      <CardContent className="flex flex-col items-center justify-center p-2 gap-2">
-        {/* Top row: Order Number + Next Badge */}
-        <div className="flex items-center gap-3">
-          {/* <Badge
+      <CardContent className="flex h-full min-h-[220px] flex-col gap-5 p-5">
+        <div className="flex flex-wrap items-center justify-center gap-3 text-center lg:justify-start lg:text-left">
+          <Badge
             variant={isNext ? "default" : "secondary"}
-            className={`text-3xl px-3 py-1 ${isNext ? "bg-emerald-600 hover:bg-emerald-600" : ""}`}
+            className={`text-lg px-3 py-1 font-bold uppercase ${isNext ? "bg-emerald-700 hover:bg-emerald-700" : ""}`}
           >
-            #{index + 1}
-          </Badge> */}
-          {isNext && (
-            <Badge className="text-shadow-lg/100 text-4xl px-3 py-1 font-bold bg-emerald-700 animate-pulse uppercase">
-              {/* bg-blue-500 text-white text-3xl font-bold uppercase px-3 py-1 rounded-full mb-3 */}
-              XE TIẾP THEO VÀO {order.stations?.station_name}
-            </Badge>
-          )}
-          {/* {!isNext && (
-            <Badge variant="outline" className="text-xl px-3 py-1 text-slate-500">
-              {t("waitingList")}
-            </Badge>
-          )} */}
+            {t("orderNumber")} {displayIndex + 1}
+          </Badge>
+          <Badge
+            variant="outline"
+            className={`border-current bg-transparent px-3 py-1 text-base font-bold uppercase ${detailClass}`}
+          >
+            {isNext ? t("nextVehicle") : t("waitingList")}
+          </Badge>
         </div>
 
-        {/* License Plate — format characters with borders */}
-        <span
-          className={`text-shadow-lg/100 contrast-300 text-5xl lg:text-9xl font-bold tracking-tight text-center leading-tight ${textClass}`}
-          style={{ WebkitTextStrokeWidth: "5px", paintOrder: "stroke fill" }}
-        >
-          {order.vehicles?.vehicle_license_plate || "N/A"}
-        </span>
-        {/* <LicensePlateDisplay
-          plate={order.vehicles?.vehicle_license_plate}
-          className={`text-5xl lg:text-9xl font-bold tracking-tight text-center leading-tight ${textClass}`}
-        /> */}
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <span
+            className={`text-shadow-lg/100 contrast-300 text-5xl xl:text-7xl 2xl:text-8xl font-bold tracking-tight text-center leading-none lg:text-left ${textClass}`}
+            style={{ WebkitTextStrokeWidth: "5px", paintOrder: "stroke fill" }}
+          >
+            {order.vehicles?.vehicle_license_plate || "N/A"}
+          </span>
 
-        {/* Debug: order_id */}
-        {/* <span className={`italic text-base font-semibold tracking-tight ${debugClass}`}>
-          order_id: {order.order_id}
-        </span> */}
+          <div className={`flex items-center justify-center gap-3 text-center text-lg xl:text-xl font-black uppercase tracking-wide lg:justify-end ${detailClass}`}>
+            <ArrowRight className={`h-5 w-5 ${textClass}`} />
+            <span className={textClass}>{stationName}</span>
+          </div>
+        </div>
       </CardContent>
     </Card>
   );
 }
-
-// ─── Sub-component: License Plate Display ───────────────────
-// function LicensePlateDisplay({ plate, className }: { plate?: string; className?: string }) {
-//   const text = plate || "N/A";
-//   if (text === "N/A") {
-//     return <span className={className}>N/A</span>;
-//   }
-
-//   return (
-//     <div className={`flex items-center justify-center ${className}`}>
-//       <span
-//         className="drop-shadow-2xl"
-//         style={{
-//           WebkitTextStrokeWidth: "10px",
-//           WebkitTextFillColor: "white",
-//           paintOrder: "stroke fill",
-//         }}
-//       >
-//         {text}
-//       </span>
-//     </div>
-//   );
-// }
