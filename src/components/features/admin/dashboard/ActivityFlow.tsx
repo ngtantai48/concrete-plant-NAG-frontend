@@ -10,7 +10,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { ArrowRight, ChevronDown, ChevronUp, Clock, GripVertical, Loader2, ChevronUp as ChevronUpIcon, ChevronDown as ChevronDownIcon } from 'lucide-react';
+import { ArrowRight, ChevronDown, ChevronUp, Clock, GripVertical, Loader2, X, ChevronUp as ChevronUpIcon, ChevronDown as ChevronDownIcon } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
@@ -541,6 +541,11 @@ export default function ActivityFlow({ stations, vehicles, orders, dispatchMode,
     [stations],
   );
 
+  const flowStationNameById = useMemo(
+    () => new Map(flowStationOptions.map((station) => [String(station.station_id), station.station_name])),
+    [flowStationOptions],
+  );
+
   const activeOrder = useMemo(
     () => orders.find((order) => order.order_id === activeOrderId) ?? null,
     [activeOrderId, orders],
@@ -575,8 +580,7 @@ export default function ActivityFlow({ stations, vehicles, orders, dispatchMode,
   }, [groupedByStation]);
 
   const selectedCount = selectedOrderIds.length;
-  const manualTargetsReady = selectedCount > 0
-    && selectedOrderIds.every((orderId) => Boolean(manualOrderStationMap[orderId] || manualStationId));
+  const selectedAssignedCount = selectedOrderIds.filter((orderId) => Boolean(manualOrderStationMap[orderId])).length;
 
   useEffect(() => {
     const validOrderIds = new Set(mergedFlowOrders.map(({ order }) => order.order_id));
@@ -672,15 +676,32 @@ export default function ActivityFlow({ stations, vehicles, orders, dispatchMode,
   }, []);
 
   const handleManualOrderStationChange = useCallback((orderId: number, stationId: string) => {
+    setManualStationId('');
     setManualOrderStationMap((previous) => ({
       ...previous,
       [orderId]: stationId,
     }));
   }, []);
 
+  const clearManualOrderStation = useCallback((orderId: number) => {
+    setManualOrderStationMap((previous) => {
+      const next = { ...previous };
+      delete next[orderId];
+      return next;
+    });
+  }, []);
+
   const handleManualAssign = useCallback(async () => {
     if (selectedOrderIds.length === 0) {
       toast.error(t('manualSelectionRequired'), { position: 'top-right' });
+      return;
+    }
+
+    if (!manualStationId && selectedAssignedCount < selectedOrderIds.length) {
+      toast.error(t('manualIncompleteAssignments', {
+        selectedCount: selectedOrderIds.length,
+        assignedCount: selectedAssignedCount,
+      }), { position: 'top-right' });
       return;
     }
 
@@ -762,7 +783,7 @@ export default function ActivityFlow({ stations, vehicles, orders, dispatchMode,
     } finally {
       setReorderingKey(null);
     }
-  }, [flowStationOptions, groupedByStation, manualOrderStationMap, manualStationId, mergedFlowOrders, onOrdersUpdated, selectedOrderIds, t]);
+  }, [flowStationOptions, groupedByStation, manualOrderStationMap, manualStationId, mergedFlowOrders, onOrdersUpdated, selectedAssignedCount, selectedOrderIds, t]);
 
   const handleReorder = async (groupStationId: number, index: number, direction: 'up' | 'down') => {
     const group = groupedByStation.find((item) => item.stationId === groupStationId);
@@ -917,24 +938,43 @@ export default function ActivityFlow({ stations, vehicles, orders, dispatchMode,
                   </span>
 
                   <div className="flex w-full flex-col gap-3 md:w-auto md:flex-row md:items-center md:justify-end">
-                    <Select value={manualStationId} onValueChange={setManualStationId}>
-                      <SelectTrigger className="w-full bg-white md:w-[240px]">
-                        <SelectValue placeholder={t('manualChooseStation')} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {flowStationOptions.map((station) => (
-                          <SelectItem key={station.station_id} value={String(station.station_id)}>
-                            {station.station_name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <div className="flex w-full items-center gap-2 md:w-auto">
+                      <Select
+                        value={manualStationId}
+                        onValueChange={(value) => {
+                          setManualStationId(value);
+                          setManualOrderStationMap({});
+                        }}
+                      >
+                        <SelectTrigger className="w-full bg-white md:w-[240px]">
+                          <SelectValue placeholder={t('manualChooseStation')} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {flowStationOptions.map((station) => (
+                            <SelectItem key={station.station_id} value={String(station.station_id)}>
+                              {station.station_name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+
+                      {manualStationId && (
+                        <button
+                          type="button"
+                          onClick={() => setManualStationId('')}
+                          className="flex h-9 w-9 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-500 transition-all hover:text-slate-700"
+                          title={t('manualClearStation')}
+                        >
+                          <X className="h-4 w-4" />
+                        </button>
+                      )}
+                    </div>
 
                     <Button
                       type="button"
                       variant="primary"
                       onClick={handleManualAssign}
-                      disabled={!manualTargetsReady || reorderingKey?.startsWith('manual-')}
+                      disabled={selectedCount === 0 || reorderingKey?.startsWith('manual-')}
                     >
                       {t('manualAssignAction')}
                     </Button>
@@ -1030,7 +1070,11 @@ export default function ActivityFlow({ stations, vehicles, orders, dispatchMode,
                     onToggleSelect={(checked: boolean) => toggleOrderSelection(order.order_id, checked)}
                     manualStationOptions={flowStationOptions}
                     manualStationValue={manualOrderStationMap[order.order_id]}
+                    manualTargetStationName={flowStationNameById.get(
+                      manualOrderStationMap[order.order_id] || manualStationId,
+                    )}
                     onManualStationChange={(stationId: string) => handleManualOrderStationChange(order.order_id, stationId)}
+                    onManualStationClear={() => clearManualOrderStation(order.order_id)}
                     isDropTarget={dragOverOrderId === order.order_id && activeOrderId !== order.order_id}
                     t={t}
                   />

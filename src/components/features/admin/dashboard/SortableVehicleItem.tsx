@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/select';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { ArrowRight, ChevronUp, ChevronDown, GripVertical } from 'lucide-react';
+import { ArrowRight, ChevronUp, ChevronDown, GripVertical, X } from 'lucide-react';
 import type { Order } from '@/types/order';
 import type { Station } from '@/types/station';
 
@@ -37,7 +37,9 @@ interface SortableVehicleItemProps {
   onToggleSelect?: (checked: boolean) => void;
   manualStationOptions?: Station[];
   manualStationValue?: string;
+  manualTargetStationName?: string;
   onManualStationChange?: (stationId: string) => void;
+  onManualStationClear?: () => void;
   isDropTarget?: boolean;
   t: (key: string) => string;
 }
@@ -58,10 +60,16 @@ export function SortableVehicleItem({
   onToggleSelect,
   manualStationOptions = [],
   manualStationValue,
+  manualTargetStationName,
   onManualStationChange,
+  onManualStationClear,
   isDropTarget = false,
   t,
 }: SortableVehicleItemProps) {
+  const displayedStationName = isManualMode && isSelected
+    ? (manualTargetStationName || stationName)
+    : stationName;
+
   const {
     attributes,
     listeners,
@@ -144,35 +152,51 @@ export function SortableVehicleItem({
 
         <div className="flex flex-wrap items-center justify-between gap-3 pl-2 md:pl-0">
           <div className="flex flex-wrap items-center gap-3">
-            {stationName && (
+            {displayedStationName && (
               <div
                 className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.18em]"
                 style={{ color: isDropTarget ? 'var(--dd-sky)' : 'var(--dd-text-muted)' }}
               >
                 <ArrowRight className="h-3.5 w-3.5 text-sky-500" />
                 <span style={{ color: 'var(--dd-text-primary)' }}>
-                  {stationName}
+                  {displayedStationName}
                 </span>
               </div>
             )}
 
             {isManualMode && isSelected && (
-              <Select value={manualStationValue} onValueChange={onManualStationChange}>
-                <SelectTrigger
-                  size="sm"
-                  className="w-[190px] bg-white text-xs font-bold uppercase tracking-[0.08em]"
-                  onClick={(event) => event.stopPropagation()}
-                >
-                  <SelectValue placeholder={t('manualChooseStation')} />
-                </SelectTrigger>
-                <SelectContent>
-                  {manualStationOptions.map((station) => (
-                    <SelectItem key={station.station_id} value={String(station.station_id)}>
-                      {station.station_name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <div className="flex items-center gap-2">
+                <Select key={manualStationValue ?? 'manual-empty'} value={manualStationValue} onValueChange={onManualStationChange}>
+                  <SelectTrigger
+                    size="sm"
+                    className="w-[190px] bg-white text-xs font-bold uppercase tracking-[0.08em]"
+                    onClick={(event) => event.stopPropagation()}
+                  >
+                    <SelectValue placeholder={t('manualChooseStation')} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {manualStationOptions.map((station) => (
+                      <SelectItem key={station.station_id} value={String(station.station_id)}>
+                        {station.station_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                {manualStationValue && (
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onManualStationClear?.();
+                    }}
+                    className="flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-500 transition-all hover:text-slate-700"
+                    title={t('manualClearStation')}
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
             )}
 
             <div className={style.chipClass}>
