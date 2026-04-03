@@ -2,9 +2,17 @@ import orderApi, { type OrderUpdatePayload } from '@/services/order.service';
 import type { Order } from '@/types/order';
 import type { Station } from '@/types/station';
 import type { Vehicle } from '@/types/vehicle';
+import { Button } from '@/components/ui/button';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { ArrowRight, ChevronDown, ChevronUp, Clock, GripVertical, Loader2, ChevronUp as ChevronUpIcon, ChevronDown as ChevronDownIcon } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 import { toast } from 'sonner';
 import {
@@ -35,6 +43,7 @@ interface ActivityFlowProps {
   stations: Station[];
   vehicles: Vehicle[];
   orders: Order[];
+  dispatchMode: DispatchMode;
   onOrdersUpdated?: () => Promise<void> | void;
 }
 
@@ -51,6 +60,14 @@ interface StationFlowGroup {
   stationStatus?: string;
   orders: Order[];
 }
+
+interface MergedFlowOrder {
+  group: StationFlowGroup;
+  order: Order;
+  actualIndex: number;
+}
+
+export type DispatchMode = 'auto' | 'manual';
 
 interface StationQueueDropZoneProps {
   group: StationFlowGroup;
@@ -69,7 +86,6 @@ interface StationQueueDropZoneProps {
 
 const FLOW_STATION_TYPE_ID = 1;
 const STATION_DROP_PREFIX = 'station-drop-';
-
 const getStationDropId = (stationId: number) => `${STATION_DROP_PREFIX}${stationId}`;
 const getOrderStationId = (order: Order) => order.stations?.station_id ?? 0;
 
@@ -102,6 +118,96 @@ const getFlowStyle = (order: Order, isFirstPending: boolean): FlowStyle => {
     icon: <ArrowRight className="h-3 w-3" />,
   };
 };
+
+function StationDropTargetCard({
+  group,
+  activeOrderId,
+  sourceStationId,
+  hoveredStationId,
+  t,
+}: {
+  group: StationFlowGroup;
+  activeOrderId: number | null;
+  sourceStationId: number | null;
+  hoveredStationId: number | null;
+  t: ReturnType<typeof useTranslations>;
+}) {
+  const { setNodeRef, isOver } = useDroppable({
+    id: getStationDropId(group.stationId),
+    data: {
+      type: 'station',
+      stationId: group.stationId,
+    },
+  });
+
+  const isDragMode = activeOrderId != null;
+  const isSourceStation = sourceStationId === group.stationId;
+  const isActiveDropTarget = hoveredStationId === group.stationId || isOver;
+  const isEligibleTarget = isDragMode && !isSourceStation;
+  const headerBadgeText = isActiveDropTarget
+    ? t('dropHereBadge')
+    : isSourceStation
+      ? t('dragSourceStationBadge')
+      : isEligibleTarget
+        ? t('dragTargetStationBadge')
+        : null;
+  const headerBadgeClass = isActiveDropTarget
+    ? 'dd-chip dd-chip-sky'
+    : isSourceStation
+      ? 'dd-chip dd-chip-amber'
+      : 'dd-chip dd-chip-slate';
+  const helperText = isSourceStation
+    ? t('dragSourceStationBadge')
+    : isActiveDropTarget
+      ? t('dropZoneActive', { stationName: group.stationName })
+      : t('dropZoneHint', { stationName: group.stationName });
+
+  return (
+    <div
+      ref={setNodeRef}
+      className="min-w-[220px] rounded-2xl border px-4 py-3 transition-all"
+      style={{
+        background: isActiveDropTarget
+          ? 'linear-gradient(135deg, rgba(14, 165, 233, 0.08), rgba(125, 211, 252, 0.04))'
+          : 'var(--dd-bg-surface)',
+        borderColor: isActiveDropTarget
+          ? 'rgba(14, 165, 233, 0.35)'
+          : isSourceStation
+            ? 'rgba(245, 158, 11, 0.28)'
+            : isEligibleTarget
+              ? 'rgba(14, 165, 233, 0.22)'
+              : 'var(--dd-border)',
+        boxShadow: isActiveDropTarget
+          ? '0 0 0 3px rgba(14, 165, 233, 0.08)'
+          : isSourceStation
+            ? '0 0 0 2px rgba(245, 158, 11, 0.06)'
+            : 'none',
+      }}
+    >
+      <div className="flex items-center justify-between gap-3">
+        <div
+          className="truncate text-sm font-bold uppercase tracking-[0.18em]"
+          style={{ color: 'var(--dd-text-primary)' }}
+        >
+          {group.stationName}
+        </div>
+
+        {headerBadgeText && (
+          <span className={headerBadgeClass}>
+            {headerBadgeText}
+          </span>
+        )}
+      </div>
+
+      <div
+        className="mt-2 text-[11px] font-bold uppercase tracking-[0.18em]"
+        style={{ color: isSourceStation ? 'var(--dd-text-muted)' : isActiveDropTarget ? 'var(--dd-sky)' : 'var(--dd-text-accent)' }}
+      >
+        {helperText}
+      </div>
+    </div>
+  );
+}
 
 function StationQueueDropZone({
   group,
@@ -360,9 +466,11 @@ function DraggedVehiclePreview({
   );
 }
 
-export default function ActivityFlow({ stations, vehicles, orders, onOrdersUpdated }: ActivityFlowProps) {
+export default function ActivityFlow({ stations, vehicles, orders, dispatchMode, onOrdersUpdated }: ActivityFlowProps) {
   const t = useTranslations('DashboardPage');
-  const [expandedStations, setExpandedStations] = useState<Record<number, boolean>>({});
+  const [selectedOrderIds, setSelectedOrderIds] = useState<number[]>([]);
+  const [manualStationId, setManualStationId] = useState<string>('');
+  const [manualOrderStationMap, setManualOrderStationMap] = useState<Record<number, string>>({});
   const [reorderingKey, setReorderingKey] = useState<string | null>(null);
   const [activeOrderId, setActiveOrderId] = useState<number | null>(null);
   const [dragOverOrderId, setDragOverOrderId] = useState<number | null>(null);
@@ -426,6 +534,13 @@ export default function ActivityFlow({ stations, vehicles, orders, onOrdersUpdat
     return [...unassignedGroup, ...stationGroups, ...missingGroups];
   }, [orders, stations, t]);
 
+  const flowStationOptions = useMemo(
+    () => stations
+      .filter((station) => isFlowStation(station))
+      .sort((a, b) => a.station_name.localeCompare(b.station_name)),
+    [stations],
+  );
+
   const activeOrder = useMemo(
     () => orders.find((order) => order.order_id === activeOrderId) ?? null,
     [activeOrderId, orders],
@@ -435,6 +550,49 @@ export default function ActivityFlow({ stations, vehicles, orders, onOrdersUpdat
     () => groupedByStation.some((group) => group.orders.length > 0),
     [groupedByStation],
   );
+
+  const mergedFlowOrders = useMemo<MergedFlowOrder[]>(() => {
+    const longestQueueLength = groupedByStation.reduce(
+      (longest, group) => Math.max(longest, group.orders.length),
+      0,
+    );
+    const mergedQueue: MergedFlowOrder[] = [];
+
+    for (let actualIndex = 0; actualIndex < longestQueueLength; actualIndex += 1) {
+      groupedByStation.forEach((group) => {
+        const order = group.orders[actualIndex];
+        if (order) {
+          mergedQueue.push({
+            group,
+            order,
+            actualIndex,
+          });
+        }
+      });
+    }
+
+    return mergedQueue;
+  }, [groupedByStation]);
+
+  const selectedCount = selectedOrderIds.length;
+  const manualTargetsReady = selectedCount > 0
+    && selectedOrderIds.every((orderId) => Boolean(manualOrderStationMap[orderId] || manualStationId));
+
+  useEffect(() => {
+    const validOrderIds = new Set(mergedFlowOrders.map(({ order }) => order.order_id));
+    setSelectedOrderIds((previous) => previous.filter((orderId) => validOrderIds.has(orderId)));
+    setManualOrderStationMap((previous) => Object.fromEntries(
+      Object.entries(previous).filter(([orderId]) => validOrderIds.has(Number(orderId))),
+    ));
+  }, [mergedFlowOrders]);
+
+  useEffect(() => {
+    if (dispatchMode === 'auto') {
+      setSelectedOrderIds([]);
+      setManualStationId('');
+      setManualOrderStationMap({});
+    }
+  }, [dispatchMode]);
 
   const activeOrderMeta = useMemo(() => {
     if (!activeOrder) {
@@ -494,6 +652,117 @@ export default function ActivityFlow({ stations, vehicles, orders, onOrdersUpdat
 
     return null;
   }, []);
+
+  const toggleOrderSelection = useCallback((orderId: number, checked: boolean) => {
+    setSelectedOrderIds((previous) => {
+      if (checked) {
+        return previous.includes(orderId) ? previous : [...previous, orderId];
+      }
+
+      return previous.filter((currentId) => currentId !== orderId);
+    });
+
+    if (!checked) {
+      setManualOrderStationMap((previous) => {
+        const next = { ...previous };
+        delete next[orderId];
+        return next;
+      });
+    }
+  }, []);
+
+  const handleManualOrderStationChange = useCallback((orderId: number, stationId: string) => {
+    setManualOrderStationMap((previous) => ({
+      ...previous,
+      [orderId]: stationId,
+    }));
+  }, []);
+
+  const handleManualAssign = useCallback(async () => {
+    if (selectedOrderIds.length === 0) {
+      toast.error(t('manualSelectionRequired'), { position: 'top-right' });
+      return;
+    }
+
+    const selectedOrders = mergedFlowOrders
+      .filter(({ order }) => selectedOrderIds.includes(order.order_id))
+      .map(({ order }) => order);
+
+    if (selectedOrders.length === 0) {
+      toast.error(t('manualSelectionRequired'), { position: 'top-right' });
+      return;
+    }
+
+    const stationAssignments = new Map<number, Order[]>();
+
+    for (const order of selectedOrders) {
+      const targetStationValue = manualOrderStationMap[order.order_id] || manualStationId;
+      if (!targetStationValue) {
+        toast.error(t('manualTargetRequired'), { position: 'top-right' });
+        return;
+      }
+
+      const targetStationId = Number(targetStationValue);
+      const assignmentGroup = stationAssignments.get(targetStationId) ?? [];
+      assignmentGroup.push(order);
+      stationAssignments.set(targetStationId, assignmentGroup);
+    }
+
+    setReorderingKey(`manual-${Date.now()}`);
+
+    try {
+      for (const [targetStationId, ordersToMove] of stationAssignments.entries()) {
+        const targetGroup = groupedByStation.find((group) => group.stationId === targetStationId);
+        const targetStation = flowStationOptions.find((station) => station.station_id === targetStationId);
+
+        if (!targetStation) {
+          throw new Error('Target station not found');
+        }
+
+        const firstNonSelectedTargetOrder = targetGroup?.orders.find(
+          (order) => !selectedOrderIds.includes(order.order_id),
+        );
+        const targetHeadOrderNumber = firstNonSelectedTargetOrder?.order_number ?? targetGroup?.orders[0]?.order_number;
+        const updateQueue = typeof targetHeadOrderNumber === 'number'
+          ? [...ordersToMove].reverse()
+          : ordersToMove;
+        let nextOrderNumber = targetGroup?.orders[targetGroup.orders.length - 1]?.order_number ?? 0;
+
+        for (const order of updateQueue) {
+          const payload: OrderUpdatePayload = {
+            station_id: targetStationId,
+            order_number: typeof targetHeadOrderNumber === 'number'
+              ? targetHeadOrderNumber
+              : ++nextOrderNumber,
+          };
+
+          await orderApi.update(order.order_id, payload);
+        }
+      }
+
+      if (stationAssignments.size === 1) {
+        const [targetStationId] = stationAssignments.keys();
+        const targetStation = flowStationOptions.find((station) => station.station_id === targetStationId);
+
+        toast.success(t('moveMultipleToStationSuccess', {
+          count: selectedOrders.length,
+          stationName: targetStation?.station_name || t('unassigned'),
+        }), { position: 'top-right' });
+      } else {
+        toast.success(t('moveMultipleToStationsSuccess', {
+          count: selectedOrders.length,
+        }), { position: 'top-right' });
+      }
+
+      setSelectedOrderIds([]);
+      setManualOrderStationMap({});
+      await onOrdersUpdated?.();
+    } catch {
+      toast.error(t('moveMultipleToStationsFailed'), { position: 'top-right' });
+    } finally {
+      setReorderingKey(null);
+    }
+  }, [flowStationOptions, groupedByStation, manualOrderStationMap, manualStationId, mergedFlowOrders, onOrdersUpdated, selectedOrderIds, t]);
 
   const handleReorder = async (groupStationId: number, index: number, direction: 'up' | 'down') => {
     const group = groupedByStation.find((item) => item.stationId === groupStationId);
@@ -633,7 +902,47 @@ export default function ActivityFlow({ stations, vehicles, orders, onOrdersUpdat
             </div>
           </div>
         ) : (
-          <div className="space-y-3 p-3 bg-transparent">
+          <div className="space-y-4 p-3 bg-transparent">
+            {dispatchMode === 'manual' && (
+              <div
+                className="rounded-2xl border px-4 py-3"
+                style={{
+                  background: 'var(--dd-bg-surface)',
+                  borderColor: 'var(--dd-border)',
+                }}
+              >
+                <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
+                  <span className="dd-chip dd-chip-sky">
+                    {t('manualSelectedVehicles', { count: selectedCount })}
+                  </span>
+
+                  <div className="flex w-full flex-col gap-3 md:w-auto md:flex-row md:items-center md:justify-end">
+                    <Select value={manualStationId} onValueChange={setManualStationId}>
+                      <SelectTrigger className="w-full bg-white md:w-[240px]">
+                        <SelectValue placeholder={t('manualChooseStation')} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {flowStationOptions.map((station) => (
+                          <SelectItem key={station.station_id} value={String(station.station_id)}>
+                            {station.station_name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+
+                    <Button
+                      type="button"
+                      variant="primary"
+                      onClick={handleManualAssign}
+                      disabled={!manualTargetsReady || reorderingKey?.startsWith('manual-')}
+                    >
+                      {t('manualAssignAction')}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {activeOrder && (
               <div
                 className="rounded-2xl border px-4 py-4"
@@ -683,107 +992,51 @@ export default function ActivityFlow({ stations, vehicles, orders, onOrdersUpdat
               </div>
             )}
 
-            {groupedByStation.map((group) => {
-              const expanded = expandedStations[group.stationId] ?? false;
-              const visibleOrders = expanded ? group.orders : group.orders.slice(0, 3);
-              const isDragMode = activeOrderId != null;
-              const isSourceStation = sourceGroup?.stationId === group.stationId;
-              const isActiveDropTarget = hoveredStationId === group.stationId;
-              const isEligibleTarget = isDragMode && !isSourceStation;
-              const placeholderIndex = isEligibleTarget && isActiveDropTarget
-                ? (() => {
-                  if (typeof dragOverOrderId === 'number') {
-                    const visibleIndex = visibleOrders.findIndex((order) => order.order_id === dragOverOrderId);
-                    if (visibleIndex !== -1) {
-                      return visibleIndex;
-                    }
-
-                    const absoluteIndex = group.orders.findIndex((order) => order.order_id === dragOverOrderId);
-                    if (absoluteIndex !== -1) {
-                      return Math.min(absoluteIndex, visibleOrders.length);
-                    }
-                  }
-
-                  return visibleOrders.length;
-                })()
-                : null;
-              const headerBadgeText = isActiveDropTarget
-                ? t('dropHereBadge')
-                : isSourceStation
-                  ? t('dragSourceStationBadge')
-                  : isEligibleTarget
-                    ? t('dragTargetStationBadge')
-                    : null;
-              const headerBadgeClass = isActiveDropTarget
-                ? 'dd-chip dd-chip-sky'
-                : isSourceStation
-                  ? 'dd-chip dd-chip-amber'
-                  : 'dd-chip dd-chip-slate';
-
-              return (
-                <div
-                  key={group.stationId}
-                  className="overflow-hidden rounded-2xl transition-all"
-                  style={{
-                    border: isActiveDropTarget
-                      ? '1px solid rgba(14, 165, 233, 0.35)'
-                      : isSourceStation
-                        ? '1px solid rgba(245, 158, 11, 0.28)'
-                        : isEligibleTarget
-                          ? '1px dashed rgba(14, 165, 233, 0.22)'
-                          : '1px solid var(--dd-border)',
-                    boxShadow: isActiveDropTarget
-                      ? '0 0 0 3px rgba(14, 165, 233, 0.08)'
-                      : isSourceStation
-                        ? '0 0 0 2px rgba(245, 158, 11, 0.06)'
-                        : 'none',
-                    opacity: isDragMode && !isSourceStation && !isActiveDropTarget ? 0.96 : 1,
-                  }}
-                >
-                  <div
-                    className="flex items-center justify-between px-5 py-3"
-                    style={{ background: 'var(--dd-bg-header)', borderBottom: '1px solid var(--dd-border)' }}
-                  >
-                    <div className="flex min-w-0 items-center gap-3">
-                      <span
-                        className="truncate text-sm font-bold uppercase tracking-[0.18em]"
-                        style={{ color: 'var(--dd-text-primary)' }}
-                      >
-                        {group.stationName}
-                      </span>
-                      {headerBadgeText && (
-                        <span className={headerBadgeClass}>
-                          {headerBadgeText}
-                        </span>
-                      )}
-                    </div>
-                    <span className="dd-chip dd-chip-sky">
-                      {group.orders.length} {t('vehicleCount')}
-                    </span>
-                  </div>
-
-                  <StationQueueDropZone
+            {activeOrder && (
+              <div className="flex flex-wrap gap-3">
+                {groupedByStation.map((group) => (
+                  <StationDropTargetCard
+                    key={group.stationId}
                     group={group}
-                    visibleOrders={visibleOrders}
-                    expanded={expanded}
-                    activeOrder={activeOrder}
                     activeOrderId={activeOrderId}
-                    placeholderIndex={placeholderIndex}
                     sourceStationId={sourceGroup?.stationId ?? null}
                     hoveredStationId={hoveredStationId}
-                    reorderingKey={reorderingKey}
-                    onReorder={(index, direction) => handleReorder(group.stationId, index, direction)}
-                    onToggleExpanded={() =>
-                      setExpandedStations((previous) => ({
-                        ...previous,
-                        [group.stationId]: !previous[group.stationId],
-                      }))
-                    }
                     t={t}
                   />
-                </div>
-              );
-            })}
+                ))}
+              </div>
+            )}
+
+            <SortableContext
+              items={mergedFlowOrders.map(({ order }) => order.order_id)}
+              strategy={verticalListSortingStrategy}
+            >
+              <div className="space-y-3">
+                {mergedFlowOrders.map(({ group, order, actualIndex }, displayIndex) => (
+                  <SortableVehicleItem
+                    key={order.order_id}
+                    order={order}
+                    stationId={group.stationId}
+                    actualIndex={actualIndex}
+                    style={getFlowStyle(order, actualIndex === 0)}
+                    isBusy={reorderingKey === String(order.order_id)}
+                    onReorder={(direction) => handleReorder(group.stationId, actualIndex, direction)}
+                    canMoveUp={actualIndex > 0}
+                    canMoveDown={actualIndex < group.orders.length - 1}
+                    displayIndex={displayIndex}
+                    stationName={group.stationName}
+                    isManualMode={dispatchMode === 'manual'}
+                    isSelected={selectedOrderIds.includes(order.order_id)}
+                    onToggleSelect={(checked: boolean) => toggleOrderSelection(order.order_id, checked)}
+                    manualStationOptions={flowStationOptions}
+                    manualStationValue={manualOrderStationMap[order.order_id]}
+                    onManualStationChange={(stationId: string) => handleManualOrderStationChange(order.order_id, stationId)}
+                    isDropTarget={dragOverOrderId === order.order_id && activeOrderId !== order.order_id}
+                    t={t}
+                  />
+                ))}
+              </div>
+            </SortableContext>
           </div>
         )}
       </div>
