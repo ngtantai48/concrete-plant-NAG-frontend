@@ -61,6 +61,7 @@ export default function StationMap({ stationLongitude, stationLatitude, radius, 
 
   useEffect(() => {
     setMounted(true);
+    return () => setMounted(false);
   }, []);
 
   if (!mounted || stationLongitude == null || stationLatitude == null) {
@@ -77,6 +78,7 @@ export default function StationMap({ stationLongitude, stationLatitude, radius, 
   return (
     <div className="w-full h-full relative z-0 rounded-lg overflow-hidden" style={{ border: '1px solid rgba(56, 189, 248, 0.1)' }}>
       <MapContainer
+        key={`${stationLat}-${stationLng}`}
         center={[stationLat, stationLng]}
         zoom={15}
         scrollWheelZoom={true}

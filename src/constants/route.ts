@@ -4,6 +4,7 @@ export const ROUTES = {
 
 export const ADMIN = {
   DASHBOARD: "/admin/dashboard",
+  END_OF_DAY_VEHICLES: "/admin/end-of-day-vehicles",
   DRIVERS: "/admin/drivers",
   VEHICLES: "/admin/vehicles",
   VEHICLE_TYPES: "/admin/vehicle-types",

@@ -11,7 +11,7 @@ import { useNavigationStore } from "@/hooks/use-navigation-store";
 import { DoubleLeftOutlined, DoubleRightOutlined } from "@ant-design/icons";
 import { createSelector } from "@reduxjs/toolkit";
 import { Avatar, Button, Layout, Menu, MenuProps } from "antd";
-import { Car, Gauge, Layers, MapPin, Truck, User, Wrench } from "lucide-react";
+import { ArrowRightLeft, Car, Gauge, Layers, MapPin, Truck, User, Wrench } from "lucide-react";
 import { useTranslations } from "next-intl";
 import Image from "next/image";
 import Link from "next/link";
@@ -100,6 +100,7 @@ export default function Sidebar() {
   const baseMenuItems = useMemo(
     () => [
       { key: ADMIN.DASHBOARD, label: t("dashboard"), icon: <Gauge />, roles: ["admin"] },
+      { key: ADMIN.END_OF_DAY_VEHICLES, label: t("endOfDayVehicles"), icon: <ArrowRightLeft />, roles: ["admin"] },
       { key: ADMIN.DRIVERS, label: t("drivers"), icon: <Truck />, roles: ["admin"] },
       { key: ADMIN.VEHICLES, label: t("vehicles"), icon: <Car />, roles: ["admin"] },
       { key: ADMIN.VEHICLE_MAINTENANCES, label: t("vehicleMaintenances"), icon: <Wrench />, roles: ["admin"] },

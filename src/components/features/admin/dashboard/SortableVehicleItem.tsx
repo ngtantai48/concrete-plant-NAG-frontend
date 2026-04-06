@@ -44,7 +44,7 @@ interface SortableVehicleItemProps {
   t: (key: string) => string;
 }
 
-export function SortableVehicleItem({
+function SortableVehicleItemBase({
   order,
   stationId,
   actualIndex,
@@ -75,7 +75,6 @@ export function SortableVehicleItem({
     listeners,
     setNodeRef,
     transform,
-    transition,
     isDragging,
   } = useSortable({
     id: order.order_id,
@@ -86,12 +85,11 @@ export function SortableVehicleItem({
     },
   });
 
-  const dndStyle = {
-    transform: CSS.Transform.toString(transform),
-    transition,
+  const dndStyle: React.CSSProperties = {
+    transform: CSS.Translate.toString(transform),
     zIndex: isDragging ? 100 : 'auto',
     opacity: isDragging ? 0.18 : 1,
-    scale: isDragging ? 0.98 : 1,
+    willChange: isDragging ? 'transform' : undefined,
     background: isDropTarget
       ? 'linear-gradient(180deg, rgba(14, 165, 233, 0.08), rgba(125, 211, 252, 0.04))'
       : 'var(--dd-bg-card)',
@@ -103,19 +101,7 @@ export function SortableVehicleItem({
     <div
       ref={setNodeRef}
       style={dndStyle}
-      className={`relative overflow-hidden rounded-2xl px-4 py-3 transition-all group shadow-sm ${isSelected ? 'ring-2 ring-sky-500/20' : ''} ${isDragging ? 'cursor-grabbing shadow-lg' : 'cursor-default'}`}
-      onMouseEnter={e => {
-        if (!isDragging && !isDropTarget) {
-          e.currentTarget.style.borderColor = 'var(--dd-border-hover)';
-          e.currentTarget.style.background = 'var(--dd-bg-card-hover)';
-        }
-      }}
-      onMouseLeave={e => {
-        if (!isDragging && !isDropTarget) {
-          e.currentTarget.style.borderColor = 'var(--dd-border)';
-          e.currentTarget.style.background = 'var(--dd-bg-card)';
-        }
-      }}
+      className={`sortable-vehicle-item relative overflow-hidden rounded-2xl px-4 py-3 group shadow-sm ${isSelected ? 'ring-2 ring-sky-500/20' : ''} ${isDragging ? 'cursor-grabbing shadow-lg is-dragging' : 'cursor-default'}`}
     >
       <div className="absolute left-0 top-0 bottom-0 w-[3px]"
         style={{ background: style.dot, opacity: 0.8 }} />
@@ -246,3 +232,5 @@ export function SortableVehicleItem({
     </div>
   );
 }
+
+export const SortableVehicleItem = React.memo(SortableVehicleItemBase);

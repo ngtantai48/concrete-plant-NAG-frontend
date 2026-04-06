@@ -668,3 +668,17 @@
 .animate-flash-bg {
   animation: flash-bg 0.8s ease-out forwards;
 }
+
+.sortable-vehicle-item {
+  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+  touch-action: none;
+}
+
+.sortable-vehicle-item:not(.is-dragging):hover {
+  border-color: var(--dd-border-hover) !important;
+  background: var(--dd-bg-card-hover) !important;
+}
+
+.sortable-vehicle-item.is-dragging {
+  transition: none !important;
+}

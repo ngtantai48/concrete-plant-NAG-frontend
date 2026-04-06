@@ -5,10 +5,23 @@ export type OrderUpdatePayload = Partial<Order> & {
   station_id?: number;
 };
 
+export interface ShiftOperationPayload {
+  operation_date: string;
+}
+
 const orderApi = {
-  getAll: () => http.get("/orders?limit=1000"),
+  getAll: (params?: Record<string, string>) => {
+    const query = new URLSearchParams({ limit: "1000", ...params });
+    return http.get(`/orders?${query.toString()}`);
+  },
+  getByInitDate: (date: string) => http.get(`/orders/order-init=${date}`),
   getById: (id: number) => http.get(`/orders/${id}`),
   update: (id: number, data: OrderUpdatePayload) => http.put(`/orders/${id}`, data),
+  shiftClose: (data: ShiftOperationPayload) => http.post("/orders/shift-close", data),
+  shiftReopen: (data: ShiftOperationPayload) => http.post("/orders/shift-reopen", data),
+  shiftOpen: (data: ShiftOperationPayload) => http.post("/orders/shift-open", data),
+  shiftReopenInit: (data: ShiftOperationPayload) => http.post("/orders/shift-reopen-init", data),
+  shiftRebalance: (data: ShiftOperationPayload) => http.post("/orders/shift-rebalance", data),
   delete: (id: number) => http.delete(`/orders/${id}`),
 };
 
