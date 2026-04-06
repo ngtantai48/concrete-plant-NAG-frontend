@@ -165,8 +165,8 @@
     "selectStationType": "Chọn loại trạm"
   },
   "VehiclePage": {
-    "title": "Cấu hình phương tiện",
-    "subtitle": "Quản lý danh sách xe tải & xe bán tải trong hệ thống",
+    "title": "Quản lý phương tiện",
+    "subtitle": "Quản lý danh sách các phương tiện trong hệ thống",
     "addVehicle": "Thêm phương tiện",
     "editVehicle": "Chỉnh sửa hồ sơ xe",
     "newVehicle": "Đăng ký xe mới",
@@ -473,7 +473,10 @@
     "fromDate": "Ngày bắt đầu",
     "toDate": "Ngày kết thúc",
     "dateRange": "Thời gian bảo trì",
-    "dateRangePlaceholder": ["Từ ngày", "Đến ngày"],
+    "dateRangePlaceholder": [
+      "Từ ngày",
+      "Đến ngày"
+    ],
     "distanceCovered": "Số km đã chạy",
     "distancePlaceholder": "VD: 15000",
     "description": "Mô tả công việc",
