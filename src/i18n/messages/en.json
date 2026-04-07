@@ -111,7 +111,12 @@
     "confirmDelete": "Are you sure you want to delete this driver?",
     "deleteSuccess": "Driver deleted successfully",
     "saveSuccess": "Driver saved successfully",
-    "required": "This field is required"
+    "required": "This field is required",
+    "searchByName": "Search drivers by Full Name",
+    "searchByUsername": "Search drivers by Username",
+    "searchByPhone": "Search drivers by Phone Number",
+    "searchByEmail": "Search drivers by Email",
+    "searchFallback": "Type a keyword to search..."
   },
   "StationPage": {
     "title": "Station Management",

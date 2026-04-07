@@ -131,7 +131,12 @@
     "confirmDelete": "Bạn có chắc chắn muốn xóa tài xế này?",
     "deleteSuccess": "Xóa tài xế thành công",
     "saveSuccess": "Lưu tài xế thành công",
-    "required": "Trường này là bắt buộc"
+    "required": "Trường này là bắt buộc",
+    "searchByName": "Tìm kiếm tài xế theo Họ và tên",
+    "searchByUsername": "Tìm kiếm tài xế theo Username",
+    "searchByPhone": "Tìm kiếm tài xế theo Số điện thoại",
+    "searchByEmail": "Tìm kiếm tài xế theo Email",
+    "searchFallback": "Nhập từ khóa tìm kiếm..."
   },
   "StationPage": {
     "title": "Quản lý trạm",
@@ -428,7 +433,7 @@
   },
   "EndOfDayPage": {
     "title": "Quản lý xe cuối ngày",
-    "subtitle": "Sắp xếp lại xe đã có lệnh theo từng trạm và kéo thả trực tiếp giữa các hàng chờ.",
+    "subtitle": "Chốt lịch danh sách xe đã được tự động sắp xếp cho ngày kế tiếp.",
     "queuedVehicles": "Xe chờ điều phối",
     "operatingStations": "Trạm đang hoạt động",
     "activeAssignedVehicles": "Xe có lệnh đang chạy",
