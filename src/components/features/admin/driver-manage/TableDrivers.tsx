@@ -1,56 +1,81 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { ButtonGroup } from "@/components/ui/button-group";
+import { Input as ShadcnInput } from "@/components/ui/input";
+import {
+  PaginationContent,
+  PaginationItem, PaginationLink,
+  PaginationNext, PaginationPrevious,
+  Pagination as ShadcnPagination,
+} from "@/components/ui/pagination";
+import { SelectContent, SelectItem, SelectTrigger, SelectValue, Select as ShadcnSelect, } from "@/components/ui/select";
+import { useAppDispatch, useAppSelector } from "@/hooks/use-app-selector";
+import { clearDrivers, fetchDrivers, setPagination } from "@/store/slices/driverSlice";
 import driverApi from "@/services/driver.service";
 import type { Driver } from "@/types/driver";
-import { Modal, Pagination, Popconfirm, Space, Table, Tag, Tooltip, Form, Input, Select } from "antd";
+import { Modal, Popconfirm, Space, Table, Tag, Tooltip, Form, Input, Select } from "antd";
 import { PencilLine, Plus, Save, Trash, Truck, X, RefreshCw } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 
 const TableDrivers: React.FC = () => {
   const t = useTranslations("DriverPage");
   const tCommon = useTranslations("Common");
-  const [drivers, setDrivers] = useState<Driver[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [searchText, setSearchText] = useState("");
+  const dispatch = useAppDispatch();
+  const { pages, page, limit, total, loading } = useAppSelector((state) => state.drivers);
+  const drivers = pages[page] || [];
+
+  const [searchCategory, setSearchCategory] = useState<"user_full_name" | "username" | "user_phone_number" | "user_email">("user_full_name");
+  const [searchInput, setSearchInput] = useState("");
+  const [currentNameFilter, setCurrentNameFilter] = useState<string | undefined>(undefined);
+  const [currentUsernameFilter, setCurrentUsernameFilter] = useState<string | undefined>(undefined);
+  const [currentPhoneFilter, setCurrentPhoneFilter] = useState<string | undefined>(undefined);
+  const [currentEmailFilter, setCurrentEmailFilter] = useState<string | undefined>(undefined);
+
   const [modalOpen, setModalOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [refreshDisabled, setRefreshDisabled] = useState(0);
   const [editingDriver, setEditingDriver] = useState<Driver | null>(null);
   const [form] = Form.useForm();
 
-  const fetchDrivers = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await driverApi.getAll();
-      setDrivers(res.data?.data || res.data || []);
-    } catch {
-      toast.error("Tải dữ liệu thất bại", { position: "top-right" });
-    } finally {
-      setLoading(false);
+  const handleSearchCommit = useCallback(() => {
+    dispatch(clearDrivers());
+
+    let nextNameFilter;
+    let nextUsernameFilter;
+    let nextPhoneFilter;
+    let nextEmailFilter;
+
+    if (searchInput.trim()) {
+      if (searchCategory === "user_full_name") nextNameFilter = searchInput.trim();
+      else if (searchCategory === "username") nextUsernameFilter = searchInput.trim();
+      else if (searchCategory === "user_phone_number") nextPhoneFilter = searchInput.trim();
+      else if (searchCategory === "user_email") nextEmailFilter = searchInput.trim();
     }
-  }, []);
+
+    setCurrentNameFilter(nextNameFilter);
+    setCurrentUsernameFilter(nextUsernameFilter);
+    setCurrentPhoneFilter(nextPhoneFilter);
+    setCurrentEmailFilter(nextEmailFilter);
+  }, [searchCategory, searchInput, dispatch]);
+
+  const loadDriversData = useCallback((force = false) => {
+    dispatch(fetchDrivers({
+      page,
+      limit,
+      user_full_name: currentNameFilter,
+      username: currentUsernameFilter,
+      user_phone_number: currentPhoneFilter,
+      user_email: currentEmailFilter,
+      force
+    }));
+  }, [dispatch, page, limit, currentNameFilter, currentUsernameFilter, currentPhoneFilter, currentEmailFilter]);
 
   useEffect(() => {
-    fetchDrivers();
-  }, [fetchDrivers]);
-
-  const filteredDrivers = useMemo(() => {
-    return drivers
-      .filter((d) => d.role === "driver")
-      .filter((d) => {
-        const matchStatus = statusFilter === "all" || d.user_status === statusFilter;
-        const matchSearch =
-          !searchText ||
-          d.user_full_name.toLowerCase().includes(searchText.toLowerCase()) ||
-          d.user_phone_number?.includes(searchText) ||
-          d.username?.toLowerCase().includes(searchText.toLowerCase());
-        return matchStatus && matchSearch;
-      });
-  }, [drivers, statusFilter, searchText]);
+    loadDriversData();
+  }, [loadDriversData]);
 
   const openAddModal = () => {
     setEditingDriver(null);
@@ -71,7 +96,8 @@ const TableDrivers: React.FC = () => {
 
   const handleRefresh = () => {
     if (refreshDisabled > 0) return;
-    fetchDrivers();
+    dispatch(clearDrivers());
+    loadDriversData(true);
     setRefreshDisabled(15);
     const interval = setInterval(() => {
       setRefreshDisabled((prev) => {
@@ -108,7 +134,8 @@ const TableDrivers: React.FC = () => {
       setModalOpen(false);
       form.resetFields();
       toast.success(t("saveSuccess"), { position: "top-right" });
-      fetchDrivers();
+      dispatch(clearDrivers());
+      loadDriversData(true);
     } catch {
       //
     } finally {
@@ -124,7 +151,8 @@ const TableDrivers: React.FC = () => {
           Tài xế <b>{driver.user_full_name}</b> đã bị xoá
         </>
       );
-      fetchDrivers();
+      dispatch(clearDrivers());
+      loadDriversData(true);
     } catch (error) {
       const message =
         (error as any)?.response?.data?.message ||
@@ -179,13 +207,13 @@ const TableDrivers: React.FC = () => {
       key: "user_email",
       render: (val: string | null) => val || "-",
     },
-    {
+    /* {
       title: t("status"),
       dataIndex: "user_status",
       key: "user_status",
       align: "center" as const,
       render: (status: string) => getStatusDisplay(status),
-    },
+    }, */
     {
       title: t("actions"),
       key: "actions",
@@ -222,10 +250,25 @@ const TableDrivers: React.FC = () => {
     },
   ];
 
+  const getSearchPlaceholder = () => {
+    switch (searchCategory) {
+      case "user_full_name":
+        return t("searchByName");
+      case "username":
+        return t("searchByUsername");
+      case "user_phone_number":
+        return t("searchByPhone");
+      case "user_email":
+        return t("searchByEmail");
+      default:
+        return t("searchFallback");
+    }
+  };
+
   return (
     <>
       <div className="m-10 bg-white rounded-2xl shadow-sm border border-slate-200 animate-fade-in overflow-hidden">
-        <div className="p-6 md:p-8 border-b-2 border-slate-100 flex flex-col items-start  gap-6 bg-slate-50/50">
+        <div className="p-6 md:p-8 border-b-2 border-slate-100 flex flex-col items-start gap-6 bg-slate-50/50">
           <div className="flex-1">
             <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-slate-900 flex items-center gap-3">
               {t("title")}
@@ -261,24 +304,37 @@ const TableDrivers: React.FC = () => {
           </div>
         </div>
 
-        <div className="px-6 md:px-8 py-6 flex flex-col sm:flex-row gap-4 items-start sm:items-center">
-          <Input
-            placeholder={`${t("name")}, ${t("phone")}, Username...`}
-            value={searchText}
-            onChange={(e) => setSearchText(e.target.value)}
-            className="max-w-xs"
-            allowClear
-          />
-          <Select
-            value={statusFilter}
-            onChange={setStatusFilter}
-            className="min-w-[160px]"
-            options={[
-              { value: "all", label: t("all") },
-              { value: "online", label: t("active") },
-              { value: "offline", label: t("inactive") },
-            ]}
-          />
+        <div className="px-6 md:px-8 py-6">
+          <ButtonGroup className="w-full max-w-3xl flex-col sm:flex-row">
+            <ShadcnSelect
+              value={searchCategory}
+              onValueChange={(val: "user_full_name" | "username" | "user_phone_number" | "user_email") => setSearchCategory(val)}
+            >
+              <SelectTrigger className="sm:w-[180px] bg-white">
+                <SelectValue placeholder="Chọn bộ lọc" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="user_full_name">{t("name")}</SelectItem>
+                {/* <SelectItem value="username">Username</SelectItem> */}
+                <SelectItem value="user_phone_number">{t("phone")}</SelectItem>
+                <SelectItem value="user_email">Email</SelectItem>
+              </SelectContent>
+            </ShadcnSelect>
+
+            <ShadcnInput
+              placeholder={getSearchPlaceholder()}
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleSearchCommit();
+              }}
+              className="flex-1"
+            />
+
+            <Button type="button" onClick={handleSearchCommit} className="sm:w-auto w-full">
+              Tìm kiếm
+            </Button>
+          </ButtonGroup>
         </div>
 
         <div
@@ -287,7 +343,7 @@ const TableDrivers: React.FC = () => {
         >
           <Table
             columns={columns}
-            dataSource={filteredDrivers}
+            dataSource={drivers}
             rowKey="user_id"
             loading={loading}
             pagination={false}
@@ -296,20 +352,72 @@ const TableDrivers: React.FC = () => {
             tableLayout="auto"
           />
 
-          <div className="border-t border-slate-200 bg-slate-50 p-4">
-            <Pagination
-              total={filteredDrivers.length}
-              align="end"
-              showTotal={(total) => (
+          <div className="border-t border-slate-200 bg-slate-50 p-4 pb-6 flex items-center justify-between">
+            <div className="text-sm text-slate-500">
+              {drivers.length > 0 ? (
                 <>
-                  <i>Tổng</i>: <b>{total}</b>
+                  <i>Tổng</i>:{" "}<b>{total}</b>
                 </>
-              )}
-            />
+              ) : null}
+            </div>
+
+            {total > limit && (
+              <ShadcnPagination className="justify-end m-0">
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious
+                      href="#"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        if (page > 1) dispatch(setPagination({ page: page - 1, limit }));
+                      }}
+                      className={page === 1 ? "pointer-events-none opacity-50" : ""}
+                    />
+                  </PaginationItem>
+
+                  {Array.from({ length: Math.ceil(total / limit) }).map((_, i) => {
+                    const p = i + 1;
+                    if (p === 1 || p === Math.ceil(total / limit) || Math.abs(p - page) <= 1) {
+                      return (
+                        <PaginationItem key={p}>
+                          <PaginationLink
+                            href="#"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              dispatch(setPagination({ page: p, limit }));
+                            }}
+                            isActive={page === p}
+                          >
+                            {p}
+                          </PaginationLink>
+                        </PaginationItem>
+                      );
+                    }
+                    if (Math.abs(p - page) === 2) {
+                      return <span key={`ellipsis-${p}`} className="px-2">...</span>;
+                    }
+                    return null;
+                  })}
+
+                  <PaginationItem>
+                    <PaginationNext
+                      href="#"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        if (page < Math.ceil(total / limit)) {
+                          dispatch(setPagination({ page: page + 1, limit }));
+                        }
+                      }}
+                      className={page >= Math.ceil(total / limit) ? "pointer-events-none opacity-50" : ""}
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </ShadcnPagination>
+            )}
           </div>
         </div>
 
-        {!loading && filteredDrivers.length === 0 && (
+        {!loading && drivers.length === 0 && (
           <div className="text-center py-12 text-gray-500">
             <Truck className="w-12 h-12 mx-auto mb-3 text-gray-300" />
             <p className="text-lg">Chưa có tài xế nào trong hệ thống</p>
