@@ -11,7 +11,7 @@ import { useNavigationStore } from "@/hooks/use-navigation-store";
 import { DoubleLeftOutlined, DoubleRightOutlined } from "@ant-design/icons";
 import { createSelector } from "@reduxjs/toolkit";
 import { Avatar, Button, Layout, Menu, MenuProps } from "antd";
-import { ArrowRightLeft, Car, Gauge, Layers, MapPin, Truck, User, Wrench } from "lucide-react";
+import { ArrowRightLeft, Car, Gauge, Layers, MapPin, Truck, User, Wrench, Monitor } from "lucide-react";
 import { useTranslations } from "next-intl";
 import Image from "next/image";
 import Link from "next/link";
