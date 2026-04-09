@@ -7,7 +7,7 @@ import type { Vehicle } from "@/types/vehicle";
 import orderApi from "@/services/order.service";
 import type { Order } from "@/types/order";
 import { Skeleton, Tooltip } from "antd";
-import { RefreshCw, Activity, Map as MapIcon, Maximize2, Minimize2, Truck, Radio } from "lucide-react";
+import { RefreshCw, Map as MapIcon, Maximize2, Minimize2, Truck, Radio, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useLocale, useTranslations } from "next-intl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -15,9 +15,10 @@ import { useNearbyVehicles } from "@/hooks/useNearbyVehicles";
 import { useDeviceHeartbeat } from "@/hooks/useDeviceHeartbeat";
 import { useRealtimeUpdates } from "@/hooks/useRealtimeUpdates";
 import dynamic from "next/dynamic";
+import { toast } from "sonner";
 
 import StationStatusPanel from "./StationStatusPanel";
-import ActivityFlow from "./ActivityFlow";
+import ActivityFlow, { type DispatchMode } from "./ActivityFlow";
 
 const StationMap = dynamic(
   () => import("@/components/features/admin/dashboard/StationMap"),
@@ -31,9 +32,15 @@ const StationMap = dynamic(
   }
 );
 
+const getTodayDate = () => {
+  const now = new Date();
+  const timezoneOffset = now.getTimezoneOffset() * 60 * 1000;
+  return new Date(now.getTime() - timezoneOffset).toISOString().slice(0, 10);
+};
+
 export default function AdminDashboard() {
   const t = useTranslations("DashboardPage");
-  const tCommon = useTranslations("Common");
+  const tVehiclePage = useTranslations("VehiclePage");
   const locale = useLocale();
 
   const [geofenceStation, setGeofenceStation] = useState<Station | null>(null);
@@ -43,6 +50,8 @@ export default function AdminDashboard() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isShiftSubmitting, setIsShiftSubmitting] = useState(false);
+  const operationDate = getTodayDate();
   const [clock, setClock] = useState("");
   const clockRef = useRef<ReturnType<typeof setInterval>>(null);
 
@@ -71,7 +80,7 @@ export default function AdminDashboard() {
 
   const fetchOrders = useCallback(async () => {
     try {
-      const res = await orderApi.getAll();
+      const res = await orderApi.getByInitDate(getTodayDate());
       setOrders(res.data?.data || res.data || []);
     } catch {
       //
@@ -83,7 +92,7 @@ export default function AdminDashboard() {
       const results = await Promise.allSettled([
         stationApi.getAll(),
         vehicleApi.getAll(),
-        orderApi.getAll()
+        orderApi.getByInitDate(getTodayDate())
       ]);
 
       if (results[0].status === 'fulfilled') {
@@ -117,6 +126,40 @@ export default function AdminDashboard() {
     setIsRefreshing(false);
   };
 
+  const isShiftClosedForDate = useMemo(() =>
+    Boolean(operationDate) && orders.some(
+      (o) => o.order_status === "canceled" && o.order_init_datetime?.slice(0, 10) === operationDate
+    ),
+    [orders, operationDate],
+  );
+
+  const handleShiftToggle = useCallback(async () => {
+    if (!operationDate) {
+      toast.error(t('shiftCloseDateRequired'), { position: 'top-right' });
+      return;
+    }
+
+    setIsShiftSubmitting(true);
+
+    try {
+      if (isShiftClosedForDate) {
+        await orderApi.shiftReopen({ operation_date: operationDate });
+        const [y, m, d] = operationDate.split("-");
+        toast.success(t('shiftReopenSuccess', { date: `${d}/${m}/${y}` }), { position: 'top-right' });
+      } else {
+        await orderApi.shiftClose({ operation_date: operationDate });
+        const [y, m, d] = operationDate.split("-");
+        toast.success(t('shiftCloseSuccess', { date: `${d}/${m}/${y}` }), { position: 'top-right' });
+      }
+
+      await fetchAll();
+    } catch {
+      toast.error(isShiftClosedForDate ? t('shiftReopenFailed') : t('shiftCloseFailed'), { position: 'top-right' });
+    } finally {
+      setIsShiftSubmitting(false);
+    }
+  }, [fetchAll, isShiftClosedForDate, operationDate, t]);
+
   const activeStations = useMemo(
     () => stations.filter((s) => s.station_types?.station_type_id === 1 && s.station_status === "operating"),
     [stations],
@@ -132,18 +175,57 @@ export default function AdminDashboard() {
   const { stationStatusMap } = useDeviceHeartbeat();
 
   const readyVehicles = useMemo(() => vehicles.filter(v => v.vehicle_status === "available"), [vehicles]);
-  const canceledOrders = useMemo(() => orders.filter(o => o.order_status === "canceled"), [orders]);
-  const outsideOrders = useMemo(
-    () => orders.filter(o => o.order_status === "running" || o.order_status === "transporting"),
-    [orders],
-  );
+
+  const stoppedMaintenanceList = useMemo(() => {
+    const list: { id: string; label: string; statusLabel: string; chipClass: string }[] = [];
+
+    vehicles.forEach(v => {
+      if (v.vehicle_status === "incident" || v.vehicle_status === "maintenance") {
+        const isIncident = v.vehicle_status === "incident";
+        list.push({
+          id: `veh-${v.vehicle_id}`,
+          label: v.vehicle_license_plate,
+          statusLabel: isIncident ? (t('incident') || 'Sự cố') : (tVehiclePage('maintenanceOption') || 'Bảo dưỡng'),
+          chipClass: isIncident ? 'dd-chip-red' : 'dd-chip-amber'
+        });
+      }
+    });
+
+    // orders.filter(o => o.order_status === "canceled").forEach(o => {
+    //   const plate = o.vehicles?.vehicle_license_plate || `#${o.order_id}`;
+    //   if (!list.some(item => item.label === plate)) {
+    //     list.push({
+    //       id: `ord-${o.order_id}`,
+    //       label: plate,
+    //       statusLabel: t('canceled'),
+    //       chipClass: 'dd-chip-amber'
+    //     });
+    //   }
+    // });
+
+    return list;
+  }, [vehicles, orders, t, tVehiclePage]);
+
+  const activeFlowOrders = useMemo(() => {
+    return orders.filter(o => {
+      const vStatus = o.vehicles?.vehicle_status;
+      return vStatus !== 'maintenance' && vStatus !== 'incident';
+    });
+  }, [orders]);
 
   const ordersAtStation = useMemo(() => orders.filter(o => o.order_status === "collecting"), [orders]);
-  const ordersPending = useMemo(() => orders.filter(o => o.order_status === "pending"), [orders]);
+  const ordersPending = useMemo(() => {
+    const today = getTodayDate();
+    return orders.filter(o => o.order_status === "pending" && o.order_init_datetime?.slice(0, 10) === today);
+  }, [orders]);
   const ordersInTransit = useMemo(() => orders.filter(o => o.order_status === "transporting" || o.order_status === "running"), [orders]);
-  const ordersCompleted = useMemo(() => orders.filter(o => o.order_status === "completed"), [orders]);
+  const ordersCompleted = useMemo(() => {
+    const today = getTodayDate();
+    return orders.filter(o => o.order_status === "completed" && o.order_end_datetime?.slice(0, 10) === today);
+  }, [orders]);
 
-  const [coreView, setCoreView] = useState<'flow' | 'map'>('flow');
+  const [dispatchMode, setDispatchMode] = useState<DispatchMode>('auto');
+  const [showMap, setShowMap] = useState(true);
 
   // if (loading) {
   //   return (
@@ -217,7 +299,7 @@ export default function AdminDashboard() {
               </p>
             </div>
 
-            <div className="flex items-stretch gap-4">
+            <div className="flex flex-wrap items-stretch justify-end gap-4">
               {/* Network Status */}
               <div className="flex flex-col items-end justify-between">
                 <span className="mb-1 text-xs font-semibold uppercase"
@@ -254,6 +336,35 @@ export default function AdminDashboard() {
                   <RefreshCw className={`w-4 h-4 ${isRefreshing ? "animate-spin" : ""}`} />
                   {t('sync')}
                 </button>
+              </div>
+
+              {/* Shift Close */}
+              <div className="flex flex-col items-end justify-between border-l pl-4" style={{ borderColor: 'var(--dd-border)' }}>
+                <span className="mb-1 text-xs font-semibold uppercase"
+                  style={{ color: 'var(--dd-text-muted)' }}>
+                  {isShiftClosedForDate ? t('shiftReopenAction') : t('shiftCloseAction')}
+                </span>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleShiftToggle}
+                    disabled={isShiftSubmitting}
+                    className="flex items-center gap-2 rounded-lg px-4 py-2 transition-all font-bold uppercase text-base disabled:opacity-50"
+                    style={{
+                      background: isShiftClosedForDate
+                        ? 'linear-gradient(135deg, rgba(217, 119, 6, 0.14), rgba(245, 158, 11, 0.12))'
+                        : 'linear-gradient(135deg, rgba(109, 40, 217, 0.14), rgba(14, 165, 233, 0.1))',
+                      border: isShiftClosedForDate
+                        ? '1px solid rgba(217, 119, 6, 0.2)'
+                        : '1px solid rgba(109, 40, 217, 0.2)',
+                      color: isShiftClosedForDate ? '#b45309' : '#6d28d9',
+                    }}
+                  >
+                    <span className={`inline-block h-2.5 w-2.5 rounded-full ${isShiftSubmitting ? 'animate-pulse' : ''}`}
+                      style={{ background: isShiftClosedForDate ? '#d97706' : '#6d28d9' }} />
+                    {isShiftClosedForDate ? t('shiftReopenAction') : t('shiftCloseAction')}
+                  </button>
+                </div>
               </div>
 
               {/* Fullscreen Toggle */}
@@ -344,22 +455,22 @@ export default function AdminDashboard() {
               <div className="flex items-center justify-between px-4 py-3 text-base font-semibold"
                 style={{ background: 'var(--dd-bg-header)', color: 'var(--dd-text-primary)', borderBottom: '1px solid var(--dd-border)' }}>
                 <span>{t('stoppedMaintenance')}</span>
-                <span className="dd-chip dd-chip-amber">{canceledOrders.length}</span>
+                <span className="dd-chip dd-chip-amber">{stoppedMaintenanceList.length}</span>
               </div>
               <div className="flex-1 overflow-y-auto p-0">
-                {canceledOrders.length === 0 ? (
+                {stoppedMaintenanceList.length === 0 ? (
                   <div className="flex h-full items-center justify-center p-4">
                     <span className="text-sm font-bold uppercase" style={{ color: 'var(--dd-text-muted)' }}>{t('empty')}</span>
                   </div>
                 ) : (
                   <ul className="flex flex-col gap-2 p-3">
-                    {canceledOrders.map((o) => (
-                      <li key={o.order_id} className="flex items-center justify-between p-3 rounded-xl border shadow-sm"
+                    {stoppedMaintenanceList.map((item) => (
+                      <li key={item.id} className="flex items-center justify-between p-3 rounded-xl border shadow-sm cursor-default"
                         style={{ background: 'var(--dd-bg-surface)', borderColor: 'var(--dd-border)' }}>
                         <span className="text-base font-bold" style={{ color: 'var(--dd-text-primary)' }}>
-                          {o.vehicles?.vehicle_license_plate || `#${o.order_id}`}
+                          {item.label}
                         </span>
-                        <span className="dd-chip dd-chip-amber">{t('canceled')}</span>
+                        <span className={`dd-chip ${item.chipClass}`}>{item.statusLabel}</span>
                       </li>
                     ))}
                   </ul>
@@ -386,43 +497,43 @@ export default function AdminDashboard() {
               <div className="flex items-center rounded-lg p-1 backdrop-blur-md shrink-0"
                 style={{ background: 'var(--dd-bg-surface)', border: '1px solid var(--dd-border)' }}>
                 <button
-                  onClick={() => setCoreView('flow')}
-                  className={`flex items-center gap-2 px-3 py-1.5 text-sm font-bold uppercase transition-all rounded-md ${coreView === 'flow'
+                  onClick={() => setDispatchMode('auto')}
+                  className={`flex items-center gap-2 px-3 py-1.5 text-sm font-bold uppercase transition-all rounded-md ${dispatchMode === 'auto'
                     ? 'bg-sky-500/20 text-sky-600 border border-sky-500/30'
                     : 'text-slate-500 border border-transparent hover:text-slate-700'
                     }`}
                 >
-                  <Activity className="h-3.5 w-3.5 shrink-0" /> <span className="hidden sm:inline">LUỒNG XE</span>
+                  <span className="hidden sm:inline">AUTO</span>
                 </button>
                 <div className="w-[1px] h-4 mx-1 opacity-20" style={{ background: 'var(--dd-text-muted)' }} />
                 <button
-                  onClick={() => setCoreView('map')}
-                  className={`flex items-center gap-2 px-3 py-1.5 text-sm font-bold uppercase transition-all rounded-md ${coreView === 'map'
+                  onClick={() => setDispatchMode('manual')}
+                  className={`flex items-center gap-2 px-3 py-1.5 text-sm font-bold uppercase transition-all rounded-md ${dispatchMode === 'manual'
                     ? 'bg-indigo-500/20 text-indigo-600 border border-indigo-500/30'
                     : 'text-slate-500 border border-transparent hover:text-slate-700'
                     }`}
                 >
-                  <MapIcon className="h-3.5 w-3.5 shrink-0" /> <span className="hidden sm:inline">BẢN ĐỒ</span>
+                  <span className="hidden sm:inline">MANUAL</span>
+                </button>
+                <div className="w-[1px] h-4 mx-1 opacity-20" style={{ background: 'var(--dd-text-muted)' }} />
+                <button
+                  onClick={() => setShowMap((previous) => !previous)}
+                  className={`flex items-center gap-2 px-3 py-1.5 text-sm font-bold uppercase transition-all rounded-md ${showMap
+                    ? 'bg-emerald-500/20 text-emerald-600 border border-emerald-500/30'
+                    : 'text-slate-500 border border-transparent hover:text-slate-700'
+                    }`}
+                >
+                  <MapIcon className="h-3.5 w-3.5 shrink-0" />
+                  <span className="hidden sm:inline">MAP</span>
                 </button>
               </div>
             </div>
 
             {/* Core Display Area */}
-            <div className="flex-1 overflow-hidden relative bg-transparent">
-              {coreView === 'flow' ? (
-                <div className="h-full overflow-y-auto w-full scrollbar-hide">
-                  <div className=" h-full">
-                    <ActivityFlow
-                      stations={stations}
-                      vehicles={vehicles}
-                      orders={orders}
-                      onOrdersUpdated={fetchAll}
-                    />
-                  </div>
-                </div>
-              ) : (
-                <div className="h-full w-full p-2">
-                  <div className="h-full w-full rounded-xl overflow-hidden"
+            <div className="flex-1 overflow-hidden relative bg-transparent p-2">
+              <div className="flex h-full flex-col gap-2">
+                {showMap && (
+                  <div className="h-[230px] w-full rounded-xl overflow-hidden shrink-0"
                     style={{ border: '1px solid rgba(99, 102, 241, 0.2)' }}>
                     <StationMap
                       stationLongitude={geofenceStation?.station_gps_longitude ?? null}
@@ -431,70 +542,78 @@ export default function AdminDashboard() {
                       vehicles={vtrackingVehicles}
                     />
                   </div>
+                )}
+
+                <div className="min-h-0 flex-1 overflow-y-auto w-full scrollbar-hide">
+                  <div className="h-full">
+                    <ActivityFlow
+                      stations={stations}
+                      vehicles={vehicles}
+                      orders={activeFlowOrders}
+                      dispatchMode={dispatchMode}
+                      onOrdersUpdated={fetchAll}
+                    />
+                  </div>
                 </div>
-              )}
+              </div>
             </div>
           </div>
 
-          {/* Right: Live Execution (col-span-3) */}
+          {/* Right: Completed Orders Today (col-span-3) */}
           <div className="lg:col-span-3 h-[704px] animate-fade-up" style={{ animationDelay: '0.6s' }}>
-            <div className="flex h-full flex-col overflow-hidden dd-card" style={{ borderColor: 'rgba(56, 189, 248, 0.2)' }}>
+            <div className="flex h-full flex-col overflow-hidden dd-card" style={{ borderColor: 'rgba(16, 185, 129, 0.2)' }}>
               <div className="flex items-center justify-between px-4 py-3 text-base font-semibold"
                 style={{ background: 'var(--dd-bg-header)', color: 'var(--dd-text-primary)', borderBottom: '1px solid var(--dd-border)' }}>
-                <span>{t('outsideStation')}</span>
-                <span className="dd-chip dd-chip-sky">{outsideOrders.length}</span>
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+                  <span>{t('completedToday')}</span>
+                </div>
+                <span className="dd-chip dd-chip-emerald">{ordersCompleted.length}</span>
               </div>
               <div className="flex-1 overflow-y-auto">
-                {outsideOrders.length === 0 ? (
+                {ordersCompleted.length === 0 ? (
                   <div className="flex items-center justify-center h-full">
-                    <div className="flex flex-col items-center justify-center relative w-full h-full">
-                      {/* Radar Animated Rings */}
-                      <div className="absolute w-24 h-24 rounded-full border border-sky-400 animate-radar" />
-                      <div className="absolute w-32 h-32 rounded-full border border-sky-400 animate-radar" style={{ animationDelay: '1s' }} />
-
-                      <div className="h-14 w-14 z-10 rounded-full flex items-center justify-center backdrop-blur-md"
+                    <div className="flex flex-col items-center justify-center">
+                      <div className="h-14 w-14 rounded-full flex items-center justify-center backdrop-blur-md"
                         style={{ background: 'var(--dd-bg-surface)', border: '2px dashed var(--dd-border)' }}>
-                        <Activity className="h-7 w-7 text-sky-500 animate-pulse" />
+                        <CheckCircle2 className="h-7 w-7 text-emerald-400 opacity-50" />
                       </div>
-                      <span className="mt-5 text-sm font-bold uppercase animate-pulse"
-                        style={{ color: 'var(--dd-sky)' }}>
-                        Đang quét dữ liệu...
+                      <span className="mt-4 text-sm font-bold uppercase"
+                        style={{ color: 'var(--dd-text-muted)' }}>
+                        {t('noCompletedToday')}
                       </span>
                     </div>
                   </div>
                 ) : (
                   <ul className="flex flex-col gap-3 p-3">
-                    {outsideOrders.map((o) => (
+                    {ordersCompleted.map((o) => (
                       <li key={o.order_id} className="dd-surface p-4 transition-all relative overflow-hidden"
                         style={{ borderRadius: '12px', border: '1px solid var(--dd-border)' }}
-                        onMouseEnter={e => e.currentTarget.style.borderColor = 'rgba(56, 189, 248, 0.4)'}
+                        onMouseEnter={e => e.currentTarget.style.borderColor = 'rgba(16, 185, 129, 0.4)'}
                         onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--dd-border)'}>
-                        {/* Scanline accent on the left */}
-                        <div className="absolute left-0 top-0 bottom-0 w-1"
-                          style={{ background: o.order_status === 'transporting' ? '#0ea5e9' : '#f59e0b' }} />
+                        <div className="absolute left-0 top-0 bottom-0 w-1" style={{ background: '#10b981' }} />
 
                         <div className="flex justify-between items-end pl-2">
                           <div className="flex items-center gap-3">
-                            <Truck className={`w-5 h-5 ${o.order_status === 'transporting' ? 'text-sky-500 animate-drive-run' : 'text-amber-500 animate-drive-idle'}`} />
+                            <Truck className="w-5 h-5 text-emerald-500" />
                             <span className="text-xl font-bold" style={{ color: 'var(--dd-text-primary)' }}>
                               {o.vehicles?.vehicle_license_plate || `#${o.order_id}`}
                             </span>
                           </div>
-                          <span className={`dd-chip ${o.order_status === 'transporting' ? 'dd-chip-sky' : 'dd-chip-amber'}`}>
-                            {o.order_status === 'transporting' ? t('transporting') : t('running')}
+                          <span className="dd-chip dd-chip-emerald">
+                            {t('completed')}
                           </span>
                         </div>
                         <div className="mt-3 pl-2 flex items-center justify-between">
                           <div className="text-xs font-bold uppercase"
                             style={{ color: 'var(--dd-text-muted)' }}>
-                            TRẠM: {o.stations?.station_name || t('unassigned')}
+                            {o.stations?.station_name || t('unassigned')}
                           </div>
-                          {/* Simulated mini ETA/Dist marker */}
-                          <div className="flex items-center gap-1 opacity-50">
-                            <div className="w-1.5 h-1.5 rounded-full bg-slate-400" />
-                            <div className="w-1 h-1 rounded-full bg-slate-500" />
-                            <div className="w-0.5 h-0.5 rounded-full bg-slate-600" />
-                          </div>
+                          {o.order_end_datetime && (
+                            <div className="text-xs font-semibold" style={{ color: 'var(--dd-text-muted)' }}>
+                              {new Date(o.order_end_datetime).toLocaleTimeString(locale === 'vi' ? 'vi-VN' : 'en-US', { hour: '2-digit', minute: '2-digit' })}
+                            </div>
+                          )}
                         </div>
                       </li>
                     ))}

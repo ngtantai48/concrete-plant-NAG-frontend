@@ -1,18 +1,40 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { ButtonGroup } from "@/components/ui/button-group";
+import { Input as ShadcnInput } from "@/components/ui/input";
+import {
+  PaginationContent,
+  PaginationEllipsis,
+  PaginationItem, PaginationLink,
+  PaginationNext, PaginationPrevious,
+  Pagination as ShadcnPagination,
+} from "@/components/ui/pagination";
+import { SelectContent, SelectItem, SelectTrigger, SelectValue, Select as ShadcnSelect, } from "@/components/ui/select";
+import { useAppDispatch, useAppSelector } from "@/hooks/use-app-selector";
 import { useNavigationStore } from "@/hooks/use-navigation-store";
+import { useRfidScanner } from "@/hooks/use-rfid-scanner";
+import driverApi from "@/services/driver.service";
 import mediaApi from "@/services/media.service";
 import vehicleTypeApi from "@/services/vehicle-type.service";
 import vehicleApi from "@/services/vehicle.service";
+import { clearVehicles, fetchVehicles, setPagination, } from "@/store/slices/vehicleSlice";
+import type { Driver } from "@/types/driver";
 import type { VehicleMedia } from "@/types/media";
 import type { Vehicle, VehicleType } from "@/types/vehicle";
-import { Divider, Form, Image, Input, Modal, Pagination, Popconfirm, Select, Space, Table, Tooltip } from "antd";
-import { CarFront, Download, FileArchive, FileText, Hash, PenSquare, Plus, RefreshCw, Trash2, Upload as UploadIcon, X, Scan } from "lucide-react";
+import {
+  Divider, Form, Image, Input, Modal,
+  Popconfirm, Select, Space, Table, Tooltip,
+} from "antd";
+import {
+  CarFront, Download, FileArchive, FileText, Hash,
+  PenSquare, Plus, RefreshCw,
+  Scan,
+  Trash2, Upload as UploadIcon, X,
+} from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { useRfidScanner } from "@/hooks/use-rfid-scanner";
 
 interface PendingFile {
   file: File;
@@ -21,17 +43,48 @@ interface PendingFile {
   uid: string;
 }
 
+const getDriversFromResponse = (payload: unknown): Driver[] => {
+  if (Array.isArray(payload)) {
+    return payload as Driver[];
+  }
+
+  if (!payload || typeof payload !== "object") {
+    return [];
+  }
+
+  const record = payload as Record<string, unknown>;
+  const candidates = [record.data, record.users, record.items, record.results];
+
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate)) {
+      return candidate as Driver[];
+    }
+  }
+
+  return [];
+};
+
 export default function TableVehicles() {
   const t = useTranslations("VehiclePage");
   const tCommon = useTranslations("Common");
   const { setDirty } = useNavigationStore();
 
   const [form] = Form.useForm();
-  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+
+  const dispatch = useAppDispatch();
+  const { pages, page, limit, total, loading } = useAppSelector((state) => state.vehicles);
+  const vehicles = pages[page] || [];
+
   const [vehicleTypes, setVehicleTypes] = useState<VehicleType[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [searchText, setSearchText] = useState("");
+  const [drivers, setDrivers] = useState<Driver[]>([]);
+  const [loadingDrivers, setLoadingDrivers] = useState(false);
+  const [searchCategory, setSearchCategory] = useState<"plate" | "driver" | "status">("plate");
+  const [plateInput, setPlateInput] = useState("");
+  const [driverInputBuf, setDriverInputBuf] = useState<number | "all">("all");
+  const [statusInputBuf, setStatusInputBuf] = useState<string>("all");
+  const [vehicleLicensePlate, setVehicleLicensePlate] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [driverFilter, setDriverFilter] = useState<number | "all">("all");
   const [refreshDisabled, setRefreshDisabled] = useState(0);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
@@ -64,17 +117,48 @@ export default function TableVehicles() {
     }
   }, [lastTag, form, disconnect, setLastTag, t]);
 
-  const fetchVehicles = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await vehicleApi.getAll();
-      setVehicles(res.data?.data || res.data || []);
-    } catch {
-      toast.error(t("loadFailed"), { position: "top-right" });
-    } finally {
-      setLoading(false);
+  const handleSearchCommit = useCallback(() => {
+    if (searchCategory === "plate") {
+      const trimmed = plateInput.trim();
+      if (!trimmed && !vehicleLicensePlate && driverFilter === "all" && statusFilter === "all") {
+        toast.warning("Vui lòng nhập từ khóa tìm kiếm!");
+        return;
+      }
+      setVehicleLicensePlate(trimmed);
+      setDriverFilter("all");
+      setStatusFilter("all");
+    } else if (searchCategory === "driver") {
+      if (driverInputBuf === "all" && driverFilter === "all" && !vehicleLicensePlate && statusFilter === "all") {
+        toast.warning("Vui lòng chọn tài xế tiếp nhận!");
+        return;
+      }
+      setDriverFilter(driverInputBuf);
+      setVehicleLicensePlate("");
+      setStatusFilter("all");
+    } else if (searchCategory === "status") {
+      if (statusInputBuf === "all" && statusFilter === "all" && !vehicleLicensePlate && driverFilter === "all") {
+        toast.warning("Vui lòng chọn trạng thái xe!");
+        return;
+      }
+      setStatusFilter(statusInputBuf);
+      setVehicleLicensePlate("");
+      setDriverFilter("all");
     }
-  }, [t]);
+    dispatch(clearVehicles());
+  }, [searchCategory, plateInput, driverInputBuf, statusInputBuf, dispatch, vehicleLicensePlate, driverFilter, statusFilter]);
+
+  const fetchVehiclesData = useCallback(async (force: boolean = false) => {
+    dispatch(
+      fetchVehicles({
+        page,
+        limit,
+        vehicle_license_plate: vehicleLicensePlate || undefined,
+        vehicle_status: statusFilter !== "all" ? statusFilter : undefined,
+        user_id: driverFilter !== "all" ? driverFilter : undefined,
+        force,
+      })
+    );
+  }, [dispatch, page, limit, vehicleLicensePlate, statusFilter, driverFilter]);
 
   const fetchVehicleTypes = useCallback(async () => {
     try {
@@ -85,25 +169,55 @@ export default function TableVehicles() {
     }
   }, []);
 
-  useEffect(() => {
-    fetchVehicles();
-    fetchVehicleTypes();
-  }, [fetchVehicles, fetchVehicleTypes]);
+  const fetchDrivers = useCallback(async () => {
+    setLoadingDrivers(true);
+    try {
+      const res = await driverApi.getAll({ limit: 1000 });
+      const driverData = getDriversFromResponse(res.data);
+      setDrivers(
+        driverData
+          .filter(
+            (driver): driver is Driver => Boolean(driver?.user_id) && driver.role === "driver"
+          )
+          .sort((a, b) => a.user_full_name.localeCompare(b.user_full_name))
+      );
+    } catch {
+      setDrivers([]);
+    } finally {
+      setLoadingDrivers(false);
+    }
+  }, []);
 
-  const filteredVehicles = useMemo(() => {
-    return vehicles.filter((v) => {
-      const matchSearch =
-        !searchText ||
-        v.vehicle_license_plate?.toLowerCase().includes(searchText.toLowerCase()) ||
-        v.vehicle_description?.toLowerCase().includes(searchText.toLowerCase());
-      const matchStatus = statusFilter === "all" || v.vehicle_status === statusFilter;
-      return matchSearch && matchStatus;
-    });
-  }, [vehicles, statusFilter, searchText]);
+  // Use effect to fetch vehicles when filters or pagination changes with basic debounce
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      fetchVehiclesData();
+    }, 300);
+    return () => clearTimeout(handler);
+  }, [fetchVehiclesData]);
+
+  // Use effect for dependencies only
+  useEffect(() => {
+    fetchVehicleTypes();
+    fetchDrivers();
+  }, [fetchVehicleTypes, fetchDrivers]);
+
+  // Client side filtering removed because it is now handled by the backend APIs
+  // via our redux slice filtering parameters (searchText, statusFilter)
+
+  const driverOptions = useMemo(
+    () =>
+      drivers.map((driver) => ({
+        value: driver.user_id,
+        label: `${driver.user_full_name}${driver.username ? ` (${driver.username})` : ""}`,
+      })),
+    [drivers]
+  );
 
   const handleRefresh = () => {
     if (refreshDisabled > 0) return;
-    fetchVehicles();
+    dispatch(clearVehicles()); // Xóa cache cũ để fetch lại từ đầu (trang 1)
+    fetchVehiclesData(true);
     setRefreshDisabled(15);
     const interval = setInterval(() => {
       setRefreshDisabled((prev) => {
@@ -145,6 +259,7 @@ export default function TableVehicles() {
       vehicle_description: record.vehicle_description,
       vehicle_rfid: record.vehicle_rfid,
       vehicle_type_id: record.vehicle_type_id,
+      user_id: record.user_id ?? record.users?.user_id,
     });
     setPendingFiles([]);
     setIsModalVisible(true);
@@ -181,13 +296,17 @@ export default function TableVehicles() {
   const handleSave = async () => {
     try {
       const values = await form.validateFields();
+      const payload = {
+        ...values,
+        user_id: values.user_id ?? null,
+      };
       setSaving(true);
       let vehicleId: number;
       if (editingVehicle) {
-        await vehicleApi.update(editingVehicle.vehicle_id, values);
+        await vehicleApi.update(editingVehicle.vehicle_id, payload);
         vehicleId = editingVehicle.vehicle_id;
       } else {
-        const res = await vehicleApi.create(values);
+        const res = await vehicleApi.create(payload);
         vehicleId = res.data?.data?.vehicle_id || res.data?.vehicle_id;
       }
 
@@ -200,10 +319,11 @@ export default function TableVehicles() {
       form.resetFields();
       setExistingMedia([]);
       setPendingFiles([]);
+      setDirty(false);
       toast.success(editingVehicle ? t("updateSuccess") : t("createSuccess"), {
         position: "top-right",
       });
-      fetchVehicles();
+      fetchVehiclesData(true);
     } catch (error) {
       const message =
         (error as any)?.response?.data?.message || (error as Error)?.message || t("saveFailed");
@@ -221,7 +341,7 @@ export default function TableVehicles() {
           {t("licensePlate")} <b>{record.vehicle_license_plate}</b> {t("deleteSuccess")}
         </>
       );
-      fetchVehicles();
+      fetchVehiclesData(true);
     } catch (error) {
       const message =
         (error as any)?.response?.data?.message || (error as Error)?.message || t("deleteFailed");
@@ -274,10 +394,12 @@ export default function TableVehicles() {
     }
   };
 
-  const updatePendingFile = (uid: string, field: "media_name" | "media_description", value: string) => {
-    setPendingFiles((prev) =>
-      prev.map((p) => (p.uid === uid ? { ...p, [field]: value } : p))
-    );
+  const updatePendingFile = (
+    uid: string,
+    field: "media_name" | "media_description",
+    value: string
+  ) => {
+    setPendingFiles((prev) => prev.map((p) => (p.uid === uid ? { ...p, [field]: value } : p)));
   };
 
   const removePendingFile = (uid: string) => {
@@ -359,7 +481,7 @@ export default function TableVehicles() {
             alt={name}
             className="object-cover"
             preview={{
-              mask: <div className="text-[10px] text-white">Xem</div>
+              mask: <div className="text-[10px] text-white">Xem</div>,
             }}
           />
         </div>
@@ -434,6 +556,29 @@ export default function TableVehicles() {
       },
     },
     {
+      title: t("assignedDriver"),
+      dataIndex: "user_id",
+      key: "user_id",
+      render: (value: number | null | undefined, record: Vehicle) => {
+        if (record.users?.user_full_name) {
+          return (
+            <div className="leading-tight">
+              <div className="font-medium text-slate-800">{record.users.user_full_name}</div>
+              {record.users.username && (
+                <div className="text-xs text-slate-500">@{record.users.username}</div>
+              )}
+            </div>
+          );
+        }
+
+        if (value) {
+          return <span className="text-xs text-slate-500">#{value}</span>;
+        }
+
+        return <span className="text-slate-400 italic">{t("unassigned")}</span>;
+      },
+    },
+    {
       title: t("description"),
       dataIndex: "vehicle_description",
       key: "vehicle_description",
@@ -455,7 +600,7 @@ export default function TableVehicles() {
         <Space size="middle">
           <Tooltip title={t("editTooltip")}>
             <Button variant="outline" size="iconSquare" onClick={() => openEditModal(record)}>
-              <PenSquare className="w-4 h-4 text-blue-600" />
+              <PenSquare className="text-blue-600" />
             </Button>
           </Tooltip>
           <Popconfirm
@@ -473,7 +618,7 @@ export default function TableVehicles() {
           >
             <Tooltip title={t("deleteTooltip")}>
               <Button variant="outline" size="iconSquare">
-                <Trash2 className="w-4 h-4 text-red-500" />
+                <Trash2 className="text-red-500" />
               </Button>
             </Tooltip>
           </Popconfirm>
@@ -485,7 +630,7 @@ export default function TableVehicles() {
   return (
     <>
       <div className="m-10 bg-white rounded-2xl shadow-sm border border-slate-200 animate-fade-in overflow-hidden">
-        <div className="p-6 md:p-8 border-b-2 border-slate-100 flex items-start justify-between gap-6 flex-wrap bg-slate-50/50">
+        <div className="p-6 md:p-8 border-b-2 border-slate-100 flex flex-col items-start gap-6 bg-slate-50/50">
           <div className="flex-1">
             <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-slate-900 flex items-center gap-3">
               {t("title")}
@@ -496,7 +641,7 @@ export default function TableVehicles() {
           <div className="flex gap-3 mt-2 sm:mt-0 flex-wrap">
             <Tooltip title={t("addTooltip")}>
               <Button variant="primary" onClick={openAddModal}>
-                <Plus className="w-4 h-4" />
+                <Plus />
                 {t("addVehicle")}
               </Button>
             </Tooltip>
@@ -509,7 +654,7 @@ export default function TableVehicles() {
                 disabled={refreshDisabled > 0}
               >
                 <div className="flex items-center gap-2">
-                  <RefreshCw className={`w-4 h-4 ${refreshDisabled > 0 ? "animate-spin" : ""}`} />
+                  <RefreshCw className={`${refreshDisabled > 0 ? "animate-spin" : ""}`} />
                   <span>
                     {refreshDisabled > 0
                       ? `${tCommon("refresh")} (${refreshDisabled}s)`
@@ -521,28 +666,79 @@ export default function TableVehicles() {
           </div>
         </div>
 
-        <div className="px-6 md:px-8 py-6 flex flex-col sm:flex-row gap-4 items-start sm:items-center">
-          <Input
-            placeholder={t("searchPlaceholder")}
-            value={searchText}
-            onChange={(e) => setSearchText(e.target.value)}
-            className="max-w-xs"
-            allowClear
-          />
-          <Select
-            value={statusFilter}
-            onChange={setStatusFilter}
-            className="min-w-[160px]"
-            options={[
-              { value: "all", label: t("all") },
-              { value: "available", label: t("active") },
-              { value: "running", label: "Đang chạy" },
-              { value: "transporting", label: "Đang giao" },
-              { value: "collecting", label: "Đang nhận" },
-              { value: "maintenance", label: t("maintenance") },
-              { value: "incident", label: "Sự cố" },
-            ]}
-          />
+        <div className="px-6 md:px-8 py-6">
+          <ButtonGroup className="w-full max-w-3xl flex-col sm:flex-row">
+            {/* Filter Category Selector */}
+            <ShadcnSelect
+              value={searchCategory}
+              onValueChange={(val: "plate" | "driver" | "status") => setSearchCategory(val)}
+            >
+              <SelectTrigger className="sm:w-[180px] bg-white">
+                <SelectValue placeholder="Chọn bộ lọc" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="plate">Biển số xe</SelectItem>
+                <SelectItem value="driver">Tài xế phụ trách</SelectItem>
+                <SelectItem value="status">Trạng thái xe</SelectItem>
+              </SelectContent>
+            </ShadcnSelect>
+
+            {/* Dynamic Filter Input */}
+            {searchCategory === "plate" && (
+              <ShadcnInput
+                placeholder="Tìm kiếm phương tiện theo biển số"
+                value={plateInput}
+                onChange={(e) => setPlateInput(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleSearchCommit();
+                }}
+              />
+            )}
+
+            {searchCategory === "driver" && (
+              <ShadcnSelect
+                value={driverInputBuf.toString()}
+                onValueChange={(val) => setDriverInputBuf(val === "all" ? "all" : Number(val))}
+              >
+                <SelectTrigger className="flex-1 bg-white">
+                  <SelectValue placeholder="Tìm kiếm theo tài xế phụ trách" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tất cả tài xế</SelectItem>
+                  {driverOptions.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value.toString()}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </ShadcnSelect>
+            )}
+
+            {searchCategory === "status" && (
+              <ShadcnSelect
+                value={statusInputBuf}
+                onValueChange={(val) => setStatusInputBuf(val)}
+              >
+                <SelectTrigger className="flex-1 bg-white">
+                  <SelectValue placeholder="Tìm kiếm theo trạng thái xe" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">{t("all")}</SelectItem>
+                  <SelectItem value="available">{t("active")}</SelectItem>
+                  <SelectItem value="running">Đang chạy</SelectItem>
+                  <SelectItem value="transporting">Đang giao</SelectItem>
+                  <SelectItem value="collecting">Đang nhận</SelectItem>
+                  <SelectItem value="maintenance">{t("maintenance")}</SelectItem>
+                  <SelectItem value="incident">Sự cố</SelectItem>
+                </SelectContent>
+              </ShadcnSelect>
+            )}
+
+            {/* Commit Button */}
+            <Button type="button" onClick={handleSearchCommit} className="sm:w-auto w-full">
+              Tìm kiếm
+            </Button>
+          </ButtonGroup>
         </div>
 
         <div
@@ -551,7 +747,7 @@ export default function TableVehicles() {
         >
           <Table
             columns={columns}
-            dataSource={filteredVehicles}
+            dataSource={vehicles}
             rowKey="vehicle_id"
             loading={loading}
             pagination={false}
@@ -560,26 +756,80 @@ export default function TableVehicles() {
             tableLayout="auto"
           />
 
-          <div className="border-t border-slate-200 bg-slate-50 p-4">
-            <Pagination
-              total={filteredVehicles.length}
-              align="end"
-              showTotal={(total) => (
+          <div className="border-t border-slate-200 bg-slate-50 p-4 pb-6 flex items-center justify-between">
+            <div className="text-sm text-slate-500 flex flex-row">
+              {vehicles.length > 0 ? (
                 <>
-                  <i>{t("total")}</i>: <b>{total}</b>
+                  <i>{t("total")}</i>:{" "}<b>{total}</b>
                 </>
-              )}
-            />
+              ) : null}
+            </div>
+
+            {total > limit && (
+              <ShadcnPagination className="justify-end m-0">
+                <PaginationContent>
+                  <PaginationItem>
+                    <PaginationPrevious
+                      href="#"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        if (page > 1) dispatch(setPagination({ page: page - 1, limit }));
+                      }}
+                      className={page === 1 ? "pointer-events-none opacity-50" : ""}
+                    />
+                  </PaginationItem>
+
+                  {Array.from({ length: Math.ceil(total / limit) }).map((_, i) => {
+                    const p = i + 1;
+                    // basic windowing for pagination
+                    if (p === 1 || p === Math.ceil(total / limit) || Math.abs(p - page) <= 1) {
+                      return (
+                        <PaginationItem key={p}>
+                          <PaginationLink
+                            href="#"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              dispatch(setPagination({ page: p, limit }));
+                            }}
+                            isActive={page === p}
+                          >
+                            {p}
+                          </PaginationLink>
+                        </PaginationItem>
+                      );
+                    }
+                    if (p === 2 && page > 3) {
+                      return <PaginationItem key="ellipsis-start"><PaginationEllipsis /></PaginationItem>;
+                    }
+                    if (p === Math.ceil(total / limit) - 1 && page < Math.ceil(total / limit) - 2) {
+                      return <PaginationItem key="ellipsis-end"><PaginationEllipsis /></PaginationItem>;
+                    }
+                    return null;
+                  })}
+
+                  <PaginationItem>
+                    <PaginationNext
+                      href="#"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        if (page < Math.ceil(total / limit)) dispatch(setPagination({ page: page + 1, limit }));
+                      }}
+                      className={page >= Math.ceil(total / limit) ? "pointer-events-none opacity-50" : ""}
+                    />
+                  </PaginationItem>
+                </PaginationContent>
+              </ShadcnPagination>
+            )}
           </div>
         </div>
 
-        {!loading && filteredVehicles.length === 0 && (
+        {/* {!loading && vehicles.length === 0 && (
           <div className="text-center py-12 text-gray-500">
             <CarFront className="w-12 h-12 mx-auto mb-3 text-gray-300" />
             <p className="text-lg">{t("emptyTitle")}</p>
             <p className="text-sm mt-2">{t("emptyHint")}</p>
           </div>
-        )}
+        )} */}
       </div>
 
       <Modal
@@ -643,11 +893,11 @@ export default function TableVehicles() {
             className="space-y-6"
           >
             <div>
-              <div className="flex items-center gap-2 mb-4 pb-2 border-b border-slate-100">
+              <div className="flex items-center gap-2 mb-4 border-b border-slate-100">
                 <Hash className="w-5 h-5 text-slate-500" />
                 <h3 className="text-base font-medium text-slate-800">{t("sectionTitle")}</h3>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6">
                 <Form.Item
                   label={
                     <span className="font-medium text-slate-700">{t("licensePlateLabel")}</span>
@@ -679,6 +929,24 @@ export default function TableVehicles() {
                 </Form.Item>
 
                 <Form.Item
+                  label={<span className="font-medium text-slate-700">{t("assignedDriver")}</span>}
+                  name="user_id"
+                  className="mb-0"
+                >
+                  <Select
+                    size="large"
+                    className="rounded-lg"
+                    placeholder={t("driverPlaceholder")}
+                    allowClear
+                    loading={loadingDrivers}
+                    showSearch
+                    options={driverOptions}
+                    optionFilterProp="label"
+                    getPopupContainer={(triggerNode) => triggerNode.parentElement || document.body}
+                  />
+                </Form.Item>
+
+                <Form.Item
                   label={<span className="font-medium text-slate-700">{t("description")}</span>}
                   name="vehicle_description"
                   className="mb-0"
@@ -697,7 +965,6 @@ export default function TableVehicles() {
                 >
                   <Input
                     placeholder={t("rfidPlaceholder")}
-                    size="large"
                     className="rounded-lg font-mono tracking-wider"
                     suffix={
                       <Tooltip title={isScanning ? "Đang đợi thẻ..." : "Bấm để quét thẻ RFID"}>
@@ -729,11 +996,11 @@ export default function TableVehicles() {
                 >
                   <Select size="large" className="rounded-lg">
                     <Select.Option value="available">{t("activeOption")}</Select.Option>
-                    <Select.Option value="running">Đang chạy</Select.Option>
-                    <Select.Option value="transporting">Đang giao</Select.Option>
-                    <Select.Option value="collecting">Đang nhận</Select.Option>
+                    {/* <Select.Option value="running">{t("running")}</Select.Option>
+                    <Select.Option value="transporting">{t("transporting")}</Select.Option>
+                    <Select.Option value="collecting">{t("collecting")}</Select.Option> */}
                     <Select.Option value="maintenance">{t("maintenanceOption")}</Select.Option>
-                    <Select.Option value="incident">Sự cố</Select.Option>
+                    <Select.Option value="incident">{t("incident")}</Select.Option>
                   </Select>
                 </Form.Item>
               </div>
@@ -741,9 +1008,9 @@ export default function TableVehicles() {
           </Form>
 
           {/* Document / Media Upload Section */}
-          <Divider className="!my-6" />
+          <Divider className="!my-3" />
           <div>
-            <div className="flex items-center gap-2 mb-4 pb-2 border-b border-slate-100">
+            <div className="flex items-center gap-2 mb-2 border-slate-100">
               <FileText className="w-5 h-5 text-slate-500" />
               <h3 className="text-base font-medium text-slate-800">{t("documentSection")}</h3>
             </div>
@@ -795,20 +1062,28 @@ export default function TableVehicles() {
                     </div>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       <div>
-                        <label className="text-xs text-slate-500 mb-1 block">{t("documentName")}</label>
+                        <label className="text-xs text-slate-500 mb-1 block">
+                          {t("documentName")}
+                        </label>
                         <Input
                           size="small"
                           value={pending.media_name}
-                          onChange={(e) => updatePendingFile(pending.uid, "media_name", e.target.value)}
+                          onChange={(e) =>
+                            updatePendingFile(pending.uid, "media_name", e.target.value)
+                          }
                           placeholder={t("documentName")}
                         />
                       </div>
                       <div>
-                        <label className="text-xs text-slate-500 mb-1 block">{t("documentDescription")}</label>
+                        <label className="text-xs text-slate-500 mb-1 block">
+                          {t("documentDescription")}
+                        </label>
                         <Input
                           size="small"
                           value={pending.media_description}
-                          onChange={(e) => updatePendingFile(pending.uid, "media_description", e.target.value)}
+                          onChange={(e) =>
+                            updatePendingFile(pending.uid, "media_description", e.target.value)
+                          }
                           placeholder={t("documentDescriptionPlaceholder")}
                         />
                       </div>
@@ -844,7 +1119,11 @@ export default function TableVehicles() {
                     key={media.media_id}
                     className="flex items-center gap-3 bg-slate-50 border border-slate-200 rounded-lg p-3 group hover:border-slate-300 transition-colors"
                   >
-                    {getFilePreview(media.media_name, media.media_url, media.media_type === "images")}
+                    {getFilePreview(
+                      media.media_name,
+                      media.media_url,
+                      media.media_type === "images"
+                    )}
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-slate-800 truncate">
                         {media.media_name}

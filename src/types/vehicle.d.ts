@@ -1,4 +1,5 @@
 import type { VehicleMedia } from './media';
+import type { Driver } from './driver';
 
 export interface Vehicle {
   vehicle_id: number;
@@ -7,9 +8,11 @@ export interface Vehicle {
   vehicle_description: string | null;
   vehicle_rfid: string | null;
   vehicle_type_id: number;
+  user_id?: number | null;
   updated_at?: string;
   updated_by?: number;
   media?: VehicleMedia[];
+  users?: Pick<Driver, 'user_id' | 'user_full_name' | 'username' | 'role'> | null;
 }
 
 export interface VehicleType {

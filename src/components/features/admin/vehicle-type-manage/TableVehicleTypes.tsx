@@ -86,6 +86,7 @@ export default function TableVehicleTypes() {
       }
       setIsModalVisible(false);
       form.resetFields();
+      setDirty(false);
       toast.success(editingType ? t("updateSuccess") : t("createSuccess"), {
         position: "top-right",
       });

@@ -1,35 +1,24 @@
 "use client";
 
 import Logo from "@/assets/images/logo.png";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { ADMIN, CUSTOMER, USER } from "@/constants/route";
 import { useAppSelector } from "@/hooks/use-app-selector";
+import { useNavigationStore } from "@/hooks/use-navigation-store";
 import { DoubleLeftOutlined, DoubleRightOutlined } from "@ant-design/icons";
 import { createSelector } from "@reduxjs/toolkit";
 import { Avatar, Button, Layout, Menu, MenuProps } from "antd";
-import { Car, Gauge, Layers, Link2, MapPin, Truck, User, Wrench, Monitor } from "lucide-react";
+import { ArrowRightLeft, Car, Gauge, Layers, MapPin, Truck, User, Wrench } from "lucide-react";
 import { useTranslations } from "next-intl";
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname, useSearchParams, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useNavigationStore } from "@/hooks/use-navigation-store";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 
-const UserProfile = ({
-  collapsed,
-  userName,
-  userRole,
-  isLoading,
-}: {
+const UserProfile = ({ collapsed, userName, userRole, isLoading }: {
   collapsed: boolean;
   userName?: string;
   userRole?: string;
@@ -111,6 +100,7 @@ export default function Sidebar() {
   const baseMenuItems = useMemo(
     () => [
       { key: ADMIN.DASHBOARD, label: t("dashboard"), icon: <Gauge />, roles: ["admin"] },
+      { key: ADMIN.END_OF_DAY_VEHICLES, label: t("endOfDayVehicles"), icon: <ArrowRightLeft />, roles: ["admin"] },
       { key: ADMIN.DRIVERS, label: t("drivers"), icon: <Truck />, roles: ["admin"] },
       { key: ADMIN.VEHICLES, label: t("vehicles"), icon: <Car />, roles: ["admin"] },
       { key: ADMIN.VEHICLE_MAINTENANCES, label: t("vehicleMaintenances"), icon: <Wrench />, roles: ["admin"] },
@@ -118,7 +108,7 @@ export default function Sidebar() {
       { key: ADMIN.STATIONS, label: t("stations"), icon: <MapPin />, roles: ["admin"] },
       { key: USER.DASHBOARD, label: t("dashboard"), icon: <Gauge />, roles: ["user"] },
       { key: CUSTOMER.DASHBOARD, label: t("dashboard"), icon: <Gauge />, roles: ["customer"] },
-      { key: ADMIN.DRIVER_DISPLAY, label: t("driverDisplay"), icon: <Monitor />, roles: ["admin"] },
+      // { key: ADMIN.DRIVER_DISPLAY, label: t("driverDisplay"), icon: <Monitor />, roles: ["admin"] },
     ],
     [t]
   );

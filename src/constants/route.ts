@@ -4,13 +4,14 @@ export const ROUTES = {
 
 export const ADMIN = {
   DASHBOARD: "/admin/dashboard",
+  END_OF_DAY_VEHICLES: "/admin/end-of-day-vehicles",
   DRIVERS: "/admin/drivers",
   VEHICLES: "/admin/vehicles",
   VEHICLE_TYPES: "/admin/vehicle-types",
   STATIONS: "/admin/stations",
   VEHICLE_MAINTENANCES: "/admin/vehicle-maintenances",
-  DRIVER_DISPLAY: "/admin/driver-display",
   PROFILE: "/profile",
+  DRIVER_DISPLAY: "/admin/driver-display",
 };
 
 export const SHARE = {
