@@ -1,3 +1,10 @@
+export interface VtrackingAttribute {
+  attribute_type?: string;
+  attribute_key: string;
+  value: unknown;
+  [key: string]: unknown;
+}
+
 export interface VtrackingVehicle {
   device_id: string;
   vehicle_name: string;
@@ -9,6 +16,7 @@ export interface VtrackingVehicle {
   geocoding: string;
   direction: number;
   timestamp: number;
+  attributes?: VtrackingAttribute[];
 }
 
 export interface VtrackingResponse {

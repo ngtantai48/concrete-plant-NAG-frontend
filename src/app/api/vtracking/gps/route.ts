@@ -1,6 +1,9 @@
 import { NextResponse } from "next/server";
 import { loginPresence, getCachedPresence, BASE_URL } from "@/lib/vtracking-auth";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 export async function GET() {
   const orgId = process.env.VTRACKING_ORG_ID;
   if (!orgId) {
@@ -67,6 +70,7 @@ async function fetchVehicles(presence: string, orgId: string) {
 
   const res = await fetch(`${BASE_URL}/portDataWithParamAndProjectId`, {
     method: "POST",
+    cache: "no-store",
     headers: {
       Accept: "*/*",
       "Content-Type": "application/json; charset=UTF-8",
@@ -114,6 +118,9 @@ function parseVehicles(rawVehicles: Record<string, unknown>[]) {
       geocoding: (datas.geocoding as string) || "",
       direction: Number(datas.direction) || 0,
       timestamp: Number(datas.timestamp) || 0,
+      attributes: attrs.filter(
+        (a: Record<string, unknown>) => a.attribute_type === "SCOPE_CLIENT",
+      ),
     };
   });
 }
