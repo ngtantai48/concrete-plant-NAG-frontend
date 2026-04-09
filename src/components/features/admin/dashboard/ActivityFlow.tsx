@@ -215,7 +215,7 @@ function StationDropTargetCard({
     >
       <div className="flex items-center justify-between gap-3">
         <div
-          className="truncate text-sm font-bold uppercase tracking-[0.18em]"
+          className="truncate text-sm font-bold uppercase"
           style={{ color: 'var(--dd-text-primary)' }}
         >
           {group.stationName}
@@ -229,7 +229,7 @@ function StationDropTargetCard({
       </div>
 
       <div
-        className="mt-2 text-[11px] font-bold uppercase tracking-[0.18em]"
+        className="mt-2 text-[11px] font-bold uppercase"
         style={{ color: isSourceStation ? 'var(--dd-text-muted)' : isActiveDropTarget ? 'var(--dd-sky)' : 'var(--dd-text-accent)' }}
       >
         {helperText}
@@ -283,7 +283,7 @@ function StationQueueDropZone({
     >
       <div className="absolute left-0 top-0 bottom-0 w-[3px] bg-sky-500/80" />
 
-      <div className="mb-2 flex min-w-0 items-center gap-2 pl-2 text-[10px] font-bold uppercase tracking-[0.18em] text-sky-600/85">
+      <div className="mb-2 flex min-w-0 items-center gap-2 pl-2 text-[10px] font-bold uppercase text-sky-600/85">
         <ArrowRight className="h-3 w-3 shrink-0" />
         <span className="truncate">{t('dropBetweenVehicles', { stationName: group.stationName })}</span>
       </div>
@@ -294,17 +294,17 @@ function StationQueueDropZone({
             <GripVertical className="h-4 w-4" />
           </div>
           <div
-            className="flex h-8 min-w-8 items-center justify-center rounded-full bg-slate-100 px-2 text-[11px] font-bold tracking-[0.05em] shadow-sm"
+            className="flex h-8 min-w-8 items-center justify-center rounded-full bg-slate-100 px-2 text-[11px] font-bold shadow-sm"
             style={{ color: 'var(--dd-text-secondary)', border: '1px solid var(--dd-border)' }}
           >
             ...
           </div>
-          <div className="text-base font-black tracking-widest" style={{ color: 'var(--dd-text-primary)' }}>
+          <div className="text-base font-black" style={{ color: 'var(--dd-text-primary)' }}>
             {activeVehicleLabel}
           </div>
         </div>
 
-        <div className="flex min-w-0 items-center gap-2 text-[11px] font-bold uppercase tracking-[0.18em] text-sky-600">
+        <div className="flex min-w-0 items-center gap-2 text-[11px] font-bold uppercase text-sky-600">
           <ArrowRight className="h-3.5 w-3.5 shrink-0" />
           <span className="dd-chip dd-chip-sky whitespace-nowrap">
             {t('dropHereBadge')}
@@ -357,7 +357,7 @@ function StationQueueDropZone({
     >
       {showDropPad && (
         <div
-          className="flex items-center justify-between gap-3 rounded-2xl border border-dashed px-3 py-3 text-[11px] font-bold uppercase tracking-[0.18em]"
+          className="flex items-center justify-between gap-3 rounded-2xl border border-dashed px-3 py-3 text-[11px] font-bold uppercase"
           style={{
             background: showDropCue ? 'rgba(14, 165, 233, 0.12)' : 'rgba(14, 165, 233, 0.04)',
             borderColor: showDropCue ? 'rgba(14, 165, 233, 0.4)' : 'rgba(14, 165, 233, 0.18)',
@@ -400,7 +400,7 @@ function StationQueueDropZone({
             color: showDropCue || showDropPad ? 'var(--dd-text-accent)' : 'var(--dd-text-muted)',
           }}
         >
-          <div className="text-xs font-bold uppercase tracking-[0.22em]">
+          <div className="text-xs font-bold uppercase">
             {showCrossStationPlaceholder ? t('dropIntoStation', { stationName: group.stationName }) : showDropPad ? dropPadText : t('stationNoVehicle')}
           </div>
         </div>
@@ -410,7 +410,7 @@ function StationQueueDropZone({
         <button
           type="button"
           onClick={onToggleExpanded}
-          className="flex items-center gap-2 px-2 pt-1 text-xs font-bold uppercase tracking-[0.16em] transition-colors"
+          className="flex items-center gap-2 px-2 pt-1 text-xs font-bold uppercase transition-colors"
           style={{ color: 'var(--dd-text-muted)' }}
           onMouseEnter={(event) => {
             event.currentTarget.style.color = 'var(--dd-text-accent)';
@@ -458,12 +458,12 @@ function DraggedVehiclePreview({
           <GripVertical className="h-4 w-4" />
         </div>
         <div
-          className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-[11px] font-bold tracking-[0.05em] shadow-sm"
+          className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-[11px] font-bold shadow-sm"
           style={{ color: 'var(--dd-text-secondary)', border: '1px solid var(--dd-border)' }}
         >
           #{actualIndex + 1}
         </div>
-        <div className="text-base font-black tracking-widest" style={{ color: 'var(--dd-text-primary)' }}>
+        <div className="text-base font-black" style={{ color: 'var(--dd-text-primary)' }}>
           {order.vehicles?.vehicle_license_plate || `ĐƠN: ${order.order_id}`}
         </div>
       </div>
@@ -1034,7 +1034,7 @@ export default function ActivityFlow({
                 <ArrowRight className="h-6 w-6 text-sky-500/80" />
               </div>
               <span
-                className="text-xs font-bold uppercase tracking-[0.3em]"
+                className="text-xs font-bold uppercase"
                 style={{ color: 'var(--dd-text-muted)' }}
               >
                 {t('noVehiclesInFlow')}
@@ -1114,20 +1114,20 @@ export default function ActivityFlow({
                 <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
                   <div className="min-w-0">
                     <div
-                      className="text-[11px] font-bold uppercase tracking-[0.22em]"
+                      className="text-[11px] font-bold uppercase"
                       style={{ color: 'var(--dd-text-muted)' }}
                     >
                       {t('draggingVehicleLabel')}
                     </div>
                     <div
-                      className="mt-1 truncate text-lg font-black uppercase tracking-[0.08em]"
+                      className="mt-1 truncate text-lg font-black uppercase"
                       style={{ color: 'var(--dd-text-primary)' }}
                     >
                       {activeOrder.vehicles?.vehicle_license_plate || `#${activeOrder.order_id}`}
                     </div>
                   </div>
 
-                  <div className="flex flex-col gap-2 text-[11px] font-bold uppercase tracking-[0.18em] md:items-end">
+                  <div className="flex flex-col gap-2 text-[11px] font-bold uppercase md:items-end">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="dd-chip dd-chip-amber">
                         {t('dragSourceStationBadge')}
@@ -1204,13 +1204,13 @@ export default function ActivityFlow({
                           <div className="flex items-start justify-between gap-3">
                             <div className="min-w-0">
                               <div
-                                className="truncate text-sm font-black uppercase tracking-[0.22em]"
+                                className="truncate text-sm font-black uppercase"
                                 style={{ color: 'var(--dd-text-primary)' }}
                               >
                                 {group.stationName}
                               </div>
                               <div
-                                className="mt-2 text-[11px] font-bold uppercase tracking-[0.18em]"
+                                className="mt-2 text-[11px] font-bold uppercase"
                                 style={{ color: 'var(--dd-text-muted)' }}
                               >
                                 {group.orders.length} {t('vehicleCount')}

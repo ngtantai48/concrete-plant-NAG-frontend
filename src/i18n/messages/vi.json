@@ -131,7 +131,12 @@
     "confirmDelete": "Bạn có chắc chắn muốn xóa tài xế này?",
     "deleteSuccess": "Xóa tài xế thành công",
     "saveSuccess": "Lưu tài xế thành công",
-    "required": "Trường này là bắt buộc"
+    "required": "Trường này là bắt buộc",
+    "searchByName": "Tìm kiếm tài xế theo Họ và tên",
+    "searchByUsername": "Tìm kiếm tài xế theo Username",
+    "searchByPhone": "Tìm kiếm tài xế theo Số điện thoại",
+    "searchByEmail": "Tìm kiếm tài xế theo Email",
+    "searchFallback": "Nhập từ khóa tìm kiếm..."
   },
   "StationPage": {
     "title": "Quản lý trạm",
@@ -165,8 +170,8 @@
     "selectStationType": "Chọn loại trạm"
   },
   "VehiclePage": {
-    "title": "Cấu hình phương tiện",
-    "subtitle": "Quản lý danh sách xe tải & xe bán tải trong hệ thống",
+    "title": "Quản lý phương tiện",
+    "subtitle": "Quản lý danh sách các phương tiện trong hệ thống",
     "addVehicle": "Thêm phương tiện",
     "editVehicle": "Chỉnh sửa hồ sơ xe",
     "newVehicle": "Đăng ký xe mới",
@@ -428,7 +433,7 @@
   },
   "EndOfDayPage": {
     "title": "Quản lý xe cuối ngày",
-    "subtitle": "Sắp xếp lại xe đã có lệnh theo từng trạm và kéo thả trực tiếp giữa các hàng chờ.",
+    "subtitle": "Chốt lịch danh sách xe đã được tự động sắp xếp cho ngày kế tiếp.",
     "queuedVehicles": "Xe chờ điều phối",
     "operatingStations": "Trạm đang hoạt động",
     "activeAssignedVehicles": "Xe có lệnh đang chạy",
@@ -473,7 +478,10 @@
     "fromDate": "Ngày bắt đầu",
     "toDate": "Ngày kết thúc",
     "dateRange": "Thời gian bảo trì",
-    "dateRangePlaceholder": ["Từ ngày", "Đến ngày"],
+    "dateRangePlaceholder": [
+      "Từ ngày",
+      "Đến ngày"
+    ],
     "distanceCovered": "Số km đã chạy",
     "distancePlaceholder": "VD: 15000",
     "description": "Mô tả công việc",

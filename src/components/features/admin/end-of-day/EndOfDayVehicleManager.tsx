@@ -224,7 +224,7 @@ export default function EndOfDayVehicleManager() {
           <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
             <div className="space-y-3">
               <div className="flex items-center gap-3">
-                <div
+                {/* <div
                   className="flex h-12 w-12 items-center justify-center rounded-2xl"
                   style={{
                     background: "linear-gradient(135deg, rgba(14, 165, 233, 0.12), rgba(59, 130, 246, 0.18))",
@@ -232,11 +232,11 @@ export default function EndOfDayVehicleManager() {
                   }}
                 >
                   <ArrowRightLeft className="h-6 w-6" style={{ color: "var(--dd-sky)" }} />
-                </div>
+                </div> */}
 
                 <div>
                   <h1
-                    className="text-3xl font-black uppercase tracking-[0.08em] md:text-5xl"
+                    className="text-4xl font-black uppercase md:text-6xl"
                     style={{ color: "var(--dd-text-primary)" }}
                   >
                     {tPage("title")}
@@ -244,7 +244,7 @@ export default function EndOfDayVehicleManager() {
                 </div>
               </div>
 
-              <p className="max-w-3xl text-sm font-semibold uppercase tracking-[0.14em] md:text-base" style={{ color: "var(--dd-text-muted)" }}>
+              <p className="max-w-3xl text-base font-semibold uppercase md:text-lg" style={{ color: "var(--dd-text-muted)" }}>
                 {tPage("subtitle")}
               </p>
             </div>
@@ -252,7 +252,7 @@ export default function EndOfDayVehicleManager() {
             <div className="flex flex-col gap-4 xl:items-end">
               <div className="flex flex-wrap items-center gap-3">
                 <div
-                  className={`flex items-center gap-2 rounded-full border px-4 py-2 text-xs font-bold uppercase tracking-[0.16em] ${isConnected ? "animate-flash-bg" : ""}`}                  style={{
+                  className={`flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-bold uppercase ${isConnected ? "animate-flash-bg" : ""}`} style={{
                     borderColor: isConnected ? "rgba(16, 185, 129, 0.24)" : "rgba(239, 68, 68, 0.22)",
                     color: isConnected ? "#047857" : "#b91c1c",
                     background: isConnected ? "rgba(16, 185, 129, 0.08)" : "rgba(239, 68, 68, 0.08)",
@@ -307,7 +307,7 @@ export default function EndOfDayVehicleManager() {
                 </button>
               </div>
 
-              <div className="text-sm font-bold uppercase tracking-[0.16em]" style={{ color: "var(--dd-text-muted)" }}>
+              <div className="text-base font-bold uppercase" style={{ color: "var(--dd-text-muted)" }}>
                 {tDashboard("systemTime")}: {clock}
               </div>
             </div>
@@ -325,10 +325,10 @@ export default function EndOfDayVehicleManager() {
             >
               <div className="flex items-center justify-between gap-4">
                 <div>
-                  <div className="text-sm font-bold uppercase tracking-[0.16em]" style={{ color: "var(--dd-text-muted)" }}>
+                  <div className="text-base font-bold uppercase" style={{ color: "var(--dd-text-muted)" }}>
                     {card.label}
                   </div>
-                  <div className="mt-3 text-5xl font-black" style={{ color: card.accent }}>
+                  <div className="mt-3 text-6xl font-black" style={{ color: card.accent }}>
                     {String(card.value).padStart(2, "0")}
                   </div>
                 </div>
@@ -354,10 +354,10 @@ export default function EndOfDayVehicleManager() {
             style={{ borderColor: "var(--dd-border)", background: "rgba(255,255,255,0.88)" }}
           >
             <div>
-              <h2 className="text-lg font-black uppercase tracking-[0.18em]" style={{ color: "var(--dd-text-primary)" }}>
+              <h2 className="text-xl font-black uppercase" style={{ color: "var(--dd-text-primary)" }}>
                 {tPage("boardTitle")}
               </h2>
-              <p className="mt-1 text-xs font-bold uppercase tracking-[0.14em]" style={{ color: "var(--dd-text-muted)" }}>
+              <p className="mt-1 text-sm font-bold uppercase" style={{ color: "var(--dd-text-muted)" }}>
                 {tPage("boardHint")}
               </p>
             </div>
