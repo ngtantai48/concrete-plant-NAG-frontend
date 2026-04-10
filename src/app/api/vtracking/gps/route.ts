@@ -104,6 +104,7 @@ function parseVehicles(rawVehicles: Record<string, unknown>[]) {
     );
 
     return {
+      id: v.id as string,
       device_id: v.device_id,
       vehicle_name: v.vehicle_name,
       license_plate: v.license_plate || (plateAttr?.value as string) || "",

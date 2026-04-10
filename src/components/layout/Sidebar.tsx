@@ -11,7 +11,9 @@ import { useNavigationStore } from "@/hooks/use-navigation-store";
 import { DoubleLeftOutlined, DoubleRightOutlined } from "@ant-design/icons";
 import { createSelector } from "@reduxjs/toolkit";
 import { Avatar, Button, Layout, Menu, MenuProps } from "antd";
-import { ArrowRightLeft, Car, Gauge, Layers, MapPin, Truck, User, Wrench } from "lucide-react";
+import {
+  ArrowRightLeft, CalendarCheck, Car, ClipboardList, Gauge, Layers, MapPin, Settings, Truck, User, UtensilsCrossed, Wrench,
+} from "lucide-react";
 import { useTranslations } from "next-intl";
 import Image from "next/image";
 import Link from "next/link";
@@ -106,6 +108,17 @@ export default function Sidebar() {
       { key: ADMIN.VEHICLE_MAINTENANCES, label: t("vehicleMaintenances"), icon: <Wrench />, roles: ["admin"] },
       { key: ADMIN.VEHICLE_TYPES, label: t("vehicleTypes"), icon: <Layers />, roles: ["admin"] },
       { key: ADMIN.STATIONS, label: t("stations"), icon: <MapPin />, roles: ["admin"] },
+      {
+        key: "tools-menu",
+        label: t("tools"),
+        icon: <Settings />,
+        roles: ["admin"],
+        children: [
+          { key: ADMIN.MEAL_CHECK, label: t("mealCheck"), icon: <UtensilsCrossed /> },
+          { key: ADMIN.DRIVER_RICE, label: t("driverRice"), icon: <ClipboardList /> },
+          { key: ADMIN.ATTENDANCE, label: t("attendance"), icon: <CalendarCheck /> },
+        ],
+      },
       { key: USER.DASHBOARD, label: t("dashboard"), icon: <Gauge />, roles: ["user"] },
       { key: CUSTOMER.DASHBOARD, label: t("dashboard"), icon: <Gauge />, roles: ["customer"] },
       // { key: ADMIN.DRIVER_DISPLAY, label: t("driverDisplay"), icon: <Monitor />, roles: ["admin"] },
@@ -163,13 +176,30 @@ export default function Sidebar() {
   const selectedKey = useMemo(() => {
     const findMatchedKey = (items: any[]): string | null => {
       for (const item of items) {
+        if (item.children) {
+          const childMatch = findMatchedKey(item.children);
+          if (childMatch) return childMatch;
+        }
         if (fullPath === item.key || fullPath.startsWith(item.key)) {
-          return item.children ? findMatchedKey(item.children) || item.key : item.key;
+          return item.key;
         }
       }
       return null;
     };
     return findMatchedKey(menuItems) || fullPath;
+  }, [fullPath, menuItems]);
+
+  const openKeys = useMemo(() => {
+    for (const item of menuItems) {
+      if (item.children) {
+        for (const child of item.children) {
+          if (fullPath === child.key || fullPath.startsWith(child.key)) {
+            return [item.key];
+          }
+        }
+      }
+    }
+    return [];
   }, [fullPath, menuItems]);
 
   const toggleCollapsed = useCallback(() => setCollapsed(!collapsed), [collapsed]);
@@ -226,6 +256,7 @@ export default function Sidebar() {
                 theme="dark"
                 mode="inline"
                 selectedKeys={[selectedKey]}
+                defaultOpenKeys={openKeys}
                 inlineCollapsed={collapsed}
                 items={buildMenuItems(menuItems)}
                 style={{
