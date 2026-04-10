@@ -271,7 +271,7 @@ function StationQueueDropZone({
   const dropPadText = showDropCue
     ? t('dropZoneActive', { stationName: group.stationName })
     : t('dropZoneHint', { stationName: group.stationName });
-  const activeVehicleLabel = activeOrder?.vehicles?.vehicle_license_plate || `#${activeOrder?.order_id ?? ''}`;
+  const activeVehicleLabel = activeOrder?.vehicles?.vehicle_license_plate ? `${activeOrder.vehicles.vehicle_license_plate}${activeOrder.vehicles.vehicle_name ? ` | ${activeOrder.vehicles.vehicle_name}` : ''}` : `#${activeOrder?.order_id ?? ''}`;
   const placeholderCard = (
     <div
       className="relative overflow-hidden rounded-2xl border border-dashed px-4 py-3"
@@ -370,7 +370,7 @@ function StationQueueDropZone({
             <span className="truncate">{dropPadText}</span>
           </div>
           <span className="dd-chip dd-chip-sky whitespace-nowrap">
-            {activeOrder?.vehicles?.vehicle_license_plate || `#${activeOrder?.order_id ?? ''}`}
+            {activeOrder?.vehicles?.vehicle_license_plate ? `${activeOrder.vehicles.vehicle_license_plate}${activeOrder.vehicles.vehicle_name ? ` | ${activeOrder.vehicles.vehicle_name}` : ''}` : `#${activeOrder?.order_id ?? ''}`}
           </span>
         </div>
       )}
@@ -464,7 +464,7 @@ function DraggedVehiclePreview({
           #{actualIndex + 1}
         </div>
         <div className="text-base font-black" style={{ color: 'var(--dd-text-primary)' }}>
-          {order.vehicles?.vehicle_license_plate || `ĐƠN: ${order.order_id}`}
+          {order.vehicles?.vehicle_license_plate ? `${order.vehicles.vehicle_license_plate}${order.vehicles.vehicle_name ? ` | ${order.vehicles.vehicle_name}` : ''}` : `ĐƠN: ${order.order_id}`}
         </div>
       </div>
 
@@ -1065,7 +1065,7 @@ export default function ActivityFlow({
                           setManualOrderStationMap({});
                         }}
                       >
-                        <SelectTrigger className="w-full bg-white md:w-[240px]">
+                        <SelectTrigger className="w-full bg-white md:w-[130px]">
                           <SelectValue placeholder={t('manualChooseStation')} />
                         </SelectTrigger>
                         <SelectContent>
@@ -1123,7 +1123,7 @@ export default function ActivityFlow({
                       className="mt-1 truncate text-lg font-black uppercase"
                       style={{ color: 'var(--dd-text-primary)' }}
                     >
-                      {activeOrder.vehicles?.vehicle_license_plate || `#${activeOrder.order_id}`}
+                      {activeOrder.vehicles?.vehicle_license_plate ? `${activeOrder.vehicles.vehicle_license_plate}${activeOrder.vehicles.vehicle_name ? ` | ${activeOrder.vehicles.vehicle_name}` : ''}` : `#${activeOrder.order_id}`}
                     </div>
                   </div>
 

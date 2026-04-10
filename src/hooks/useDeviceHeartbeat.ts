@@ -10,11 +10,14 @@ export interface DeviceUpdatePayload {
 export interface DeviceStationStatus {
   stationId: string;
   deviceStatus: "connected" | "disconnected";
+  rfidStatus?: "connected" | "disconnected";
+  ledStatus?: "connected" | "disconnected";
   lastPayload: DeviceUpdatePayload;
 }
 
 interface DeviceHeartbeatState {
   isSocketConnected: boolean;
+  isLedConnected: boolean;
   stationStatusMap: Record<string, DeviceStationStatus>;
 }
 
@@ -45,7 +48,8 @@ const isStationHeartbeat = (payload: DeviceUpdatePayload | null) => {
     return false;
   }
 
-  return payload.update_type === "rfid_checks" && String(payload.station_id ?? "") !== "";
+  const validTypes = ["rfid_checks", "led_checks", "led", "led_status"];
+  return validTypes.includes(payload.update_type || "") && String(payload.station_id ?? "") !== "";
 };
 
 export function useDeviceHeartbeat(): DeviceHeartbeatState {
@@ -71,16 +75,27 @@ export function useDeviceHeartbeat(): DeviceHeartbeatState {
       }
 
       const stationId = String(payload.station_id);
+      const updateType = payload.update_type;
       const deviceStatus = payload.device_status === "connected" ? "connected" : "disconnected";
 
-      setStationStatusMap((prev) => ({
-        ...prev,
-        [stationId]: {
+      setStationStatusMap((prev) => {
+        const existing = prev[stationId] || {
           stationId,
-          deviceStatus,
-          lastPayload: payload,
-        },
-      }));
+          deviceStatus: "disconnected",
+          rfidStatus: "disconnected",
+          ledStatus: "disconnected",
+          lastPayload: payload
+        };
+
+        return {
+          ...prev,
+          [stationId]: {
+            ...existing,
+            deviceStatus: deviceStatus,
+            lastPayload: payload,
+          },
+        };
+      });
     };
 
     const socket = io(socketUrl, {
@@ -104,6 +119,7 @@ export function useDeviceHeartbeat(): DeviceHeartbeatState {
     socket.on("update", handleHeartbeat);
     socket.onAny((eventName, payload) => {
       if (eventName === "update") {
+        console.log("update", payload);
         return;
       }
 
@@ -118,11 +134,17 @@ export function useDeviceHeartbeat(): DeviceHeartbeatState {
     };
   }, []);
 
+  const isLedConnected = useMemo(() => {
+    // Theo backend, station_id = 1 là tín hiệu của LED
+    return stationStatusMap["1"]?.deviceStatus === "connected";
+  }, [stationStatusMap]);
+
   return useMemo(
     () => ({
       isSocketConnected,
+      isLedConnected,
       stationStatusMap,
     }),
-    [isSocketConnected, stationStatusMap],
+    [isSocketConnected, isLedConnected, stationStatusMap],
   );
 }

@@ -338,7 +338,7 @@ export default function TableVehicles() {
       await vehicleApi.delete(record.vehicle_id);
       toast.success(
         <>
-          {t("licensePlate")} <b>{record.vehicle_license_plate}</b> {t("deleteSuccess")}
+          {t("licensePlate")} <b>{record.vehicle_license_plate}{record.vehicle_name ? ` | ${record.vehicle_name}` : ''}</b> {t("deleteSuccess")}
         </>
       );
       fetchVehiclesData(true);
@@ -526,9 +526,9 @@ export default function TableVehicles() {
       title: t("licensePlate"),
       dataIndex: "vehicle_license_plate",
       key: "vehicle_license_plate",
-      render: (text: string) => (
+      render: (text: string, record: Vehicle) => (
         <div className="font-semibold text-slate-800 bg-slate-100 uppercase tracking-wider px-3 py-1 rounded inline-block border-2 border-slate-300">
-          {text}
+          {text}{record.vehicle_name ? ` | ${record.vehicle_name}` : ''}
         </div>
       ),
     },
@@ -607,7 +607,7 @@ export default function TableVehicles() {
             title={t("confirmTitle")}
             description={
               <span>
-                {t("confirmDelete")} <b>{record.vehicle_license_plate}</b>?
+                {t("confirmDelete")} <b>{record.vehicle_license_plate}{record.vehicle_name ? ` | ${record.vehicle_name}` : ''}</b>?
               </span>
             }
             okText={t("okText")}
