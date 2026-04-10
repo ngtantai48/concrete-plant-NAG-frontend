@@ -255,11 +255,11 @@ export default function EndOfDayVehicleManager({ mode = "today" }: { mode?: "tod
   }
 
   return (
-    <div className="dashboard-light min-h-screen bg-cover bg-center">
-      <div className="mx-auto space-y-6 p-6 md:p-10">
+    <div className="dashboard-light">
+      <div className="mx-auto space-y-2 p-6 md:p-10">
         <div className="dd-header p-6 md:p-8">
-          <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
-            <div className="space-y-3">
+          <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between w-full">
+            <div className="space-y-4 shrink-0">
               <div className="flex items-center gap-3">
                 {/* <div
                   className="flex h-12 w-12 items-center justify-center rounded-2xl"
@@ -273,7 +273,7 @@ export default function EndOfDayVehicleManager({ mode = "today" }: { mode?: "tod
 
                 <div>
                   <h1
-                    className="text-4xl font-black uppercase md:text-6xl"
+                    className="text-4xl font-black uppercase md:text-6xl whitespace-nowrap"
                     style={{ color: "var(--dd-text-primary)" }}
                   >
                     {tPage("title")}
@@ -286,38 +286,9 @@ export default function EndOfDayVehicleManager({ mode = "today" }: { mode?: "tod
               </p>
             </div>
 
-            <div className="flex flex-col gap-4 xl:items-end">
-              <div className="flex flex-wrap items-center gap-3">
-                <div
-                  className="flex items-center rounded-lg p-1"
-                  style={{ background: "var(--dd-bg-surface)", border: "1px solid var(--dd-border)" }}
-                >
-                  <button
-                    type="button"
-                    onClick={() => router.replace(`${ADMIN.END_OF_DAY_VEHICLES}?mode=today`)}
-                    className={`px-4 py-2 text-sm font-bold uppercase transition-all rounded-md ${
-                      mode === "today"
-                        ? "bg-amber-500/20 text-amber-600 border border-amber-500/30"
-                        : "text-slate-500 border border-transparent hover:text-slate-700"
-                    }`}
-                  >
-                    {tPage("modeToday")}
-                  </button>
-                  <div className="mx-1 h-4 w-[1px] opacity-20" style={{ background: "var(--dd-text-muted)" }} />
-                  <button
-                    type="button"
-                    onClick={() => router.replace(`${ADMIN.END_OF_DAY_VEHICLES}?mode=previous`)}
-                    className={`px-4 py-2 text-sm font-bold uppercase transition-all rounded-md ${
-                      mode === "previous"
-                        ? "bg-sky-500/20 text-sky-600 border border-sky-500/30"
-                        : "text-slate-500 border border-transparent hover:text-slate-700"
-                    }`}
-                  >
-                    {tPage("modePrevious")}
-                  </button>
-                </div>
-
-                <div
+            <div className="flex flex-col gap-4 items-end">
+              <div className="flex flex-wrap items-center justify-end gap-3">
+                {/* <div
                   className={`flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-bold uppercase ${isConnected ? "animate-flash-bg" : ""}`} style={{
                     borderColor: isConnected ? "rgba(16, 185, 129, 0.24)" : "rgba(239, 68, 68, 0.22)",
                     color: isConnected ? "#047857" : "#b91c1c",
@@ -336,9 +307,9 @@ export default function EndOfDayVehicleManager({ mode = "today" }: { mode?: "tod
                 >
                   <RefreshCw className={`h-4 w-4 ${isRefreshing ? "animate-spin" : ""}`} />
                   {tDashboard("sync")}
-                </button>
+                </button> */}
 
-                <button
+                {/* <button
                   type="button"
                   onClick={handleRebalance}
                   disabled={isRebalancing}
@@ -351,29 +322,58 @@ export default function EndOfDayVehicleManager({ mode = "today" }: { mode?: "tod
                 >
                   <Shuffle className={`h-4 w-4 ${isRebalancing ? "animate-spin" : ""}`} />
                   {tPage("rebalanceAction")}
-                </button>
+                </button> */}
 
-                <button
-                  type="button"
-                  onClick={handleShiftToggle}
-                  disabled={isShiftToggling || (mode === "previous" && !isScheduleLocked && !isShiftClosed)}
-                  className="dd-btn flex items-center gap-2 disabled:opacity-50"
-                  style={{
-                    background: isScheduleLocked
-                      ? "linear-gradient(135deg, rgba(217, 119, 6, 0.14), rgba(245, 158, 11, 0.12))"
-                      : "linear-gradient(135deg, rgba(124, 58, 237, 0.16), rgba(14, 165, 233, 0.12))",
-                    border: isScheduleLocked
-                      ? "1px solid rgba(217, 119, 6, 0.2)"
-                      : "1px solid rgba(124, 58, 237, 0.22)",
-                    color: isScheduleLocked ? "#b45309" : "#6d28d9",
-                  }}
-                >
-                  <ArrowRightLeft className={`h-4 w-4 ${isShiftToggling ? "animate-pulse" : ""}`} />
-                  {mode === "previous"
-                    ? (isScheduleLocked ? tPage("shiftClosePreviousAction") : isShiftClosed ? tPage("shiftOpenPreviousAction") : tPage("shiftOpenAction"))
-                    : (isScheduleLocked ? tPage("shiftReopenTodayAction") : tPage("shiftOpenTodayAction"))
-                  }
-                </button>
+                <div className="flex items-center gap-3">
+                  <div
+                    className="flex items-center rounded-lg p-1"
+                    style={{ background: "var(--dd-bg-surface)", border: "1px solid var(--dd-border)" }}
+                  >
+                    <button
+                      type="button"
+                      onClick={() => router.replace(`${ADMIN.END_OF_DAY_VEHICLES}?mode=today`)}
+                      className={`px-4 py-2 text-sm font-bold uppercase transition-all rounded-md ${mode === "today"
+                        ? "bg-amber-500/20 text-amber-600 border border-amber-500/30"
+                        : "text-slate-500 border border-transparent hover:text-slate-700"
+                        }`}
+                    >
+                      {tPage("modeToday")}
+                    </button>
+                    <div className="mx-1 h-4 w-[1px] opacity-20" style={{ background: "var(--dd-text-muted)" }} />
+                    <button
+                      type="button"
+                      onClick={() => router.replace(`${ADMIN.END_OF_DAY_VEHICLES}?mode=previous`)}
+                      className={`px-4 py-2 text-sm font-bold uppercase transition-all rounded-md ${mode === "previous"
+                        ? "bg-sky-500/20 text-sky-600 border border-sky-500/30"
+                        : "text-slate-500 border border-transparent hover:text-slate-700"
+                        }`}
+                    >
+                      {tPage("modePrevious")}
+                    </button>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleShiftToggle}
+                    disabled={isShiftToggling || (mode === "previous" && !isScheduleLocked && !isShiftClosed)}
+                    className="dd-btn flex items-center gap-2 disabled:opacity-50"
+                    style={{
+                      background: isScheduleLocked
+                        ? "linear-gradient(135deg, rgba(217, 119, 6, 0.14), rgba(245, 158, 11, 0.12))"
+                        : "linear-gradient(135deg, rgba(124, 58, 237, 0.16), rgba(14, 165, 233, 0.12))",
+                      border: isScheduleLocked
+                        ? "1px solid rgba(217, 119, 6, 0.2)"
+                        : "1px solid rgba(124, 58, 237, 0.22)",
+                      color: isScheduleLocked ? "#b45309" : "#6d28d9",
+                    }}
+                  >
+                    <ArrowRightLeft className={`h-4 w-4 ${isShiftToggling ? "animate-pulse" : ""}`} />
+                    {mode === "previous"
+                      ? (isScheduleLocked ? tPage("shiftClosePreviousAction") : isShiftClosed ? tPage("shiftOpenPreviousAction") : tPage("shiftOpenAction"))
+                      : (isScheduleLocked ? tPage("shiftReopenTodayAction") : tPage("shiftOpenTodayAction"))
+                    }
+                  </button>
+                </div>
               </div>
 
               <div className="text-base font-bold uppercase" style={{ color: "var(--dd-text-muted)" }}>

@@ -17,12 +17,6 @@ interface StationQueueGroup {
   pendingOrders: Order[];
 }
 
-interface MergedQueueItem {
-  station: Station;
-  order: Order;
-  queueIndex: number;
-}
-
 const STATUS_COLORS: Record<string, string> = {
   collecting: "bg-blue-600",
   operating: "bg-[#6F6E73]",
@@ -150,29 +144,6 @@ export default function DriverDisplay() {
     }));
   }, [activeStations, collectingOrders, pendingOrders]);
 
-  const mergedPendingQueue = useMemo<MergedQueueItem[]>(() => {
-    const longestQueueLength = stationQueueGroups.reduce(
-      (longest, group) => Math.max(longest, group.pendingOrders.length),
-      0
-    );
-    const mergedQueue: MergedQueueItem[] = [];
-
-    for (let queueIndex = 0; queueIndex < longestQueueLength; queueIndex += 1) {
-      stationQueueGroups.forEach((group) => {
-        const order = group.pendingOrders[queueIndex];
-        if (order) {
-          mergedQueue.push({
-            station: group.station,
-            order,
-            queueIndex,
-          });
-        }
-      });
-    }
-
-    return mergedQueue;
-  }, [stationQueueGroups]);
-
   const queueGridStyle = useMemo(
     () => getQueueGridStyle(activeStations.length),
     [activeStations.length]
@@ -250,55 +221,58 @@ export default function DriverDisplay() {
             <p className="text-3xl font-bold">{t("emptyStation")}</p>
           </div>
         ) : (
-          <div className="flex h-full flex-col gap-6">
-            <div className="overflow-x-auto pb-1">
-              <div style={queueGridStyle}>
+          <div className="flex h-full flex-col gap-6 overflow-hidden">
+            <div className="flex-1 overflow-x-auto overflow-y-hidden pb-1 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+              <div style={{ ...queueGridStyle, height: "100%" }}>
                 {stationQueueGroups.map((group) => (
-                  <StationOverviewCard
-                    key={group.station.station_id}
-                    station={group.station}
-                    collectingOrder={group.collectingOrder}
-                    pendingCount={group.pendingOrders.length}
-                    t={t}
-                  />
-                ))}
-              </div>
-            </div>
-
-            <div className="min-h-0 flex-1 overflow-hidden rounded-3xl border-2 border-slate-200 bg-white shadow-sm">
-              <div className="text-shadow-lg/10 px-6 py-4 flex items-center justify-between shrink-0">
-                <h3 className="text-3xl font-black text-slate-500 uppercase tracking-wider">
-                  {t("pendingQueue")}
-                </h3>
-                <span className="text-xl bg-slate-200 text-slate-600 font-extrabold px-3 py-1 rounded-full">
-                  {mergedPendingQueue.length} {t("truck")}
-                </span>
-              </div>
-
-              <div className="px-6 shrink-0">
-                <div className="border-t-2 border-slate-200" />
-              </div>
-
-              <div className="min-h-0 flex-1 overflow-auto px-4 py-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-                {mergedPendingQueue.length === 0 ? (
-                  <div className="flex h-full flex-col items-center justify-center text-slate-500">
-                    <Truck className="w-24 h-24 mb-3" />
-                    <p className="text-4xl font-bold uppercase">Không có xe chờ</p>
-                  </div>
-                ) : (
-                  <div className="space-y-4">
-                    {mergedPendingQueue.map(({ station, order, queueIndex }, displayIndex) => (
-                      <PendingOrderCard
-                        key={`${station.station_id}-${order.order_id}`}
-                        order={order}
-                        queueIndex={queueIndex}
-                        displayIndex={displayIndex}
-                        stationName={station.station_name}
+                  <div key={group.station.station_id} className="flex flex-col gap-6 h-[100%] max-h-full">
+                    <div className="shrink-0">
+                      <StationOverviewCard
+                        station={group.station}
+                        collectingOrder={group.collectingOrder}
+                        pendingCount={group.pendingOrders.length}
                         t={t}
                       />
-                    ))}
+                    </div>
+
+                    <div className="min-h-0 flex-1 flex flex-col rounded-3xl border-2 border-slate-200 bg-white shadow-sm overflow-hidden">
+                      <div className="px-6 py-4 flex items-center justify-between shrink-0">
+                        <h3 className="text-2xl font-black text-slate-500 uppercase tracking-wider">
+                          {t("waitingList")}
+                        </h3>
+                        <span className="text-lg bg-slate-200 text-slate-600 font-extrabold px-3 py-1 rounded-full">
+                          {group.pendingOrders.length} {t("truck")}
+                        </span>
+                      </div>
+
+                      <div className="px-6 shrink-0">
+                        <div className="border-t-2 border-slate-200" />
+                      </div>
+
+                      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                        {group.pendingOrders.length === 0 ? (
+                          <div className="flex h-full flex-col items-center justify-center text-slate-400">
+                            <Truck className="w-16 h-16 mb-2 text-slate-300" />
+                            <p className="text-lg font-bold uppercase">Không có xe chờ</p>
+                          </div>
+                        ) : (
+                          <div className="space-y-4">
+                            {group.pendingOrders.map((order, index) => (
+                              <PendingOrderCard
+                                key={order.order_id}
+                                order={order}
+                                queueIndex={index}
+                                displayIndex={index}
+                                stationName={group.station.station_name}
+                                t={t}
+                              />
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
-                )}
+                ))}
               </div>
             </div>
           </div>
@@ -356,7 +330,7 @@ function StationStatusCard({ station, collectingOrder, t }: {
           className="text-4xl lg:text-7xl font-bold text-blue-700 text-center leading-none"
           style={{ WebkitTextStrokeWidth: "5px", paintOrder: "stroke fill" }}
         >
-          {collectingOrder?.vehicles?.vehicle_license_plate || "N/A"}
+          {collectingOrder?.vehicles?.vehicle_license_plate ? `${collectingOrder.vehicles.vehicle_license_plate}${collectingOrder.vehicles.vehicle_name ? ` | ${collectingOrder.vehicles.vehicle_name}` : ''}` : "N/A"}
         </span>
       </div>
     );
@@ -411,7 +385,7 @@ function PendingOrderCard({ order, queueIndex, displayIndex, stationName, t }: {
   let detailClass = "text-slate-500";
 
   if (isNext) {
-    cardClass = "border-4 border-emerald-500 shadow-lg shadow-emerald-100 bg-emerald-50";
+    cardClass = "border-4 border-emerald-500 shadow-lg shadow-emerald-100 bg-emerald-50 animate-pulse";
     textClass = "text-emerald-700";
     detailClass = "text-emerald-700/80";
   } else if (isSecond) {
@@ -425,15 +399,9 @@ function PendingOrderCard({ order, queueIndex, displayIndex, stationName, t }: {
   }
 
   return (
-    <Card className={baseClass + cardClass}>
-      <CardContent className="flex h-full min-h-[220px] flex-col gap-5 p-5">
-        <div className="flex flex-wrap items-center justify-center gap-3 text-center lg:justify-start lg:text-left">
-          <Badge
-            variant={isNext ? "default" : "secondary"}
-            className={`text-lg px-3 py-1 font-bold uppercase ${isNext ? "bg-emerald-700 hover:bg-emerald-700" : ""}`}
-          >
-            {t("orderNumber")} {displayIndex + 1}
-          </Badge>
+    <Card className={`${baseClass} ${cardClass}`}>
+      <CardContent className="flex h-full min-h-[220px] flex-col p-5 gap-5">
+        <div className="flex flex-wrap items-center justify-center gap-3 text-center">
           <Badge
             variant="outline"
             className={`border-current bg-transparent px-3 py-1 text-base font-bold uppercase ${detailClass}`}
@@ -442,18 +410,13 @@ function PendingOrderCard({ order, queueIndex, displayIndex, stationName, t }: {
           </Badge>
         </div>
 
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-1 items-center justify-center">
           <span
-            className={`text-shadow-lg/100 contrast-300 text-5xl xl:text-7xl 2xl:text-8xl font-bold tracking-tight text-center leading-none lg:text-left ${textClass}`}
+            className={`text-shadow-lg/100 contrast-300 text-5xl xl:text-7xl 2xl:text-8xl font-bold tracking-tight text-center leading-none ${textClass}`}
             style={{ WebkitTextStrokeWidth: "5px", paintOrder: "stroke fill" }}
           >
-            {order.vehicles?.vehicle_license_plate || "N/A"}
+            {order.vehicles?.vehicle_license_plate ? `${order.vehicles.vehicle_license_plate}${order.vehicles.vehicle_name ? ` | ${order.vehicles.vehicle_name}` : ''}` : "N/A"}
           </span>
-
-          <div className={`flex items-center justify-center gap-3 text-center text-lg xl:text-xl font-black uppercase tracking-wide lg:justify-end ${detailClass}`}>
-            <ArrowRight className={`h-5 w-5 ${textClass}`} />
-            <span className={textClass}>{stationName}</span>
-          </div>
         </div>
       </CardContent>
     </Card>

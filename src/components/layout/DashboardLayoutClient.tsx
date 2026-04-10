@@ -30,11 +30,11 @@ export default function DashboardLayoutClient({ children }: { children: React.Re
 
     return (
         <AuthGuard>
-            <Layout className="min-h-screen">
+            <Layout className="h-screen overflow-hidden">
                 <Sidebar />
-                <Layout id="main-content-layout" style={{ marginLeft: 270, transition: "margin-left 0.5s ease" }}>
+                <Layout id="main-content-layout" style={{ marginLeft: 270, transition: "margin-left 0.5s ease" }} className="h-screen overflow-hidden flex flex-col">
                     <AppHeader onLogout={handleLogout} />
-                    <Content className="bg-gray-50 min-h-[calc(100vh-64px)]">
+                    <Content className="bg-gray-50 flex-1 overflow-auto">
                         {children}
                     </Content>
                 </Layout>
