@@ -51,7 +51,7 @@ export default function StationStatusPanel({ stations, orders, deviceStationStat
         }
 
         map[order.stations.station_id].push({
-          license_plate: order.vehicles?.vehicle_license_plate || `#${order.order_id}`,
+          license_plate: order.vehicles?.vehicle_license_plate ? `${order.vehicles.vehicle_license_plate}${order.vehicles.vehicle_name ? ` | ${order.vehicles.vehicle_name}` : ''}` : `#${order.order_id}`,
           status: order.order_status,
           order_number: order.order_number,
         });
@@ -75,7 +75,7 @@ export default function StationStatusPanel({ stations, orders, deviceStationStat
         const stationId = order.stations!.station_id;
         if (!map[stationId]) {
           map[stationId] = {
-            license_plate: order.vehicles?.vehicle_license_plate || `#${order.order_id}`,
+            license_plate: order.vehicles?.vehicle_license_plate ? `${order.vehicles.vehicle_license_plate}${order.vehicles.vehicle_name ? ` | ${order.vehicles.vehicle_name}` : ''}` : `#${order.order_id}`,
             order_number: order.order_number,
           };
         }
@@ -141,15 +141,15 @@ export default function StationStatusPanel({ stations, orders, deviceStationStat
     if (station.station_status === 'operating' || station.station_status === 'collecting') {
       return {
         label: t('stopped'),
-        icon: <Pause className="mr-1.5 h-3.5 w-3.5" />,
-        className: 'dd-btn dd-btn-ghost',
+        icon: <Pause className="mr-1.5 h-3 w-3" />,
+        variant: 'secondary' as const,
       };
     }
 
     return {
       label: t('restore'),
-      icon: <Play className="mr-1.5 h-3.5 w-3.5" />,
-      className: 'dd-btn dd-btn-primary',
+      icon: <Play className="mr-1.5 h-3 w-3" />,
+      variant: 'default' as const,
     };
   };
 
@@ -226,136 +226,131 @@ export default function StationStatusPanel({ stations, orders, deviceStationStat
           return (
             <div
               key={station.station_id}
-              className="dd-card dd-glow-border flex min-h-[280px] flex-col overflow-hidden"
+              className="dd-card dd-glow-border flex min-h-0 flex-row overflow-hidden"
               style={{ borderColor: theme.borderGlow }}
             >
-              {/* Header */}
-              <div className="flex items-start justify-between gap-4 px-5 py-4 rounded-t-[19px]"
-                style={{ background: 'var(--dd-bg-header)', borderBottom: '1px solid var(--dd-border)' }}>
-                <div>
-                  <p className="text-sm font-bold uppercase"
-                    style={{ color: 'var(--dd-text-muted)' }}>
-                    {t('dispatchStationLabel')}
-                  </p>
-                  <h3 className="mt-2 text-3xl font-black" style={{ color: 'var(--dd-text-primary)' }}>
-                    {station.station_name}
-                  </h3>
-                  <div className={`mt-3 dd-chip ${deviceStatus === 'connected' ? '' : 'animate-danger-blink'}`}
-                    style={{
-                      background: deviceStatus === 'connected' ? 'var(--dd-emerald-glow)' : 'var(--dd-red-glow)',
-                      border: `1px solid ${deviceStatus === 'connected' ? 'var(--dd-emerald)' : 'var(--dd-red)'}`,
-                      color: deviceStatus === 'connected' ? 'var(--dd-emerald)' : 'var(--dd-red)',
-                    }}>
-                    <span className="h-2 w-2 rounded-sm"
+              {/* Left — Header + Vehicle Info */}
+              <div className="flex flex-col flex-1 min-w-0 p-4">
+                {/* Header — Name | RFID | Status */}
+                <div className="flex items-center justify-between gap-1.5 px-2 py-1 rounded-tl-[7px]">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <h3 className="text-base font-black whitespace-nowrap" style={{ color: 'var(--dd-text-primary)' }}>
+                      {station.station_name}
+                    </h3>
+                    <div className={`inline-flex items-center gap-1 dd-chip text-[10px] px-1.5 py-0.5 shrink-0 ${deviceStatus === 'connected' ? '' : 'animate-danger-blink'}`}
                       style={{
-                        background: deviceStatus === 'connected' ? '#10b981' : '#ef4444',
-                        boxShadow: `0 0 6px ${deviceStatus === 'connected' ? 'rgba(16, 185, 129, 0.5)' : 'rgba(239, 68, 68, 0.5)'}`,
-                        display: 'inline-block',
-                      }} />
-                    RFID {deviceStatus === 'connected' ? t('connected') : t('disconnected')}
-                  </div>
-                </div>
-
-                <div className={theme.chipClass}>
-                  <span className="h-2 w-2 rounded-full" style={{ background: theme.dot, boxShadow: `0 0 6px ${theme.dotGlow}`, display: 'inline-block' }} />
-                  {theme.label}
-                </div>
-              </div>
-
-              {/* Content */}
-              <div className="grid flex-1 gap-3 px-5 py-4">
-                {/* Active Vehicle */}
-                <div className="rounded-2xl p-4 shadow-sm" style={{ background: 'var(--dd-bg-surface)', border: '1px solid var(--dd-border)' }}>
-                  <div className="mb-2 flex items-center justify-between gap-3">
-                    <span className="text-sm font-bold uppercase" style={{ color: 'var(--dd-text-muted)' }}>
-                      {t('vehicleUnloading')}
-                    </span>
-                    <span className="text-sm font-bold uppercase" style={{ color: theme.tone }}>
-                      {activeVehicle ? t('processing') : t('empty')}
-                    </span>
-                  </div>
-
-                  {activeVehicle ? (
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="inline-flex items-center gap-2 rounded-lg px-3 py-2 text-base font-bold"
+                        background: deviceStatus === 'connected' ? 'var(--dd-emerald-glow)' : 'var(--dd-red-glow)',
+                        border: `1px solid ${deviceStatus === 'connected' ? 'var(--dd-emerald)' : 'var(--dd-red)'}`,
+                        color: deviceStatus === 'connected' ? 'var(--dd-emerald)' : 'var(--dd-red)',
+                      }}>
+                      <span className="h-1.5 w-1.5 rounded-sm"
                         style={{
-                          background: 'var(--dd-cyan-glow)',
-                          border: '1px solid var(--dd-border-accent)',
-                          color: 'var(--dd-text-accent)',
-                        }}>
-                        <LoaderCircle className="h-4 w-4 animate-soft-spin" />
-                        {activeVehicle.license_plate}
+                          background: deviceStatus === 'connected' ? '#10b981' : '#ef4444',
+                          boxShadow: `0 0 4px ${deviceStatus === 'connected' ? 'rgba(16, 185, 129, 0.5)' : 'rgba(239, 68, 68, 0.5)'}`,
+                          display: 'inline-block',
+                        }} />
+                      RFID {deviceStatus === 'connected' ? t('connected') : t('disconnected')}
+                    </div>
+                  </div>
+                  <div className={`${theme.chipClass} text-[10px] px-2 py-0.5 shrink-0`}>
+                    <span className="h-1.5 w-1.5 rounded-full" style={{ background: theme.dot, boxShadow: `0 0 4px ${theme.dotGlow}`, display: 'inline-block' }} />
+                    {theme.label}
+                  </div>
+                </div>
+
+                {/* Content — compact vehicle info */}
+                <div className="flex flex-col flex-1 gap-1 px-2 py-1.5">
+                  {/* Active Vehicle */}
+                  <div className="rounded-md px-2 py-1.5 shadow-sm" style={{ background: 'var(--dd-bg-surface)', border: '1px solid var(--dd-border)' }}>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[10px] font-bold uppercase" style={{ color: 'var(--dd-text-muted)' }}>
+                        {t('vehicleUnloading')}
                       </span>
-                      {remainingVehicles > 0 && (
-                        <span className="dd-chip dd-chip-slate">
-                          +{remainingVehicles} {t('vehicleCount')}
-                        </span>
+                      {activeVehicle ? (
+                        <div className="flex items-center gap-2">
+                          <span className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-bold"
+                            style={{
+                              background: 'var(--dd-cyan-glow)',
+                              border: '1px solid var(--dd-border-accent)',
+                              color: 'var(--dd-text-accent)',
+                            }}>
+                            <LoaderCircle className="h-2.5 w-2.5 animate-soft-spin" />
+                            {activeVehicle.license_plate}
+                          </span>
+                          {remainingVehicles > 0 && (
+                            <span className="dd-chip dd-chip-slate text-[10px] px-1 py-0.5">
+                              +{remainingVehicles}
+                            </span>
+                          )}
+                        </div>
+                      ) : (
+                        <span className="text-xs italic" style={{ color: 'var(--dd-text-muted)', opacity: 0.5 }}>{t('noVehicleAtStation')}</span>
                       )}
                     </div>
-                  ) : (
-                    <p className="text-base font-bold italic" style={{ color: 'var(--dd-text-muted)', opacity: 0.6 }}>{t('noVehicleAtStation')}</p>
-                  )}
-                </div>
-
-                {/* Divider Arrow */}
-                <div className="flex items-center justify-center gap-3 px-2">
-                  <span className="h-px flex-1" style={{ background: 'var(--dd-border)' }} />
-                  <span className="flex h-8 w-8 items-center justify-center rounded-full"
-                    style={{
-                      background: 'var(--dd-bg-surface)',
-                      border: '1px solid var(--dd-border)',
-                      color: 'var(--dd-text-accent)',
-                    }}>
-                    {nextVehicle ? <ArrowUp className="h-4 w-4 animate-flow-arrow-up" /> : <LoaderCircle className="h-4 w-4 animate-soft-spin" />}
-                  </span>
-                  <span className="h-px flex-1" style={{ background: 'var(--dd-border)' }} />
-                </div>
-
-                {/* Next Vehicle */}
-                <div className="rounded-2xl p-4 shadow-sm" style={{ background: 'var(--dd-bg-surface)', border: '1px solid var(--dd-border)' }}>
-                  <div className="mb-2 flex items-center justify-between gap-3">
-                    <span className="text-sm font-bold uppercase" style={{ color: 'var(--dd-text-secondary)' }}>
-                      {t('nextVehicle')}
-                    </span>
-                    <span className="text-sm font-bold uppercase" style={{ color: 'var(--dd-text-muted)' }}>
-                      {t('nextTurn')}
-                    </span>
                   </div>
 
-                  {nextVehicle ? (
-                    <div className="flex items-center gap-2" style={{ color: 'var(--dd-text-accent)' }}>
-                      <ArrowUp className="h-4 w-4 animate-flow-arrow-up" />
-                      <span className="text-lg font-black">{nextVehicle.license_plate}</span>
+                  {/* Divider */}
+                  <div className="flex items-center justify-center gap-1 px-1">
+                    <span className="h-px flex-1" style={{ background: 'var(--dd-border)' }} />
+                    <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full"
+                      style={{
+                        background: 'var(--dd-bg-surface)',
+                        border: '1px solid var(--dd-border)',
+                        color: 'var(--dd-text-accent)',
+                      }}>
+                      {nextVehicle ? <ArrowUp className="h-3 w-3 animate-flow-arrow-up" /> : <LoaderCircle className="h-3 w-3 animate-soft-spin" />}
+                    </span>
+                    <span className="h-px flex-1" style={{ background: 'var(--dd-border)' }} />
+                  </div>
+
+                  {/* Next Vehicle */}
+                  <div className="rounded-md px-2 py-1.5 shadow-sm" style={{ background: 'var(--dd-bg-surface)', border: '1px solid var(--dd-border)' }}>
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[10px] font-bold uppercase" style={{ color: 'var(--dd-text-secondary)' }}>
+                        {t('nextVehicle')}
+                      </span>
+                      {nextVehicle ? (
+                        <div className="flex items-center gap-1" style={{ color: 'var(--dd-text-accent)' }}>
+                          <ArrowUp className="h-2.5 w-2.5 animate-flow-arrow-up" />
+                          <span className="text-xs font-black">{nextVehicle.license_plate}</span>
+                        </div>
+                      ) : (
+                        <span className="text-[10px] italic" style={{ color: 'var(--dd-text-muted)', opacity: 0.5 }}>{t('noNextVehicle')}</span>
+                      )}
                     </div>
-                  ) : (
-                    <span className="text-sm italic" style={{ color: 'var(--dd-text-muted)', opacity: 0.6 }}>{t('noNextVehicle')}</span>
-                  )}
+                  </div>
                 </div>
               </div>
 
-              {/* Footer Actions */}
-              <div className="flex gap-2 px-4 py-4 rounded-b-[19px]" style={{ background: 'var(--dd-bg-surface)', borderTop: '1px solid var(--dd-border)' }}>
-                <button
+              {/* Right — Action Buttons stacked vertically */}
+              <div className="flex flex-col shrink-0" style={{ borderLeft: '1px solid var(--dd-border)' }}>
+                <Button
+                  variant={btnConfig.variant}
+                  size="sm"
                   onClick={() => handleToggleStatus(station)}
                   disabled={isToggling}
-                  className={`flex items-center justify-center flex-1 disabled:cursor-not-allowed disabled:opacity-50 ${btnConfig.className}`}
+                  className="flex-1 h-auto text-[10px] px-3 uppercase font-bold rounded-none rounded-tr-[7px]"
+                  style={{ borderBottom: '1px solid var(--dd-border)' }}
                 >
-                  {isToggling ? <LoaderCircle className="h-4 w-4 animate-soft-spin" /> : (
-                    <>
+                  {isToggling ? <LoaderCircle className="h-3 w-3 animate-soft-spin" /> : (
+                    <div className="flex flex-col items-center gap-0.5">
                       {btnConfig.icon}
                       {btnConfig.label}
-                    </>
+                    </div>
                   )}
-                </button>
-
+                </Button>
                 {station.station_status !== 'incident' && (
-                  <button
+                  <Button
+                    variant="outline"
+                    size="sm"
                     onClick={() => setIncidentStation(station)}
-                    className="flex items-center justify-center flex-1 dd-btn dd-btn-danger"
+                    className="flex-1 h-auto text-[10px] px-3 uppercase font-bold text-rose-500 border-0 hover:bg-rose-50 hover:text-rose-600 rounded-none rounded-br-[7px]"
                   >
-                    <AlertTriangle className="mr-1.5 h-3.5 w-3.5" />
-                    {t('reportIncident')}
-                  </button>
+                    <div className="flex flex-col items-center gap-0.5">
+                      <AlertTriangle className="h-3 w-3" />
+                      {t('reportIncident')}
+                    </div>
+                  </Button>
                 )}
               </div>
             </div>

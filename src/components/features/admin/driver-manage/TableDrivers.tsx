@@ -267,7 +267,7 @@ const TableDrivers: React.FC = () => {
 
   return (
     <>
-      <div className="m-10 bg-white rounded-2xl shadow-sm border border-slate-200 animate-fade-in overflow-hidden">
+      <div className="m-10 bg-white rounded-lg shadow-sm border border-slate-200 animate-fade-in overflow-hidden">
         <div className="p-6 md:p-8 border-b-2 border-slate-100 flex flex-col items-start gap-6 bg-slate-50/50">
           <div className="flex-1">
             <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-slate-900 flex items-center gap-3">

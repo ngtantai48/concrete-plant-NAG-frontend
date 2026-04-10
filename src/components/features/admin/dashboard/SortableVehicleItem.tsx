@@ -101,13 +101,13 @@ function SortableVehicleItemBase({
     <div
       ref={setNodeRef}
       style={dndStyle}
-      className={`sortable-vehicle-item relative overflow-hidden rounded-2xl px-4 py-3 group shadow-sm ${isSelected ? 'ring-2 ring-sky-500/20' : ''} ${isDragging ? 'cursor-grabbing shadow-lg is-dragging' : 'cursor-default'}`}
+      className={`sortable-vehicle-item relative overflow-hidden rounded-lg px-4 py-3 group shadow-sm ${isSelected ? 'ring-2 ring-sky-500/20' : ''} ${isDragging ? 'cursor-grabbing shadow-lg is-dragging' : 'cursor-default'}`}
     >
       <div className="absolute left-0 top-0 bottom-0 w-[3px]"
         style={{ background: style.dot, opacity: 0.8 }} />
 
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-        <div className="flex min-w-0 items-center gap-4 pl-2">
+        <div className="flex items-center gap-2">
           {isManualMode && (
             <Checkbox
               checked={isSelected}
@@ -117,30 +117,32 @@ function SortableVehicleItemBase({
             />
           )}
 
-          <div
-            {...(isManualMode ? {} : attributes)}
-            {...(isManualMode ? {} : listeners)}
-            className={`p-1 -ml-1 transition-colors ${isManualMode ? 'cursor-not-allowed text-slate-300' : 'cursor-grab active:cursor-grabbing text-slate-400 hover:text-sky-500'}`}
-          >
-            <GripVertical className="h-4 w-4" />
-          </div>
+          {isManualMode && (
+            <div
+              {...attributes}
+              {...listeners}
+              className="p-1 -ml-1 transition-colors cursor-grab active:cursor-grabbing text-slate-400 hover:text-sky-500"
+            >
+              <GripVertical className="h-4 w-4" />
+            </div>
+          )}
 
           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[11px] font-bold tracking-[0.05em] shadow-sm" style={{ color: 'var(--dd-text-secondary)', border: '1px solid var(--dd-border)' }}>
             #{(displayIndex ?? actualIndex) + 1}
           </div>
 
           <div className="min-w-0 flex-1">
-            <div className="truncate text-base font-black tracking-widest" style={{ color: 'var(--dd-text-primary)' }}>
-              {order.vehicles?.vehicle_license_plate || `ĐƠN: ${order.order_id}`}
+            <div className="truncate text-base font-black" style={{ color: 'var(--dd-text-primary)' }}>
+              {order.vehicles?.vehicle_license_plate ? `${order.vehicles.vehicle_license_plate}${order.vehicles.vehicle_name ? ` | ${order.vehicles.vehicle_name}` : ''}` : `ĐƠN: ${order.order_id}`}
             </div>
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center justify-between gap-3 pl-2 md:pl-0">
-          <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap md:flex-nowrap items-center justify-between gap-2 pl-2 md:pl-0 shrink-0">
+          <div className="flex flex-wrap md:flex-nowrap items-center gap-2">
             {displayedStationName && (
               <div
-                className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.18em]"
+                className="flex items-center text-[14px] font-bold"
                 style={{ color: isDropTarget ? 'var(--dd-sky)' : 'var(--dd-text-muted)' }}
               >
                 <ArrowRight className="h-3.5 w-3.5 text-sky-500" />
@@ -155,12 +157,12 @@ function SortableVehicleItemBase({
                 <Select key={manualStationValue ?? 'manual-empty'} value={manualStationValue} onValueChange={onManualStationChange}>
                   <SelectTrigger
                     size="sm"
-                    className="w-[190px] bg-white text-xs font-bold uppercase tracking-[0.08em]"
+                    className="w-[120px] h-8 bg-white text-[11px] font-bold uppercase"
                     onClick={(event) => event.stopPropagation()}
                   >
                     <SelectValue placeholder={t('manualChooseStation')} />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent >
                     {manualStationOptions.map((station) => (
                       <SelectItem key={station.station_id} value={String(station.station_id)}>
                         {station.station_name}
@@ -197,36 +199,38 @@ function SortableVehicleItemBase({
             )}
           </div>
 
-          <div className="flex items-center gap-1 md:ml-auto">
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); onReorder('up'); }}
-              disabled={isBusy || !canMoveUp}
-              title={t('moveUp')}
-              className="flex h-8 w-8 items-center justify-center rounded-full transition-all disabled:cursor-not-allowed disabled:opacity-40"
-              style={{
-                background: 'var(--dd-bg-surface)',
-                border: '1px solid var(--dd-border)',
-                color: 'var(--dd-text-secondary)',
-              }}
-            >
-              <ChevronUp className="h-4 w-4" />
-            </button>
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); onReorder('down'); }}
-              disabled={isBusy || !canMoveDown}
-              title={t('moveDown')}
-              className="flex h-8 w-8 items-center justify-center rounded-full transition-all disabled:cursor-not-allowed disabled:opacity-40"
-              style={{
-                background: 'var(--dd-bg-surface)',
-                border: '1px solid var(--dd-border)',
-                color: 'var(--dd-text-secondary)',
-              }}
-            >
-              <ChevronDown className="h-4 w-4" />
-            </button>
-          </div>
+            {isManualMode && (
+              <div className="flex items-center gap-1 md:ml-auto">
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); onReorder('up'); }}
+                  disabled={isBusy || !canMoveUp}
+                  title={t('moveUp')}
+                  className="flex h-8 w-8 items-center justify-center rounded-full transition-all disabled:cursor-not-allowed disabled:opacity-40"
+                  style={{
+                    background: 'var(--dd-bg-surface)',
+                    border: '1px solid var(--dd-border)',
+                    color: 'var(--dd-text-secondary)',
+                  }}
+                >
+                  <ChevronUp className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); onReorder('down'); }}
+                  disabled={isBusy || !canMoveDown}
+                  title={t('moveDown')}
+                  className="flex h-8 w-8 items-center justify-center rounded-full transition-all disabled:cursor-not-allowed disabled:opacity-40"
+                  style={{
+                    background: 'var(--dd-bg-surface)',
+                    border: '1px solid var(--dd-border)',
+                    color: 'var(--dd-text-secondary)',
+                  }}
+                >
+                  <ChevronDown className="h-4 w-4" />
+                </button>
+              </div>
+            )}
         </div>
       </div>
     </div>
