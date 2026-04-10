@@ -3,6 +3,7 @@ import type { Driver } from './driver';
 
 export interface Vehicle {
   vehicle_id: number;
+  vehicle_name?: string | null;
   vehicle_license_plate: string;
   vehicle_status: string;
   vehicle_description: string | null;
