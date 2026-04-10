@@ -95,7 +95,7 @@ export default function AdminDashboard() {
     try {
       const results = await Promise.allSettled([
         stationApi.getAll(),
-        vehicleApi.getAll(),
+        vehicleApi.getAll({ limit: 100 }),
         orderApi.getByInitDate(getTodayDate())
       ]);
 
@@ -314,149 +314,107 @@ export default function AdminDashboard() {
   ];
 
   return (
-    <div className={`dashboard-light bg-cover bg-center min-h-screen ${isFullScreen ? 'fixed inset-0 z-[100] overflow-y-auto bg-slate-50' : ''}`}>
-      <div className={`p-10 mx-auto bg-transparent`}>
+    <div className={`dashboard-light bg-cover bg-center ${isFullScreen ? 'fixed inset-0 z-[100] bg-slate-50 h-screen' : 'h-full'} overflow-hidden flex flex-col`}>
+      <div className={`p-2 lg:px-4 lg:py-2 mx-auto bg-transparent w-full flex-1 flex flex-col min-h-0`}>
 
         {/* ═══ HEADER ═══ */}
-        <div className="dd-header mb-8 p-6">
-          <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between pt-4">
-            <div>
-              <div className="mb-2 flex items-center gap-3">
-                <h1 className="text-4xl md:text-6xl font-black uppercase leading-none" style={{ color: 'var(--dd-text-primary)' }}>
-                  {t("title")}
-                </h1>
-              </div>
-              <p className="pl-2 text-base font-bold uppercase"
+        <div className="dd-header mb-1 px-3 py-2 shrink-0">
+          <div className="flex items-center justify-between gap-3">
+            {/* Title + Clock */}
+            <div className="flex items-center gap-3 min-w-0">
+              <h1 className="text-xl font-black uppercase leading-none whitespace-nowrap" style={{ color: 'var(--dd-text-primary)' }}>
+                {t("title")}
+              </h1>
+              <span className="text-xs font-bold uppercase whitespace-nowrap"
                 style={{ color: 'var(--dd-text-muted)' }}>
                 {t('systemTime')}: {clock}
-              </p>
+              </span>
             </div>
 
-            <div className="flex flex-wrap items-stretch justify-end gap-4">
+            {/* Right Controls */}
+            <div className="flex items-center gap-2 shrink-0">
               {/* LED Status */}
-              <div className="flex flex-col items-center justify-between" style={{ borderColor: 'var(--dd-border)' }}>
-                <span className="mb-1 text-md font-semibold uppercase"
-                  style={{ color: 'var(--dd-text-muted)' }}>
-                  Bảng LED
-                </span>
-                <Tooltip title={isLedConnected ? 'Bảng LED đang kết nối' : 'Bảng LED đang mất kết nối'}>
-                  <div className={`flex items-center gap-2 rounded-full px-4 py-2 border transition-colors ${isLedConnected
-                    ? "border-emerald-200 text-emerald-700 animate-flash-bg"
-                    : "border-red-200 bg-red-50 text-red-700"
-                    }`}>
-                    {isLedConnected
-                      ? <Radio className="h-4 w-4 text-emerald-500 animate-pulse" />
-                      : <div className="h-2 w-2 rounded-full" style={{ background: '#f87171', boxShadow: '0 0 8px rgba(248, 113, 113, 0.5)' }} />
-                    }
-                    <span className="text-base font-bold uppercase">
-                      {isLedConnected ? 'KẾT NỐI' : 'MẤT KẾT NỐI'}
-                    </span>
-                  </div>
-                </Tooltip>
-              </div>
+              <Tooltip title={isLedConnected ? 'Bảng LED đang kết nối' : 'Bảng LED đang mất kết nối'}>
+                <div className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 border text-xs font-bold uppercase ${isLedConnected
+                  ? "border-emerald-200 text-emerald-700 animate-flash-bg"
+                  : "border-red-200 bg-red-50 text-red-700"
+                  }`}>
+                  {isLedConnected
+                    ? <Radio className="h-2.5 w-2.5 text-emerald-500 animate-pulse" />
+                    : <div className="h-1.5 w-1.5 rounded-full" style={{ background: '#f87171', boxShadow: '0 0 6px rgba(248, 113, 113, 0.5)' }} />
+                  }
+                  LED
+                </div>
+              </Tooltip>
 
               {/* Network Status */}
-              <div className="flex flex-col items-center justify-between">
-                <span className="mb-1 text-md font-semibold uppercase"
-                  style={{ color: 'var(--dd-text-muted)' }}>
-                  {t('network')}
-                </span>
-                <Tooltip title={socketConnected ? t('socketConnected') : t('socketDisconnected')}>
-                  <div key={lastSignalTime?.toISOString() || 'offline'} className={`flex items-center gap-2 rounded-full px-4 py-2 border transition-colors ${socketConnected
-                    ? "border-emerald-200 text-emerald-700 animate-flash-bg"
-                    : "border-red-200 bg-red-50 text-red-700"
-                    }`}>
-                    {socketConnected
-                      ? <Radio className="h-4 w-4 text-emerald-500 animate-pulse" />
-                      : <div className="h-2 w-2 rounded-full" style={{ background: '#f87171', boxShadow: '0 0 8px rgba(248, 113, 113, 0.5)' }} />
-                    }
-                    <span className="text-base font-bold uppercase">
-                      {socketConnected ? 'TRỰC TUYẾN' : t('disconnected')}
-                    </span>
-                  </div>
-                </Tooltip>
-              </div>
+              <Tooltip title={socketConnected ? t('socketConnected') : t('socketDisconnected')}>
+                <div key={lastSignalTime?.toISOString() || 'offline'} className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 border text-xs font-bold uppercase ${socketConnected
+                  ? "border-emerald-200 text-emerald-700 animate-flash-bg"
+                  : "border-red-200 bg-red-50 text-red-700"
+                  }`}>
+                  {socketConnected
+                    ? <Radio className="h-2.5 w-2.5 text-emerald-500 animate-pulse" />
+                    : <div className="h-1.5 w-1.5 rounded-full" style={{ background: '#f87171', boxShadow: '0 0 6px rgba(248, 113, 113, 0.5)' }} />
+                  }
+                  {socketConnected ? 'ONLINE' : 'OFFLINE'}
+                </div>
+              </Tooltip>
 
               {/* Sync Button */}
-              <div className="flex flex-col items-center justify-between">
-                <span className="mb-1 text-md font-semibold uppercase"
-                  style={{ color: 'var(--dd-text-muted)' }}>
-                  {t('data')}
-                </span>
-                <button
-                  onClick={handleRefresh}
-                  disabled={isRefreshing}
-                  className="dd-btn dd-btn-primary flex items-center gap-2 disabled:opacity-50"
-                >
-                  <RefreshCw className={`w-4 h-4 ${isRefreshing ? "animate-spin" : ""}`} />
-                  {t('sync')}
-                </button>
-              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleRefresh}
+                disabled={isRefreshing}
+                className="h-7 px-2.5 text-xs font-bold uppercase gap-1"
+              >
+                <RefreshCw className={`w-3 h-3 ${isRefreshing ? "animate-spin" : ""}`} />
+                {t('sync')}
+              </Button>
 
               {/* Shift Close */}
-              <div className="flex flex-col items-center justify-between border-l pl-4" style={{ borderColor: 'var(--dd-border)' }}>
-                <span className="mb-1 text-md font-semibold uppercase"
-                  style={{ color: 'var(--dd-text-muted)' }}>
-                  {isShiftClosedForDate ? t('shiftReopenAction') : t('shiftCloseAction')}
-                </span>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={handleShiftToggle}
-                    disabled={isShiftSubmitting}
-                    className="flex items-center gap-2 rounded-lg px-4 py-2 transition-all font-bold uppercase text-base disabled:opacity-50"
-                    style={{
-                      background: isShiftClosedForDate
-                        ? 'linear-gradient(135deg, rgba(217, 119, 6, 0.14), rgba(245, 158, 11, 0.12))'
-                        : 'linear-gradient(135deg, rgba(109, 40, 217, 0.14), rgba(14, 165, 233, 0.1))',
-                      border: isShiftClosedForDate
-                        ? '1px solid rgba(217, 119, 6, 0.2)'
-                        : '1px solid rgba(109, 40, 217, 0.2)',
-                      color: isShiftClosedForDate ? '#b45309' : '#6d28d9',
-                    }}
-                  >
-                    <span className={`inline-block h-2.5 w-2.5 rounded-full ${isShiftSubmitting ? 'animate-pulse' : ''}`}
-                      style={{ background: isShiftClosedForDate ? '#d97706' : '#6d28d9' }} />
-                    {isShiftClosedForDate ? t('shiftReopenAction') : t('shiftCloseAction')}
-                  </button>
-                </div>
-              </div>
-
-              {/* Fullscreen Toggle */}
-              {/* <div className="flex flex-col items-end justify-between ml-2 border-l pl-4" style={{ borderColor: 'var(--dd-border)' }}>
-                <span className="mb-1 text-xs font-semibold uppercase"
-                  style={{ color: 'var(--dd-text-muted)' }}>
-                  Giao diện
-                </span>
-                <button
-                  onClick={() => setIsFullScreen(!isFullScreen)}
-                  className="flex items-center gap-2 rounded-lg px-4 py-2 transition-all font-bold uppercase text-base"
-                  style={{ background: isFullScreen ? 'var(--dd-bg-surface)' : 'var(--dd-sky)', color: isFullScreen ? 'var(--dd-text-primary)' : '#fff' }}
-                  title={isFullScreen ? "Thu nhỏ" : "Toàn màn hình"}
+              <div className="border-l pl-2 flex items-center" style={{ borderColor: 'var(--dd-border)' }}>
+                <Button
+                  variant={isShiftClosedForDate ? "outline" : "secondary"}
+                  size="sm"
+                  onClick={handleShiftToggle}
+                  disabled={isShiftSubmitting}
+                  className="h-7 px-2.5 text-xs font-bold uppercase gap-1"
+                  style={{
+                    background: isShiftClosedForDate
+                      ? 'linear-gradient(135deg, rgba(217, 119, 6, 0.14), rgba(245, 158, 11, 0.12))'
+                      : 'linear-gradient(135deg, rgba(109, 40, 217, 0.14), rgba(14, 165, 233, 0.1))',
+                    border: isShiftClosedForDate
+                      ? '1px solid rgba(217, 119, 6, 0.2)'
+                      : '1px solid rgba(109, 40, 217, 0.2)',
+                    color: isShiftClosedForDate ? '#b45309' : '#6d28d9',
+                  }}
                 >
-                  {isFullScreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
-                  {isFullScreen ? "Thu Nhỏ" : "Mở Rộng"}
-                </button>
-              </div> */}
+                  <span className={`inline-block h-1.5 w-1.5 rounded-full ${isShiftSubmitting ? 'animate-pulse' : ''}`}
+                    style={{ background: isShiftClosedForDate ? '#d97706' : '#6d28d9' }} />
+                  {isShiftClosedForDate ? t('shiftReopenAction') : t('shiftCloseAction')}
+                </Button>
+              </div>
             </div>
           </div>
 
           {/* ═══ STAT CARDS ═══ */}
-          <div className="mt-6 grid grid-cols-2 gap-4 md:grid-cols-5">
+          <div className="mt-1.5 grid grid-cols-2 gap-2 md:grid-cols-5 shrink-0">
             {statCards.map((card, i) => (
               <div
                 key={i}
-                className="dd-stat-card p-5 animate-fade-up hover:scale-[1.02] active:scale-[0.98] transition-all cursor-default"
+                className="dd-stat-card px-2 py-1 animate-fade-up hover:scale-[1.02] active:scale-[0.98] transition-all cursor-default"
                 style={{
                   '--accent-color': card.accentColor,
                   animationDelay: `${i * 0.1}s`
                 } as React.CSSProperties}
               >
-                <span className="text-sm font-bold uppercase"
+                <span className="text-[10px] font-bold uppercase"
                   style={{ color: 'var(--dd-text-muted)' }}>
                   {card.label}
                 </span>
-                <div className="mt-3 text-6xl font-black"
+                <div className="text-2xl lg:text-3xl font-black leading-tight"
                   style={{ color: card.accentColor }}>
                   {card.value}
                 </div>
@@ -468,72 +426,66 @@ export default function AdminDashboard() {
         {/* ═══ END-OF-DAY BANNER ═══ */}
         {!loading && orders.length > 0 && ordersPending.length === 0 && ordersAtStation.length === 0 && ordersInTransit.length === 0 && (
           <div
-            className="mb-6 rounded-2xl border px-6 py-4"
+            className="mb-1.5 shrink-0 rounded-lg border px-3 py-1.5"
             style={{
               background: "linear-gradient(135deg, rgba(245, 158, 11, 0.08), rgba(217, 119, 6, 0.06))",
               borderColor: "rgba(245, 158, 11, 0.25)",
             }}
           >
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex items-center gap-3">
-                <CalendarClock className="h-5 w-5 text-amber-500 shrink-0" />
-                <div>
-                  <div className="text-base font-bold uppercase" style={{ color: "var(--dd-text-primary)" }}>
-                    {t("endOfDayBannerTitle")}
-                  </div>
-                  <div className="text-sm font-semibold" style={{ color: "var(--dd-text-muted)" }}>
-                    {t("endOfDayBannerDescription")}
-                  </div>
-                </div>
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <CalendarClock className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                <span className="text-xs font-bold uppercase" style={{ color: "var(--dd-text-primary)" }}>
+                  {t("endOfDayBannerTitle")} — {t("endOfDayBannerDescription")}
+                </span>
               </div>
-              <Link
-                href={`${ADMIN.END_OF_DAY_VEHICLES}?mode=today`}
-                className="dd-btn flex shrink-0 items-center gap-2 font-bold uppercase"
-                style={{
-                  background: "linear-gradient(135deg, rgba(245, 158, 11, 0.16), rgba(217, 119, 6, 0.12))",
-                  border: "1px solid rgba(245, 158, 11, 0.25)",
-                  color: "#b45309",
-                }}
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 px-2.5 text-xs font-bold uppercase gap-1 border-amber-300 text-amber-700 hover:bg-amber-50"
+                asChild
               >
-                {t("endOfDayBannerAction")}
-              </Link>
+                <Link href={`${ADMIN.END_OF_DAY_VEHICLES}?mode=today`}>
+                  {t("endOfDayBannerAction")}
+                </Link>
+              </Button>
             </div>
           </div>
         )}
 
-        {/* ═══ SYSTEM TELEMETRY ═══ */}
-        <div className="mb-6 dd-card p-5 md:p-6">
+        {/* \u2550\u2550\u2550 SYSTEM TELEMETRY \u2550\u2550\u2550 */}
+        <div className="mb-1.5 shrink-0">
           <StationStatusPanel stations={stations} orders={orders} deviceStationStatusMap={stationStatusMap} onStationUpdated={fetchAll} />
         </div>
 
         {/* ═══ COMMAND CORE GRID ═══ */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-1.5 flex-1 min-h-0">
 
           {/* Left: Asset Management (col-span-3) */}
-          <div className="lg:col-span-3 space-y-6 animate-fade-up" style={{ animationDelay: '0.2s' }}>
+          <div className="lg:col-span-3 flex flex-col gap-1.5 h-full min-h-0 animate-fade-up" style={{ animationDelay: '0.2s' }}>
             {/* Ready Vehicles */}
-            <div className="flex h-[400px] flex-col overflow-hidden dd-card">
-              <div className="flex items-center justify-between px-4 py-3 text-base font-semibold uppercase"
+            <div className="flex max-h-[45%] flex-col overflow-hidden dd-card">
+              <div className="flex items-center justify-between px-3 py-1.5 text-xs font-semibold uppercase"
                 style={{ background: 'var(--dd-bg-header)', color: 'var(--dd-text-primary)', borderBottom: '1px solid var(--dd-border)' }}>
                 <span>{t('readyVehiclesPanel')}</span>
-                <span className="dd-chip dd-chip-emerald">{readyVehicles.length}</span>
+                <span className="dd-chip dd-chip-emerald text-[10px] px-1.5 py-0.5">{readyVehicles.length}</span>
               </div>
               <div className="overflow-y-auto p-0 flex-1">
                 {readyVehicles.length === 0 ? (
-                  <div className="flex h-full items-center justify-center p-4">
-                    <span className="text-sm font-bold uppercase" style={{ color: 'var(--dd-text-muted)' }}>{t('noReadyVehicles')}</span>
+                  <div className="flex h-full items-center justify-center p-3">
+                    <span className="text-xs font-bold uppercase" style={{ color: 'var(--dd-text-muted)' }}>{t('noReadyVehicles')}</span>
                   </div>
                 ) : (
-                  <ul className="flex flex-col gap-2 p-3">
+                  <ul className="flex flex-col gap-1 p-2">
                     {readyVehicles.map((v) => (
-                      <li key={v.vehicle_id} className="flex items-center gap-3 p-3 transition-colors rounded-xl border shadow-sm cursor-default hover:shadow-md hover:scale-[1.01]"
+                      <li key={v.vehicle_id} className="flex items-center gap-2 px-2 py-1 transition-colors rounded-md border shadow-sm cursor-default hover:shadow-md"
                         style={{ background: 'var(--dd-bg-surface)', borderColor: 'var(--dd-border)' }}
                         onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--dd-emerald)'}
                         onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--dd-border)'}>
-                        <div className="h-8 w-8 rounded-full flex items-center justify-center shrink-0 border" style={{ background: 'rgba(16, 185, 129, 0.1)', borderColor: 'rgba(16, 185, 129, 0.3)' }}>
-                          <Truck className="h-4 w-4 animate-drive-idle" style={{ color: 'var(--dd-emerald)' }} />
+                        <div className="h-5 w-5 rounded-full flex items-center justify-center shrink-0 border" style={{ background: 'rgba(16, 185, 129, 0.1)', borderColor: 'rgba(16, 185, 129, 0.3)' }}>
+                          <Truck className="h-2.5 w-2.5 animate-drive-idle" style={{ color: 'var(--dd-emerald)' }} />
                         </div>
-                        <span className="text-base font-bold" style={{ color: 'var(--dd-text-primary)' }}>{v.vehicle_license_plate}{v.vehicle_name ? ` | ${v.vehicle_name}` : ''}</span>
+                        <span className="text-xs font-bold" style={{ color: 'var(--dd-text-primary)' }}>{v.vehicle_license_plate}{v.vehicle_name ? ` | ${v.vehicle_name}` : ''}</span>
                       </li>
                     ))}
                   </ul>
@@ -542,26 +494,26 @@ export default function AdminDashboard() {
             </div>
 
             {/* Canceled / Stopped */}
-            <div className="flex h-[280px] flex-col overflow-hidden dd-card" style={{ borderColor: 'rgba(245, 158, 11, 0.2)' }}>
-              <div className="flex items-center justify-between px-4 py-3 text-base font-semibold"
+            <div className="flex flex-1 min-h-[60px] flex-col overflow-hidden dd-card" style={{ borderColor: 'rgba(245, 158, 11, 0.2)' }}>
+              <div className="flex items-center justify-between px-3 py-1.5 text-xs font-semibold uppercase"
                 style={{ background: 'var(--dd-bg-header)', color: 'var(--dd-text-primary)', borderBottom: '1px solid var(--dd-border)' }}>
                 <span>{t('stoppedMaintenance')}</span>
-                <span className="dd-chip dd-chip-amber">{stoppedMaintenanceList.length}</span>
+                <span className="dd-chip dd-chip-amber text-[10px] px-1.5 py-0.5">{stoppedMaintenanceList.length}</span>
               </div>
               <div className="flex-1 overflow-y-auto p-0">
                 {stoppedMaintenanceList.length === 0 ? (
-                  <div className="flex h-full items-center justify-center p-4">
-                    <span className="text-sm font-bold uppercase" style={{ color: 'var(--dd-text-muted)' }}>{t('empty')}</span>
+                  <div className="flex h-full items-center justify-center p-2">
+                    <span className="text-xs font-bold uppercase" style={{ color: 'var(--dd-text-muted)' }}>{t('empty')}</span>
                   </div>
                 ) : (
-                  <ul className="flex flex-col gap-2 p-3">
+                  <ul className="flex flex-col gap-1 p-2">
                     {stoppedMaintenanceList.map((item) => (
-                      <li key={item.id} className="flex items-center justify-between p-3 rounded-xl border shadow-sm cursor-default"
+                      <li key={item.id} className="flex items-center justify-between px-2 py-1 rounded-md border shadow-sm cursor-default"
                         style={{ background: 'var(--dd-bg-surface)', borderColor: 'var(--dd-border)' }}>
-                        <span className="text-base font-bold" style={{ color: 'var(--dd-text-primary)' }}>
+                        <span className="text-xs font-bold truncate pr-2" style={{ color: 'var(--dd-text-primary)' }}>
                           {item.label}
                         </span>
-                        <span className={`dd-chip ${item.chipClass}`}>{item.statusLabel}</span>
+                        <span className={`dd-chip text-[10px] px-1.5 py-0.5 ${item.chipClass}`}>{item.statusLabel}</span>
                       </li>
                     ))}
                   </ul>
@@ -571,49 +523,55 @@ export default function AdminDashboard() {
           </div>
 
           {/* Center: Command Core (col-span-6) */}
-          <div className="lg:col-span-6 flex flex-col h-[704px] dd-card overflow-hidden animate-fade-up"
+          <div className="lg:col-span-6 flex flex-col h-full min-h-0 dd-card overflow-hidden animate-fade-up"
             style={{ boxShadow: '0 0 20px rgba(14, 165, 233, 0.05)', border: '1px solid rgba(14, 165, 233, 0.2)', animationDelay: '0.4s' }}>
 
             {/* Core Header with Toggle */}
-            <div className="flex items-center justify-between px-5 py-4 relative z-10"
+            <div className="flex items-center justify-between px-3 py-1.5 relative z-10"
               style={{ background: 'var(--dd-bg-header)', borderBottom: '1px solid var(--dd-border)' }}>
-              <div className="flex items-center gap-3 min-w-0 pr-2">
-                <div className="h-2 w-2 rounded-full animate-pulse shrink-0" style={{ background: '#0ea5e9', boxShadow: '0 0 10px rgba(14, 165, 233, 0.8)' }} />
-                <span className="text-lg font-black uppercase truncate" style={{ color: 'var(--dd-text-primary)' }} title="TRUNG TÂM ĐIỀU PHỐI">
+              <div className="flex items-center gap-1.5 min-w-0 pr-2">
+                <div className="h-1.5 w-1.5 rounded-full animate-pulse shrink-0" style={{ background: '#0ea5e9', boxShadow: '0 0 10px rgba(14, 165, 233, 0.8)' }} />
+                <span className="text-xs font-black uppercase truncate" style={{ color: 'var(--dd-text-primary)' }} title="TRUNG TÂM ĐIỀU PHỐI">
                   TRUNG TÂM ĐIỀU PHỐI
                 </span>
               </div>
 
               {/* Segmented Toggle HUD */}
-              <div className="flex items-center rounded-lg p-1 backdrop-blur-md shrink-0"
+              <div className="flex items-center rounded-md p-0.5 backdrop-blur-md shrink-0"
                 style={{ background: 'var(--dd-bg-surface)', border: '1px solid var(--dd-border)' }}>
-                <button
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={() => setDispatchMode('auto')}
-                  className={`flex items-center gap-2 px-3 py-1.5 text-sm font-bold uppercase transition-all rounded-md ${dispatchMode === 'auto'
+                  className={`h-5 px-2 text-[10px] font-bold uppercase ${dispatchMode === 'auto'
                     ? 'bg-sky-500/20 text-sky-600 border border-sky-500/30'
                     : 'text-slate-500 border border-transparent hover:text-slate-700'
                     }`}
                 >
-                  <span className="hidden sm:inline">AUTO</span>
-                </button>
-                <div className="w-[1px] h-4 mx-1 opacity-20" style={{ background: 'var(--dd-text-muted)' }} />
-                <button
+                  AUTO
+                </Button>
+                <div className="w-[1px] h-3 mx-0.5 opacity-20" style={{ background: 'var(--dd-text-muted)' }} />
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={() => setDispatchMode('manual')}
-                  className={`flex items-center gap-2 px-3 py-1.5 text-sm font-bold uppercase transition-all rounded-md ${dispatchMode === 'manual'
+                  className={`h-5 px-2 text-[10px] font-bold uppercase ${dispatchMode === 'manual'
                     ? 'bg-indigo-500/20 text-indigo-600 border border-indigo-500/30'
                     : 'text-slate-500 border border-transparent hover:text-slate-700'
                     }`}
                 >
-                  <span className="hidden sm:inline">MANUAL</span>
-                </button>
-                <div className="w-[1px] h-4 mx-1 opacity-20" style={{ background: 'var(--dd-text-muted)' }} />
-                <button
+                  MANUAL
+                </Button>
+                <div className="w-[1px] h-3 mx-0.5 opacity-20" style={{ background: 'var(--dd-text-muted)' }} />
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={() => setShowMap(true)}
-                  className="flex items-center gap-2 px-3 py-1.5 text-sm font-bold uppercase transition-all rounded-md text-slate-500 border border-transparent hover:text-slate-700 hover:bg-slate-100"
+                  className="h-5 px-2 text-[10px] font-bold uppercase text-slate-500 border border-transparent hover:text-slate-700 hover:bg-slate-100"
                 >
-                  <MapIcon className="h-3.5 w-3.5 shrink-0" />
-                  <span className="hidden sm:inline">MAP</span>
-                </button>
+                  <MapIcon className="h-3 w-3 shrink-0" />
+                  MAP
+                </Button>
               </div>
             </div>
 
@@ -636,21 +594,21 @@ export default function AdminDashboard() {
           </div>
 
           {/* Right: Today's Orders (col-span-3) */}
-          <div className="lg:col-span-3 h-[704px] animate-fade-up" style={{ animationDelay: '0.6s' }}>
+          <div className="lg:col-span-3 h-full min-h-0 animate-fade-up" style={{ animationDelay: '0.6s' }}>
             <div className="flex h-full flex-col overflow-hidden dd-card" style={{ borderColor: 'rgba(16, 185, 129, 0.2)' }}>
-              <div className="flex items-center justify-between px-4 py-3 text-base font-semibold"
+              <div className="flex items-center justify-between px-3 py-1.5 text-xs font-semibold uppercase"
                 style={{ background: 'var(--dd-bg-header)', color: 'var(--dd-text-primary)', borderBottom: '1px solid var(--dd-border)' }}>
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+                <div className="flex items-center gap-1.5">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
                   <span>{t('completedToday')}</span>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5">
                   {ordersActive.length > 0 && (
-                    <span className="dd-chip" style={{ background: 'rgba(14, 165, 233, 0.12)', color: '#0ea5e9', border: '1px solid rgba(14, 165, 233, 0.3)' }}>
+                    <span className="dd-chip text-[10px] px-1.5 py-0.5" style={{ background: 'rgba(14, 165, 233, 0.12)', color: '#0ea5e9', border: '1px solid rgba(14, 165, 233, 0.3)' }}>
                       {ordersActive.length} {t('running')}
                     </span>
                   )}
-                  <span className="dd-chip dd-chip-emerald">{ordersCompleted.length}</span>
+                  <span className="dd-chip dd-chip-emerald text-[10px] px-1.5 py-0.5">{ordersCompleted.length}</span>
                 </div>
               </div>
               <div className="flex-1 overflow-y-auto">
@@ -659,46 +617,46 @@ export default function AdminDashboard() {
                     <div className="flex flex-col items-center justify-center">
                       <div className="h-14 w-14 rounded-full flex items-center justify-center backdrop-blur-md"
                         style={{ background: 'var(--dd-bg-surface)', border: '2px dashed var(--dd-border)' }}>
-                        <CheckCircle2 className="h-7 w-7 text-emerald-400 opacity-50" />
+                        <CheckCircle2 className="h-6 w-6 text-emerald-400 opacity-50" />
                       </div>
-                      <span className="mt-4 text-sm font-bold uppercase"
+                      <span className="mt-3 text-xs font-bold uppercase"
                         style={{ color: 'var(--dd-text-muted)' }}>
                         {t('noCompletedToday')}
                       </span>
                     </div>
                   </div>
                 ) : (
-                  <ul className="flex flex-col gap-3 p-3">
+                  <ul className="flex flex-col gap-1.5 p-2">
                     {ordersTodayPanel.map((o) => {
                       const isCompleted = o.order_status === "completed";
                       const accentColor = isCompleted ? '#10b981' : '#0ea5e9';
                       const hoverBorder = isCompleted ? 'rgba(16, 185, 129, 0.4)' : 'rgba(14, 165, 233, 0.4)';
                       return (
-                        <li key={o.order_id} className="dd-surface p-4 transition-all relative overflow-hidden"
+                        <li key={o.order_id} className="dd-surface px-2 py-1.5 transition-all relative overflow-hidden"
                           style={{ borderRadius: '12px', border: '1px solid var(--dd-border)' }}
                           onMouseEnter={e => e.currentTarget.style.borderColor = hoverBorder}
                           onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--dd-border)'}>
                           <div className="absolute left-0 top-0 bottom-0 w-1" style={{ background: accentColor }} />
 
                           <div className="flex justify-between items-end pl-2">
-                            <div className="flex items-center gap-3">
-                              <Truck className="w-5 h-5" style={{ color: accentColor }} />
-                              <span className="text-xl font-bold" style={{ color: 'var(--dd-text-primary)' }}>
+                            <div className="flex items-center gap-1.5">
+                              <Truck className="w-3.5 h-3.5" style={{ color: accentColor }} />
+                              <span className="text-xs font-bold" style={{ color: 'var(--dd-text-primary)' }}>
                                 {o.vehicles?.vehicle_license_plate ? `${o.vehicles.vehicle_license_plate}${o.vehicles.vehicle_name ? ` | ${o.vehicles.vehicle_name}` : ''}` : `#${o.order_id}`}
                               </span>
                             </div>
                             {isCompleted ? (
-                              <span className="dd-chip dd-chip-emerald">
+                              <span className="dd-chip dd-chip-emerald text-[10px] px-1.5 py-0.5">
                                 {t('completed')}
                               </span>
                             ) : (
-                              <span className="dd-chip" style={{ background: 'rgba(14, 165, 233, 0.12)', color: '#0ea5e9', border: '1px solid rgba(14, 165, 233, 0.3)' }}>
+                              <span className="dd-chip text-[10px] px-1.5 py-0.5" style={{ background: 'rgba(14, 165, 233, 0.12)', color: '#0ea5e9', border: '1px solid rgba(14, 165, 233, 0.3)' }}>
                                 {o.order_status === "collecting" ? t('collecting') : t('running')}
                               </span>
                             )}
                           </div>
-                          <div className="mt-3 pl-2 flex items-center justify-between">
-                            <div className="text-xs font-bold uppercase"
+                          <div className="mt-1 pl-2 flex items-center justify-between">
+                            <div className="text-[10px] font-bold uppercase"
                               style={{ color: 'var(--dd-text-muted)' }}>
                               {o.stations?.station_name || t('unassigned')}
                             </div>
@@ -709,14 +667,14 @@ export default function AdminDashboard() {
                                 const hours = Math.floor(diffMins / 60);
                                 const mins = diffMins % 60;
                                 return (
-                                  <div className="flex items-center gap-1 text-xs font-semibold" style={{ color: accentColor }}>
+                                  <div className="flex items-center gap-1 text-[10px] font-semibold" style={{ color: accentColor }}>
                                     <Clock className="w-3 h-3" />
                                     <span>{hours > 0 ? `${hours}h${mins.toString().padStart(2, '0')}m` : `${mins}m`}</span>
                                   </div>
                                 );
                               })()}
                               {o.order_end_datetime && (
-                                <div className="text-xs font-semibold" style={{ color: 'var(--dd-text-muted)' }}>
+                                <div className="text-[10px] font-semibold" style={{ color: 'var(--dd-text-muted)' }}>
                                   {new Date(o.order_end_datetime).toLocaleTimeString(locale === 'vi' ? 'vi-VN' : 'en-US', { hour: '2-digit', minute: '2-digit' })}
                                 </div>
                               )}
@@ -728,12 +686,12 @@ export default function AdminDashboard() {
                             const distanceKm = ((o.order_multi.distance_end - o.order_multi.distance_start) / 1000).toFixed(1);
                             const stops = o.order_multi.nStop_end - o.order_multi.nStop_start;
                             return (
-                              <div className="mt-2 pl-2 flex items-center gap-4">
-                                <div className="flex items-center gap-1 text-xs font-semibold" style={{ color: '#0ea5e9' }}>
+                              <div className="mt-1.5 pl-2 flex items-center gap-3">
+                                <div className="flex items-center gap-1 text-[10px] font-semibold" style={{ color: '#0ea5e9' }}>
                                   <Route className="w-3 h-3" />
                                   <span>{distanceKm} km</span>
                                 </div>
-                                <div className="flex items-center gap-1 text-xs font-semibold" style={{ color: '#f59e0b' }}>
+                                <div className="flex items-center gap-1 text-[10px] font-semibold" style={{ color: '#f59e0b' }}>
                                   <MapPin className="w-3 h-3" />
                                   <span>{stops} {t('stops') || 'lần dừng'}</span>
                                 </div>
@@ -751,17 +709,17 @@ export default function AdminDashboard() {
         </div>
 
         {/* ═══ FOOTER ═══ */}
-        <div className=" mt-8 flex flex-col justify-between gap-4 pt-4 md:flex-row md:items-baseline whitespace-nowrap"
+        <div className="mt-1 flex justify-between pt-1 shrink-0 items-center whitespace-nowrap"
           style={{ borderTop: '1px solid var(--dd-border)' }}>
-          <div className="flex items-center gap-4 text-sm font-semibold uppercase"
+          <div className="flex items-center gap-2 text-[10px] font-semibold uppercase"
             style={{ color: 'var(--dd-text-muted)' }}>
-            <span className="dd-chip dd-chip-red flex items-center gap-2">
-              <div className="h-1.5 w-1.5 rounded-full animate-ping" style={{ background: '#f87171' }} />
+            <span className="dd-chip dd-chip-red flex items-center gap-1 px-1.5 py-0.5 text-[10px]">
+              <div className="h-1 w-1 rounded-full animate-ping" style={{ background: '#f87171' }} />
               {t('systemSignal')}
             </span>
             <span>{t('systemListening')}</span>
           </div>
-          <p className="text-sm uppercase" style={{ color: 'var(--dd-text-muted)' }}>
+          <p className="text-[10px] uppercase" style={{ color: 'var(--dd-text-muted)' }}>
             {t('connectionStable')} • {t('plantName')}
           </p>
         </div>
