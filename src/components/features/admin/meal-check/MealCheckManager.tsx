@@ -10,11 +10,11 @@ import {
   Progress,
   Table,
   Tag,
-  TimePicker,
-  Tooltip,
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import dayjs, { type Dayjs } from "dayjs";
+import ExcelJS from "exceljs";
+import { saveAs } from "file-saver";
 import {
   CheckCircle,
   ChevronDown,
@@ -25,20 +25,71 @@ import {
   RefreshCw,
   Search,
   UtensilsCrossed,
-  XCircle,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCallback, useMemo, useState } from "react";
-import * as XLSX from "xlsx";
 
-interface MealResult {
-  vehicle_name: string;
-  license_plate: string;
-  driver_name: string;
-  had_meal: boolean;
-  min_distance: number | null;
-  reason: string;
+const { RangePicker } = DatePicker;
+
+// --- Types ---
+
+interface Personnel {
+  tenVT: string;
+  hoTen: string;
+  boPhan: string;
 }
+
+interface MealSlot {
+  key: "sang" | "trua" | "toi";
+  label: string;
+  fromH: number;
+  fromM: number;
+  toH: number;
+  toM: number;
+}
+
+const MEAL_SLOTS: MealSlot[] = [
+  { key: "sang", label: "Sáng", fromH: 11, fromM: 30, toH: 13, toM: 0 },
+  { key: "trua", label: "Trưa", fromH: 19, fromM: 0, toH: 22, toM: 0 },
+  { key: "toi", label: "Tối", fromH: 22, fromM: 0, toH: 23, toM: 59 },
+];
+
+interface DayMeals {
+  sang: boolean;
+  trua: boolean;
+  toi: boolean;
+}
+
+// personName -> { "01" -> { sang, trua, toi }, "02" -> ... }
+type MealData = Record<string, Record<string, DayMeals>>;
+
+interface NhomConfig {
+  key: string;
+  ten: string;
+  boPhanMatch: string[];
+}
+
+const NHOM_CONFIG: NhomConfig[] = [
+  { key: "A", ten: "Quản lý sản xuất", boPhanMatch: ["BLD", "QLSX"] },
+  { key: "B", ten: "Văn phòng", boPhanMatch: ["VP", "Văn phòng"] },
+  { key: "C", ten: "Vận hành trạm", boPhanMatch: ["VHT"] },
+  { key: "D", ten: "Quản lý chất lượng (QA/QC)", boPhanMatch: ["QA/QC"] },
+  { key: "E", ten: "Tổ xe bơm", boPhanMatch: ["Tổ bơm"] },
+  { key: "F", ten: "Tổ bơm tĩnh", boPhanMatch: ["Bơm tĩnh"] },
+  { key: "", ten: "Tổ xe bồn", boPhanMatch: ["Xe bồn"] },
+];
+
+interface FlatRow {
+  stt: number | string;
+  hoTen: string;
+  licensePlate: string;
+  meals: Record<string, DayMeals>;
+  total: number;
+  isSection: boolean;
+  sectionName?: string;
+}
+
+// --- Helpers ---
 
 function haversine(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const R = 6371000;
@@ -51,166 +102,629 @@ function haversine(lat1: number, lng1: number, lat2: number, lng2: number): numb
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+function getDaysInRange(from: Dayjs, to: Dayjs): Dayjs[] {
+  const days: Dayjs[] = [];
+  let current = from.startOf("day");
+  const end = to.startOf("day");
+  while (current.isBefore(end) || current.isSame(end, "day")) {
+    days.push(current);
+    current = current.add(1, "day");
+  }
+  return days;
+}
+
+// Vietnamese number to words (basic)
+function numberToVietnamese(n: number): string {
+  const ones = [
+    "",
+    "một",
+    "hai",
+    "ba",
+    "bốn",
+    "năm",
+    "sáu",
+    "bảy",
+    "tám",
+    "chín",
+  ];
+  const teens = [
+    "mười",
+    "mười một",
+    "mười hai",
+    "mười ba",
+    "mười bốn",
+    "mười lăm",
+    "mười sáu",
+    "mười bảy",
+    "mười tám",
+    "mười chín",
+  ];
+
+  if (n === 0) return "Không";
+  if (n < 10) return ones[n].charAt(0).toUpperCase() + ones[n].slice(1);
+  if (n < 20) return teens[n - 10].charAt(0).toUpperCase() + teens[n - 10].slice(1);
+  if (n < 100) {
+    const t = Math.floor(n / 10);
+    const o = n % 10;
+    let s = ones[t] + " mươi";
+    if (o === 1) s += " mốt";
+    else if (o === 5) s += " lăm";
+    else if (o > 0) s += " " + ones[o];
+    return s.charAt(0).toUpperCase() + s.slice(1);
+  }
+  if (n < 1000) {
+    const h = Math.floor(n / 100);
+    const remainder = n % 100;
+    let s = ones[h] + " trăm";
+    if (remainder > 0 && remainder < 10) s += " lẻ " + ones[remainder];
+    else if (remainder >= 10)
+      s += " " + numberToVietnamese(remainder).toLowerCase();
+    return s.charAt(0).toUpperCase() + s.slice(1);
+  }
+  if (n < 1000000) {
+    const th = Math.floor(n / 1000);
+    const remainder = n % 1000;
+    let s = numberToVietnamese(th).toLowerCase() + " nghìn";
+    if (remainder > 0 && remainder < 100) s += " không trăm " + numberToVietnamese(remainder).toLowerCase();
+    else if (remainder >= 100)
+      s += " " + numberToVietnamese(remainder).toLowerCase();
+    return s.charAt(0).toUpperCase() + s.slice(1);
+  }
+  return String(n);
+}
+
 export default function MealCheckManager() {
   const t = useTranslations("MealCheck");
 
-  const [date, setDate] = useState<Dayjs>(dayjs());
-  const [fromTime, setFromTime] = useState<Dayjs>(dayjs().hour(11).minute(0));
-  const [toTime, setToTime] = useState<Dayjs>(dayjs().hour(13).minute(0));
+  const [dateRange, setDateRange] = useState<[Dayjs, Dayjs]>([
+    dayjs().startOf("month"),
+    dayjs(),
+  ]);
   const [latitude, setLatitude] = useState(17.490144886448913);
   const [longitude, setLongitude] = useState(106.55922219182935);
   const [radius, setRadius] = useState(150);
   const [loading, setLoading] = useState(false);
-  const [results, setResults] = useState<MealResult[]>([]);
-  const [checked, setChecked] = useState(false);
   const [showLocation, setShowLocation] = useState(false);
   const [progress, setProgress] = useState({ current: 0, total: 0 });
   const [syncing, setSyncing] = useState(false);
   const [sheetUrl, setSheetUrl] = useState<string | null>(null);
 
+  // Data
+  const [mealData, setMealData] = useState<MealData>({});
+  const [personnelList, setPersonnelList] = useState<Personnel[]>([]);
+  const [driverMap, setDriverMap] = useState<Record<string, string>>({}); // license_plate -> driver_name
+  const [nameToPlateMap, setNameToPlateMap] = useState<Record<string, string>>({}); // driver_name -> license_plate
+  const [checked, setChecked] = useState(false);
+
+  const days = useMemo(
+    () => getDaysInRange(dateRange[0], dateRange[1]),
+    [dateRange]
+  );
+
   const handleCheck = useCallback(async () => {
     setLoading(true);
-    setResults([]);
+    setMealData({});
     setChecked(false);
     setProgress({ current: 0, total: 0 });
 
     try {
-      const dateStr = date.format("DD-MM-YYYY");
-      const fromDate = `${dateStr},${fromTime.format("HH:mm")}`;
-      const toDate = `${dateStr},${toTime.format("HH:mm")}`;
-
-      const vehiclesRes = await vtrackingApi.fetchVehicles();
-      const vehicles = vehiclesRes.data.vehicles || [];
-      setProgress({ current: 0, total: vehicles.length });
-
-      // Fetch driver-rice mapping from DB
-      let driverMap: Record<string, string> = {};
+      // 1. Fetch driver-rice mapping
+      let drMap: Record<string, string> = {};
+      let n2p: Record<string, string> = {};
       try {
-        const drRes = await http.get<{ data: { license_plate: string; driver_name: string | null }[] }>("/driver-rice");
+        const drRes = await http.get<{
+          data: { license_plate: string; driver_name: string | null }[];
+        }>("/driver-rice");
         const drData = drRes.data?.data || drRes.data || [];
         const list = Array.isArray(drData) ? drData : [];
-        driverMap = Object.fromEntries(
-          list.filter((d) => d.driver_name).map((d) => [d.license_plate, d.driver_name!])
+        drMap = Object.fromEntries(
+          list
+            .filter((d) => d.driver_name)
+            .map((d) => [d.license_plate, d.driver_name!])
+        );
+        n2p = Object.fromEntries(
+          list
+            .filter((d) => d.driver_name)
+            .map((d) => [d.driver_name!, d.license_plate])
         );
       } catch {
-        // continue without driver names
+        // continue
       }
+      setDriverMap(drMap);
+      setNameToPlateMap(n2p);
 
-      const mealResults: MealResult[] = [];
+      // 2. Fetch personnel
+      let personnel: Personnel[] = [];
+      try {
+        const pRes = await fetch("/api/google-sheets/attendance/personnel");
+        const pData = await pRes.json();
+        personnel = pData.personnel || [];
+      } catch {
+        // continue
+      }
+      setPersonnelList(personnel);
 
-      for (let i = 0; i < vehicles.length; i++) {
-        const vehicle = vehicles[i];
-        setProgress({ current: i + 1, total: vehicles.length });
+      // 3. Fetch vehicles
+      const vehiclesRes = await vtrackingApi.fetchVehicles();
+      const vehicles = vehiclesRes.data.vehicles || [];
 
-        try {
-          const historyRes = await vtrackingApi.fetchHistory(
-            vehicle.id,
-            fromDate,
-            toDate
-          );
-          const logs = historyRes.data.logs || [];
+      const allDays = getDaysInRange(dateRange[0], dateRange[1]);
+      const totalSteps = vehicles.length * allDays.length * MEAL_SLOTS.length;
+      setProgress({ current: 0, total: totalSteps });
 
-          if (logs.length === 0) {
-            mealResults.push({
-              vehicle_name: vehicle.vehicle_name,
-              license_plate: vehicle.license_plate,
-              driver_name: driverMap[vehicle.license_plate] || "",
-              had_meal: false,
-              min_distance: null,
-              reason: t("noData"),
-            });
-            continue;
-          }
+      // 4. For each vehicle, each day, each meal slot
+      const data: MealData = {};
+      let step = 0;
 
-          let found = false;
-          let minDist = Infinity;
+      for (const vehicle of vehicles) {
+        const driverName = drMap[vehicle.license_plate];
+        if (!driverName) {
+          step += allDays.length * MEAL_SLOTS.length;
+          setProgress({ current: step, total: totalSteps });
+          continue;
+        }
 
-          for (const log of logs) {
-            const val = (log.value as Record<string, unknown>) || {};
-            const lat = Number(val.latitude);
-            const lng = Number(val.longitude);
-            if (!lat || !lng) continue;
+        for (const day of allDays) {
+          const dateStr = day.format("DD");
+          if (!data[driverName]) data[driverName] = {};
+          if (!data[driverName][dateStr])
+            data[driverName][dateStr] = { sang: false, trua: false, toi: false };
 
-            const dist = haversine(latitude, longitude, lat, lng);
-            if (dist < minDist) minDist = dist;
-            if (dist <= radius) {
-              found = true;
-              break;
+          for (const slot of MEAL_SLOTS) {
+            step++;
+            setProgress({ current: step, total: totalSteps });
+
+            if (data[driverName][dateStr][slot.key]) continue; // already found
+
+            try {
+              const dayStr = day.format("DD-MM-YYYY");
+              const fromDate = `${dayStr},${String(slot.fromH).padStart(2, "0")}:${String(slot.fromM).padStart(2, "0")}`;
+              const toDate = `${dayStr},${String(slot.toH).padStart(2, "0")}:${String(slot.toM).padStart(2, "0")}`;
+
+              const historyRes = await vtrackingApi.fetchHistory(
+                vehicle.id,
+                fromDate,
+                toDate
+              );
+              const logs = historyRes.data.logs || [];
+
+              for (const log of logs) {
+                const val = (log.value as Record<string, unknown>) || {};
+                const lat = Number(val.latitude);
+                const lng = Number(val.longitude);
+                if (!lat || !lng) continue;
+                const dist = haversine(latitude, longitude, lat, lng);
+                if (dist <= radius) {
+                  data[driverName][dateStr][slot.key] = true;
+                  break;
+                }
+              }
+            } catch {
+              // continue
             }
           }
-
-          mealResults.push({
-            vehicle_name: vehicle.vehicle_name,
-            license_plate: vehicle.license_plate,
-            driver_name: driverMap[vehicle.license_plate] || "",
-            had_meal: found,
-            min_distance: minDist === Infinity ? null : Math.round(minDist),
-            reason: found
-              ? t("hadMeal")
-              : t("nearest", { distance: Math.round(minDist) }),
-          });
-        } catch (err: unknown) {
-          const message = err instanceof Error ? err.message : "Unknown";
-          mealResults.push({
-            vehicle_name: vehicle.vehicle_name,
-            license_plate: vehicle.license_plate,
-            driver_name: driverMap[vehicle.license_plate] || "",
-            had_meal: false,
-            min_distance: null,
-            reason: t("error", { message }),
-          });
         }
       }
 
-      setResults(mealResults);
+      setMealData(data);
       setChecked(true);
     } catch {
-      // handled silently
+      message.error(t("fetchError"));
     } finally {
       setLoading(false);
     }
-  }, [date, fromTime, toTime, latitude, longitude, radius, t]);
+  }, [dateRange, latitude, longitude, radius, t]);
 
-  const hadMealCount = useMemo(() => results.filter((r) => r.had_meal).length, [results]);
-  const missedMealCount = useMemo(() => results.filter((r) => !r.had_meal).length, [results]);
+  // Build flat rows for table display
+  const flatRows = useMemo(() => {
+    if (!checked) return [];
+    const rows: FlatRow[] = [];
+    let stt = 1;
 
-  const handleExportExcel = useCallback(() => {
-    const rows = results.map((r) => ({
-      [t("vehicleName")]: r.vehicle_name,
-      [t("licensePlate")]: r.license_plate,
-      [t("driverName")]: r.driver_name || "—",
-      [t("status")]: r.had_meal ? t("hadMeal") : t("missedMeal"),
-      [t("nearestDistance")]: r.min_distance !== null ? `${r.min_distance}m` : "—",
-    }));
+    // Group personnel by department
+    const nhomGroups: { config: NhomConfig; members: Personnel[] }[] =
+      NHOM_CONFIG.map((cfg) => ({ config: cfg, members: [] }));
 
-    const ws = XLSX.utils.json_to_sheet(rows);
+    for (const p of personnelList) {
+      let placed = false;
+      for (const g of nhomGroups) {
+        if (g.config.boPhanMatch.some((m) => p.boPhan.includes(m))) {
+          g.members.push(p);
+          placed = true;
+          break;
+        }
+      }
+      if (!placed) {
+        nhomGroups[nhomGroups.length - 1].members.push(p);
+      }
+    }
 
-    // Auto column widths
-    const colWidths = Object.keys(rows[0] || {}).map((key) => ({
-      wch: Math.max(key.length, ...rows.map((r) => String(r[key as keyof typeof r] ?? "").length)) + 2,
-    }));
-    ws["!cols"] = colWidths;
+    for (const g of nhomGroups) {
+      if (g.members.length === 0) continue;
+      rows.push({
+        stt: g.config.key,
+        hoTen: g.config.ten,
+        licensePlate: "",
+        meals: {},
+        total: 0,
+        isSection: true,
+        sectionName: g.config.ten,
+      });
 
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Cơm ca");
-    XLSX.writeFile(wb, `com-ca_${date.format("DD-MM-YYYY")}.xlsx`);
-  }, [results, date, t]);
+      for (const member of g.members) {
+        const personMeals = mealData[member.hoTen] || {};
+        let total = 0;
+        for (const dayMeals of Object.values(personMeals)) {
+          if (dayMeals.sang) total++;
+          if (dayMeals.trua) total++;
+          if (dayMeals.toi) total++;
+        }
+        rows.push({
+          stt: stt++,
+          hoTen: member.hoTen,
+          licensePlate: nameToPlateMap[member.hoTen] || "",
+          meals: personMeals,
+          total,
+          isSection: false,
+        });
+      }
+    }
+
+    return rows;
+  }, [checked, personnelList, mealData, nameToPlateMap]);
+
+  const grandTotal = useMemo(
+    () => flatRows.reduce((sum, r) => sum + (r.isSection ? 0 : r.total), 0),
+    [flatRows]
+  );
+
+  // --- Excel Export ---
+
+  const handleExportExcel = useCallback(async () => {
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet("Cơm ca");
+
+    const allDays = getDaysInRange(dateRange[0], dateRange[1]);
+    const numDays = allDays.length;
+    const dayStartCol = 3; // col C (1-indexed)
+    const lastDayCol = dayStartCol + numDays * 3 - 1;
+    const tongCol = lastDayCol + 1; // Tổng
+    const kyCol = tongCol + 1; // Ký nhận
+    const totalCols = kyCol;
+
+    // Common styles from original template
+    const thinBorder: Partial<ExcelJS.Borders> = {
+      top: { style: "thin" },
+      left: { style: "thin" },
+      bottom: { style: "thin" },
+      right: { style: "thin" },
+    };
+    const fontTNR = "Times New Roman";
+
+    // Helper to get column letter
+    const colLetter = (n: number) => {
+      let s = "";
+      let num = n;
+      while (num > 0) {
+        num--;
+        s = String.fromCharCode(65 + (num % 26)) + s;
+        num = Math.floor(num / 26);
+      }
+      return s;
+    };
+
+    // --- Row 1: Title --- (BOLD, sz=18, Times New Roman, center, height=28.5)
+    const titleRow = ws.addRow([]);
+    titleRow.getCell(1).value = "BẢNG CHẤM TIỀN ĂN QUA BỮA ";
+    ws.mergeCells(`A1:${colLetter(totalCols)}1`);
+    titleRow.getCell(1).font = { bold: true, size: 18, name: fontTNR };
+    titleRow.getCell(1).alignment = { horizontal: "center" };
+    titleRow.height = 50;
+
+    // --- Row 2: Date range --- (BOLD, sz=16, center, v=middle, height=18)
+    const dateRow = ws.addRow([]);
+    dateRow.getCell(1).value = `Từ ngày ${dateRange[0].format("DD/MM/YYYY")} - ${dateRange[1].format("DD/MM/YYYY")}`;
+    ws.mergeCells(`A2:${colLetter(totalCols)}2`);
+    dateRow.getCell(1).font = { bold: true, size: 16, name: fontTNR };
+    dateRow.getCell(1).alignment = { horizontal: "center", vertical: "middle" };
+    dateRow.height = 44;
+
+    // --- Row 3: Header row 1 --- (BOLD, sz=11, center, middle, wrap, thin border)
+    const headerRow1 = ws.addRow([]);
+    headerRow1.getCell(1).value = "STT";
+    headerRow1.getCell(2).value = "Họ và tên";
+    headerRow1.getCell(dayStartCol).value = "Ngày trong tháng";
+    headerRow1.getCell(tongCol).value = "Tổng";
+    headerRow1.getCell(kyCol).value = "Kí nhận";
+    headerRow1.height = 40.75;
+
+    // --- Row 4: Day numbers --- (BOLD, sz=10, height=30.75)
+    const headerRow2 = ws.addRow([]);
+    for (let i = 0; i < numDays; i++) {
+      const col = dayStartCol + i * 3;
+      headerRow2.getCell(col).value = allDays[i].date();
+    }
+    headerRow2.height = 40.75;
+
+    // --- Row 5: Trưa/Chiều/Tối --- (sz=10, NOT bold, height=26.25)
+    const headerRow3 = ws.addRow([]);
+    for (let i = 0; i < numDays; i++) {
+      const col = dayStartCol + i * 3;
+      headerRow3.getCell(col).value = "Sáng";
+      headerRow3.getCell(col + 1).value = "Trưa";
+      headerRow3.getCell(col + 2).value = "Tối";
+    }
+    headerRow3.height = 26.25;
+
+    // Apply merges AFTER all header rows are created to avoid addRow offset issues
+    ws.mergeCells(3, dayStartCol, 3, lastDayCol); // "Ngày trong tháng"
+    ws.mergeCells("A3:A5"); // STT
+    ws.mergeCells("B3:B5"); // Họ và tên
+    ws.mergeCells(3, tongCol, 5, tongCol); // Tổng
+    ws.mergeCells(3, kyCol, 5, kyCol); // Ký nhận
+    for (let i = 0; i < numDays; i++) {
+      const col = dayStartCol + i * 3;
+      ws.mergeCells(4, col, 4, col + 2); // Day number merge
+    }
+
+    // Style header rows 3-5
+    for (let r = 3; r <= 5; r++) {
+      const row = ws.getRow(r);
+      for (let c = 1; c <= totalCols; c++) {
+        const cell = row.getCell(c);
+        cell.border = thinBorder;
+        cell.alignment = { horizontal: "center", vertical: "middle", wrapText: true };
+        if (r === 5 && c >= dayStartCol && c <= lastDayCol) {
+          // Sub-headers: sz=10, NOT bold
+          cell.font = { size: 10, name: fontTNR };
+        } else if (r === 4 && c >= dayStartCol && c <= lastDayCol) {
+          // Day numbers: sz=10, bold
+          cell.font = { bold: true, size: 10, name: fontTNR };
+        } else {
+          // STT, Họ và tên, Ngày trong tháng, Tổng, Ký nhận: sz=11, bold
+          cell.font = { bold: true, size: 11, name: fontTNR };
+        }
+      }
+    }
+
+    // --- Data rows ---
+    const nhomGroups: { config: NhomConfig; members: Personnel[] }[] =
+      NHOM_CONFIG.map((cfg) => ({ config: cfg, members: [] }));
+
+    for (const p of personnelList) {
+      let placed = false;
+      for (const g of nhomGroups) {
+        if (g.config.boPhanMatch.some((m) => p.boPhan.includes(m))) {
+          g.members.push(p);
+          placed = true;
+          break;
+        }
+      }
+      if (!placed) {
+        nhomGroups[nhomGroups.length - 1].members.push(p);
+      }
+    }
+
+    const colTotals: number[] = new Array(numDays * 3).fill(0);
+    let globalStt = 1;
+
+    for (const g of nhomGroups) {
+      if (g.members.length === 0) continue;
+
+      // Section header row (BOLD, sz=12, center/middle/wrap, merge B:lastDayCol, top+left+right border)
+      const sectionRow = ws.addRow([]);
+      sectionRow.height = 25;
+      sectionRow.getCell(1).value = g.config.key;
+      sectionRow.getCell(1).font = { bold: true, size: 12, name: fontTNR };
+      sectionRow.getCell(1).alignment = { horizontal: "center", vertical: "middle", wrapText: true };
+      sectionRow.getCell(1).border = { left: { style: "thin" }, right: { style: "thin" }, top: { style: "thin" } };
+
+      sectionRow.getCell(2).value = g.config.ten;
+      ws.mergeCells(sectionRow.number, 2, sectionRow.number, lastDayCol);
+      // Style merged section cells
+      for (let c = 2; c <= lastDayCol; c++) {
+        sectionRow.getCell(c).font = { bold: true, size: 12, name: fontTNR };
+        sectionRow.getCell(c).alignment = { horizontal: "center", vertical: "middle", wrapText: true };
+        sectionRow.getCell(c).border = { left: { style: "thin" }, right: { style: "thin" }, top: { style: "thin" } };
+      }
+
+      // Data rows
+      for (const member of g.members) {
+        const personMeals = mealData[member.hoTen] || {};
+        const dataRow = ws.addRow([]);
+        dataRow.height = 25;
+
+        // STT (sz=12, center, middle, wrap, thin border left+top+bottom)
+        dataRow.getCell(1).value = globalStt++;
+        dataRow.getCell(1).font = { size: 12, name: fontTNR };
+        dataRow.getCell(1).alignment = { horizontal: "center", vertical: "middle", wrapText: true };
+        dataRow.getCell(1).border = { left: { style: "thin" }, top: { style: "thin" }, bottom: { style: "thin" } };
+
+        // Name (sz=12, left, wrap, thin border all)
+        dataRow.getCell(2).value = member.hoTen;
+        dataRow.getCell(2).font = { size: 12, name: fontTNR };
+        dataRow.getCell(2).alignment = { horizontal: "left", wrapText: true };
+        dataRow.getCell(2).border = thinBorder;
+
+        let personTotal = 0;
+
+        for (let i = 0; i < numDays; i++) {
+          const day = allDays[i];
+          const dateStr = day.format("DD");
+          const dm = personMeals[dateStr] || { sang: false, trua: false, toi: false };
+          const col = dayStartCol + i * 3;
+
+          if (dm.sang) {
+            dataRow.getCell(col).value = "/";
+            personTotal++;
+            colTotals[i * 3]++;
+          }
+          if (dm.trua) {
+            dataRow.getCell(col + 1).value = "/";
+            personTotal++;
+            colTotals[i * 3 + 1]++;
+          }
+          if (dm.toi) {
+            dataRow.getCell(col + 2).value = "/";
+            personTotal++;
+            colTotals[i * 3 + 2]++;
+          }
+
+          // Style meal cells (sz=10, center, border)
+          for (let s = 0; s < 3; s++) {
+            dataRow.getCell(col + s).font = { size: 10, name: fontTNR };
+            dataRow.getCell(col + s).alignment = { horizontal: "center" };
+            dataRow.getCell(col + s).border = thinBorder;
+          }
+        }
+
+        // Tổng column (sz=12, center, middle, thin border right+top+bottom)
+        dataRow.getCell(tongCol).value = personTotal;
+        dataRow.getCell(tongCol).font = { size: 12, name: fontTNR };
+        dataRow.getCell(tongCol).alignment = { horizontal: "center", vertical: "middle" };
+        dataRow.getCell(tongCol).border = { right: { style: "thin" }, top: { style: "thin" }, bottom: { style: "thin" } };
+
+        // Ký nhận column (border)
+        dataRow.getCell(kyCol).border = thinBorder;
+      }
+    }
+
+    // --- Tổng cộng row --- (merge A:B, BOLD sz=11, all borders, white fill)
+    const totalRow = ws.addRow([]);
+    totalRow.height = 25;
+    totalRow.getCell(1).value = "Tổng cộng";
+    ws.mergeCells(totalRow.number, 1, totalRow.number, 2);
+    totalRow.getCell(1).font = { bold: true, size: 11, name: fontTNR };
+    totalRow.getCell(1).alignment = { horizontal: "center", vertical: "middle", wrapText: true };
+    totalRow.getCell(1).border = thinBorder;
+    totalRow.getCell(2).border = thinBorder;
+
+    for (let i = 0; i < numDays * 3; i++) {
+      const col = dayStartCol + i;
+      totalRow.getCell(col).value = colTotals[i] || undefined;
+      totalRow.getCell(col).font = { bold: true, size: 12, name: fontTNR };
+      totalRow.getCell(col).alignment = { horizontal: "center", vertical: "middle" };
+      totalRow.getCell(col).border = { left: { style: "thin" }, right: { style: "thin" }, bottom: { style: "thin" } };
+    }
+    totalRow.getCell(tongCol).value = grandTotal;
+    totalRow.getCell(tongCol).font = { bold: true, size: 11, name: fontTNR };
+    totalRow.getCell(tongCol).alignment = { horizontal: "center", vertical: "middle", wrapText: true };
+    totalRow.getCell(tongCol).border = thinBorder;
+
+    // --- Tổng cộng text row --- (merge A:AJ, BOLD sz=12, center, middle, thin border)
+    const totalTextRow = ws.addRow([]);
+    totalTextRow.height = 25;
+    totalTextRow.getCell(1).value = "Tổng cộng";
+    ws.mergeCells(totalTextRow.number, 1, totalTextRow.number, tongCol);
+    totalTextRow.getCell(1).font = { bold: true, size: 12, name: fontTNR };
+    totalTextRow.getCell(1).alignment = { horizontal: "center", vertical: "middle" };
+    totalTextRow.getCell(1).border = thinBorder;
+
+    // --- Tổng bữa text row --- (merge A:AK, BOLD sz=12, left, middle, top border)
+    const totalBuaRow = ws.addRow([]);
+    totalBuaRow.height = 21.75;
+    const buaText = numberToVietnamese(grandTotal);
+    totalBuaRow.getCell(1).value = `     Tổng:  ${String(grandTotal).padStart(2, "0")} bữa (${buaText} bữa)`;
+    ws.mergeCells(totalBuaRow.number, 1, totalBuaRow.number, kyCol);
+    totalBuaRow.getCell(1).font = { bold: true, size: 12, name: fontTNR };
+    totalBuaRow.getCell(1).alignment = { horizontal: "left", vertical: "middle" };
+    totalBuaRow.getCell(1).border = { top: { style: "thin" } };
+
+    // --- Ghi chú row --- (A=" ", B="Ghi chú" BOLD sz=10, merge C:M)
+    const noteRow = ws.addRow([]);
+    noteRow.height = 21.75;
+    noteRow.getCell(1).value = " ";
+    noteRow.getCell(1).font = { size: 10, name: fontTNR };
+    noteRow.getCell(2).value = "Ghi chú";
+    noteRow.getCell(2).font = { bold: true, size: 10, name: fontTNR };
+    noteRow.getCell(2).alignment = { horizontal: "left", vertical: "middle" };
+    const ghiChuEndCol = Math.min(dayStartCol + 10, lastDayCol);
+    ws.mergeCells(noteRow.number, dayStartCol, noteRow.number, ghiChuEndCol);
+
+    // --- Date & signature row --- (merge T:AI, italic sz=12, center, middle)
+    const signDateRow = ws.addRow([]);
+    signDateRow.height = 14.25;
+    const now = dateRange[1];
+    // Start from ~col 20 (T) to lastDayCol (AI)
+    const signStartCol = Math.max(20, dayStartCol);
+    signDateRow.getCell(signStartCol).value = `          Quảng Trị, ngày ${now.format("DD")} Tháng ${now.format("MM")} năm ${now.format("YYYY")}         `;
+    signDateRow.getCell(signStartCol).font = { italic: true, size: 12, name: fontTNR };
+    signDateRow.getCell(signStartCol).alignment = { horizontal: "center", vertical: "middle" };
+    if (lastDayCol > signStartCol) {
+      ws.mergeCells(signDateRow.number, signStartCol, signDateRow.number, lastDayCol);
+    }
+
+    // --- "Người lập" row --- (merge B:E, G:R, U:AH, BOLD sz=12, center, middle)
+    const signTitleRow = ws.addRow([]);
+    signTitleRow.height = 15.4;
+    ws.mergeCells(signTitleRow.number, 2, signTitleRow.number, 5);
+    const nguoiLapEnd = Math.min(18, lastDayCol);
+    if (nguoiLapEnd > 7) {
+      ws.mergeCells(signTitleRow.number, 7, signTitleRow.number, nguoiLapEnd);
+    }
+    const nguoiLap2Start = Math.min(21, lastDayCol);
+    const nguoiLap2End = Math.min(lastDayCol - 1, lastDayCol);
+    if (nguoiLap2End > nguoiLap2Start) {
+      signTitleRow.getCell(nguoiLap2Start).value = "Người lập";
+      signTitleRow.getCell(nguoiLap2Start).font = { bold: true, size: 12, name: fontTNR };
+      signTitleRow.getCell(nguoiLap2Start).alignment = { horizontal: "center", vertical: "middle" };
+      ws.mergeCells(signTitleRow.number, nguoiLap2Start, signTitleRow.number, nguoiLap2End);
+    }
+
+    // --- "(Ký, họ tên)" row --- (merge B:E, G:R, V:AH, sz=12, center, middle)
+    const signNameRow = ws.addRow([]);
+    signNameRow.height = 15.4;
+    ws.mergeCells(signNameRow.number, 2, signNameRow.number, 5);
+    const kyGEnd = Math.min(18, lastDayCol);
+    if (kyGEnd > 7) {
+      ws.mergeCells(signNameRow.number, 7, signNameRow.number, kyGEnd);
+    }
+    const kyVStart = Math.min(22, lastDayCol);
+    const kyVEnd = Math.min(lastDayCol - 1, lastDayCol);
+    if (kyVEnd > kyVStart) {
+      signNameRow.getCell(kyVStart).value = "(Ký, họ tên)       ";
+      signNameRow.getCell(kyVStart).font = { size: 12, name: fontTNR };
+      signNameRow.getCell(kyVStart).alignment = { horizontal: "center", vertical: "middle" };
+      ws.mergeCells(signNameRow.number, kyVStart, signNameRow.number, kyVEnd);
+    }
+
+    // --- Column widths (matching original) ---
+    ws.getColumn(1).width = 5.56; // A: STT
+    ws.getColumn(2).width = 21.44; // B: Họ và tên
+    for (let i = 0; i < numDays * 3; i++) {
+      ws.getColumn(dayStartCol + i).width = 5.44; // C-AI: day columns
+    }
+    ws.getColumn(tongCol).width = 5.56; // Tổng
+    ws.getColumn(kyCol).width = 17.31; // Ký nhận
+
+    // --- Write file ---
+    const buffer = await wb.xlsx.writeBuffer();
+    const blob = new Blob([buffer], {
+      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    });
+    saveAs(
+      blob,
+      `com-ca_${dateRange[0].format("DD-MM-YYYY")}_${dateRange[1].format("DD-MM-YYYY")}.xlsx`
+    );
+  }, [dateRange, personnelList, mealData, grandTotal]);
+
+  // --- Sync to Google Sheet ---
 
   const handleSyncSheet = useCallback(async () => {
     setSyncing(true);
     try {
-      const rows = results.map((r) => [
-        r.vehicle_name,
-        r.license_plate,
-        r.driver_name || "—",
-        r.had_meal ? t("hadMeal") : t("missedMeal"),
-        r.min_distance !== null ? `${r.min_distance}m` : "—",
-      ]);
+      const allDays = getDaysInRange(dateRange[0], dateRange[1]);
 
       const res = await fetch("/api/google-sheets/sync", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ rows, date: date.format("DD/MM/YYYY HH:mm") }),
+        body: JSON.stringify({
+          flatRows,
+          days: allDays.map((d) => d.format("DD")),
+          dateRange: [dateRange[0].format("DD/MM/YYYY"), dateRange[1].format("DD/MM/YYYY")],
+          grandTotal,
+          grandTotalText: numberToVietnamese(grandTotal),
+        }),
       });
 
       const data = await res.json();
@@ -224,7 +738,7 @@ export default function MealCheckManager() {
     } finally {
       setSyncing(false);
     }
-  }, [results, date, t]);
+  }, [flatRows, dateRange, grandTotal, t]);
 
   const handleOpenSheet = useCallback(async () => {
     if (sheetUrl) {
@@ -243,80 +757,83 @@ export default function MealCheckManager() {
     }
   }, [sheetUrl]);
 
-  const columns: ColumnsType<MealResult> = [
-    {
-      title: t("vehicleName"),
-      dataIndex: "vehicle_name",
-      key: "vehicle_name",
-      width: 120,
-      sorter: (a, b) => a.vehicle_name.localeCompare(b.vehicle_name),
-    },
-    {
-      title: t("licensePlate"),
-      dataIndex: "license_plate",
-      key: "license_plate",
-      width: 150,
-    },
-    {
-      title: t("driverName"),
-      dataIndex: "driver_name",
-      key: "driver_name",
-      width: 180,
-      render: (val: string) =>
-        val ? (
-          <span className="font-medium text-neutral-800">{val}</span>
-        ) : (
-          <span className="text-neutral-400">—</span>
-        ),
-    },
-    {
-      title: t("status"),
-      key: "had_meal",
-      width: 130,
-      filters: [
-        { text: t("hadMeal"), value: true },
-        { text: t("missedMeal"), value: false },
-      ],
-      onFilter: (value, record) => record.had_meal === value,
-      render: (_: unknown, record: MealResult) =>
-        record.had_meal ? (
-          <Tag color="success" className="flex items-center gap-1 w-fit">
-            <CheckCircle size={13} />
-            {t("hadMeal")}
-          </Tag>
-        ) : (
-          <Tag color="error" className="flex items-center gap-1 w-fit">
-            <XCircle size={13} />
-            {t("missedMeal")}
-          </Tag>
-        ),
-    },
-    {
-      title: t("nearestDistance"),
-      key: "min_distance",
-      width: 150,
-      sorter: (a, b) => (a.min_distance ?? Infinity) - (b.min_distance ?? Infinity),
-      render: (_: unknown, record: MealResult) => {
-        if (record.min_distance === null) return <span className="text-neutral-400">—</span>;
-        const isClose = record.min_distance <= radius;
-        return (
-          <span className={isClose ? "text-emerald-700 font-semibold" : "text-neutral-600"}>
-            {record.min_distance}m
-          </span>
-        );
+  // --- Table columns ---
+
+  const columns: ColumnsType<FlatRow> = useMemo(() => {
+    const cols: ColumnsType<FlatRow> = [
+      {
+        title: "STT",
+        dataIndex: "stt",
+        key: "stt",
+        width: 50,
+        fixed: "left",
+        render: (val: number | string, record: FlatRow) =>
+          record.isSection ? (
+            <span className="font-bold">{val}</span>
+          ) : (
+            <span>{val}</span>
+          ),
       },
-    },
-    {
-      title: "",
-      key: "reason",
-      dataIndex: "reason",
-      ellipsis: true,
-      render: (text: string) => <span className="text-neutral-500 text-sm">{text}</span>,
-    },
-  ];
+      {
+        title: t("driverName"),
+        dataIndex: "hoTen",
+        key: "hoTen",
+        width: 180,
+        fixed: "left",
+        render: (val: string, record: FlatRow) =>
+          record.isSection ? (
+            <span className="font-bold text-neutral-700">{val}</span>
+          ) : (
+            <span>{val}</span>
+          ),
+      },
+    ];
+
+    // Day columns
+    for (const day of days) {
+      const dateStr = day.format("DD");
+      const dayLabel = day.date();
+
+      cols.push({
+        title: String(dayLabel),
+        key: `day-${dateStr}`,
+        children: MEAL_SLOTS.map((slot) => ({
+          title: slot.label.charAt(0), // T, C, T
+          key: `${dateStr}-${slot.key}`,
+          width: 35,
+          align: "center" as const,
+          render: (_: unknown, record: FlatRow) => {
+            if (record.isSection) return null;
+            const dm = record.meals[dateStr];
+            if (!dm) return null;
+            const hasIt = dm[slot.key];
+            return hasIt ? (
+              <Tag color="success" className="m-0 px-1">
+                <CheckCircle size={12} />
+              </Tag>
+            ) : null;
+          },
+        })),
+      });
+    }
+
+    cols.push({
+      title: "Tổng",
+      dataIndex: "total",
+      key: "total",
+      width: 60,
+      fixed: "right",
+      render: (val: number, record: FlatRow) =>
+        record.isSection ? null : (
+          <span className="font-semibold">{val}</span>
+        ),
+    });
+
+    return cols;
+  }, [days, t]);
 
   return (
-    <div className="px-6 py-8 max-w-[1400px]">
+    <div className="px-6 py-8 max-w-[1600px]">
       {/* Header */}
       <div className="mb-8">
         <div className="flex items-center gap-3 mb-1">
@@ -331,43 +848,31 @@ export default function MealCheckManager() {
       {/* Controls */}
       <div className="bg-neutral-50 border border-neutral-200 rounded-lg p-5 mb-6">
         <div className="flex flex-wrap items-end gap-5">
-          {/* Date */}
+          {/* Date range */}
           <div>
             <label className="block text-xs font-semibold text-neutral-500 uppercase tracking-wide mb-1.5">
               {t("date")}
             </label>
-            <DatePicker
-              value={date}
-              onChange={(val) => val && setDate(val)}
+            <RangePicker
+              value={dateRange}
+              onChange={(val) => {
+                if (val && val[0] && val[1]) setDateRange([val[0], val[1]]);
+              }}
               format="DD/MM/YYYY"
               allowClear={false}
-              style={{ width: 150 }}
+              style={{ width: 280 }}
             />
           </div>
 
-          {/* Time range */}
+          {/* Meal slots info */}
           <div>
             <label className="block text-xs font-semibold text-neutral-500 uppercase tracking-wide mb-1.5">
               {t("timeRange")}
             </label>
-            <div className="flex items-center gap-2">
-              <TimePicker
-                value={fromTime}
-                onChange={(val) => val && setFromTime(val)}
-                format="HH:mm"
-                minuteStep={15}
-                allowClear={false}
-                style={{ width: 100 }}
-              />
-              <span className="text-neutral-400 font-medium">—</span>
-              <TimePicker
-                value={toTime}
-                onChange={(val) => val && setToTime(val)}
-                format="HH:mm"
-                minuteStep={15}
-                allowClear={false}
-                style={{ width: 100 }}
-              />
+            <div className="flex items-center gap-2 text-sm text-neutral-600">
+              <Tag color="blue">Sáng: 11:30-13:00</Tag>
+              <Tag color="orange">Trưa: 19:00-22:00</Tag>
+              <Tag color="purple">Tối: 22:00-24:00</Tag>
             </div>
           </div>
 
@@ -403,7 +908,7 @@ export default function MealCheckManager() {
           </div>
         </div>
 
-        {/* Location settings (collapsible) */}
+        {/* Location settings */}
         {showLocation && (
           <div className="flex flex-wrap gap-4 mt-4 pt-4 border-t border-neutral-200">
             <div>
@@ -465,41 +970,32 @@ export default function MealCheckManager() {
         </div>
       )}
 
-      {/* Summary stats */}
+      {/* Summary */}
       {checked && (
         <div className="flex items-center gap-3 mb-6 flex-wrap">
-          <Tooltip title={t("totalVehicles")}>
-            <div className="flex items-center gap-2 bg-neutral-100 border border-neutral-200 rounded-md px-4 py-2.5">
-              <span className="text-2xl font-bold text-neutral-800 tabular-nums leading-none">
-                {results.length}
-              </span>
-              <span className="text-xs text-neutral-500 font-medium uppercase">{t("totalVehicles")}</span>
-            </div>
-          </Tooltip>
+          <div className="flex items-center gap-2 bg-neutral-100 border border-neutral-200 rounded-md px-4 py-2.5">
+            <span className="text-2xl font-bold text-neutral-800 tabular-nums leading-none">
+              {flatRows.filter((r) => !r.isSection).length}
+            </span>
+            <span className="text-xs text-neutral-500 font-medium uppercase">
+              Nhân viên
+            </span>
+          </div>
 
-          <Tooltip title={t("hadMeal")}>
-            <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-md px-4 py-2.5">
-              <span className="text-2xl font-bold text-emerald-700 tabular-nums leading-none">
-                {hadMealCount}
-              </span>
-              <span className="text-xs text-emerald-600 font-medium uppercase">{t("hadMeal")}</span>
-            </div>
-          </Tooltip>
-
-          <Tooltip title={t("missedMeal")}>
-            <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-md px-4 py-2.5">
-              <span className="text-2xl font-bold text-red-700 tabular-nums leading-none">
-                {missedMealCount}
-              </span>
-              <span className="text-xs text-red-600 font-medium uppercase">{t("missedMeal")}</span>
-            </div>
-          </Tooltip>
+          <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-200 rounded-md px-4 py-2.5">
+            <span className="text-2xl font-bold text-emerald-700 tabular-nums leading-none">
+              {grandTotal}
+            </span>
+            <span className="text-xs text-emerald-600 font-medium uppercase">
+              Tổng bữa ăn
+            </span>
+          </div>
 
           <div className="ml-auto flex items-center gap-2">
             <Button
               icon={<Download size={15} />}
               onClick={handleExportExcel}
-              disabled={results.length === 0}
+              disabled={flatRows.length === 0}
               style={{ fontWeight: 600 }}
             >
               {t("exportExcel")}
@@ -508,7 +1004,7 @@ export default function MealCheckManager() {
               icon={<RefreshCw size={15} className={syncing ? "animate-spin" : ""} />}
               onClick={handleSyncSheet}
               loading={syncing}
-              disabled={results.length === 0}
+              disabled={flatRows.length === 0}
               style={{ fontWeight: 600 }}
             >
               {t("syncSheet")}
@@ -527,16 +1023,15 @@ export default function MealCheckManager() {
       {/* Table */}
       <Table
         columns={columns}
-        dataSource={results}
-        rowKey={(record) => `${record.vehicle_name}-${record.license_plate}`}
+        dataSource={flatRows}
+        rowKey={(record, index) => `${record.stt}-${record.hoTen}-${index}`}
         loading={loading && progress.total === 0}
-        pagination={{ pageSize: 50, size: "small", showSizeChanger: false }}
-        scroll={{ x: 800 }}
-        size="middle"
+        pagination={false}
+        scroll={{ x: 800 + days.length * 105 }}
+        size="small"
+        bordered
         rowClassName={(record) =>
-          record.had_meal
-            ? "bg-emerald-50/40 hover:bg-emerald-50/70!"
-            : "bg-red-50/30 hover:bg-red-50/50!"
+          record.isSection ? "bg-amber-50/60 font-semibold" : ""
         }
       />
     </div>
