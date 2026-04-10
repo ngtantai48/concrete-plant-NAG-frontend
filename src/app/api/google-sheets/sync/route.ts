@@ -97,6 +97,69 @@ export async function POST(request: Request) {
   }
 }
 
+export async function DELETE() {
+  try {
+    const spreadsheetId = process.env.GOOGLE_SPREADSHEET_ID;
+    if (!spreadsheetId) {
+      return NextResponse.json({ error: "Missing GOOGLE_SPREADSHEET_ID" }, { status: 500 });
+    }
+
+    const auth = getAuth();
+    const sheets = google.sheets({ version: "v4", auth });
+
+    const meta = await sheets.spreadsheets.get({ spreadsheetId });
+    const existing = meta.data.sheets?.find((s) => s.properties?.title === SHEET_NAME);
+
+    if (!existing) {
+      return NextResponse.json({ message: "Sheet not found, nothing to clear" });
+    }
+
+    const sheetId = existing.properties?.sheetId ?? 0;
+
+    // Clear all data (keep header row)
+    await sheets.spreadsheets.values.clear({
+      spreadsheetId,
+      range: `'${SHEET_NAME}'!A2:Z`,
+    });
+
+    // Rewrite header + freeze + bold
+    const header = ["Ngày", "Tên xe", "Biển số", "Tên tài xế", "Trạng thái", "Khoảng cách gần nhất"];
+    await sheets.spreadsheets.values.update({
+      spreadsheetId,
+      range: `'${SHEET_NAME}'!A1`,
+      valueInputOption: "USER_ENTERED",
+      requestBody: { values: [header] },
+    });
+
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId,
+      requestBody: {
+        requests: [
+          {
+            updateSheetProperties: {
+              properties: { sheetId, gridProperties: { frozenRowCount: 1 } },
+              fields: "gridProperties.frozenRowCount",
+            },
+          },
+          {
+            repeatCell: {
+              range: { sheetId, startRowIndex: 0, endRowIndex: 1 },
+              cell: { userEnteredFormat: { textFormat: { bold: true } } },
+              fields: "userEnteredFormat.textFormat.bold",
+            },
+          },
+        ],
+      },
+    });
+
+    return NextResponse.json({ success: true, message: "Sheet cleared, header preserved" });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    console.error("Google Sheets clear error:", message);
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
+
 export async function GET() {
   const spreadsheetId = process.env.GOOGLE_SPREADSHEET_ID;
   if (!spreadsheetId) {

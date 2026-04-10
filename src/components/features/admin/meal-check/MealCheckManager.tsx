@@ -210,7 +210,7 @@ export default function MealCheckManager() {
       const res = await fetch("/api/google-sheets/sync", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ rows, date: date.format("DD/MM/YYYY") }),
+        body: JSON.stringify({ rows, date: date.format("DD/MM/YYYY HH:mm") }),
       });
 
       const data = await res.json();
