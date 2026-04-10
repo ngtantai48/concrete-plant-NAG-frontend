@@ -1,4 +1,5 @@
 import { Toaster } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { getLocaleMessages } from "@/i18n/server";
 import '@/lib/fontawesome';
 import { Providers } from "@/store/providers";
@@ -38,7 +39,9 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
           </Suspense>
 
           <NextIntlClientProvider locale={locale} messages={messages}>
-            {children}
+            <TooltipProvider>
+              {children}
+            </TooltipProvider>
           </NextIntlClientProvider>
 
           <Toaster />

@@ -6,11 +6,15 @@ import vehicleApi from "@/services/vehicle.service";
 import type { Vehicle } from "@/types/vehicle";
 import orderApi from "@/services/order.service";
 import type { Order } from "@/types/order";
-import { Skeleton, Tooltip } from "antd";
 import { RefreshCw, Map as MapIcon, Maximize2, Minimize2, Truck, Radio, CheckCircle2, Clock, Route, MapPin, Search, CalendarClock } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Separator } from "@/components/ui/separator";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { ADMIN } from "@/constants/route";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle as DlgTitle } from "@/components/ui/dialog";
 import { useLocale, useTranslations } from "next-intl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNearbyVehicles } from "@/hooks/useNearbyVehicles";
@@ -334,31 +338,41 @@ export default function AdminDashboard() {
             {/* Right Controls */}
             <div className="flex items-center gap-2 shrink-0">
               {/* LED Status */}
-              <Tooltip title={isLedConnected ? 'Bảng LED đang kết nối' : 'Bảng LED đang mất kết nối'}>
-                <div className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 border text-xs font-bold uppercase ${isLedConnected
-                  ? "border-emerald-200 text-emerald-700 animate-flash-bg"
-                  : "border-red-200 bg-red-50 text-red-700"
-                  }`}>
-                  {isLedConnected
-                    ? <Radio className="h-2.5 w-2.5 text-emerald-500 animate-pulse" />
-                    : <div className="h-1.5 w-1.5 rounded-full" style={{ background: '#f87171', boxShadow: '0 0 6px rgba(248, 113, 113, 0.5)' }} />
-                  }
-                  LED
-                </div>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 border text-xs font-bold uppercase cursor-default ${isLedConnected
+                    ? "border-emerald-200 text-emerald-700 animate-flash-bg"
+                    : "border-red-200 bg-red-50 text-red-700"
+                    }`}>
+                    {isLedConnected
+                      ? <Radio className="h-2.5 w-2.5 text-emerald-500 animate-pulse" />
+                      : <div className="h-1.5 w-1.5 rounded-full" style={{ background: '#f87171', boxShadow: '0 0 6px rgba(248, 113, 113, 0.5)' }} />
+                    }
+                    LED
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>{isLedConnected ? 'Bảng LED đang kết nối' : 'Bảng LED đang mất kết nối'}</p>
+                </TooltipContent>
               </Tooltip>
 
               {/* Network Status */}
-              <Tooltip title={socketConnected ? t('socketConnected') : t('socketDisconnected')}>
-                <div key={lastSignalTime?.toISOString() || 'offline'} className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 border text-xs font-bold uppercase ${socketConnected
-                  ? "border-emerald-200 text-emerald-700 animate-flash-bg"
-                  : "border-red-200 bg-red-50 text-red-700"
-                  }`}>
-                  {socketConnected
-                    ? <Radio className="h-2.5 w-2.5 text-emerald-500 animate-pulse" />
-                    : <div className="h-1.5 w-1.5 rounded-full" style={{ background: '#f87171', boxShadow: '0 0 6px rgba(248, 113, 113, 0.5)' }} />
-                  }
-                  {socketConnected ? 'ONLINE' : 'OFFLINE'}
-                </div>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div key={lastSignalTime?.toISOString() || 'offline'} className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 border text-xs font-bold uppercase cursor-default ${socketConnected
+                    ? "border-emerald-200 text-emerald-700 animate-flash-bg"
+                    : "border-red-200 bg-red-50 text-red-700"
+                    }`}>
+                    {socketConnected
+                      ? <Radio className="h-2.5 w-2.5 text-emerald-500 animate-pulse" />
+                      : <div className="h-1.5 w-1.5 rounded-full" style={{ background: '#f87171', boxShadow: '0 0 6px rgba(248, 113, 113, 0.5)' }} />
+                    }
+                    {socketConnected ? 'ONLINE' : 'OFFLINE'}
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>{socketConnected ? t('socketConnected') : t('socketDisconnected')}</p>
+                </TooltipContent>
               </Tooltip>
 
               {/* Sync Button */}
@@ -402,23 +416,25 @@ export default function AdminDashboard() {
           {/* ═══ STAT CARDS ═══ */}
           <div className="mt-1.5 grid grid-cols-2 gap-2 md:grid-cols-5 shrink-0">
             {statCards.map((card, i) => (
-              <div
+              <Card
                 key={i}
-                className="dd-stat-card px-2 py-1 animate-fade-up hover:scale-[1.02] active:scale-[0.98] transition-all cursor-default"
+                className="dd-stat-card py-0 animate-fade-up hover:scale-[1.02] active:scale-[0.98] transition-all cursor-default"
                 style={{
                   '--accent-color': card.accentColor,
                   animationDelay: `${i * 0.1}s`
                 } as React.CSSProperties}
               >
-                <span className="text-[10px] font-bold uppercase"
-                  style={{ color: 'var(--dd-text-muted)' }}>
-                  {card.label}
-                </span>
-                <div className="text-2xl lg:text-3xl font-black leading-tight"
-                  style={{ color: card.accentColor }}>
-                  {card.value}
-                </div>
-              </div>
+                <CardContent className="p-2 lg:px-3 lg:py-1.5 flex items-center justify-between gap-2 h-full">
+                  <span className="text-sm font-extrabold uppercase truncate"
+                    style={{ color: 'var(--dd-text-muted)' }}>
+                    {card.label}
+                  </span>
+                  <div className="text-xl lg:text-2xl font-black leading-none shrink-0"
+                    style={{ color: card.accentColor }}>
+                    {card.value}
+                  </div>
+                </CardContent>
+              </Card>
             ))}
           </div>
         </div>
@@ -459,7 +475,7 @@ export default function AdminDashboard() {
         </div>
 
         {/* ═══ COMMAND CORE GRID ═══ */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-1.5 flex-1 min-h-0">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4  overflow-hidden">
 
           {/* Left: Asset Management (col-span-3) */}
           <div className="lg:col-span-3 flex flex-col gap-1.5 h-full min-h-0 animate-fade-up" style={{ animationDelay: '0.2s' }}>
@@ -476,7 +492,7 @@ export default function AdminDashboard() {
                     <span className="text-xs font-bold uppercase" style={{ color: 'var(--dd-text-muted)' }}>{t('noReadyVehicles')}</span>
                   </div>
                 ) : (
-                  <ul className="flex flex-col gap-1 p-2">
+                  <ul className="flex flex-col gap-1 px-4 py-2">
                     {readyVehicles.map((v) => (
                       <li key={v.vehicle_id} className="flex items-center gap-2 px-2 py-1 transition-colors rounded-md border shadow-sm cursor-default hover:shadow-md"
                         style={{ background: 'var(--dd-bg-surface)', borderColor: 'var(--dd-border)' }}
@@ -506,7 +522,7 @@ export default function AdminDashboard() {
                     <span className="text-xs font-bold uppercase" style={{ color: 'var(--dd-text-muted)' }}>{t('empty')}</span>
                   </div>
                 ) : (
-                  <ul className="flex flex-col gap-1 p-2">
+                  <ul className="flex flex-col gap-1 px-4 py-2">
                     {stoppedMaintenanceList.map((item) => (
                       <li key={item.id} className="flex items-center justify-between px-2 py-1 rounded-md border shadow-sm cursor-default"
                         style={{ background: 'var(--dd-bg-surface)', borderColor: 'var(--dd-border)' }}>
@@ -633,7 +649,7 @@ export default function AdminDashboard() {
                       const hoverBorder = isCompleted ? 'rgba(16, 185, 129, 0.4)' : 'rgba(14, 165, 233, 0.4)';
                       return (
                         <li key={o.order_id} className="dd-surface px-2 py-1.5 transition-all relative overflow-hidden"
-                          style={{ borderRadius: '12px', border: '1px solid var(--dd-border)' }}
+                          style={{ borderRadius: '6px', border: '1px solid var(--dd-border)' }}
                           onMouseEnter={e => e.currentTarget.style.borderColor = hoverBorder}
                           onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--dd-border)'}>
                           <div className="absolute left-0 top-0 bottom-0 w-1" style={{ background: accentColor }} />
@@ -752,22 +768,17 @@ export default function AdminDashboard() {
               </p>
             </div>
             <div className="flex w-full gap-3">
-              <button
-                type="button"
+              <Button
+                variant="outline"
                 onClick={() => setShowNoPendingModal(false)}
-                className="dd-btn flex-1 py-3 text-sm font-bold uppercase"
-                style={{
-                  background: "var(--dd-bg-surface)",
-                  border: "1px solid var(--dd-border)",
-                  color: "var(--dd-text-muted)",
-                }}
+                className="flex-1 py-3 text-sm font-bold uppercase"
               >
                 {t("endOfDayBannerDismiss")}
-              </button>
-              <button
-                type="button"
+              </Button>
+              <Button
+                variant="secondary"
                 onClick={() => router.push(`${ADMIN.END_OF_DAY_VEHICLES}`)}
-                className="dd-btn flex-1 py-3 text-sm font-bold uppercase"
+                className="flex-1 py-3 text-sm font-bold uppercase border-amber-300 text-amber-700 hover:bg-amber-50"
                 style={{
                   background: "linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(217, 119, 6, 0.15))",
                   border: "1px solid rgba(245, 158, 11, 0.35)",
@@ -775,7 +786,7 @@ export default function AdminDashboard() {
                 }}
               >
                 {t("endOfDayBannerAction")}
-              </button>
+              </Button>
             </div>
           </div>
         </DialogContent>
@@ -788,21 +799,20 @@ export default function AdminDashboard() {
             {/* Left: Vehicle Search */}
             <div className="w-[300px] shrink-0 flex flex-col border-r" style={{ borderColor: 'var(--dd-border)' }}>
               <DialogHeader className="px-4 py-3 shrink-0" style={{ borderBottom: '1px solid var(--dd-border)' }}>
-                <DialogTitle className="text-base font-bold uppercase flex items-center gap-2">
+                <DlgTitle className="text-base font-bold uppercase flex items-center gap-2">
                   <MapIcon className="w-4 h-4 text-sky-500" />
                   {t('searchVehicle')}
-                </DialogTitle>
+                </DlgTitle>
               </DialogHeader>
               <div className="px-3 py-2 shrink-0" style={{ borderBottom: '1px solid var(--dd-border)' }}>
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-                  <input
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 z-10" />
+                  <Input
                     type="text"
                     value={mapSearch}
                     onChange={(e) => setMapSearch(e.target.value)}
                     placeholder={t('searchVehicle')}
-                    className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border bg-white focus:outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-400"
-                    style={{ borderColor: 'var(--dd-border)' }}
+                    className="w-full pl-9 pr-3 py-2 text-sm bg-white"
                   />
                 </div>
               </div>
@@ -814,10 +824,12 @@ export default function AdminDashboard() {
                   { key: 'park', label: t('stopped'), color: '#f59e0b', bg: 'rgba(245,158,11,0.1)' },
                   { key: 'offline', label: t('disconnected'), color: '#94a3b8', bg: 'rgba(148,163,184,0.1)' },
                 ] as const).map((f) => (
-                  <button
+                  <Button
                     key={f.key}
+                    variant={mapStatusFilter === f.key ? 'outline' : 'ghost'}
+                    size="sm"
                     onClick={() => setMapStatusFilter(f.key)}
-                    className="px-2.5 py-1 text-xs font-bold rounded-full transition-all border"
+                    className="h-7 px-2.5 text-xs font-bold rounded-md"
                     style={{
                       background: mapStatusFilter === f.key ? f.bg : 'transparent',
                       color: mapStatusFilter === f.key ? f.color : 'var(--dd-text-muted)',
@@ -825,7 +837,7 @@ export default function AdminDashboard() {
                     }}
                   >
                     {f.label}
-                  </button>
+                  </Button>
                 ))}
               </div>
               <div className="flex-1 overflow-y-auto overscroll-contain p-2">
@@ -839,10 +851,11 @@ export default function AdminDashboard() {
                   .map((v) => {
                     const isActive = focusVehicleId === v.device_id;
                     return (
-                      <button
+                      <Button
                         key={v.device_id}
+                        variant={isActive ? 'outline' : 'ghost'}
                         onClick={() => setFocusVehicleId(v.device_id)}
-                        className={`w-full text-left p-3 rounded-xl mb-1.5 border transition-all ${isActive
+                        className={`w-full justify-start h-auto p-3 mb-1.5 transition-all flex-col items-stretch ${isActive
                           ? 'border-sky-400 bg-sky-50 shadow-sm'
                           : 'border-transparent hover:bg-slate-50 hover:border-slate-200'
                           }`}
@@ -861,10 +874,10 @@ export default function AdminDashboard() {
                           <span>{v.status === 'run' ? t('running') : v.status === 'park' ? t('stopped') : t('disconnected')}</span>
                           <span className="font-semibold tabular-nums">{v.speed} km/h</span>
                         </div>
-                        <div className="mt-0.5 pl-5 text-xs" style={{ color: 'var(--dd-text-muted)' }}>
+                        <div className="mt-0.5 pl-5 text-xs text-left" style={{ color: 'var(--dd-text-muted)' }}>
                           {v.distance >= 1000 ? `${(v.distance / 1000).toFixed(1)} km` : `${v.distance} m`}
                         </div>
-                      </button>
+                      </Button>
                     );
                   })}
                 {vtrackingVehicles.length === 0 && (

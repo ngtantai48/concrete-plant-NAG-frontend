@@ -56,7 +56,7 @@
 }
 
 :root {
-  --radius: 0.625rem;
+  --radius: 0.5rem;
   --background: oklch(0.995 0.005 250);
   --foreground: oklch(0.145 0.01 250);
   --card: oklch(0.993 0.005 250);
@@ -167,7 +167,7 @@
 .dd-card {
   background: #ffffff;
   border: 1px solid var(--dd-border);
-  border-radius: 20px;
+  border-radius: 8px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.04), 0 1px 3px rgba(0, 0, 0, 0.02);
   transition: all 0.2s ease-in-out;
 }
@@ -181,7 +181,7 @@
 .dd-stat-card {
   background: #ffffff;
   border: 1px solid var(--dd-border);
-  border-radius: 16px;
+  border-radius: 8px;
   position: relative;
   overflow: hidden;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.03);
@@ -192,7 +192,7 @@
   content: '';
   position: absolute;
   inset: 0;
-  border-radius: 16px;
+  border-radius: 8px;
   padding: 2px;
   background: linear-gradient(135deg, var(--accent-color, var(--dd-cyan)), transparent);
   -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
@@ -212,7 +212,7 @@
 .dd-header {
   background: #ffffff;
   border: 1px solid var(--dd-border);
-  border-radius: 24px;
+  border-radius: 8px;
   box-shadow: 0 4px 15px rgba(0, 0, 0, 0.03);
 }
 
@@ -242,7 +242,7 @@
 
 /* ── Status Chip Dark ── */
 .dd-chip {
-  border-radius: 20px;
+  border-radius: 6px;
   padding: 4px 14px;
   font-size: 11px;
   font-weight: 700;
@@ -395,7 +395,7 @@
 .dd-surface {
   background: #f8fafc;
   border: 1px solid var(--dd-border);
-  border-radius: 16px;
+  border-radius: 8px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
 }
 
