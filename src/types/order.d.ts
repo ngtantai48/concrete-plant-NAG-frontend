@@ -38,6 +38,13 @@ export interface OrderCheck {
   check_out_gps: string | null;
 }
 
+export interface OrderMulti {
+  distance_start: number;
+  nStop_start: number;
+  distance_end: number;
+  nStop_end: number;
+}
+
 export interface Order {
   order_id: number;
   order_number: number;
@@ -46,6 +53,7 @@ export interface Order {
   order_start_datetime: string | null;
   order_end_datetime: string | null;
   order_description: string | null;
+  order_multi: OrderMulti | null;
   users: OrderUser;
   vehicles: OrderVehicle;
   stations: OrderStation;
