@@ -436,9 +436,9 @@
     "stationIncident": "Sự cố",
     "stationControlPanel": "Bảng điều khiển trạm bê tông",
     "stationNoVehicle": "Chưa có xe",
-    "endOfDayBannerTitle": "Chưa có lệnh đang chờ cho hôm nay",
+    "endOfDayBannerTitle": "Chưa có lịch xe cho hôm nay",
     "endOfDayBannerDescription": "Ca vận hành hôm nay chưa có lịch. Chuyển đến trang quản lý xe cuối ngày để thiết lập.",
-    "endOfDayBannerAction": "Lập lịch ngày mai",
+    "endOfDayBannerAction": "Chốt lịch",
     "endOfDayBannerDismiss": "Bỏ qua"
   },
   "EndOfDayPage": {
@@ -477,7 +477,7 @@
     "modeToday": "Hôm nay",
     "modePrevious": "Hôm trước",
     "subtitleToday": "Quản lý chốt lịch xe.",
-    "subtitlePrevious": "Xử lý ca vận hành hôm trước bị bỏ lỡ. Quên chốt ca (xe pending) hoặc quên chốt lịch (xe canceled).",
+    "subtitlePrevious": "Xử lý ca vận hành hôm trước bị bỏ lỡ. Quên chốt ca hoặc quên chốt lịch.",
     "shiftOpenTodayAction": "Chốt lịch hôm nay",
     "shiftOpenTodaySuccess": "Đã xác nhận lịch hôm nay {date}",
     "shiftOpenTodayFailed": "Không thể xác nhận lịch cho hôm nay",
