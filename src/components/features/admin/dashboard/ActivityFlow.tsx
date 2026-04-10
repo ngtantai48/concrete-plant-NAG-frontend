@@ -85,6 +85,7 @@ interface StationQueueDropZoneProps {
   reorderingKey: string | null;
   onReorder: (index: number, direction: 'up' | 'down') => void;
   onToggleExpanded: () => void;
+  isManualMode: boolean;
   t: ReturnType<typeof useTranslations>;
 }
 
@@ -194,7 +195,7 @@ function StationDropTargetCard({
   return (
     <div
       ref={setNodeRef}
-      className="min-w-[220px] rounded-2xl border px-4 py-3"
+      className="min-w-[220px] rounded-lg border px-4 py-3"
       style={{
         background: isActiveDropTarget
           ? 'linear-gradient(135deg, rgba(14, 165, 233, 0.08), rgba(125, 211, 252, 0.04))'
@@ -251,6 +252,7 @@ function StationQueueDropZone({
   reorderingKey,
   onReorder,
   onToggleExpanded,
+  isManualMode,
   t,
 }: StationQueueDropZoneProps) {
   const { setNodeRef, isOver } = useDroppable({
@@ -274,7 +276,7 @@ function StationQueueDropZone({
   const activeVehicleLabel = activeOrder?.vehicles?.vehicle_license_plate ? `${activeOrder.vehicles.vehicle_license_plate}${activeOrder.vehicles.vehicle_name ? ` | ${activeOrder.vehicles.vehicle_name}` : ''}` : `#${activeOrder?.order_id ?? ''}`;
   const placeholderCard = (
     <div
-      className="relative overflow-hidden rounded-2xl border border-dashed px-4 py-3"
+      className="relative overflow-hidden rounded-lg border border-dashed px-4 py-3"
       style={{
         background: 'linear-gradient(135deg, rgba(14, 165, 233, 0.1), rgba(125, 211, 252, 0.04))',
         borderColor: 'rgba(14, 165, 233, 0.35)',
@@ -331,6 +333,7 @@ function StationQueueDropZone({
         canMoveUp={actualIndex > 0}
         canMoveDown={actualIndex < group.orders.length - 1}
         isDropTarget={dragOverOrderId === order.order_id && activeOrderId !== order.order_id}
+        isManualMode={isManualMode}
         t={t}
       />
     );
@@ -357,7 +360,7 @@ function StationQueueDropZone({
     >
       {showDropPad && (
         <div
-          className="flex items-center justify-between gap-3 rounded-2xl border border-dashed px-3 py-3 text-[11px] font-bold uppercase"
+          className="flex items-center justify-between gap-3 rounded-lg border border-dashed px-3 py-3 text-[11px] font-bold uppercase"
           style={{
             background: showDropCue ? 'rgba(14, 165, 233, 0.12)' : 'rgba(14, 165, 233, 0.04)',
             borderColor: showDropCue ? 'rgba(14, 165, 233, 0.4)' : 'rgba(14, 165, 233, 0.18)',
@@ -389,7 +392,7 @@ function StationQueueDropZone({
 
       {group.orders.length === 0 && !showCrossStationPlaceholder && (
         <div
-          className="rounded-2xl border border-dashed px-4 py-8 text-center"
+          className="rounded-lg border border-dashed px-4 py-8 text-center"
           style={{
             background: showDropCue ? 'rgba(14, 165, 233, 0.08)' : showDropPad ? 'rgba(14, 165, 233, 0.04)' : 'rgba(255, 255, 255, 0.8)',
             borderColor: showDropCue
@@ -440,7 +443,7 @@ function DraggedVehiclePreview({
 }) {
   return (
     <div
-      className="relative flex min-w-[520px] items-center justify-between gap-3 overflow-hidden rounded-2xl border px-4 py-3"
+      className="relative flex min-w-[520px] items-center justify-between gap-3 overflow-hidden rounded-lg border px-4 py-3"
       style={{
         background: 'linear-gradient(180deg, rgba(255,255,255,0.98), rgba(248,250,252,0.98))',
         borderColor: 'rgba(14, 165, 233, 0.22)',
@@ -451,7 +454,7 @@ function DraggedVehiclePreview({
     >
       <div className="absolute left-0 top-0 bottom-0 w-[3px]" style={{ background: style.dot, opacity: 0.8 }} />
       <div className="absolute inset-x-0 top-0 h-px bg-white/80" />
-      <div className="absolute -inset-6 -z-10 rounded-[28px] bg-sky-200/20 blur-2xl" />
+      <div className="absolute -inset-6 -z-10 rounded-lg bg-sky-200/20 blur-2xl" />
 
       <div className="flex min-w-[150px] items-center gap-4 pl-2">
         <div className="p-1 text-sky-500">
@@ -1045,7 +1048,7 @@ export default function ActivityFlow({
           <div className="space-y-4 p-3 bg-transparent">
             {layout === 'merged' && dispatchMode === 'manual' && (
               <div
-                className="rounded-2xl border px-4 py-3"
+                className="rounded-lg border px-4 py-3"
                 style={{
                   background: 'var(--dd-bg-surface)',
                   borderColor: 'var(--dd-border)',
@@ -1104,7 +1107,7 @@ export default function ActivityFlow({
 
             {activeOrder && (
               <div
-                className="rounded-2xl border px-4 py-4"
+                className="rounded-lg border px-4 py-4"
                 style={{
                   background: 'linear-gradient(135deg, rgba(14, 165, 233, 0.08), rgba(125, 211, 252, 0.04))',
                   borderColor: 'rgba(14, 165, 233, 0.2)',
@@ -1183,7 +1186,7 @@ export default function ActivityFlow({
                     return (
                       <div
                         key={group.stationId}
-                        className="overflow-hidden rounded-[24px] border shadow-sm"
+                        className="overflow-hidden rounded-lg border shadow-sm"
                         style={{
                           background: 'rgba(255, 255, 255, 0.92)',
                           borderColor: hoveredStationId === group.stationId
@@ -1236,6 +1239,7 @@ export default function ActivityFlow({
                           reorderingKey={reorderingKey}
                           onReorder={(index, direction) => handleReorder(group.stationId, index, direction)}
                           onToggleExpanded={() => toggleStationExpanded(group.stationId)}
+                          isManualMode={dispatchMode === 'manual'}
                           t={t}
                         />
                       </div>

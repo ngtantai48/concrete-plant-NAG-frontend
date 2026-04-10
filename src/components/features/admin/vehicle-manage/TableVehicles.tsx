@@ -629,7 +629,7 @@ export default function TableVehicles() {
 
   return (
     <>
-      <div className="m-10 bg-white rounded-2xl shadow-sm border border-slate-200 animate-fade-in overflow-hidden">
+      <div className="m-10 bg-white rounded-lg shadow-sm border border-slate-200 animate-fade-in overflow-hidden">
         <div className="p-6 md:p-8 border-b-2 border-slate-100 flex flex-col items-start gap-6 bg-slate-50/50">
           <div className="flex-1">
             <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-slate-900 flex items-center gap-3">
@@ -1027,7 +1027,7 @@ export default function TableVehicles() {
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="w-full border-2 border-dashed border-slate-300 rounded-xl py-6 px-4 text-center hover:border-blue-400 hover:bg-blue-50/30 transition-all duration-200 cursor-pointer group"
+                className="w-full border-2 border-dashed border-slate-300 rounded-lg py-6 px-4 text-center hover:border-blue-400 hover:bg-blue-50/30 transition-all duration-200 cursor-pointer group"
               >
                 <UploadIcon className="w-8 h-8 mx-auto mb-2 text-slate-400 group-hover:text-blue-500 transition-colors" />
                 <p className="text-sm font-medium text-slate-600 group-hover:text-blue-600">

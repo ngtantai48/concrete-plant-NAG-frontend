@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/select';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { ArrowRight, GripVertical, X } from 'lucide-react';
+import { ArrowRight, ChevronUp, ChevronDown, GripVertical, X } from 'lucide-react';
 import type { Order } from '@/types/order';
 import type { Station } from '@/types/station';
 
@@ -101,7 +101,7 @@ function SortableVehicleItemBase({
     <div
       ref={setNodeRef}
       style={dndStyle}
-      className={`sortable-vehicle-item relative overflow-hidden rounded-2xl px-4 py-3 group shadow-sm ${isSelected ? 'ring-2 ring-sky-500/20' : ''} ${isDragging ? 'cursor-grabbing shadow-lg is-dragging' : 'cursor-default'}`}
+      className={`sortable-vehicle-item relative overflow-hidden rounded-lg px-4 py-3 group shadow-sm ${isSelected ? 'ring-2 ring-sky-500/20' : ''} ${isDragging ? 'cursor-grabbing shadow-lg is-dragging' : 'cursor-default'}`}
     >
       <div className="absolute left-0 top-0 bottom-0 w-[3px]"
         style={{ background: style.dot, opacity: 0.8 }} />
@@ -118,7 +118,11 @@ function SortableVehicleItemBase({
           )}
 
           {isManualMode && (
-            <div className="p-1 -ml-1 text-slate-300 cursor-not-allowed">
+            <div
+              {...attributes}
+              {...listeners}
+              className="p-1 -ml-1 transition-colors cursor-grab active:cursor-grabbing text-slate-400 hover:text-sky-500"
+            >
               <GripVertical className="h-4 w-4" />
             </div>
           )}
@@ -195,7 +199,38 @@ function SortableVehicleItemBase({
             )}
           </div>
 
-
+            {isManualMode && (
+              <div className="flex items-center gap-1 md:ml-auto">
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); onReorder('up'); }}
+                  disabled={isBusy || !canMoveUp}
+                  title={t('moveUp')}
+                  className="flex h-8 w-8 items-center justify-center rounded-full transition-all disabled:cursor-not-allowed disabled:opacity-40"
+                  style={{
+                    background: 'var(--dd-bg-surface)',
+                    border: '1px solid var(--dd-border)',
+                    color: 'var(--dd-text-secondary)',
+                  }}
+                >
+                  <ChevronUp className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); onReorder('down'); }}
+                  disabled={isBusy || !canMoveDown}
+                  title={t('moveDown')}
+                  className="flex h-8 w-8 items-center justify-center rounded-full transition-all disabled:cursor-not-allowed disabled:opacity-40"
+                  style={{
+                    background: 'var(--dd-bg-surface)',
+                    border: '1px solid var(--dd-border)',
+                    color: 'var(--dd-text-secondary)',
+                  }}
+                >
+                  <ChevronDown className="h-4 w-4" />
+                </button>
+              </div>
+            )}
         </div>
       </div>
     </div>

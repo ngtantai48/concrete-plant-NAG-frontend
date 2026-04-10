@@ -262,7 +262,7 @@ export default function EndOfDayVehicleManager({ mode = "today" }: { mode?: "tod
             <div className="space-y-4 shrink-0">
               <div className="flex items-center gap-3">
                 {/* <div
-                  className="flex h-12 w-12 items-center justify-center rounded-2xl"
+                  className="flex h-12 w-12 items-center justify-center rounded-lg"
                   style={{
                     background: "linear-gradient(135deg, rgba(14, 165, 233, 0.12), rgba(59, 130, 246, 0.18))",
                     border: "1px solid rgba(14, 165, 233, 0.16)",
@@ -403,7 +403,7 @@ export default function EndOfDayVehicleManager({ mode = "today" }: { mode?: "tod
                 </div>
 
                 <div
-                  className="flex h-12 w-12 items-center justify-center rounded-2xl"
+                  className="flex h-12 w-12 items-center justify-center rounded-lg"
                   style={{
                     background: card.surface,
                     border: `1px solid ${card.surface.replace("0.08", "0.18")}`,

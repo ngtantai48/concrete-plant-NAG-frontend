@@ -192,7 +192,7 @@ export default function DriverDisplay() {
         {/* <div className="flex justify-end">
           <button
             onClick={toggleFullscreen}
-            className="flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl transition-colors shadow-lg shadow-blue-600/20"
+            className="flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-lg transition-colors shadow-lg shadow-blue-600/20"
           >
             {isFullscreen ? <Minimize className="w-6 h-6" /> : <Maximize className="w-6 h-6" />}
             <span className="text-lg">
@@ -235,7 +235,7 @@ export default function DriverDisplay() {
                       />
                     </div>
 
-                    <div className="min-h-0 flex-1 flex flex-col rounded-3xl border-2 border-slate-200 bg-white shadow-sm overflow-hidden">
+                    <div className="min-h-0 flex-1 flex flex-col rounded-lg border-2 border-slate-200 bg-white shadow-sm overflow-hidden">
                       <div className="px-6 py-4 flex items-center justify-between shrink-0">
                         <h3 className="text-2xl font-black text-slate-500 uppercase tracking-wider">
                           {t("waitingList")}
@@ -293,7 +293,7 @@ function StationOverviewCard({ station, collectingOrder, pendingCount, t }: Stat
   const headerBg = STATUS_COLORS[station.station_status] || "bg-slate-600";
 
   return (
-    <div className="bg-white rounded-3xl border-2 border-slate-200 shadow-sm flex flex-col overflow-hidden">
+    <div className="bg-white rounded-lg border-2 border-slate-200 shadow-sm flex flex-col overflow-hidden">
       <div className={`${headerBg} px-6 py-5 flex items-center justify-between gap-4 shrink-0`}>
         <h2 className="text-shadow-lg/90 text-4xl font-black text-white uppercase tracking-wider text-center">
           {station.station_name}
@@ -322,7 +322,7 @@ function StationStatusCard({ station, collectingOrder, t }: {
 }) {
   if (collectingOrder || station.station_status === "collecting") {
     return (
-      <div className="text-shadow-lg/100 w-full h-44 lg:h-52 bg-blue-100 border-4 border-blue-200 rounded-2xl p-4 gap-2 flex flex-col items-center justify-center animate-pulse shrink-0">
+      <div className="text-shadow-lg/100 w-full h-44 lg:h-52 bg-blue-100 border-4 border-blue-200 rounded-lg p-4 gap-2 flex flex-col items-center justify-center animate-pulse shrink-0">
         <span className="bg-blue-700 text-white text-2xl lg:text-3xl font-bold uppercase px-3 py-1 rounded-full mb-2 text-center">
           {t("collectingAction")}
         </span>
@@ -338,7 +338,7 @@ function StationStatusCard({ station, collectingOrder, t }: {
 
   if (station.station_status === "stopped") {
     return (
-      <div className="text-shadow-lg/30 w-full h-44 lg:h-52 bg-amber-50 border-4 border-dashed border-amber-300 rounded-2xl p-6 flex flex-col items-center justify-center shrink-0">
+      <div className="text-shadow-lg/30 w-full h-44 lg:h-52 bg-amber-50 border-4 border-dashed border-amber-300 rounded-lg p-6 flex flex-col items-center justify-center shrink-0">
         <Ban className="w-16 h-16 text-amber-500 mb-2" />
         <span className="text-4xl lg:text-5xl font-black text-amber-600 uppercase tracking-widest text-center">
           {t("stationStopped")}
@@ -349,7 +349,7 @@ function StationStatusCard({ station, collectingOrder, t }: {
 
   if (station.station_status === "incident") {
     return (
-      <div className="text-shadow-lg/30 w-full h-44 lg:h-52 bg-red-50 border-4 border-dashed border-red-300 rounded-2xl p-6 flex flex-col items-center justify-center shrink-0">
+      <div className="text-shadow-lg/30 w-full h-44 lg:h-52 bg-red-50 border-4 border-dashed border-red-300 rounded-lg p-6 flex flex-col items-center justify-center shrink-0">
         <AlertTriangle className="w-16 h-16 text-red-500 mb-2" />
         <span className="text-4xl lg:text-5xl font-black text-red-600 uppercase tracking-widest text-center">
           {t("stationIncident")}
@@ -359,7 +359,7 @@ function StationStatusCard({ station, collectingOrder, t }: {
   }
 
   return (
-    <div className="text-shadow-lg/30 w-full h-44 lg:h-52 bg-[#6F6E73]/10 border-4 border-dashed border-[#6F6E73]/40 rounded-2xl p-5 flex flex-col items-center justify-center shrink-0">
+    <div className="text-shadow-lg/30 w-full h-44 lg:h-52 bg-[#6F6E73]/10 border-4 border-dashed border-[#6F6E73]/40 rounded-lg p-5 flex flex-col items-center justify-center shrink-0">
       <SquareX className="w-16 h-16 text-[#6F6E73] mb-2" />
       <span className="text-4xl lg:text-5xl font-black text-[#6F6E73] uppercase tracking-widest text-center">
         {t("emptyStation")}
