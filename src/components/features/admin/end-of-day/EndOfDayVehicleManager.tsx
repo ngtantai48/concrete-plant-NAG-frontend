@@ -6,9 +6,11 @@ import orderApi from "@/services/order.service";
 import stationApi from "@/services/station.service";
 import type { Order } from "@/types/order";
 import type { Station } from "@/types/station";
+import { ADMIN } from "@/constants/route";
 import { Skeleton } from "antd";
 import { ArrowRightLeft, Factory, Radio, RefreshCw, Shuffle, Truck } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -25,15 +27,24 @@ const getTomorrowDate = () => {
   today.setDate(today.getDate() + 1);
   return today.toISOString().slice(0, 10);
 };
+const getYesterdayDate = () => {
+  const now = new Date();
+  const timezoneOffset = now.getTimezoneOffset() * 60 * 1000;
+  const today = new Date(now.getTime() - timezoneOffset);
+  today.setDate(today.getDate() - 1);
+  return today.toISOString().slice(0, 10);
+};
 
-export default function EndOfDayVehicleManager() {
+export default function EndOfDayVehicleManager({ mode = "today" }: { mode?: "today" | "previous" }) {
   const tPage = useTranslations("EndOfDayPage");
   const tDashboard = useTranslations("DashboardPage");
   const locale = useLocale();
+  const router = useRouter();
+  const targetDate = mode === "today" ? getTodayDate() : getYesterdayDate();
 
   const [stations, setStations] = useState<Station[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
-  const [tomorrowOrders, setTomorrowOrders] = useState<Order[]>([]);
+  const [targetDateOrders, setTargetDateOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isShiftToggling, setIsShiftToggling] = useState(false);
@@ -71,8 +82,8 @@ export default function EndOfDayVehicleManager() {
     try {
       const results = await Promise.allSettled([
         stationApi.getAll(),
-        orderApi.getAll({ order_status: "init" }),
-        orderApi.getByInitDate(getTomorrowDate()),
+        orderApi.getAll(),
+        orderApi.getByInitDate(targetDate),
       ]);
 
       if (results[0].status === "fulfilled") {
@@ -87,12 +98,12 @@ export default function EndOfDayVehicleManager() {
 
       if (results[2].status === "fulfilled") {
         const tomorrowData = results[2].value.data?.data || results[2].value.data || [];
-        setTomorrowOrders(Array.isArray(tomorrowData) ? tomorrowData : []);
+        setTargetDateOrders(Array.isArray(tomorrowData) ? tomorrowData : []);
       }
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [targetDate]);
 
   useEffect(() => {
     fetchAll();
@@ -104,28 +115,54 @@ export default function EndOfDayVehicleManager() {
     setIsRefreshing(false);
   }, [fetchAll]);
 
-  const isScheduleLocked = tomorrowOrders.some((o) => o.order_status === "pending");
+  const isScheduleLocked = targetDateOrders.some((o) => o.order_status === "pending");
+  const isShiftClosed = targetDateOrders.some((o) => o.order_status === "canceled");
 
   const handleShiftToggle = useCallback(async () => {
     setIsShiftToggling(true);
-    const tomorrowDate = getTomorrowDate();
     try {
-      if (isScheduleLocked) {
-        await orderApi.shiftReopenInit({ operation_date: tomorrowDate });
-        const [y, m, d] = tomorrowDate.split("-");
-        toast.success(tPage("shiftReopenInitSuccess", { date: `${d}/${m}/${y}` }), { position: "top-right" });
+      if (mode === "previous") {
+        const prevDate = getYesterdayDate();
+        const [y, m, d] = prevDate.split("-");
+        const fmtDate = `${d}/${m}/${y}`;
+        if (isScheduleLocked) {
+          // Previous day has pending orders → forgot to close shift → close it
+          await orderApi.shiftClose({ operation_date: prevDate });
+          toast.success(tPage("shiftClosePreviousSuccess", { date: fmtDate }), { position: "top-right" });
+        } else if (isShiftClosed) {
+          // Previous day has canceled orders → closed shift but forgot schedule → open schedule
+          await orderApi.shiftOpen({ operation_date: prevDate });
+          toast.success(tPage("shiftOpenPreviousSuccess", { date: fmtDate }), { position: "top-right" });
+        }
       } else {
-        await orderApi.shiftOpen({ operation_date: operationDate });
-        const [y, m, d] = operationDate.split("-");
-        toast.success(tPage("shiftOpenSuccess", { date: `${d}/${m}/${y}` }), { position: "top-right" });
+        const todayDate = getTodayDate();
+        const [y, m, d] = todayDate.split("-");
+        const fmtDate = `${d}/${m}/${y}`;
+        if (isScheduleLocked) {
+          await orderApi.shiftReopenInit({ operation_date: todayDate });
+          toast.success(tPage("shiftReopenTodaySuccess", { date: fmtDate }), { position: "top-right" });
+        } else {
+          await orderApi.shiftOpen({ operation_date: todayDate });
+          toast.success(tPage("shiftOpenTodaySuccess", { date: fmtDate }), { position: "top-right" });
+        }
       }
       await fetchAll();
     } catch {
-      toast.error(isScheduleLocked ? tPage("shiftReopenInitFailed") : tPage("shiftOpenFailed"), { position: "top-right" });
+      if (mode === "previous") {
+        toast.error(
+          isScheduleLocked ? tPage("shiftClosePreviousFailed") : tPage("shiftOpenPreviousFailed"),
+          { position: "top-right" },
+        );
+      } else {
+        toast.error(
+          isScheduleLocked ? tPage("shiftReopenTodayFailed") : tPage("shiftOpenTodayFailed"),
+          { position: "top-right" },
+        );
+      }
     } finally {
       setIsShiftToggling(false);
     }
-  }, [fetchAll, isScheduleLocked, operationDate, tPage]);
+  }, [fetchAll, isScheduleLocked, isShiftClosed, mode, tPage]);
 
   const handleRebalance = useCallback(async () => {
     setIsRebalancing(true);
@@ -245,12 +282,41 @@ export default function EndOfDayVehicleManager() {
               </div>
 
               <p className="max-w-3xl text-base font-semibold uppercase md:text-lg" style={{ color: "var(--dd-text-muted)" }}>
-                {tPage("subtitle")}
+                {mode === "today" ? tPage("subtitleToday") : mode === "previous" ? tPage("subtitlePrevious") : tPage("subtitle")}
               </p>
             </div>
 
             <div className="flex flex-col gap-4 xl:items-end">
               <div className="flex flex-wrap items-center gap-3">
+                <div
+                  className="flex items-center rounded-lg p-1"
+                  style={{ background: "var(--dd-bg-surface)", border: "1px solid var(--dd-border)" }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => router.replace(`${ADMIN.END_OF_DAY_VEHICLES}?mode=today`)}
+                    className={`px-4 py-2 text-sm font-bold uppercase transition-all rounded-md ${
+                      mode === "today"
+                        ? "bg-amber-500/20 text-amber-600 border border-amber-500/30"
+                        : "text-slate-500 border border-transparent hover:text-slate-700"
+                    }`}
+                  >
+                    {tPage("modeToday")}
+                  </button>
+                  <div className="mx-1 h-4 w-[1px] opacity-20" style={{ background: "var(--dd-text-muted)" }} />
+                  <button
+                    type="button"
+                    onClick={() => router.replace(`${ADMIN.END_OF_DAY_VEHICLES}?mode=previous`)}
+                    className={`px-4 py-2 text-sm font-bold uppercase transition-all rounded-md ${
+                      mode === "previous"
+                        ? "bg-sky-500/20 text-sky-600 border border-sky-500/30"
+                        : "text-slate-500 border border-transparent hover:text-slate-700"
+                    }`}
+                  >
+                    {tPage("modePrevious")}
+                  </button>
+                </div>
+
                 <div
                   className={`flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-bold uppercase ${isConnected ? "animate-flash-bg" : ""}`} style={{
                     borderColor: isConnected ? "rgba(16, 185, 129, 0.24)" : "rgba(239, 68, 68, 0.22)",
@@ -290,7 +356,7 @@ export default function EndOfDayVehicleManager() {
                 <button
                   type="button"
                   onClick={handleShiftToggle}
-                  disabled={isShiftToggling}
+                  disabled={isShiftToggling || (mode === "previous" && !isScheduleLocked && !isShiftClosed)}
                   className="dd-btn flex items-center gap-2 disabled:opacity-50"
                   style={{
                     background: isScheduleLocked
@@ -303,7 +369,10 @@ export default function EndOfDayVehicleManager() {
                   }}
                 >
                   <ArrowRightLeft className={`h-4 w-4 ${isShiftToggling ? "animate-pulse" : ""}`} />
-                  {isScheduleLocked ? tPage("shiftReopenInitAction") : tPage("shiftOpenAction")}
+                  {mode === "previous"
+                    ? (isScheduleLocked ? tPage("shiftClosePreviousAction") : isShiftClosed ? tPage("shiftOpenPreviousAction") : tPage("shiftOpenAction"))
+                    : (isScheduleLocked ? tPage("shiftReopenTodayAction") : tPage("shiftOpenTodayAction"))
+                  }
                 </button>
               </div>
 
@@ -374,7 +443,7 @@ export default function EndOfDayVehicleManager() {
               orders={managedOrders}
               dispatchMode="auto"
               layout="board"
-              orderStatusFilter={["init"]}
+              orderStatusFilter={mode === "previous" ? ["pending", "canceled"] : ["init"]}
               onOrdersUpdated={fetchAll}
             />
           </div>

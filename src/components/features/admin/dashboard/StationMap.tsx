@@ -1,5 +1,5 @@
 import "leaflet/dist/leaflet.css";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from "react-leaflet";
 import L from "leaflet";
 import type { NearbyVehicle } from "@/hooks/useNearbyVehicles";
@@ -45,6 +45,8 @@ interface StationMapProps {
   stationLatitude: number | null;
   radius: number;
   vehicles: NearbyVehicle[];
+  focusVehicle?: { latitude: number; longitude: number } | null;
+  focusDeviceId?: string | null;
 }
 
 // Component này dùng để tự động fit map với bounds của trạm
@@ -56,8 +58,40 @@ function MapUpdater({ stationLat, stationLng }: { stationLat: number; stationLng
   return null;
 }
 
-export default function StationMap({ stationLongitude, stationLatitude, radius, vehicles }: StationMapProps) {
+// Component flyTo khi chọn xe + mở popup
+function FlyToVehicle({ focusVehicle, focusDeviceId, markerRefs }: {
+  focusVehicle: { latitude: number; longitude: number } | null;
+  focusDeviceId: string | null;
+  markerRefs: React.RefObject<Record<string, L.Marker>>;
+}) {
+  const map = useMap();
+  useEffect(() => {
+    if (focusVehicle) {
+      map.flyTo([focusVehicle.latitude, focusVehicle.longitude], 17, { animate: true, duration: 1 });
+
+      // Mở popup sau khi flyTo xong
+      if (focusDeviceId && markerRefs.current) {
+        setTimeout(() => {
+          const marker = markerRefs.current[focusDeviceId];
+          if (marker) marker.openPopup();
+        }, 1100);
+      }
+    }
+  }, [map, focusVehicle, focusDeviceId, markerRefs]);
+  return null;
+}
+
+export default function StationMap({ stationLongitude, stationLatitude, radius, vehicles, focusVehicle, focusDeviceId }: StationMapProps) {
   const [mounted, setMounted] = useState(false);
+  const markerRefs = useRef<Record<string, L.Marker>>({});
+
+  const setMarkerRef = useCallback((deviceId: string, ref: L.Marker | null) => {
+    if (ref) {
+      markerRefs.current[deviceId] = ref;
+    } else {
+      delete markerRefs.current[deviceId];
+    }
+  }, []);
 
   useEffect(() => {
     setMounted(true);
@@ -90,6 +124,7 @@ export default function StationMap({ stationLongitude, stationLatitude, radius, 
         />
 
         <MapUpdater stationLat={stationLat} stationLng={stationLng} />
+        <FlyToVehicle focusVehicle={focusVehicle ?? null} focusDeviceId={focusDeviceId ?? null} markerRefs={markerRefs} />
 
         {/* Vị trí trạm */}
         <Marker position={[stationLat, stationLng]} icon={iconDefault}>
@@ -114,7 +149,8 @@ export default function StationMap({ stationLongitude, stationLatitude, radius, 
           const icon = v.status === "run" ? runIcon : v.status === "park" ? parkIcon : offlineIcon;
 
           return (
-            <Marker key={v.device_id} position={[v.latitude, v.longitude]} icon={icon}>
+            <Marker key={v.device_id} position={[v.latitude, v.longitude]} icon={icon}
+              ref={(ref) => setMarkerRef(v.device_id, ref as unknown as L.Marker | null)}>
               <Popup>
                 <div className="font-sans min-w-[200px] p-0.5">
                   <strong className="text-base font-bold text-slate-800 uppercase">{v.license_plate}</strong>

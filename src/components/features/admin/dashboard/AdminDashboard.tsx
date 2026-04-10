@@ -7,14 +7,18 @@ import type { Vehicle } from "@/types/vehicle";
 import orderApi from "@/services/order.service";
 import type { Order } from "@/types/order";
 import { Skeleton, Tooltip } from "antd";
-import { RefreshCw, Map as MapIcon, Maximize2, Minimize2, Truck, Radio, CheckCircle2 } from "lucide-react";
+import { RefreshCw, Map as MapIcon, Maximize2, Minimize2, Truck, Radio, CheckCircle2, Clock, Route, MapPin, Search, CalendarClock } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { ADMIN } from "@/constants/route";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useLocale, useTranslations } from "next-intl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNearbyVehicles } from "@/hooks/useNearbyVehicles";
 import { useDeviceHeartbeat } from "@/hooks/useDeviceHeartbeat";
 import { useRealtimeUpdates } from "@/hooks/useRealtimeUpdates";
 import dynamic from "next/dynamic";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 
 import StationStatusPanel from "./StationStatusPanel";
@@ -224,8 +228,37 @@ export default function AdminDashboard() {
     return orders.filter(o => o.order_status === "completed" && o.order_end_datetime?.slice(0, 10) === today);
   }, [orders]);
 
+  useEffect(() => {
+    if (!loading && ordersPending.length === 0 && ordersAtStation.length === 0 && ordersInTransit.length === 0) {
+      setShowNoPendingModal(true);
+    }
+  }, [loading, ordersPending.length, ordersAtStation.length, ordersInTransit.length]);
+
+  const ordersActive = useMemo(() => {
+    return orders.filter(o =>
+      o.order_status === "collecting" || o.order_status === "transporting" || o.order_status === "running"
+    );
+  }, [orders]);
+
+  const ordersTodayPanel = useMemo(() => {
+    return [...ordersActive, ...ordersCompleted].sort(
+      (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+    );
+  }, [ordersActive, ordersCompleted]);
+
   const [dispatchMode, setDispatchMode] = useState<DispatchMode>('auto');
-  const [showMap, setShowMap] = useState(true);
+  const [showMap, setShowMap] = useState(false);
+  const [showNoPendingModal, setShowNoPendingModal] = useState(false);
+  const router = useRouter();
+  const [mapSearch, setMapSearch] = useState('');
+  const [focusVehicleId, setFocusVehicleId] = useState<string | null>(null);
+  const [mapStatusFilter, setMapStatusFilter] = useState<'all' | 'run' | 'park' | 'offline'>('all');
+
+  const focusVehicle = useMemo(() => {
+    if (!focusVehicleId) return null;
+    const v = vtrackingVehicles.find(v => v.device_id === focusVehicleId);
+    return v ? { latitude: v.latitude, longitude: v.longitude } : null;
+  }, [focusVehicleId, vtrackingVehicles]);
 
   // if (loading) {
   //   return (
@@ -410,6 +443,42 @@ export default function AdminDashboard() {
           </div>
         </div>
 
+        {/* ═══ END-OF-DAY BANNER ═══ */}
+        {!loading && orders.length > 0 && ordersPending.length === 0 && ordersAtStation.length === 0 && ordersInTransit.length === 0 && (
+          <div
+            className="mb-6 rounded-2xl border px-6 py-4"
+            style={{
+              background: "linear-gradient(135deg, rgba(245, 158, 11, 0.08), rgba(217, 119, 6, 0.06))",
+              borderColor: "rgba(245, 158, 11, 0.25)",
+            }}
+          >
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <CalendarClock className="h-5 w-5 text-amber-500 shrink-0" />
+                <div>
+                  <div className="text-base font-bold uppercase" style={{ color: "var(--dd-text-primary)" }}>
+                    {t("endOfDayBannerTitle")}
+                  </div>
+                  <div className="text-sm font-semibold" style={{ color: "var(--dd-text-muted)" }}>
+                    {t("endOfDayBannerDescription")}
+                  </div>
+                </div>
+              </div>
+              <Link
+                href={`${ADMIN.END_OF_DAY_VEHICLES}?mode=today`}
+                className="dd-btn flex shrink-0 items-center gap-2 font-bold uppercase"
+                style={{
+                  background: "linear-gradient(135deg, rgba(245, 158, 11, 0.16), rgba(217, 119, 6, 0.12))",
+                  border: "1px solid rgba(245, 158, 11, 0.25)",
+                  color: "#b45309",
+                }}
+              >
+                {t("endOfDayBannerAction")}
+              </Link>
+            </div>
+          </div>
+        )}
+
         {/* ═══ SYSTEM TELEMETRY ═══ */}
         <div className="mb-6 dd-card p-5 md:p-6">
           <StationStatusPanel stations={stations} orders={orders} deviceStationStatusMap={stationStatusMap} onStationUpdated={fetchAll} />
@@ -517,11 +586,8 @@ export default function AdminDashboard() {
                 </button>
                 <div className="w-[1px] h-4 mx-1 opacity-20" style={{ background: 'var(--dd-text-muted)' }} />
                 <button
-                  onClick={() => setShowMap((previous) => !previous)}
-                  className={`flex items-center gap-2 px-3 py-1.5 text-sm font-bold uppercase transition-all rounded-md ${showMap
-                    ? 'bg-emerald-500/20 text-emerald-600 border border-emerald-500/30'
-                    : 'text-slate-500 border border-transparent hover:text-slate-700'
-                    }`}
+                  onClick={() => setShowMap(true)}
+                  className="flex items-center gap-2 px-3 py-1.5 text-sm font-bold uppercase transition-all rounded-md text-slate-500 border border-transparent hover:text-slate-700 hover:bg-slate-100"
                 >
                   <MapIcon className="h-3.5 w-3.5 shrink-0" />
                   <span className="hidden sm:inline">MAP</span>
@@ -532,18 +598,6 @@ export default function AdminDashboard() {
             {/* Core Display Area */}
             <div className="flex-1 overflow-hidden relative bg-transparent p-2">
               <div className="flex h-full flex-col gap-2">
-                {showMap && (
-                  <div className="h-[230px] w-full rounded-xl overflow-hidden shrink-0"
-                    style={{ border: '1px solid rgba(99, 102, 241, 0.2)' }}>
-                    <StationMap
-                      stationLongitude={geofenceStation?.station_gps_longitude ?? null}
-                      stationLatitude={geofenceStation?.station_gps_latitude ?? null}
-                      radius={geofenceStation?.station_gps_geofencing || 500}
-                      vehicles={vtrackingVehicles}
-                    />
-                  </div>
-                )}
-
                 <div className="min-h-0 flex-1 overflow-y-auto w-full scrollbar-hide">
                   <div className="h-full">
                     <ActivityFlow
@@ -559,7 +613,7 @@ export default function AdminDashboard() {
             </div>
           </div>
 
-          {/* Right: Completed Orders Today (col-span-3) */}
+          {/* Right: Today's Orders (col-span-3) */}
           <div className="lg:col-span-3 h-[704px] animate-fade-up" style={{ animationDelay: '0.6s' }}>
             <div className="flex h-full flex-col overflow-hidden dd-card" style={{ borderColor: 'rgba(16, 185, 129, 0.2)' }}>
               <div className="flex items-center justify-between px-4 py-3 text-base font-semibold"
@@ -568,10 +622,17 @@ export default function AdminDashboard() {
                   <CheckCircle2 className="w-5 h-5 text-emerald-500" />
                   <span>{t('completedToday')}</span>
                 </div>
-                <span className="dd-chip dd-chip-emerald">{ordersCompleted.length}</span>
+                <div className="flex items-center gap-2">
+                  {ordersActive.length > 0 && (
+                    <span className="dd-chip" style={{ background: 'rgba(14, 165, 233, 0.12)', color: '#0ea5e9', border: '1px solid rgba(14, 165, 233, 0.3)' }}>
+                      {ordersActive.length} {t('running')}
+                    </span>
+                  )}
+                  <span className="dd-chip dd-chip-emerald">{ordersCompleted.length}</span>
+                </div>
               </div>
               <div className="flex-1 overflow-y-auto">
-                {ordersCompleted.length === 0 ? (
+                {ordersTodayPanel.length === 0 ? (
                   <div className="flex items-center justify-center h-full">
                     <div className="flex flex-col items-center justify-center">
                       <div className="h-14 w-14 rounded-full flex items-center justify-center backdrop-blur-md"
@@ -586,37 +647,80 @@ export default function AdminDashboard() {
                   </div>
                 ) : (
                   <ul className="flex flex-col gap-3 p-3">
-                    {ordersCompleted.map((o) => (
-                      <li key={o.order_id} className="dd-surface p-4 transition-all relative overflow-hidden"
-                        style={{ borderRadius: '12px', border: '1px solid var(--dd-border)' }}
-                        onMouseEnter={e => e.currentTarget.style.borderColor = 'rgba(16, 185, 129, 0.4)'}
-                        onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--dd-border)'}>
-                        <div className="absolute left-0 top-0 bottom-0 w-1" style={{ background: '#10b981' }} />
+                    {ordersTodayPanel.map((o) => {
+                      const isCompleted = o.order_status === "completed";
+                      const accentColor = isCompleted ? '#10b981' : '#0ea5e9';
+                      const hoverBorder = isCompleted ? 'rgba(16, 185, 129, 0.4)' : 'rgba(14, 165, 233, 0.4)';
+                      return (
+                        <li key={o.order_id} className="dd-surface p-4 transition-all relative overflow-hidden"
+                          style={{ borderRadius: '12px', border: '1px solid var(--dd-border)' }}
+                          onMouseEnter={e => e.currentTarget.style.borderColor = hoverBorder}
+                          onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--dd-border)'}>
+                          <div className="absolute left-0 top-0 bottom-0 w-1" style={{ background: accentColor }} />
 
-                        <div className="flex justify-between items-end pl-2">
-                          <div className="flex items-center gap-3">
-                            <Truck className="w-5 h-5 text-emerald-500" />
-                            <span className="text-xl font-bold" style={{ color: 'var(--dd-text-primary)' }}>
-                              {o.vehicles?.vehicle_license_plate || `#${o.order_id}`}
-                            </span>
-                          </div>
-                          <span className="dd-chip dd-chip-emerald">
-                            {t('completed')}
-                          </span>
-                        </div>
-                        <div className="mt-3 pl-2 flex items-center justify-between">
-                          <div className="text-xs font-bold uppercase"
-                            style={{ color: 'var(--dd-text-muted)' }}>
-                            {o.stations?.station_name || t('unassigned')}
-                          </div>
-                          {o.order_end_datetime && (
-                            <div className="text-xs font-semibold" style={{ color: 'var(--dd-text-muted)' }}>
-                              {new Date(o.order_end_datetime).toLocaleTimeString(locale === 'vi' ? 'vi-VN' : 'en-US', { hour: '2-digit', minute: '2-digit' })}
+                          <div className="flex justify-between items-end pl-2">
+                            <div className="flex items-center gap-3">
+                              <Truck className="w-5 h-5" style={{ color: accentColor }} />
+                              <span className="text-xl font-bold" style={{ color: 'var(--dd-text-primary)' }}>
+                                {o.vehicles?.vehicle_license_plate || `#${o.order_id}`}
+                              </span>
                             </div>
-                          )}
-                        </div>
-                      </li>
-                    ))}
+                            {isCompleted ? (
+                              <span className="dd-chip dd-chip-emerald">
+                                {t('completed')}
+                              </span>
+                            ) : (
+                              <span className="dd-chip" style={{ background: 'rgba(14, 165, 233, 0.12)', color: '#0ea5e9', border: '1px solid rgba(14, 165, 233, 0.3)' }}>
+                                {o.order_status === "collecting" ? t('collecting') : t('running')}
+                              </span>
+                            )}
+                          </div>
+                          <div className="mt-3 pl-2 flex items-center justify-between">
+                            <div className="text-xs font-bold uppercase"
+                              style={{ color: 'var(--dd-text-muted)' }}>
+                              {o.stations?.station_name || t('unassigned')}
+                            </div>
+                            <div className="flex items-center gap-3">
+                              {o.order_start_datetime && o.order_end_datetime && (() => {
+                                const diffMs = new Date(o.order_end_datetime).getTime() - new Date(o.order_start_datetime).getTime();
+                                const diffMins = Math.floor(diffMs / 60000);
+                                const hours = Math.floor(diffMins / 60);
+                                const mins = diffMins % 60;
+                                return (
+                                  <div className="flex items-center gap-1 text-xs font-semibold" style={{ color: accentColor }}>
+                                    <Clock className="w-3 h-3" />
+                                    <span>{hours > 0 ? `${hours}h${mins.toString().padStart(2, '0')}m` : `${mins}m`}</span>
+                                  </div>
+                                );
+                              })()}
+                              {o.order_end_datetime && (
+                                <div className="text-xs font-semibold" style={{ color: 'var(--dd-text-muted)' }}>
+                                  {new Date(o.order_end_datetime).toLocaleTimeString(locale === 'vi' ? 'vi-VN' : 'en-US', { hour: '2-digit', minute: '2-digit' })}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {/* Distance & Stops from order_multi */}
+                          {o.order_multi && (() => {
+                            const distanceKm = ((o.order_multi.distance_end - o.order_multi.distance_start) / 1000).toFixed(1);
+                            const stops = o.order_multi.nStop_end - o.order_multi.nStop_start;
+                            return (
+                              <div className="mt-2 pl-2 flex items-center gap-4">
+                                <div className="flex items-center gap-1 text-xs font-semibold" style={{ color: '#0ea5e9' }}>
+                                  <Route className="w-3 h-3" />
+                                  <span>{distanceKm} km</span>
+                                </div>
+                                <div className="flex items-center gap-1 text-xs font-semibold" style={{ color: '#f59e0b' }}>
+                                  <MapPin className="w-3 h-3" />
+                                  <span>{stops} {t('stops') || 'lần dừng'}</span>
+                                </div>
+                              </div>
+                            );
+                          })()}
+                        </li>
+                      );
+                    })}
                   </ul>
                 )}
               </div>
@@ -640,6 +744,172 @@ export default function AdminDashboard() {
           </p>
         </div>
       </div>
+
+      {/* ═══ NO PENDING MODAL ═══ */}
+      <Dialog open={showNoPendingModal} onOpenChange={() => {}}>
+        <DialogContent
+          className="sm:max-w-md"
+          showCloseButton={false}
+          onPointerDownOutside={(e) => e.preventDefault()}
+          onEscapeKeyDown={(e) => e.preventDefault()}
+        >
+          <div className="flex flex-col items-center gap-5 py-4">
+            <div
+              className="flex h-16 w-16 items-center justify-center rounded-full"
+              style={{
+                background: "linear-gradient(135deg, rgba(245, 158, 11, 0.15), rgba(217, 119, 6, 0.1))",
+                border: "2px solid rgba(245, 158, 11, 0.3)",
+              }}
+            >
+              <CalendarClock className="h-8 w-8 text-amber-500" />
+            </div>
+            <div className="text-center">
+              <h3 className="text-xl font-black uppercase" style={{ color: "var(--dd-text-primary)" }}>
+                {t("endOfDayBannerTitle")}
+              </h3>
+              <p className="mt-2 text-sm font-semibold" style={{ color: "var(--dd-text-muted)" }}>
+                {t("endOfDayBannerDescription")}
+              </p>
+            </div>
+            <div className="flex w-full gap-3">
+              <button
+                type="button"
+                onClick={() => setShowNoPendingModal(false)}
+                className="dd-btn flex-1 py-3 text-sm font-bold uppercase"
+                style={{
+                  background: "var(--dd-bg-surface)",
+                  border: "1px solid var(--dd-border)",
+                  color: "var(--dd-text-muted)",
+                }}
+              >
+                {t("endOfDayBannerDismiss")}
+              </button>
+              <button
+                type="button"
+                onClick={() => router.push(`${ADMIN.END_OF_DAY_VEHICLES}`)}
+                className="dd-btn flex-1 py-3 text-sm font-bold uppercase"
+                style={{
+                  background: "linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(217, 119, 6, 0.15))",
+                  border: "1px solid rgba(245, 158, 11, 0.35)",
+                  color: "#92400e",
+                }}
+              >
+                {t("endOfDayBannerAction")}
+              </button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* ═══ MAP DIALOG ═══ */}
+      <Dialog open={showMap} onOpenChange={(open) => { if (!open) { setShowMap(false); setMapSearch(''); setFocusVehicleId(null); setMapStatusFilter('all'); } }}>
+        <DialogContent className="max-w-7xl sm:max-w-7xl w-[95vw] h-[85vh] p-0 gap-0 overflow-hidden" showCloseButton={false}>
+          <div className="flex h-full overflow-hidden">
+            {/* Left: Vehicle Search */}
+            <div className="w-[300px] shrink-0 flex flex-col border-r" style={{ borderColor: 'var(--dd-border)' }}>
+              <DialogHeader className="px-4 py-3 shrink-0" style={{ borderBottom: '1px solid var(--dd-border)' }}>
+                <DialogTitle className="text-base font-bold uppercase flex items-center gap-2">
+                  <MapIcon className="w-4 h-4 text-sky-500" />
+                  {t('searchVehicle')}
+                </DialogTitle>
+              </DialogHeader>
+              <div className="px-3 py-2 shrink-0" style={{ borderBottom: '1px solid var(--dd-border)' }}>
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <input
+                    type="text"
+                    value={mapSearch}
+                    onChange={(e) => setMapSearch(e.target.value)}
+                    placeholder={t('searchVehicle')}
+                    className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border bg-white focus:outline-none focus:ring-2 focus:ring-sky-500/30 focus:border-sky-400"
+                    style={{ borderColor: 'var(--dd-border)' }}
+                  />
+                </div>
+              </div>
+              {/* Status Filter */}
+              <div className="flex items-center gap-1.5 px-3 py-2 shrink-0" style={{ borderBottom: '1px solid var(--dd-border)' }}>
+                {([
+                  { key: 'all', label: t('all') || 'Tất cả', color: '#64748b', bg: 'rgba(100,116,139,0.1)' },
+                  { key: 'run', label: t('running'), color: '#10b981', bg: 'rgba(16,185,129,0.1)' },
+                  { key: 'park', label: t('stopped'), color: '#f59e0b', bg: 'rgba(245,158,11,0.1)' },
+                  { key: 'offline', label: t('disconnected'), color: '#94a3b8', bg: 'rgba(148,163,184,0.1)' },
+                ] as const).map((f) => (
+                  <button
+                    key={f.key}
+                    onClick={() => setMapStatusFilter(f.key)}
+                    className="px-2.5 py-1 text-xs font-bold rounded-full transition-all border"
+                    style={{
+                      background: mapStatusFilter === f.key ? f.bg : 'transparent',
+                      color: mapStatusFilter === f.key ? f.color : 'var(--dd-text-muted)',
+                      borderColor: mapStatusFilter === f.key ? f.color + '40' : 'transparent',
+                    }}
+                  >
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+              <div className="flex-1 overflow-y-auto overscroll-contain p-2">
+                {vtrackingVehicles
+                  .filter(v => {
+                    if (mapStatusFilter !== 'all' && v.status !== mapStatusFilter) return false;
+                    if (!mapSearch) return true;
+                    const q = mapSearch.toLowerCase();
+                    return v.license_plate?.toLowerCase().includes(q) || v.vehicle_name?.toLowerCase().includes(q);
+                  })
+                  .map((v) => {
+                    const isActive = focusVehicleId === v.device_id;
+                    return (
+                      <button
+                        key={v.device_id}
+                        onClick={() => setFocusVehicleId(v.device_id)}
+                        className={`w-full text-left p-3 rounded-xl mb-1.5 border transition-all ${
+                          isActive
+                            ? 'border-sky-400 bg-sky-50 shadow-sm'
+                            : 'border-transparent hover:bg-slate-50 hover:border-slate-200'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <div className="h-3 w-3 rounded-full shrink-0 border-2 border-white shadow-sm"
+                            style={{
+                              background: v.status === 'run' ? '#10b981' : v.status === 'park' ? '#f59e0b' : '#94a3b8',
+                            }}
+                          />
+                          <span className="text-sm font-bold" style={{ color: 'var(--dd-text-primary)' }}>
+                            {v.license_plate}
+                          </span>
+                        </div>
+                        <div className="mt-1.5 pl-5 flex items-center justify-between text-xs" style={{ color: 'var(--dd-text-muted)' }}>
+                          <span>{v.status === 'run' ? t('running') : v.status === 'park' ? t('stopped') : t('disconnected')}</span>
+                          <span className="font-semibold tabular-nums">{v.speed} km/h</span>
+                        </div>
+                        <div className="mt-0.5 pl-5 text-xs" style={{ color: 'var(--dd-text-muted)' }}>
+                          {v.distance >= 1000 ? `${(v.distance / 1000).toFixed(1)} km` : `${v.distance} m`}
+                        </div>
+                      </button>
+                    );
+                  })}
+                {vtrackingVehicles.length === 0 && (
+                  <div className="flex items-center justify-center h-32 text-sm font-bold uppercase" style={{ color: 'var(--dd-text-muted)' }}>
+                    {t('empty')}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Right: Map */}
+            <div className="flex-1 relative">
+              <StationMap
+                stationLongitude={geofenceStation?.station_gps_longitude ?? null}
+                stationLatitude={geofenceStation?.station_gps_latitude ?? null}
+                radius={geofenceStation?.station_gps_geofencing || 500}
+                vehicles={vtrackingVehicles}
+                focusVehicle={focusVehicle}
+                focusDeviceId={focusVehicleId}
+              />
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
