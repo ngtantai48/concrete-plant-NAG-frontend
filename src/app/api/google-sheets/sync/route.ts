@@ -51,7 +51,7 @@ export async function POST(request: Request) {
         requestBody: { values: [header] },
       });
 
-      // Freeze top row + bold header
+      // Freeze top row + style header + auto-filter
       await sheets.spreadsheets.batchUpdate({
         spreadsheetId,
         requestBody: {
@@ -67,9 +67,21 @@ export async function POST(request: Request) {
             },
             {
               repeatCell: {
-                range: { sheetId, startRowIndex: 0, endRowIndex: 1 },
-                cell: { userEnteredFormat: { textFormat: { bold: true } } },
-                fields: "userEnteredFormat.textFormat.bold",
+                range: { sheetId, startRowIndex: 0, endRowIndex: 1, startColumnIndex: 0, endColumnIndex: 6 },
+                cell: {
+                  userEnteredFormat: {
+                    backgroundColor: { red: 0.2, green: 0.66, blue: 0.33, alpha: 1 },
+                    textFormat: { bold: true, foregroundColor: { red: 1, green: 1, blue: 1 } },
+                  },
+                },
+                fields: "userEnteredFormat(textFormat,backgroundColor)",
+              },
+            },
+            {
+              setBasicFilter: {
+                filter: {
+                  range: { sheetId, startRowIndex: 0, startColumnIndex: 0, endColumnIndex: 6 },
+                },
               },
             },
           ],
@@ -143,9 +155,21 @@ export async function DELETE() {
           },
           {
             repeatCell: {
-              range: { sheetId, startRowIndex: 0, endRowIndex: 1 },
-              cell: { userEnteredFormat: { textFormat: { bold: true } } },
-              fields: "userEnteredFormat.textFormat.bold",
+              range: { sheetId, startRowIndex: 0, endRowIndex: 1, startColumnIndex: 0, endColumnIndex: 6 },
+              cell: {
+                userEnteredFormat: {
+                  backgroundColor: { red: 0.2, green: 0.66, blue: 0.33, alpha: 1 },
+                  textFormat: { bold: true, foregroundColor: { red: 1, green: 1, blue: 1 } },
+                },
+              },
+              fields: "userEnteredFormat(textFormat,backgroundColor)",
+            },
+          },
+          {
+            setBasicFilter: {
+              filter: {
+                range: { sheetId, startRowIndex: 0, startColumnIndex: 0, endColumnIndex: 6 },
+              },
             },
           },
         ],
