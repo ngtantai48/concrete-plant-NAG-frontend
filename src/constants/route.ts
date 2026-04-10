@@ -12,6 +12,9 @@ export const ADMIN = {
   VEHICLE_MAINTENANCES: "/admin/vehicle-maintenances",
   PROFILE: "/profile",
   DRIVER_DISPLAY: "/admin/driver-display",
+  MEAL_CHECK: "/admin/meal-check",
+  ATTENDANCE: "/admin/attendance",
+  DRIVER_RICE: "/admin/driver-rice",
 };
 
 export const SHARE = {

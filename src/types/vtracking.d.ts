@@ -6,6 +6,7 @@ export interface VtrackingAttribute {
 }
 
 export interface VtrackingVehicle {
+  id: string;
   device_id: string;
   vehicle_name: string;
   license_plate: string;
