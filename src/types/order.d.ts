@@ -9,6 +9,7 @@ export interface OrderUser {
 
 export interface OrderVehicle {
   vehicle_id: number;
+  vehicle_name?: string | null;
   vehicle_license_plate: string;
   vehicle_rfid: string;
   vehicle_status: string;

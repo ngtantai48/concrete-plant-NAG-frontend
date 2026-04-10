@@ -330,7 +330,7 @@ function StationStatusCard({ station, collectingOrder, t }: {
           className="text-4xl lg:text-7xl font-bold text-blue-700 text-center leading-none"
           style={{ WebkitTextStrokeWidth: "5px", paintOrder: "stroke fill" }}
         >
-          {collectingOrder?.vehicles?.vehicle_license_plate || "N/A"}
+          {collectingOrder?.vehicles?.vehicle_license_plate ? `${collectingOrder.vehicles.vehicle_license_plate}${collectingOrder.vehicles.vehicle_name ? ` | ${collectingOrder.vehicles.vehicle_name}` : ''}` : "N/A"}
         </span>
       </div>
     );
@@ -415,7 +415,7 @@ function PendingOrderCard({ order, queueIndex, displayIndex, stationName, t }: {
             className={`text-shadow-lg/100 contrast-300 text-5xl xl:text-7xl 2xl:text-8xl font-bold tracking-tight text-center leading-none ${textClass}`}
             style={{ WebkitTextStrokeWidth: "5px", paintOrder: "stroke fill" }}
           >
-            {order.vehicles?.vehicle_license_plate || "N/A"}
+            {order.vehicles?.vehicle_license_plate ? `${order.vehicles.vehicle_license_plate}${order.vehicles.vehicle_name ? ` | ${order.vehicles.vehicle_name}` : ''}` : "N/A"}
           </span>
         </div>
       </CardContent>

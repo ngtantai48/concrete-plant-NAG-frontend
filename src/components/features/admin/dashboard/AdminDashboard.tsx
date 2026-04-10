@@ -176,7 +176,7 @@ export default function AdminDashboard() {
   );
 
   const { isConnected: socketConnected, lastSignal, lastSignalTime } = useRealtimeUpdates(fetchAll);
-  const { stationStatusMap } = useDeviceHeartbeat();
+  const { stationStatusMap, isLedConnected } = useDeviceHeartbeat();
 
   const readyVehicles = useMemo(() => vehicles.filter(v => v.vehicle_status === "available"), [vehicles]);
 
@@ -188,7 +188,7 @@ export default function AdminDashboard() {
         const isIncident = v.vehicle_status === "incident";
         list.push({
           id: `veh-${v.vehicle_id}`,
-          label: v.vehicle_license_plate,
+          label: v.vehicle_license_plate ? `${v.vehicle_license_plate}${v.vehicle_name ? ` | ${v.vehicle_name}` : ''}` : '',
           statusLabel: isIncident ? (t('incident') || 'Sự cố') : (tVehiclePage('maintenanceOption') || 'Bảo dưỡng'),
           chipClass: isIncident ? 'dd-chip-red' : 'dd-chip-amber'
         });
@@ -333,9 +333,31 @@ export default function AdminDashboard() {
             </div>
 
             <div className="flex flex-wrap items-stretch justify-end gap-4">
+              {/* LED Status */}
+              <div className="flex flex-col items-center justify-between" style={{ borderColor: 'var(--dd-border)' }}>
+                <span className="mb-1 text-md font-semibold uppercase"
+                  style={{ color: 'var(--dd-text-muted)' }}>
+                  Bảng LED
+                </span>
+                <Tooltip title={isLedConnected ? 'Bảng LED đang kết nối' : 'Bảng LED đang mất kết nối'}>
+                  <div className={`flex items-center gap-2 rounded-full px-4 py-2 border transition-colors ${isLedConnected
+                    ? "border-emerald-200 text-emerald-700 animate-flash-bg"
+                    : "border-red-200 bg-red-50 text-red-700"
+                    }`}>
+                    {isLedConnected
+                      ? <Radio className="h-4 w-4 text-emerald-500 animate-pulse" />
+                      : <div className="h-2 w-2 rounded-full" style={{ background: '#f87171', boxShadow: '0 0 8px rgba(248, 113, 113, 0.5)' }} />
+                    }
+                    <span className="text-base font-bold uppercase">
+                      {isLedConnected ? 'KẾT NỐI' : 'MẤT KẾT NỐI'}
+                    </span>
+                  </div>
+                </Tooltip>
+              </div>
+
               {/* Network Status */}
-              <div className="flex flex-col items-end justify-between">
-                <span className="mb-1 text-xs font-semibold uppercase"
+              <div className="flex flex-col items-center justify-between">
+                <span className="mb-1 text-md font-semibold uppercase"
                   style={{ color: 'var(--dd-text-muted)' }}>
                   {t('network')}
                 </span>
@@ -356,8 +378,8 @@ export default function AdminDashboard() {
               </div>
 
               {/* Sync Button */}
-              <div className="flex flex-col items-end justify-between">
-                <span className="mb-1 text-xs font-semibold uppercase"
+              <div className="flex flex-col items-center justify-between">
+                <span className="mb-1 text-md font-semibold uppercase"
                   style={{ color: 'var(--dd-text-muted)' }}>
                   {t('data')}
                 </span>
@@ -372,8 +394,8 @@ export default function AdminDashboard() {
               </div>
 
               {/* Shift Close */}
-              <div className="flex flex-col items-end justify-between border-l pl-4" style={{ borderColor: 'var(--dd-border)' }}>
-                <span className="mb-1 text-xs font-semibold uppercase"
+              <div className="flex flex-col items-center justify-between border-l pl-4" style={{ borderColor: 'var(--dd-border)' }}>
+                <span className="mb-1 text-md font-semibold uppercase"
                   style={{ color: 'var(--dd-text-muted)' }}>
                   {isShiftClosedForDate ? t('shiftReopenAction') : t('shiftCloseAction')}
                 </span>
@@ -401,7 +423,7 @@ export default function AdminDashboard() {
               </div>
 
               {/* Fullscreen Toggle */}
-              <div className="flex flex-col items-end justify-between ml-2 border-l pl-4" style={{ borderColor: 'var(--dd-border)' }}>
+              {/* <div className="flex flex-col items-end justify-between ml-2 border-l pl-4" style={{ borderColor: 'var(--dd-border)' }}>
                 <span className="mb-1 text-xs font-semibold uppercase"
                   style={{ color: 'var(--dd-text-muted)' }}>
                   Giao diện
@@ -415,7 +437,7 @@ export default function AdminDashboard() {
                   {isFullScreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
                   {isFullScreen ? "Thu Nhỏ" : "Mở Rộng"}
                 </button>
-              </div>
+              </div> */}
             </div>
           </div>
 
@@ -511,7 +533,7 @@ export default function AdminDashboard() {
                         <div className="h-8 w-8 rounded-full flex items-center justify-center shrink-0 border" style={{ background: 'rgba(16, 185, 129, 0.1)', borderColor: 'rgba(16, 185, 129, 0.3)' }}>
                           <Truck className="h-4 w-4 animate-drive-idle" style={{ color: 'var(--dd-emerald)' }} />
                         </div>
-                        <span className="text-base font-bold" style={{ color: 'var(--dd-text-primary)' }}>{v.vehicle_license_plate}</span>
+                        <span className="text-base font-bold" style={{ color: 'var(--dd-text-primary)' }}>{v.vehicle_license_plate}{v.vehicle_name ? ` | ${v.vehicle_name}` : ''}</span>
                       </li>
                     ))}
                   </ul>
@@ -662,7 +684,7 @@ export default function AdminDashboard() {
                             <div className="flex items-center gap-3">
                               <Truck className="w-5 h-5" style={{ color: accentColor }} />
                               <span className="text-xl font-bold" style={{ color: 'var(--dd-text-primary)' }}>
-                                {o.vehicles?.vehicle_license_plate || `#${o.order_id}`}
+                                {o.vehicles?.vehicle_license_plate ? `${o.vehicles.vehicle_license_plate}${o.vehicles.vehicle_name ? ` | ${o.vehicles.vehicle_name}` : ''}` : `#${o.order_id}`}
                               </span>
                             </div>
                             {isCompleted ? (
@@ -746,7 +768,7 @@ export default function AdminDashboard() {
       </div>
 
       {/* ═══ NO PENDING MODAL ═══ */}
-      <Dialog open={showNoPendingModal} onOpenChange={() => {}}>
+      <Dialog open={showNoPendingModal} onOpenChange={() => { }}>
         <DialogContent
           className="sm:max-w-md"
           showCloseButton={false}
@@ -862,11 +884,10 @@ export default function AdminDashboard() {
                       <button
                         key={v.device_id}
                         onClick={() => setFocusVehicleId(v.device_id)}
-                        className={`w-full text-left p-3 rounded-xl mb-1.5 border transition-all ${
-                          isActive
-                            ? 'border-sky-400 bg-sky-50 shadow-sm'
-                            : 'border-transparent hover:bg-slate-50 hover:border-slate-200'
-                        }`}
+                        className={`w-full text-left p-3 rounded-xl mb-1.5 border transition-all ${isActive
+                          ? 'border-sky-400 bg-sky-50 shadow-sm'
+                          : 'border-transparent hover:bg-slate-50 hover:border-slate-200'
+                          }`}
                       >
                         <div className="flex items-center gap-2.5">
                           <div className="h-3 w-3 rounded-full shrink-0 border-2 border-white shadow-sm"

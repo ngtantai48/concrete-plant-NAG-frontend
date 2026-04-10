@@ -65,7 +65,7 @@ export default function TableVehicleMaintenances() {
 
   const getVehiclePlate = (vehicleId: number) => {
     const found = vehicles.find((v) => v.vehicle_id === vehicleId);
-    return found?.vehicle_license_plate || `#${vehicleId}`;
+    return found?.vehicle_license_plate ? `${found.vehicle_license_plate}${found.vehicle_name ? ` | ${found.vehicle_name}` : ''}` : `#${vehicleId}`;
   };
 
   const filteredMaintenances = useMemo(() => {
@@ -476,7 +476,7 @@ export default function TableVehicleMaintenances() {
                   <Select size="large" className="rounded-lg" placeholder={t("vehiclePlaceholder")}>
                     {vehicles.map((v) => (
                       <Select.Option key={v.vehicle_id} value={v.vehicle_id}>
-                        {v.vehicle_license_plate}
+                        {v.vehicle_license_plate}{v.vehicle_name ? ` | ${v.vehicle_name}` : ''}
                       </Select.Option>
                     ))}
                   </Select>

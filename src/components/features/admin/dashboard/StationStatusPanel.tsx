@@ -51,7 +51,7 @@ export default function StationStatusPanel({ stations, orders, deviceStationStat
         }
 
         map[order.stations.station_id].push({
-          license_plate: order.vehicles?.vehicle_license_plate || `#${order.order_id}`,
+          license_plate: order.vehicles?.vehicle_license_plate ? `${order.vehicles.vehicle_license_plate}${order.vehicles.vehicle_name ? ` | ${order.vehicles.vehicle_name}` : ''}` : `#${order.order_id}`,
           status: order.order_status,
           order_number: order.order_number,
         });
@@ -75,7 +75,7 @@ export default function StationStatusPanel({ stations, orders, deviceStationStat
         const stationId = order.stations!.station_id;
         if (!map[stationId]) {
           map[stationId] = {
-            license_plate: order.vehicles?.vehicle_license_plate || `#${order.order_id}`,
+            license_plate: order.vehicles?.vehicle_license_plate ? `${order.vehicles.vehicle_license_plate}${order.vehicles.vehicle_name ? ` | ${order.vehicles.vehicle_name}` : ''}` : `#${order.order_id}`,
             order_number: order.order_number,
           };
         }
