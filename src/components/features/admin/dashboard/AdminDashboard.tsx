@@ -6,7 +6,7 @@ import vehicleApi from "@/services/vehicle.service";
 import type { Vehicle } from "@/types/vehicle";
 import orderApi from "@/services/order.service";
 import type { Order } from "@/types/order";
-import { RefreshCw, Map as MapIcon, Maximize2, Minimize2, Truck, Radio, CheckCircle2, Clock, Route, MapPin, Search, CalendarClock } from "lucide-react";
+import { RefreshCw, Map as MapIcon, Maximize2, Minimize2, Truck, Radio, CheckCircle2, Clock, Route, MapPin, Search, CalendarClock, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -45,9 +45,24 @@ const getTodayDate = () => {
   const timezoneOffset = now.getTimezoneOffset() * 60 * 1000;
   return new Date(now.getTime() - timezoneOffset).toISOString().slice(0, 10);
 };
+const getTomorrowDate = () => {
+  const now = new Date();
+  const timezoneOffset = now.getTimezoneOffset() * 60 * 1000;
+  const today = new Date(now.getTime() - timezoneOffset);
+  today.setDate(today.getDate() + 1);
+  return today.toISOString().slice(0, 10);
+};
+const getYesterdayDate = () => {
+  const now = new Date();
+  const timezoneOffset = now.getTimezoneOffset() * 60 * 1000;
+  const today = new Date(now.getTime() - timezoneOffset);
+  today.setDate(today.getDate() - 1);
+  return today.toISOString().slice(0, 10);
+};
 
 export default function AdminDashboard() {
   const t = useTranslations("DashboardPage");
+  const tEndOfDay = useTranslations("EndOfDayPage");
   const tVehiclePage = useTranslations("VehiclePage");
   const locale = useLocale();
 
@@ -56,6 +71,8 @@ export default function AdminDashboard() {
   const [stations, setStations] = useState<Station[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [tomorrowOrders, setTomorrowOrders] = useState<Order[]>([]);
+  const [yesterdayOrders, setYesterdayOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isShiftSubmitting, setIsShiftSubmitting] = useState(false);
@@ -100,7 +117,9 @@ export default function AdminDashboard() {
       const results = await Promise.allSettled([
         stationApi.getAll(),
         vehicleApi.getAll({ limit: 100 }),
-        orderApi.getByInitDate(getTodayDate())
+        orderApi.getByInitDate(getTodayDate()),
+        orderApi.getByInitDate(getTomorrowDate()),
+        orderApi.getByInitDate(getYesterdayDate()),
       ]);
 
       if (results[0].status === 'fulfilled') {
@@ -116,6 +135,14 @@ export default function AdminDashboard() {
       if (results[2].status === 'fulfilled') {
         const oRes = results[2].value;
         setOrders(oRes.data?.data || oRes.data || []);
+      }
+      if (results[3].status === 'fulfilled') {
+        const tmRes = results[3].value;
+        setTomorrowOrders(tmRes.data?.data || tmRes.data || []);
+      }
+      if (results[4]?.status === 'fulfilled') {
+        const ydRes = results[4].value;
+        setYesterdayOrders(ydRes.data?.data || ydRes.data || []);
       }
     } catch {
       //
@@ -134,12 +161,29 @@ export default function AdminDashboard() {
     setIsRefreshing(false);
   };
 
-  const isShiftClosedForDate = useMemo(() =>
-    Boolean(operationDate) && orders.some(
-      (o) => o.order_status === "canceled" && o.order_init_datetime?.slice(0, 10) === operationDate
-    ),
-    [orders, operationDate],
+  const isShiftClosedForDate = useMemo(
+    () => orders.some((o) => o.order_status === "canceled"),
+    [orders],
   );
+
+  const isTomorrowScheduleReady = useMemo(
+    () => tomorrowOrders.some((o) => o.order_status === "pending"),
+    [tomorrowOrders],
+  );
+
+  const pendingAction = useMemo(() => {
+    const hasTodayAnyOrder = orders.length > 0;
+    const hasYesterdayPending = yesterdayOrders.some((o) => o.order_status === "pending");
+    const hasYesterdayCanceledOrInit = yesterdayOrders.some(
+      (o) => o.order_status === "canceled" || o.order_status === "init"
+    );
+
+    if (!hasTodayAnyOrder) {
+      if (hasYesterdayPending) return "forgotShiftClose" as const;
+      if (hasYesterdayCanceledOrInit) return "forgotScheduleConfirm" as const;
+    }
+    return "none" as const;
+  }, [orders, yesterdayOrders]);
 
   const handleShiftToggle = useCallback(async () => {
     if (!operationDate) {
@@ -182,7 +226,7 @@ export default function AdminDashboard() {
   const { isConnected: socketConnected, lastSignal, lastSignalTime } = useRealtimeUpdates(fetchAll);
   const { stationStatusMap, isLedConnected } = useDeviceHeartbeat();
 
-  const readyVehicles = useMemo(() => vehicles.filter(v => v.vehicle_status === "available"), [vehicles]);
+  const inYardVehicles = useMemo(() => vtrackingVehicles.filter(v => v.inRange), [vtrackingVehicles]);
 
   const stoppedMaintenanceList = useMemo(() => {
     const list: { id: string; label: string; statusLabel: string; chipClass: string }[] = [];
@@ -224,7 +268,7 @@ export default function AdminDashboard() {
   const ordersAtStation = useMemo(() => orders.filter(o => o.order_status === "collecting"), [orders]);
   const ordersPending = useMemo(() => {
     const today = getTodayDate();
-    return orders.filter(o => o.order_status === "pending" && o.order_init_datetime?.slice(0, 10) === today);
+    return orders.filter(o => o.order_status === "pending" && o.order_init_datetime?.slice(0, 10) === today && o.vehicles?.vehicle_status === "available");
   }, [orders]);
   const ordersInTransit = useMemo(() => orders.filter(o => o.order_status === "transporting" || o.order_status === "running"), [orders]);
   const ordersCompleted = useMemo(() => {
@@ -233,10 +277,10 @@ export default function AdminDashboard() {
   }, [orders]);
 
   useEffect(() => {
-    if (!loading && ordersPending.length === 0 && ordersAtStation.length === 0 && ordersInTransit.length === 0) {
+    if (!loading && ordersPending.length === 0 && ordersAtStation.length === 0 && ordersInTransit.length === 0 && !isTomorrowScheduleReady) {
       setShowNoPendingModal(true);
     }
-  }, [loading, ordersPending.length, ordersAtStation.length, ordersInTransit.length]);
+  }, [loading, ordersPending.length, ordersAtStation.length, ordersInTransit.length, isTomorrowScheduleReady]);
 
   const ordersActive = useMemo(() => {
     return orders.filter(o =>
@@ -318,7 +362,7 @@ export default function AdminDashboard() {
   ];
 
   return (
-    <div className={`dashboard-light bg-cover bg-center ${isFullScreen ? 'fixed inset-0 z-[100] bg-slate-50 h-screen' : 'h-full'} overflow-hidden flex flex-col`}>
+    <div className={`dashboard-light bg-cover bg-center ${isFullScreen ? 'fixed inset-0 z-[100] bg-slate-50 h-screen' : 'h-[calc(100vh-64px)]'} overflow-hidden flex flex-col`}>
       <div className={`p-2 lg:px-4 lg:py-2 mx-auto bg-transparent w-full flex-1 flex flex-col min-h-0`}>
 
         {/* ═══ HEADER ═══ */}
@@ -388,28 +432,39 @@ export default function AdminDashboard() {
               </Button>
 
               {/* Shift Close */}
-              <div className="border-l pl-2 flex items-center" style={{ borderColor: 'var(--dd-border)' }}>
-                <Button
-                  variant={isShiftClosedForDate ? "outline" : "secondary"}
-                  size="sm"
-                  onClick={handleShiftToggle}
-                  disabled={isShiftSubmitting}
-                  className="h-7 px-2.5 text-xs font-bold uppercase gap-1"
-                  style={{
-                    background: isShiftClosedForDate
-                      ? 'linear-gradient(135deg, rgba(217, 119, 6, 0.14), rgba(245, 158, 11, 0.12))'
-                      : 'linear-gradient(135deg, rgba(109, 40, 217, 0.14), rgba(14, 165, 233, 0.1))',
-                    border: isShiftClosedForDate
-                      ? '1px solid rgba(217, 119, 6, 0.2)'
-                      : '1px solid rgba(109, 40, 217, 0.2)',
-                    color: isShiftClosedForDate ? '#b45309' : '#6d28d9',
-                  }}
+              {!isTomorrowScheduleReady && (
+                <div
+                  className="border-l pl-2 flex items-center"
+                  style={{ borderColor: "var(--dd-border)" }}
                 >
-                  <span className={`inline-block h-1.5 w-1.5 rounded-full ${isShiftSubmitting ? 'animate-pulse' : ''}`}
-                    style={{ background: isShiftClosedForDate ? '#d97706' : '#6d28d9' }} />
-                  {isShiftClosedForDate ? t('shiftReopenAction') : t('shiftCloseAction')}
-                </Button>
-              </div>
+                  <Button
+                    variant={isShiftClosedForDate ? "outline" : "secondary"}
+                    size="sm"
+                    onClick={handleShiftToggle}
+                    disabled={isShiftSubmitting}
+                    className="h-7 px-2.5 text-xs font-bold uppercase gap-1"
+                    style={{
+                      background: isShiftClosedForDate
+                        ? "linear-gradient(135deg, rgba(217, 119, 6, 0.14), rgba(245, 158, 11, 0.12))"
+                        : "linear-gradient(135deg, rgba(109, 40, 217, 0.14), rgba(14, 165, 233, 0.1))",
+                      border: isShiftClosedForDate
+                        ? "1px solid rgba(217, 119, 6, 0.2)"
+                        : "1px solid rgba(109, 40, 217, 0.2)",
+                      color: isShiftClosedForDate ? "#b45309" : "#6d28d9",
+                    }}
+                  >
+                    <span
+                      className={`inline-block h-1.5 w-1.5 rounded-full ${isShiftSubmitting ? "animate-pulse" : ""}`}
+                      style={{
+                        background: isShiftClosedForDate ? "#d97706" : "#6d28d9",
+                      }}
+                    />
+                    {isShiftClosedForDate
+                      ? t("shiftReopenAction")
+                      : t("shiftCloseAction")}
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
 
@@ -439,34 +494,114 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        {/* ═══ END-OF-DAY BANNER ═══ */}
-        {!loading && orders.length > 0 && ordersPending.length === 0 && ordersAtStation.length === 0 && ordersInTransit.length === 0 && (
+        {/* ═══ WARNING BANNER (YESTERDAY) ═══ */}
+        {!loading && pendingAction !== "none" && (
           <div
             className="mb-1.5 shrink-0 rounded-lg border px-3 py-1.5"
             style={{
-              background: "linear-gradient(135deg, rgba(245, 158, 11, 0.08), rgba(217, 119, 6, 0.06))",
-              borderColor: "rgba(245, 158, 11, 0.25)",
+              background:
+                pendingAction === "forgotShiftClose"
+                  ? "linear-gradient(135deg, rgba(239, 68, 68, 0.08), rgba(245, 158, 11, 0.06))"
+                  : "linear-gradient(135deg, rgba(245, 158, 11, 0.08), rgba(124, 58, 237, 0.06))",
+              borderColor:
+                pendingAction === "forgotShiftClose"
+                  ? "rgba(239, 68, 68, 0.25)"
+                  : "rgba(245, 158, 11, 0.25)",
             }}
           >
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">
-                <CalendarClock className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                <AlertTriangle
+                  className="h-3.5 w-3.5 shrink-0"
+                  style={{ color: pendingAction === "forgotShiftClose" ? "#ef4444" : "#d97706" }}
+                />
                 <span className="text-xs font-bold uppercase" style={{ color: "var(--dd-text-primary)" }}>
-                  {t("endOfDayBannerTitle")} — {t("endOfDayBannerDescription")}
+                  {tEndOfDay(
+                    pendingAction === "forgotShiftClose"
+                      ? "alertForgotShiftCloseTitle"
+                      : "alertForgotScheduleConfirmTitle"
+                  )} — {tEndOfDay(
+                    pendingAction === "forgotShiftClose"
+                      ? "alertForgotShiftCloseDescription"
+                      : "alertForgotScheduleConfirmDescription"
+                  )}
                 </span>
               </div>
               <Button
                 variant="outline"
                 size="sm"
-                className="h-7 px-2.5 text-xs font-bold uppercase gap-1 border-amber-300 text-amber-700 hover:bg-amber-50"
+                className="h-7 px-2.5 text-xs font-bold uppercase gap-1"
+                style={{
+                  borderColor: pendingAction === "forgotShiftClose" ? "#fca5a5" : "#fcd34d",
+                  color: pendingAction === "forgotShiftClose" ? "#b91c1c" : "#b45309",
+                }}
                 asChild
               >
-                <Link href={`${ADMIN.END_OF_DAY_VEHICLES}?mode=today`}>
-                  {t("endOfDayBannerAction")}
+                <Link href={`${ADMIN.END_OF_DAY_VEHICLES}?mode=previous`}>
+                  {tEndOfDay("alertGoToPrevious")}
                 </Link>
               </Button>
             </div>
           </div>
+        )}
+
+        {/* ═══ END-OF-DAY BANNER ═══ */}
+        {!loading && isShiftClosedForDate && pendingAction === "none" && (
+          isTomorrowScheduleReady ? (
+            <div
+              className="mb-1.5 shrink-0 rounded-lg border px-3 py-1.5"
+              style={{
+                background: "linear-gradient(135deg, rgba(16, 185, 129, 0.08), rgba(5, 150, 105, 0.06))",
+                borderColor: "rgba(16, 185, 129, 0.25)",
+              }}
+            >
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+                  <span className="text-xs font-bold uppercase" style={{ color: "var(--dd-text-primary)" }}>
+                    {t("tomorrowScheduleReadyTitle")} — {t("tomorrowScheduleReadyDescription", { count: tomorrowOrders.length })}
+                  </span>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 px-2.5 text-xs font-bold uppercase gap-1 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
+                  asChild
+                >
+                  <Link href={`${ADMIN.END_OF_DAY_VEHICLES}?mode=today`}>
+                    {t("undoScheduleAction")}
+                  </Link>
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <div
+              className="mb-1.5 shrink-0 rounded-lg border px-3 py-1.5"
+              style={{
+                background: "linear-gradient(135deg, rgba(245, 158, 11, 0.08), rgba(217, 119, 6, 0.06))",
+                borderColor: "rgba(245, 158, 11, 0.25)",
+              }}
+            >
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <CalendarClock className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                  <span className="text-xs font-bold uppercase" style={{ color: "var(--dd-text-primary)" }}>
+                    {t("endOfDayBannerTitle")} — {t("endOfDayBannerDescription")}
+                  </span>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-7 px-2.5 text-xs font-bold uppercase gap-1 border-amber-300 text-amber-700 hover:bg-amber-50"
+                  asChild
+                >
+                  <Link href={`${ADMIN.END_OF_DAY_VEHICLES}?mode=today`}>
+                    {t("endOfDayBannerAction")}
+                  </Link>
+                </Button>
+              </div>
+            </div>
+          )
         )}
 
         {/* \u2550\u2550\u2550 SYSTEM TELEMETRY \u2550\u2550\u2550 */}
@@ -475,7 +610,7 @@ export default function AdminDashboard() {
         </div>
 
         {/* ═══ COMMAND CORE GRID ═══ */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4  overflow-hidden">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 flex-1 min-h-0 overflow-hidden">
 
           {/* Left: Asset Management (col-span-3) */}
           <div className="lg:col-span-3 flex flex-col gap-1.5 h-full min-h-0 animate-fade-up" style={{ animationDelay: '0.2s' }}>
@@ -484,24 +619,29 @@ export default function AdminDashboard() {
               <div className="flex items-center justify-between px-3 py-1.5 text-xs font-semibold uppercase"
                 style={{ background: 'var(--dd-bg-header)', color: 'var(--dd-text-primary)', borderBottom: '1px solid var(--dd-border)' }}>
                 <span>{t('readyVehiclesPanel')}</span>
-                <span className="dd-chip dd-chip-emerald text-[10px] px-1.5 py-0.5">{readyVehicles.length}</span>
+                <span className="dd-chip dd-chip-emerald text-[10px] px-1.5 py-0.5">{inYardVehicles.length}</span>
               </div>
               <div className="overflow-y-auto p-0 flex-1">
-                {readyVehicles.length === 0 ? (
+                {inYardVehicles.length === 0 ? (
                   <div className="flex h-full items-center justify-center p-3">
                     <span className="text-xs font-bold uppercase" style={{ color: 'var(--dd-text-muted)' }}>{t('noReadyVehicles')}</span>
                   </div>
                 ) : (
                   <ul className="flex flex-col gap-1 px-4 py-2">
-                    {readyVehicles.map((v) => (
-                      <li key={v.vehicle_id} className="flex items-center gap-2 px-2 py-1 transition-colors rounded-md border shadow-sm cursor-default hover:shadow-md"
+                    {inYardVehicles.map((v) => (
+                      <li key={v.device_id} className="flex items-center gap-2 px-2 py-1 transition-colors rounded-md border shadow-sm cursor-default hover:shadow-md"
                         style={{ background: 'var(--dd-bg-surface)', borderColor: 'var(--dd-border)' }}
                         onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--dd-emerald)'}
                         onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--dd-border)'}>
                         <div className="h-5 w-5 rounded-full flex items-center justify-center shrink-0 border" style={{ background: 'rgba(16, 185, 129, 0.1)', borderColor: 'rgba(16, 185, 129, 0.3)' }}>
                           <Truck className="h-2.5 w-2.5 animate-drive-idle" style={{ color: 'var(--dd-emerald)' }} />
                         </div>
-                        <span className="text-xs font-bold" style={{ color: 'var(--dd-text-primary)' }}>{v.vehicle_license_plate}{v.vehicle_name ? ` | ${v.vehicle_name}` : ''}</span>
+                        <div className="flex flex-col min-w-0">
+                          <span className="text-xs font-bold" style={{ color: 'var(--dd-text-primary)' }}>{v.license_plate}{v.vehicle_name ? ` | ${v.vehicle_name}` : ''}</span>
+                          <span className="text-[10px] font-semibold" style={{ color: 'var(--dd-text-muted)' }}>
+                            {v.distance >= 1000 ? `${(v.distance / 1000).toFixed(1)} km` : `${v.distance} m`}
+                          </span>
+                        </div>
                       </li>
                     ))}
                   </ul>
@@ -725,7 +865,7 @@ export default function AdminDashboard() {
         </div>
 
         {/* ═══ FOOTER ═══ */}
-        <div className="mt-1 flex justify-between pt-1 shrink-0 items-center whitespace-nowrap"
+        {/* <div className="mt-1 flex justify-between pt-1 shrink-0 items-center whitespace-nowrap"
           style={{ borderTop: '1px solid var(--dd-border)' }}>
           <div className="flex items-center gap-2 text-[10px] font-semibold uppercase"
             style={{ color: 'var(--dd-text-muted)' }}>
@@ -738,7 +878,7 @@ export default function AdminDashboard() {
           <p className="text-[10px] uppercase" style={{ color: 'var(--dd-text-muted)' }}>
             {t('connectionStable')} • {t('plantName')}
           </p>
-        </div>
+        </div> */}
       </div>
 
       {/* ═══ NO PENDING MODAL ═══ */}

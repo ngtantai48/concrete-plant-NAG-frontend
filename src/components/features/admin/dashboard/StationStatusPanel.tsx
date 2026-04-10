@@ -69,7 +69,7 @@ export default function StationStatusPanel({ stations, orders, deviceStationStat
     const map: Record<number, { license_plate: string; order_number: number }> = {};
 
     orders
-      .filter((order) => order.order_status === 'pending' && order.stations?.station_id)
+      .filter((order) => order.order_status === 'pending' && order.stations?.station_id && order.vehicles?.vehicle_status === 'available')
       .sort((a, b) => a.order_number - b.order_number)
       .forEach((order) => {
         const stationId = order.stations!.station_id;
