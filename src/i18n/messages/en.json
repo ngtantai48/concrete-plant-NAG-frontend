@@ -291,8 +291,8 @@
     "activeStationsShort": "Active Stations",
     "dispatchStations": "Dispatch Stations",
     "stationLabelWord": "Station",
-    "readyVehiclesPanel": "Ready Vehicles",
-    "noReadyVehicles": "No ready vehicles",
+    "readyVehiclesPanel": "Vehicles in Yard",
+    "noReadyVehicles": "No vehicles in yard",
     "stoppedMaintenance": "Stopped / Maintenance",
     "empty": "Empty",
     "stopped": "Stopped",
@@ -419,7 +419,10 @@
     "endOfDayBannerTitle": "No pending orders for today",
     "endOfDayBannerDescription": "Today's shift has no active schedule. Go to end-of-day management to set it up.",
     "endOfDayBannerAction": "Schedule today",
-    "endOfDayBannerDismiss": "Dismiss"
+    "endOfDayBannerDismiss": "Dismiss",
+    "tomorrowScheduleReadyTitle": "Tomorrow's schedule is ready",
+    "tomorrowScheduleReadyDescription": "Confirmed {count} vehicles for tomorrow",
+    "undoScheduleAction": "Undo schedule"
   },
   "EndOfDayPage": {
     "title": "End-of-day vehicle management",
@@ -464,12 +467,23 @@
     "shiftReopenTodayAction": "Undo today's schedule",
     "shiftReopenTodaySuccess": "Today's schedule undone for {date}",
     "shiftReopenTodayFailed": "Unable to undo today's schedule",
+    "shiftUndoCloseTodayAction": "Undo today's shift close",
+    "shiftUndoCloseTodaySuccess": "Today's shift close undone for {date}",
+    "shiftUndoCloseTodayFailed": "Unable to undo today's shift close",
     "shiftClosePreviousAction": "Close previous shift",
     "shiftClosePreviousSuccess": "Previous shift closed for {date}",
     "shiftClosePreviousFailed": "Unable to close previous shift",
     "shiftOpenPreviousAction": "Confirm previous schedule",
     "shiftOpenPreviousSuccess": "Previous schedule confirmed for {date}",
-    "shiftOpenPreviousFailed": "Unable to confirm previous schedule"
+    "shiftOpenPreviousFailed": "Unable to confirm previous schedule",
+    "undoScheduleAction": "Undo schedule",
+    "undoScheduleSuccess": "Schedule undone for {date}",
+    "undoScheduleFailed": "Unable to undo the schedule",
+    "alertForgotShiftCloseTitle": "Previous shift not closed",
+    "alertForgotShiftCloseDescription": "The system detected that yesterday's shift was not closed. Please close the shift before continuing.",
+    "alertForgotScheduleConfirmTitle": "Previous schedule not confirmed",
+    "alertForgotScheduleConfirmDescription": "Yesterday's shift was closed but today's vehicle schedule has not been confirmed. Please confirm the schedule.",
+    "alertGoToPrevious": "Resolve now"
   },
   "VehicleMaintenancePage": {
     "title": "Vehicle Maintenance",
