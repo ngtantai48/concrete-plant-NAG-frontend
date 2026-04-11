@@ -6,14 +6,15 @@ import vehicleApi from "@/services/vehicle.service";
 import type { Vehicle } from "@/types/vehicle";
 import orderApi from "@/services/order.service";
 import type { Order } from "@/types/order";
-import { RefreshCw, Map as MapIcon, Maximize2, Minimize2, Truck, Radio, CheckCircle2, Clock, Route, MapPin, Search, CalendarClock, AlertTriangle } from "lucide-react";
+import { RefreshCw, Map as MapIcon, Maximize2, Minimize2, Truck, Radio, CheckCircle2, Clock, Route, MapPin, Search, Calendar } from "lucide-react";
+import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { ADMIN } from "@/constants/route";
+
 import { Dialog, DialogContent, DialogHeader, DialogTitle as DlgTitle } from "@/components/ui/dialog";
 import { useLocale, useTranslations } from "next-intl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -21,9 +22,9 @@ import { useNearbyVehicles } from "@/hooks/useNearbyVehicles";
 import { useDeviceHeartbeat } from "@/hooks/useDeviceHeartbeat";
 import { useRealtimeUpdates } from "@/hooks/useRealtimeUpdates";
 import dynamic from "next/dynamic";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+
+
+
 
 import StationStatusPanel from "./StationStatusPanel";
 import ActivityFlow, { type DispatchMode } from "./ActivityFlow";
@@ -52,17 +53,10 @@ const getTomorrowDate = () => {
   today.setDate(today.getDate() + 1);
   return today.toISOString().slice(0, 10);
 };
-const getYesterdayDate = () => {
-  const now = new Date();
-  const timezoneOffset = now.getTimezoneOffset() * 60 * 1000;
-  const today = new Date(now.getTime() - timezoneOffset);
-  today.setDate(today.getDate() - 1);
-  return today.toISOString().slice(0, 10);
-};
+
 
 export default function AdminDashboard() {
   const t = useTranslations("DashboardPage");
-  const tEndOfDay = useTranslations("EndOfDayPage");
   const tVehiclePage = useTranslations("VehiclePage");
   const locale = useLocale();
 
@@ -72,11 +66,13 @@ export default function AdminDashboard() {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [tomorrowOrders, setTomorrowOrders] = useState<Order[]>([]);
-  const [yesterdayOrders, setYesterdayOrders] = useState<Order[]>([]);
+  const [realTomorrowOrders, setRealTomorrowOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isShiftSubmitting, setIsShiftSubmitting] = useState(false);
-  const operationDate = getTodayDate();
+  const [selectedDate, setSelectedDate] = useState(getTodayDate());
+  const operationDate = selectedDate;
+  const isPastDate = selectedDate < getTodayDate();
   const [clock, setClock] = useState("");
   const clockRef = useRef<ReturnType<typeof setInterval>>(null);
 
@@ -103,24 +99,31 @@ export default function AdminDashboard() {
     };
   }, [locale]);
 
-  const fetchOrders = useCallback(async () => {
-    try {
-      const res = await orderApi.getByInitDate(getTodayDate());
-      setOrders(res.data?.data || res.data || []);
-    } catch {
-      //
-    }
+
+
+  const getNextDate = useCallback((date: string) => {
+    const d = new Date(date + 'T00:00:00');
+    d.setDate(d.getDate() + 1);
+    return d.toISOString().slice(0, 10);
   }, []);
 
   const fetchAll = useCallback(async () => {
     try {
-      const results = await Promise.allSettled([
+      const nextDate = getNextDate(selectedDate);
+      const realTomorrow = getTomorrowDate();
+      const needExtraFetch = nextDate !== realTomorrow;
+
+      const apiCalls = [
         stationApi.getAll(),
         vehicleApi.getAll({ limit: 100 }),
-        orderApi.getByInitDate(getTodayDate()),
-        orderApi.getByInitDate(getTomorrowDate()),
-        orderApi.getByInitDate(getYesterdayDate()),
-      ]);
+        orderApi.getByInitDate(selectedDate),
+        orderApi.getByInitDate(nextDate),
+      ];
+      if (needExtraFetch) {
+        apiCalls.push(orderApi.getByInitDate(realTomorrow));
+      }
+
+      const results = await Promise.allSettled(apiCalls);
 
       if (results[0].status === 'fulfilled') {
         const sRes = results[0].value;
@@ -139,27 +142,24 @@ export default function AdminDashboard() {
       if (results[3].status === 'fulfilled') {
         const tmRes = results[3].value;
         setTomorrowOrders(tmRes.data?.data || tmRes.data || []);
+        if (!needExtraFetch) {
+          setRealTomorrowOrders(tmRes.data?.data || tmRes.data || []);
+        }
       }
-      if (results[4]?.status === 'fulfilled') {
-        const ydRes = results[4].value;
-        setYesterdayOrders(ydRes.data?.data || ydRes.data || []);
+      if (needExtraFetch && results[4]?.status === 'fulfilled') {
+        const rtRes = results[4].value;
+        setRealTomorrowOrders(rtRes.data?.data || rtRes.data || []);
       }
     } catch {
       //
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [selectedDate, getNextDate]);
 
   useEffect(() => {
     fetchAll();
   }, [fetchAll]);
-
-  const handleRefresh = async () => {
-    setIsRefreshing(true);
-    await fetchAll();
-    setIsRefreshing(false);
-  };
 
   const isShiftClosedForDate = useMemo(
     () => orders.some((o) => o.order_status === "canceled"),
@@ -167,40 +167,23 @@ export default function AdminDashboard() {
   );
 
   const isTomorrowScheduleReady = useMemo(
-    () => tomorrowOrders.some((o) => o.order_status === "pending"),
-    [tomorrowOrders],
+    () => realTomorrowOrders.some((o) => o.order_status === "pending"),
+    [realTomorrowOrders],
   );
 
-  const pendingAction = useMemo(() => {
-    const hasTodayAnyOrder = orders.length > 0;
-    const hasYesterdayPending = yesterdayOrders.some((o) => o.order_status === "pending");
-    const hasYesterdayCanceledOrInit = yesterdayOrders.some(
-      (o) => o.order_status === "canceled" || o.order_status === "init"
-    );
-
-    if (!hasTodayAnyOrder) {
-      if (hasYesterdayPending) return "forgotShiftClose" as const;
-      if (hasYesterdayCanceledOrInit) return "forgotScheduleConfirm" as const;
-    }
-    return "none" as const;
-  }, [orders, yesterdayOrders]);
-
   const handleShiftToggle = useCallback(async () => {
-    if (!operationDate) {
-      toast.error(t('shiftCloseDateRequired'), { position: 'top-right' });
-      return;
-    }
-
+    const todayDate = getTodayDate();
+    console.log(todayDate);
     setIsShiftSubmitting(true);
 
     try {
       if (isShiftClosedForDate) {
-        await orderApi.shiftReopen({ operation_date: operationDate });
-        const [y, m, d] = operationDate.split("-");
+        await orderApi.shiftReopen({ operation_date: todayDate });
+        const [y, m, d] = todayDate.split("-");
         toast.success(t('shiftReopenSuccess', { date: `${d}/${m}/${y}` }), { position: 'top-right' });
       } else {
-        await orderApi.shiftClose({ operation_date: operationDate });
-        const [y, m, d] = operationDate.split("-");
+        await orderApi.shiftClose({ operation_date: todayDate });
+        const [y, m, d] = todayDate.split("-");
         toast.success(t('shiftCloseSuccess', { date: `${d}/${m}/${y}` }), { position: 'top-right' });
       }
 
@@ -210,7 +193,7 @@ export default function AdminDashboard() {
     } finally {
       setIsShiftSubmitting(false);
     }
-  }, [fetchAll, isShiftClosedForDate, operationDate, t]);
+  }, [fetchAll, isShiftClosedForDate, t]);
 
   const activeStations = useMemo(
     () => stations.filter((s) => s.station_types?.station_type_id === 1 && s.station_status === "operating"),
@@ -267,20 +250,14 @@ export default function AdminDashboard() {
 
   const ordersAtStation = useMemo(() => orders.filter(o => o.order_status === "collecting"), [orders]);
   const ordersPending = useMemo(() => {
-    const today = getTodayDate();
-    return orders.filter(o => o.order_status === "pending" && o.order_init_datetime?.slice(0, 10) === today && o.vehicles?.vehicle_status === "available");
-  }, [orders]);
+    return orders.filter(o => o.order_status === "pending" && o.order_init_datetime?.slice(0, 10) === operationDate && o.vehicles?.vehicle_status === "available");
+  }, [orders, operationDate]);
   const ordersInTransit = useMemo(() => orders.filter(o => o.order_status === "transporting" || o.order_status === "running"), [orders]);
   const ordersCompleted = useMemo(() => {
-    const today = getTodayDate();
-    return orders.filter(o => o.order_status === "completed" && o.order_end_datetime?.slice(0, 10) === today);
+    return orders.filter(o => o.order_status === "completed");
   }, [orders]);
 
-  useEffect(() => {
-    if (!loading && ordersPending.length === 0 && ordersAtStation.length === 0 && ordersInTransit.length === 0 && !isTomorrowScheduleReady) {
-      setShowNoPendingModal(true);
-    }
-  }, [loading, ordersPending.length, ordersAtStation.length, ordersInTransit.length, isTomorrowScheduleReady]);
+
 
   const ordersActive = useMemo(() => {
     return orders.filter(o =>
@@ -296,8 +273,7 @@ export default function AdminDashboard() {
 
   const [dispatchMode, setDispatchMode] = useState<DispatchMode>('auto');
   const [showMap, setShowMap] = useState(false);
-  const [showNoPendingModal, setShowNoPendingModal] = useState(false);
-  const router = useRouter();
+
   const [mapSearch, setMapSearch] = useState('');
   const [focusVehicleId, setFocusVehicleId] = useState<string | null>(null);
   const [mapStatusFilter, setMapStatusFilter] = useState<'all' | 'run' | 'park' | 'offline'>('all');
@@ -419,8 +395,27 @@ export default function AdminDashboard() {
                 </TooltipContent>
               </Tooltip>
 
+              {/* Date Picker */}
+              <div className="border-l pl-2 flex items-center gap-1.5" style={{ borderColor: "var(--dd-border)" }}>
+                <Calendar className="h-3 w-3" style={{ color: 'var(--dd-text-muted)' }} />
+                <input
+                  type="date"
+                  value={selectedDate}
+                  onChange={(e) => {
+                    setSelectedDate(e.target.value);
+                    setLoading(true);
+                  }}
+                  className="h-7 px-2 text-xs font-bold uppercase rounded-md border bg-transparent cursor-pointer"
+                  style={{
+                    borderColor: 'var(--dd-border)',
+                    color: 'var(--dd-text-primary)',
+                    colorScheme: 'light',
+                  }}
+                />
+              </div>
+
               {/* Sync Button */}
-              <Button
+              {/* <Button
                 variant="outline"
                 size="sm"
                 onClick={handleRefresh}
@@ -429,9 +424,8 @@ export default function AdminDashboard() {
               >
                 <RefreshCw className={`w-3 h-3 ${isRefreshing ? "animate-spin" : ""}`} />
                 {t('sync')}
-              </Button>
+              </Button> */}
 
-              {/* Shift Close */}
               {!isTomorrowScheduleReady && (
                 <div
                   className="border-l pl-2 flex items-center"
@@ -465,292 +459,249 @@ export default function AdminDashboard() {
                   </Button>
                 </div>
               )}
+
+              {isTomorrowScheduleReady && (
+                <div
+                  className="border-l pl-2 flex items-center"
+                  style={{ borderColor: "var(--dd-border)" }}
+                >
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={async () => {
+                      setIsShiftSubmitting(true);
+                      try {
+                        const todayDate = getTodayDate();
+                        await orderApi.shiftReopen({ operation_date: todayDate });
+                        const [y, m, d] = todayDate.split("-");
+                        toast.success(t("shiftReopenSuccess", { date: `${d}/${m}/${y}` }), { position: "top-right" });
+                        await fetchAll();
+                      } catch {
+                        toast.error(t("shiftReopenFailed"), { position: "top-right" });
+                      } finally {
+                        setIsShiftSubmitting(false);
+                      }
+                    }}
+                    disabled={isShiftSubmitting}
+                    className="h-7 px-2.5 text-xs font-bold uppercase gap-1"
+                    style={{
+                      background: "linear-gradient(135deg, rgba(217, 119, 6, 0.14), rgba(245, 158, 11, 0.12))",
+                      border: "1px solid rgba(217, 119, 6, 0.2)",
+                      color: "#b45309",
+                    }}
+                  >
+                    <span
+                      className={`inline-block h-1.5 w-1.5 rounded-full ${isShiftSubmitting ? "animate-pulse" : ""}`}
+                      style={{ background: "#d97706" }}
+                    />
+                    {t("shiftReopenAction")}
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
 
           {/* ═══ STAT CARDS ═══ */}
-          <div className="mt-1.5 grid grid-cols-2 gap-2 md:grid-cols-5 shrink-0">
-            {statCards.map((card, i) => (
-              <Card
-                key={i}
-                className="dd-stat-card py-0 animate-fade-up hover:scale-[1.02] active:scale-[0.98] transition-all cursor-default"
-                style={{
-                  '--accent-color': card.accentColor,
-                  animationDelay: `${i * 0.1}s`
-                } as React.CSSProperties}
-              >
-                <CardContent className="p-2 lg:px-3 lg:py-1.5 flex items-center justify-between gap-2 h-full">
-                  <span className="text-sm font-extrabold uppercase truncate"
-                    style={{ color: 'var(--dd-text-muted)' }}>
-                    {card.label}
-                  </span>
-                  <div className="text-xl lg:text-2xl font-black leading-none shrink-0"
-                    style={{ color: card.accentColor }}>
-                    {card.value}
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+          {!isPastDate && (
+            <div className="mt-1.5 grid grid-cols-2 gap-2 md:grid-cols-5 shrink-0">
+              {statCards.map((card, i) => (
+                <Card
+                  key={i}
+                  className="dd-stat-card py-0 animate-fade-up hover:scale-[1.02] active:scale-[0.98] transition-all cursor-default"
+                  style={{
+                    '--accent-color': card.accentColor,
+                    animationDelay: `${i * 0.1}s`
+                  } as React.CSSProperties}
+                >
+                  <CardContent className="p-2 lg:px-3 lg:py-1.5 flex items-center justify-between gap-2 h-full">
+                    <span className="text-sm font-extrabold uppercase truncate"
+                      style={{ color: 'var(--dd-text-muted)' }}>
+                      {card.label}
+                    </span>
+                    <div className="text-xl lg:text-2xl font-black leading-none shrink-0"
+                      style={{ color: card.accentColor }}>
+                      {card.value}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
         </div>
 
-        {/* ═══ WARNING BANNER (YESTERDAY) ═══ */}
-        {!loading && pendingAction !== "none" && (
-          <div
-            className="mb-1.5 shrink-0 rounded-lg border px-3 py-1.5"
-            style={{
-              background:
-                pendingAction === "forgotShiftClose"
-                  ? "linear-gradient(135deg, rgba(239, 68, 68, 0.08), rgba(245, 158, 11, 0.06))"
-                  : "linear-gradient(135deg, rgba(245, 158, 11, 0.08), rgba(124, 58, 237, 0.06))",
-              borderColor:
-                pendingAction === "forgotShiftClose"
-                  ? "rgba(239, 68, 68, 0.25)"
-                  : "rgba(245, 158, 11, 0.25)",
-            }}
-          >
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <AlertTriangle
-                  className="h-3.5 w-3.5 shrink-0"
-                  style={{ color: pendingAction === "forgotShiftClose" ? "#ef4444" : "#d97706" }}
-                />
-                <span className="text-xs font-bold uppercase" style={{ color: "var(--dd-text-primary)" }}>
-                  {tEndOfDay(
-                    pendingAction === "forgotShiftClose"
-                      ? "alertForgotShiftCloseTitle"
-                      : "alertForgotScheduleConfirmTitle"
-                  )} — {tEndOfDay(
-                    pendingAction === "forgotShiftClose"
-                      ? "alertForgotShiftCloseDescription"
-                      : "alertForgotScheduleConfirmDescription"
-                  )}
-                </span>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-7 px-2.5 text-xs font-bold uppercase gap-1"
+        {!isPastDate && (
+          <>
+            {/* ═══ SCHEDULE STATUS BANNER ═══ */}
+            {!loading && isTomorrowScheduleReady && (
+              <div
+                className="mb-1.5 shrink-0 rounded-lg border px-3 py-1.5"
                 style={{
-                  borderColor: pendingAction === "forgotShiftClose" ? "#fca5a5" : "#fcd34d",
-                  color: pendingAction === "forgotShiftClose" ? "#b91c1c" : "#b45309",
+                  background: "linear-gradient(135deg, rgba(16, 185, 129, 0.08), rgba(5, 150, 105, 0.06))",
+                  borderColor: "rgba(16, 185, 129, 0.25)",
                 }}
-                asChild
               >
-                <Link href={`${ADMIN.END_OF_DAY_VEHICLES}?mode=previous`}>
-                  {tEndOfDay("alertGoToPrevious")}
-                </Link>
-              </Button>
-            </div>
-          </div>
-        )}
-
-        {/* ═══ END-OF-DAY BANNER ═══ */}
-        {!loading && isShiftClosedForDate && pendingAction === "none" && (
-          isTomorrowScheduleReady ? (
-            <div
-              className="mb-1.5 shrink-0 rounded-lg border px-3 py-1.5"
-              style={{
-                background: "linear-gradient(135deg, rgba(16, 185, 129, 0.08), rgba(5, 150, 105, 0.06))",
-                borderColor: "rgba(16, 185, 129, 0.25)",
-              }}
-            >
-              <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
                   <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
                   <span className="text-xs font-bold uppercase" style={{ color: "var(--dd-text-primary)" }}>
                     {t("tomorrowScheduleReadyTitle")} — {t("tomorrowScheduleReadyDescription", { count: tomorrowOrders.length })}
                   </span>
                 </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-7 px-2.5 text-xs font-bold uppercase gap-1 border-emerald-300 text-emerald-700 hover:bg-emerald-50"
-                  asChild
-                >
-                  <Link href={`${ADMIN.END_OF_DAY_VEHICLES}?mode=today`}>
-                    {t("undoScheduleAction")}
-                  </Link>
-                </Button>
               </div>
+            )}
+
+            {/* ═══ SYSTEM TELEMETRY ═══ */}
+            <div className="mb-1.5 shrink-0">
+              <StationStatusPanel stations={stations} orders={orders} deviceStationStatusMap={stationStatusMap} onStationUpdated={fetchAll} />
             </div>
-          ) : (
-            <div
-              className="mb-1.5 shrink-0 rounded-lg border px-3 py-1.5"
-              style={{
-                background: "linear-gradient(135deg, rgba(245, 158, 11, 0.08), rgba(217, 119, 6, 0.06))",
-                borderColor: "rgba(245, 158, 11, 0.25)",
-              }}
-            >
-              <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  <CalendarClock className="h-3.5 w-3.5 text-amber-500 shrink-0" />
-                  <span className="text-xs font-bold uppercase" style={{ color: "var(--dd-text-primary)" }}>
-                    {t("endOfDayBannerTitle")} — {t("endOfDayBannerDescription")}
-                  </span>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-7 px-2.5 text-xs font-bold uppercase gap-1 border-amber-300 text-amber-700 hover:bg-amber-50"
-                  asChild
-                >
-                  <Link href={`${ADMIN.END_OF_DAY_VEHICLES}?mode=today`}>
-                    {t("endOfDayBannerAction")}
-                  </Link>
-                </Button>
-              </div>
-            </div>
-          )
+          </>
         )}
 
-        {/* \u2550\u2550\u2550 SYSTEM TELEMETRY \u2550\u2550\u2550 */}
-        <div className="mb-1.5 shrink-0">
-          <StationStatusPanel stations={stations} orders={orders} deviceStationStatusMap={stationStatusMap} onStationUpdated={fetchAll} />
-        </div>
-
         {/* ═══ COMMAND CORE GRID ═══ */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 flex-1 min-h-0 overflow-hidden">
+        <div className={`grid grid-cols-1 ${isPastDate ? '' : 'lg:grid-cols-12'} gap-4 flex-1 min-h-0 overflow-hidden`}>
 
           {/* Left: Asset Management (col-span-3) */}
-          <div className="lg:col-span-3 flex flex-col gap-1.5 h-full min-h-0 animate-fade-up" style={{ animationDelay: '0.2s' }}>
-            {/* Ready Vehicles */}
-            <div className="flex max-h-[45%] flex-col overflow-hidden dd-card">
-              <div className="flex items-center justify-between px-3 py-1.5 text-xs font-semibold uppercase"
-                style={{ background: 'var(--dd-bg-header)', color: 'var(--dd-text-primary)', borderBottom: '1px solid var(--dd-border)' }}>
-                <span>{t('readyVehiclesPanel')}</span>
-                <span className="dd-chip dd-chip-emerald text-[10px] px-1.5 py-0.5">{inYardVehicles.length}</span>
+          {!isPastDate && (
+            <div className="lg:col-span-3 flex flex-col gap-1.5 h-full min-h-0 animate-fade-up" style={{ animationDelay: '0.2s' }}>
+              {/* Ready Vehicles */}
+              <div className="flex max-h-[45%] flex-col overflow-hidden dd-card">
+                <div className="flex items-center justify-between px-3 py-1.5 text-xs font-semibold uppercase"
+                  style={{ background: 'var(--dd-bg-header)', color: 'var(--dd-text-primary)', borderBottom: '1px solid var(--dd-border)' }}>
+                  <span>{t('readyVehiclesPanel')}</span>
+                  <span className="dd-chip dd-chip-emerald text-[10px] px-1.5 py-0.5">{inYardVehicles.length}</span>
+                </div>
+                <div className="overflow-y-auto p-0 flex-1">
+                  {inYardVehicles.length === 0 ? (
+                    <div className="flex h-full items-center justify-center p-3">
+                      <span className="text-xs font-bold uppercase" style={{ color: 'var(--dd-text-muted)' }}>{t('noReadyVehicles')}</span>
+                    </div>
+                  ) : (
+                    <ul className="flex flex-col gap-1 px-4 py-2">
+                      {inYardVehicles.map((v) => (
+                        <li key={v.device_id} className="flex items-center gap-2 px-2 py-1 transition-colors rounded-md border shadow-sm cursor-default hover:shadow-md"
+                          style={{ background: 'var(--dd-bg-surface)', borderColor: 'var(--dd-border)' }}
+                          onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--dd-emerald)'}
+                          onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--dd-border)'}>
+                          <div className="h-5 w-5 rounded-full flex items-center justify-center shrink-0 border" style={{ background: 'rgba(16, 185, 129, 0.1)', borderColor: 'rgba(16, 185, 129, 0.3)' }}>
+                            <Truck className="h-2.5 w-2.5 animate-drive-idle" style={{ color: 'var(--dd-emerald)' }} />
+                          </div>
+                          <div className="flex flex-col min-w-0">
+                            <span className="text-xs font-bold" style={{ color: 'var(--dd-text-primary)' }}>{v.license_plate}{v.vehicle_name ? ` | ${v.vehicle_name}` : ''}</span>
+                            <span className="text-[10px] font-semibold" style={{ color: 'var(--dd-text-muted)' }}>
+                              {v.distance >= 1000 ? `${(v.distance / 1000).toFixed(1)} km` : `${v.distance} m`}
+                            </span>
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
               </div>
-              <div className="overflow-y-auto p-0 flex-1">
-                {inYardVehicles.length === 0 ? (
-                  <div className="flex h-full items-center justify-center p-3">
-                    <span className="text-xs font-bold uppercase" style={{ color: 'var(--dd-text-muted)' }}>{t('noReadyVehicles')}</span>
-                  </div>
-                ) : (
-                  <ul className="flex flex-col gap-1 px-4 py-2">
-                    {inYardVehicles.map((v) => (
-                      <li key={v.device_id} className="flex items-center gap-2 px-2 py-1 transition-colors rounded-md border shadow-sm cursor-default hover:shadow-md"
-                        style={{ background: 'var(--dd-bg-surface)', borderColor: 'var(--dd-border)' }}
-                        onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--dd-emerald)'}
-                        onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--dd-border)'}>
-                        <div className="h-5 w-5 rounded-full flex items-center justify-center shrink-0 border" style={{ background: 'rgba(16, 185, 129, 0.1)', borderColor: 'rgba(16, 185, 129, 0.3)' }}>
-                          <Truck className="h-2.5 w-2.5 animate-drive-idle" style={{ color: 'var(--dd-emerald)' }} />
-                        </div>
-                        <div className="flex flex-col min-w-0">
-                          <span className="text-xs font-bold" style={{ color: 'var(--dd-text-primary)' }}>{v.license_plate}{v.vehicle_name ? ` | ${v.vehicle_name}` : ''}</span>
-                          <span className="text-[10px] font-semibold" style={{ color: 'var(--dd-text-muted)' }}>
-                            {v.distance >= 1000 ? `${(v.distance / 1000).toFixed(1)} km` : `${v.distance} m`}
-                          </span>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            </div>
 
-            {/* Canceled / Stopped */}
-            <div className="flex flex-1 min-h-[60px] flex-col overflow-hidden dd-card" style={{ borderColor: 'rgba(245, 158, 11, 0.2)' }}>
-              <div className="flex items-center justify-between px-3 py-1.5 text-xs font-semibold uppercase"
-                style={{ background: 'var(--dd-bg-header)', color: 'var(--dd-text-primary)', borderBottom: '1px solid var(--dd-border)' }}>
-                <span>{t('stoppedMaintenance')}</span>
-                <span className="dd-chip dd-chip-amber text-[10px] px-1.5 py-0.5">{stoppedMaintenanceList.length}</span>
-              </div>
-              <div className="flex-1 overflow-y-auto p-0">
-                {stoppedMaintenanceList.length === 0 ? (
-                  <div className="flex h-full items-center justify-center p-2">
-                    <span className="text-xs font-bold uppercase" style={{ color: 'var(--dd-text-muted)' }}>{t('empty')}</span>
-                  </div>
-                ) : (
-                  <ul className="flex flex-col gap-1 px-4 py-2">
-                    {stoppedMaintenanceList.map((item) => (
-                      <li key={item.id} className="flex items-center justify-between px-2 py-1 rounded-md border shadow-sm cursor-default"
-                        style={{ background: 'var(--dd-bg-surface)', borderColor: 'var(--dd-border)' }}>
-                        <span className="text-xs font-bold truncate pr-2" style={{ color: 'var(--dd-text-primary)' }}>
-                          {item.label}
-                        </span>
-                        <span className={`dd-chip text-[10px] px-1.5 py-0.5 ${item.chipClass}`}>{item.statusLabel}</span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
+              {/* Canceled / Stopped */}
+              <div className="flex flex-1 min-h-[60px] flex-col overflow-hidden dd-card" style={{ borderColor: 'rgba(245, 158, 11, 0.2)' }}>
+                <div className="flex items-center justify-between px-3 py-1.5 text-xs font-semibold uppercase"
+                  style={{ background: 'var(--dd-bg-header)', color: 'var(--dd-text-primary)', borderBottom: '1px solid var(--dd-border)' }}>
+                  <span>{t('stoppedMaintenance')}</span>
+                  <span className="dd-chip dd-chip-amber text-[10px] px-1.5 py-0.5">{stoppedMaintenanceList.length}</span>
+                </div>
+                <div className="flex-1 overflow-y-auto p-0">
+                  {stoppedMaintenanceList.length === 0 ? (
+                    <div className="flex h-full items-center justify-center p-2">
+                      <span className="text-xs font-bold uppercase" style={{ color: 'var(--dd-text-muted)' }}>{t('empty')}</span>
+                    </div>
+                  ) : (
+                    <ul className="flex flex-col gap-1 px-4 py-2">
+                      {stoppedMaintenanceList.map((item) => (
+                        <li key={item.id} className="flex items-center justify-between px-2 py-1 rounded-md border shadow-sm cursor-default"
+                          style={{ background: 'var(--dd-bg-surface)', borderColor: 'var(--dd-border)' }}>
+                          <span className="text-xs font-bold truncate pr-2" style={{ color: 'var(--dd-text-primary)' }}>
+                            {item.label}
+                          </span>
+                          <span className={`dd-chip text-[10px] px-1.5 py-0.5 ${item.chipClass}`}>{item.statusLabel}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
               </div>
             </div>
-          </div>
+          )}
 
           {/* Center: Command Core (col-span-6) */}
-          <div className="lg:col-span-6 flex flex-col h-full min-h-0 dd-card overflow-hidden animate-fade-up"
-            style={{ boxShadow: '0 0 20px rgba(14, 165, 233, 0.05)', border: '1px solid rgba(14, 165, 233, 0.2)', animationDelay: '0.4s' }}>
+          {!isPastDate && (
+            <div className="lg:col-span-6 flex flex-col h-full min-h-0 dd-card overflow-hidden animate-fade-up"
+              style={{ boxShadow: '0 0 20px rgba(14, 165, 233, 0.05)', border: '1px solid rgba(14, 165, 233, 0.2)', animationDelay: '0.4s' }}>
 
-            {/* Core Header with Toggle */}
-            <div className="flex items-center justify-between px-3 py-1.5 relative z-10"
-              style={{ background: 'var(--dd-bg-header)', borderBottom: '1px solid var(--dd-border)' }}>
-              <div className="flex items-center gap-1.5 min-w-0 pr-2">
-                <div className="h-1.5 w-1.5 rounded-full animate-pulse shrink-0" style={{ background: '#0ea5e9', boxShadow: '0 0 10px rgba(14, 165, 233, 0.8)' }} />
-                <span className="text-xs font-black uppercase truncate" style={{ color: 'var(--dd-text-primary)' }} title="TRUNG TÂM ĐIỀU PHỐI">
-                  TRUNG TÂM ĐIỀU PHỐI
-                </span>
+              {/* Core Header with Toggle */}
+              <div className="flex items-center justify-between px-3 py-1.5 relative z-10"
+                style={{ background: 'var(--dd-bg-header)', borderBottom: '1px solid var(--dd-border)' }}>
+                <div className="flex items-center gap-1.5 min-w-0 pr-2">
+                  <div className="h-1.5 w-1.5 rounded-full animate-pulse shrink-0" style={{ background: '#0ea5e9', boxShadow: '0 0 10px rgba(14, 165, 233, 0.8)' }} />
+                  <span className="text-xs font-black uppercase truncate" style={{ color: 'var(--dd-text-primary)' }} title="TRUNG TÂM ĐIỀU PHỐI">
+                    TRUNG TÂM ĐIỀU PHỐI
+                  </span>
+                </div>
+
+                {/* Segmented Toggle HUD */}
+                <div className="flex items-center rounded-md p-0.5 backdrop-blur-md shrink-0"
+                  style={{ background: 'var(--dd-bg-surface)', border: '1px solid var(--dd-border)' }}>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setDispatchMode('auto')}
+                    className={`h-5 px-2 text-[10px] font-bold uppercase ${dispatchMode === 'auto'
+                      ? 'bg-sky-500/20 text-sky-600 border border-sky-500/30'
+                      : 'text-slate-500 border border-transparent hover:text-slate-700'
+                      }`}
+                  >
+                    AUTO
+                  </Button>
+                  <div className="w-[1px] h-3 mx-0.5 opacity-20" style={{ background: 'var(--dd-text-muted)' }} />
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setDispatchMode('manual')}
+                    className={`h-5 px-2 text-[10px] font-bold uppercase ${dispatchMode === 'manual'
+                      ? 'bg-indigo-500/20 text-indigo-600 border border-indigo-500/30'
+                      : 'text-slate-500 border border-transparent hover:text-slate-700'
+                      }`}
+                  >
+                    MANUAL
+                  </Button>
+                  <div className="w-[1px] h-3 mx-0.5 opacity-20" style={{ background: 'var(--dd-text-muted)' }} />
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowMap(true)}
+                    className="h-5 px-2 text-[10px] font-bold uppercase text-slate-500 border border-transparent hover:text-slate-700 hover:bg-slate-100"
+                  >
+                    <MapIcon className="h-3 w-3 shrink-0" />
+                    MAP
+                  </Button>
+                </div>
               </div>
 
-              {/* Segmented Toggle HUD */}
-              <div className="flex items-center rounded-md p-0.5 backdrop-blur-md shrink-0"
-                style={{ background: 'var(--dd-bg-surface)', border: '1px solid var(--dd-border)' }}>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setDispatchMode('auto')}
-                  className={`h-5 px-2 text-[10px] font-bold uppercase ${dispatchMode === 'auto'
-                    ? 'bg-sky-500/20 text-sky-600 border border-sky-500/30'
-                    : 'text-slate-500 border border-transparent hover:text-slate-700'
-                    }`}
-                >
-                  AUTO
-                </Button>
-                <div className="w-[1px] h-3 mx-0.5 opacity-20" style={{ background: 'var(--dd-text-muted)' }} />
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setDispatchMode('manual')}
-                  className={`h-5 px-2 text-[10px] font-bold uppercase ${dispatchMode === 'manual'
-                    ? 'bg-indigo-500/20 text-indigo-600 border border-indigo-500/30'
-                    : 'text-slate-500 border border-transparent hover:text-slate-700'
-                    }`}
-                >
-                  MANUAL
-                </Button>
-                <div className="w-[1px] h-3 mx-0.5 opacity-20" style={{ background: 'var(--dd-text-muted)' }} />
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setShowMap(true)}
-                  className="h-5 px-2 text-[10px] font-bold uppercase text-slate-500 border border-transparent hover:text-slate-700 hover:bg-slate-100"
-                >
-                  <MapIcon className="h-3 w-3 shrink-0" />
-                  MAP
-                </Button>
-              </div>
-            </div>
-
-            {/* Core Display Area */}
-            <div className="flex-1 overflow-hidden relative bg-transparent p-2">
-              <div className="flex h-full flex-col gap-2">
-                <div className="min-h-0 flex-1 overflow-y-auto w-full scrollbar-hide">
-                  <div className="h-full">
-                    <ActivityFlow
-                      stations={stations}
-                      vehicles={vehicles}
-                      orders={activeFlowOrders}
-                      dispatchMode={dispatchMode}
-                      onOrdersUpdated={fetchAll}
-                    />
+              {/* Core Display Area */}
+              <div className="flex-1 overflow-hidden relative bg-transparent p-2">
+                <div className="flex h-full flex-col gap-2">
+                  <div className="min-h-0 flex-1 overflow-y-auto w-full scrollbar-hide">
+                    <div className="h-full">
+                      <ActivityFlow
+                        stations={stations}
+                        vehicles={vehicles}
+                        orders={activeFlowOrders}
+                        dispatchMode={dispatchMode}
+                        onOrdersUpdated={fetchAll}
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
-          </div>
+          )}
 
           {/* Right: Today's Orders (col-span-3) */}
-          <div className="lg:col-span-3 h-full min-h-0 animate-fade-up" style={{ animationDelay: '0.6s' }}>
+          <div className={`${isPastDate ? '' : 'lg:col-span-3'} h-full min-h-0 animate-fade-up`} style={{ animationDelay: '0.6s' }}>
             <div className="flex h-full flex-col overflow-hidden dd-card" style={{ borderColor: 'rgba(16, 185, 129, 0.2)' }}>
               <div className="flex items-center justify-between px-3 py-1.5 text-xs font-semibold uppercase"
                 style={{ background: 'var(--dd-bg-header)', color: 'var(--dd-text-primary)', borderBottom: '1px solid var(--dd-border)' }}>
@@ -881,56 +832,7 @@ export default function AdminDashboard() {
         </div> */}
       </div>
 
-      {/* ═══ NO PENDING MODAL ═══ */}
-      <Dialog open={showNoPendingModal} onOpenChange={() => { }}>
-        <DialogContent
-          className="sm:max-w-md"
-          showCloseButton={false}
-          onPointerDownOutside={(e) => e.preventDefault()}
-          onEscapeKeyDown={(e) => e.preventDefault()}
-        >
-          <div className="flex flex-col items-center gap-5 py-4">
-            <div
-              className="flex h-16 w-16 items-center justify-center rounded-full"
-              style={{
-                background: "linear-gradient(135deg, rgba(245, 158, 11, 0.15), rgba(217, 119, 6, 0.1))",
-                border: "2px solid rgba(245, 158, 11, 0.3)",
-              }}
-            >
-              <CalendarClock className="h-8 w-8 text-amber-500" />
-            </div>
-            <div className="text-center">
-              <h3 className="text-xl font-black uppercase" style={{ color: "var(--dd-text-primary)" }}>
-                {t("endOfDayBannerTitle")}
-              </h3>
-              <p className="mt-2 text-sm font-semibold" style={{ color: "var(--dd-text-muted)" }}>
-                {t("endOfDayBannerDescription")}
-              </p>
-            </div>
-            <div className="flex w-full gap-3">
-              <Button
-                variant="outline"
-                onClick={() => setShowNoPendingModal(false)}
-                className="flex-1 py-3 text-sm font-bold uppercase"
-              >
-                {t("endOfDayBannerDismiss")}
-              </Button>
-              <Button
-                variant="secondary"
-                onClick={() => router.push(`${ADMIN.END_OF_DAY_VEHICLES}`)}
-                className="flex-1 py-3 text-sm font-bold uppercase border-amber-300 text-amber-700 hover:bg-amber-50"
-                style={{
-                  background: "linear-gradient(135deg, rgba(245, 158, 11, 0.2), rgba(217, 119, 6, 0.15))",
-                  border: "1px solid rgba(245, 158, 11, 0.35)",
-                  color: "#92400e",
-                }}
-              >
-                {t("endOfDayBannerAction")}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+
 
       {/* ═══ MAP DIALOG ═══ */}
       <Dialog open={showMap} onOpenChange={(open) => { if (!open) { setShowMap(false); setMapSearch(''); setFocusVehicleId(null); setMapStatusFilter('all'); } }}>

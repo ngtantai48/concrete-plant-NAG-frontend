@@ -442,7 +442,9 @@
     "endOfDayBannerDismiss": "Bỏ qua",
     "tomorrowScheduleReadyTitle": "Lịch xe ngày mai đã sẵn sàng",
     "tomorrowScheduleReadyDescription": "Đã chốt lịch {count} xe cho ngày mai",
-    "undoScheduleAction": "Hủy chốt lịch"
+    "undoScheduleAction": "Hủy chốt lịch",
+    "undoScheduleSuccess": "Đã hủy chốt lịch ngày mai",
+    "undoScheduleFailed": "Không thể hủy chốt lịch"
   },
   "EndOfDayPage": {
     "title": "Quản lý xe cuối ngày",
@@ -459,6 +461,7 @@
     "shiftCloseFailed": "Không thể chốt ca cho ngày đã chọn",
     "shiftCloseDateRequired": "Vui lòng chọn ngày vận hành trước khi chốt ca",
     "rebalanceAction": "Tự động sắp xếp",
+    "saveAction": "Lưu",
     "rebalanceSuccess": "Đã tự động sắp xếp xe thành công",
     "rebalanceFailed": "Không thể tự động sắp xếp xe",
     "shiftOpenSuccess": "Đã xác nhận lịch cho ngày {date}",
@@ -591,6 +594,7 @@
     "progress": "Đang kiểm tra {current}/{total}...",
     "locationSettings": "Cài đặt vị trí",
     "exportExcel": "Xuất Excel",
+    "exportImage": "Xuất ảnh",
     "syncSheet": "Đồng bộ Sheet",
     "openSheet": "Mở Sheet",
     "syncing": "Đang đồng bộ...",
