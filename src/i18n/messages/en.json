@@ -422,7 +422,9 @@
     "endOfDayBannerDismiss": "Dismiss",
     "tomorrowScheduleReadyTitle": "Tomorrow's schedule is ready",
     "tomorrowScheduleReadyDescription": "Confirmed {count} vehicles for tomorrow",
-    "undoScheduleAction": "Undo schedule"
+    "undoScheduleAction": "Undo schedule",
+    "undoScheduleSuccess": "Tomorrow's schedule has been undone",
+    "undoScheduleFailed": "Unable to undo schedule"
   },
   "EndOfDayPage": {
     "title": "End-of-day vehicle management",
@@ -439,6 +441,7 @@
     "shiftCloseFailed": "Unable to close the shift for the selected date",
     "shiftCloseDateRequired": "Please choose an operation date before closing the shift",
     "rebalanceAction": "Auto arrange",
+    "saveAction": "Save",
     "rebalanceSuccess": "Vehicles auto-arranged successfully",
     "rebalanceFailed": "Unable to auto-arrange vehicles",
     "shiftOpenSuccess": "Schedule confirmed for {date}",
@@ -587,6 +590,7 @@
     "progress": "Checking {current}/{total}...",
     "locationSettings": "Location settings",
     "exportExcel": "Export Excel",
+    "exportImage": "Export Image",
     "syncSheet": "Sync Sheet",
     "openSheet": "Open Sheet",
     "syncing": "Syncing...",

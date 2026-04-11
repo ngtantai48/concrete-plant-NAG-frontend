@@ -8,6 +8,7 @@ import {
   InputNumber,
   message,
   Progress,
+  Select,
   Table,
   Tag,
 } from "antd";
@@ -15,19 +16,21 @@ import type { ColumnsType } from "antd/es/table";
 import dayjs, { type Dayjs } from "dayjs";
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
+import { toPng } from "html-to-image";
 import {
   CheckCircle,
   ChevronDown,
   ChevronUp,
   Download,
   ExternalLink,
+  ImageDown,
   MapPin,
   RefreshCw,
   Search,
   UtensilsCrossed,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 
 const { RangePicker } = DatePicker;
 
@@ -195,6 +198,13 @@ export default function MealCheckManager() {
   const [driverMap, setDriverMap] = useState<Record<string, string>>({}); // license_plate -> driver_name
   const [nameToPlateMap, setNameToPlateMap] = useState<Record<string, string>>({}); // driver_name -> license_plate
   const [checked, setChecked] = useState(false);
+  const tableRef = useRef<HTMLDivElement>(null);
+  const [selectedSlots, setSelectedSlots] = useState<MealSlot["key"][]>([]);
+
+  const activeSlots = useMemo(
+    () => MEAL_SLOTS.filter((s) => selectedSlots.includes(s.key)),
+    [selectedSlots]
+  );
 
   const days = useMemo(
     () => getDaysInRange(dateRange[0], dateRange[1]),
@@ -249,7 +259,7 @@ export default function MealCheckManager() {
       const vehicles = vehiclesRes.data.vehicles || [];
 
       const allDays = getDaysInRange(dateRange[0], dateRange[1]);
-      const totalSteps = vehicles.length * allDays.length * MEAL_SLOTS.length;
+      const totalSteps = vehicles.length * allDays.length * activeSlots.length;
       setProgress({ current: 0, total: totalSteps });
 
       // 4. For each vehicle, each day, each meal slot
@@ -259,7 +269,7 @@ export default function MealCheckManager() {
       for (const vehicle of vehicles) {
         const driverName = drMap[vehicle.license_plate];
         if (!driverName) {
-          step += allDays.length * MEAL_SLOTS.length;
+          step += allDays.length * activeSlots.length;
           setProgress({ current: step, total: totalSteps });
           continue;
         }
@@ -270,7 +280,7 @@ export default function MealCheckManager() {
           if (!data[driverName][dateStr])
             data[driverName][dateStr] = { sang: false, trua: false, toi: false };
 
-          for (const slot of MEAL_SLOTS) {
+          for (const slot of activeSlots) {
             step++;
             setProgress({ current: step, total: totalSteps });
 
@@ -294,7 +304,7 @@ export default function MealCheckManager() {
                 const lng = Number(val.longitude);
                 if (!lat || !lng) continue;
                 const dist = haversine(latitude, longitude, lat, lng);
-                if (dist <= radius) {
+                if (dist > radius) {
                   data[driverName][dateStr][slot.key] = true;
                   break;
                 }
@@ -313,7 +323,7 @@ export default function MealCheckManager() {
     } finally {
       setLoading(false);
     }
-  }, [dateRange, latitude, longitude, radius, t]);
+  }, [dateRange, latitude, longitude, radius, activeSlots, t]);
 
   // Build flat rows for table display
   const flatRows = useMemo(() => {
@@ -355,9 +365,9 @@ export default function MealCheckManager() {
         const personMeals = mealData[member.hoTen] || {};
         let total = 0;
         for (const dayMeals of Object.values(personMeals)) {
-          if (dayMeals.sang) total++;
-          if (dayMeals.trua) total++;
-          if (dayMeals.toi) total++;
+          for (const slot of activeSlots) {
+            if (dayMeals[slot.key]) total++;
+          }
         }
         rows.push({
           stt: stt++,
@@ -371,7 +381,7 @@ export default function MealCheckManager() {
     }
 
     return rows;
-  }, [checked, personnelList, mealData, nameToPlateMap]);
+  }, [checked, personnelList, mealData, nameToPlateMap, activeSlots]);
 
   const grandTotal = useMemo(
     () => flatRows.reduce((sum, r) => sum + (r.isSection ? 0 : r.total), 0),
@@ -386,8 +396,9 @@ export default function MealCheckManager() {
 
     const allDays = getDaysInRange(dateRange[0], dateRange[1]);
     const numDays = allDays.length;
+    const numSlots = activeSlots.length;
     const dayStartCol = 3; // col C (1-indexed)
-    const lastDayCol = dayStartCol + numDays * 3 - 1;
+    const lastDayCol = dayStartCol + numDays * numSlots - 1;
     const tongCol = lastDayCol + 1; // Tổng
     const kyCol = tongCol + 1; // Ký nhận
     const totalCols = kyCol;
@@ -441,18 +452,18 @@ export default function MealCheckManager() {
     // --- Row 4: Day numbers --- (BOLD, sz=10, height=30.75)
     const headerRow2 = ws.addRow([]);
     for (let i = 0; i < numDays; i++) {
-      const col = dayStartCol + i * 3;
+      const col = dayStartCol + i * numSlots;
       headerRow2.getCell(col).value = allDays[i].date();
     }
     headerRow2.height = 40.75;
 
-    // --- Row 5: Trưa/Chiều/Tối --- (sz=10, NOT bold, height=26.25)
+    // --- Row 5: Slot labels --- (sz=10, NOT bold, height=26.25)
     const headerRow3 = ws.addRow([]);
     for (let i = 0; i < numDays; i++) {
-      const col = dayStartCol + i * 3;
-      headerRow3.getCell(col).value = "Sáng";
-      headerRow3.getCell(col + 1).value = "Trưa";
-      headerRow3.getCell(col + 2).value = "Tối";
+      const col = dayStartCol + i * numSlots;
+      for (let s = 0; s < numSlots; s++) {
+        headerRow3.getCell(col + s).value = activeSlots[s].label;
+      }
     }
     headerRow3.height = 26.25;
 
@@ -463,8 +474,8 @@ export default function MealCheckManager() {
     ws.mergeCells(3, tongCol, 5, tongCol); // Tổng
     ws.mergeCells(3, kyCol, 5, kyCol); // Ký nhận
     for (let i = 0; i < numDays; i++) {
-      const col = dayStartCol + i * 3;
-      ws.mergeCells(4, col, 4, col + 2); // Day number merge
+      const col = dayStartCol + i * numSlots;
+      ws.mergeCells(4, col, 4, col + numSlots - 1); // Day number merge
     }
 
     // Style header rows 3-5
@@ -505,7 +516,7 @@ export default function MealCheckManager() {
       }
     }
 
-    const colTotals: number[] = new Array(numDays * 3).fill(0);
+    const colTotals: number[] = new Array(numDays * numSlots).fill(0);
     let globalStt = 1;
 
     for (const g of nhomGroups) {
@@ -552,26 +563,14 @@ export default function MealCheckManager() {
           const day = allDays[i];
           const dateStr = day.format("DD");
           const dm = personMeals[dateStr] || { sang: false, trua: false, toi: false };
-          const col = dayStartCol + i * 3;
+          const col = dayStartCol + i * numSlots;
 
-          if (dm.sang) {
-            dataRow.getCell(col).value = "/";
-            personTotal++;
-            colTotals[i * 3]++;
-          }
-          if (dm.trua) {
-            dataRow.getCell(col + 1).value = "/";
-            personTotal++;
-            colTotals[i * 3 + 1]++;
-          }
-          if (dm.toi) {
-            dataRow.getCell(col + 2).value = "/";
-            personTotal++;
-            colTotals[i * 3 + 2]++;
-          }
-
-          // Style meal cells (sz=10, center, border)
-          for (let s = 0; s < 3; s++) {
+          for (let s = 0; s < numSlots; s++) {
+            if (dm[activeSlots[s].key]) {
+              dataRow.getCell(col + s).value = "/";
+              personTotal++;
+              colTotals[i * numSlots + s]++;
+            }
             dataRow.getCell(col + s).font = { size: 10, name: fontTNR };
             dataRow.getCell(col + s).alignment = { horizontal: "center" };
             dataRow.getCell(col + s).border = thinBorder;
@@ -599,7 +598,7 @@ export default function MealCheckManager() {
     totalRow.getCell(1).border = thinBorder;
     totalRow.getCell(2).border = thinBorder;
 
-    for (let i = 0; i < numDays * 3; i++) {
+    for (let i = 0; i < numDays * numSlots; i++) {
       const col = dayStartCol + i;
       totalRow.getCell(col).value = colTotals[i] || undefined;
       totalRow.getCell(col).font = { bold: true, size: 12, name: fontTNR };
@@ -691,8 +690,8 @@ export default function MealCheckManager() {
     // --- Column widths (matching original) ---
     ws.getColumn(1).width = 5.56; // A: STT
     ws.getColumn(2).width = 21.44; // B: Họ và tên
-    for (let i = 0; i < numDays * 3; i++) {
-      ws.getColumn(dayStartCol + i).width = 5.44; // C-AI: day columns
+    for (let i = 0; i < numDays * numSlots; i++) {
+      ws.getColumn(dayStartCol + i).width = 5.44; // day columns
     }
     ws.getColumn(tongCol).width = 5.56; // Tổng
     ws.getColumn(kyCol).width = 17.31; // Ký nhận
@@ -706,7 +705,25 @@ export default function MealCheckManager() {
       blob,
       `com-ca_${dateRange[0].format("DD-MM-YYYY")}_${dateRange[1].format("DD-MM-YYYY")}.xlsx`
     );
-  }, [dateRange, personnelList, mealData, grandTotal]);
+  }, [dateRange, personnelList, mealData, grandTotal, activeSlots]);
+
+  // --- Image Export ---
+
+  const handleExportImage = useCallback(async () => {
+    if (!tableRef.current) return;
+    try {
+      const dataUrl = await toPng(tableRef.current, {
+        backgroundColor: "#ffffff",
+        pixelRatio: 2,
+      });
+      const link = document.createElement("a");
+      link.download = `com-ca_${dateRange[0].format("DD-MM-YYYY")}_${dateRange[1].format("DD-MM-YYYY")}.png`;
+      link.href = dataUrl;
+      link.click();
+    } catch {
+      message.error("Export image failed");
+    }
+  }, [dateRange]);
 
   // --- Sync to Google Sheet ---
 
@@ -797,7 +814,7 @@ export default function MealCheckManager() {
       cols.push({
         title: String(dayLabel),
         key: `day-${dateStr}`,
-        children: MEAL_SLOTS.map((slot) => ({
+        children: activeSlots.map((slot) => ({
           title: slot.label.charAt(0), // T, C, T
           key: `${dateStr}-${slot.key}`,
           width: 35,
@@ -830,7 +847,7 @@ export default function MealCheckManager() {
     });
 
     return cols;
-  }, [days, t]);
+  }, [days, activeSlots, t]);
 
   return (
     <div className="px-6 py-8 max-w-[1600px]">
@@ -864,16 +881,22 @@ export default function MealCheckManager() {
             />
           </div>
 
-          {/* Meal slots info */}
+          {/* Meal slots select */}
           <div>
             <label className="block text-xs font-semibold text-neutral-500 uppercase tracking-wide mb-1.5">
               {t("timeRange")}
             </label>
-            <div className="flex items-center gap-2 text-sm text-neutral-600">
-              <Tag color="blue">Sáng: 11:30-13:00</Tag>
-              <Tag color="orange">Trưa: 19:00-22:00</Tag>
-              <Tag color="purple">Tối: 22:00-24:00</Tag>
-            </div>
+            <Select
+              mode="multiple"
+              value={selectedSlots}
+              onChange={setSelectedSlots}
+              placeholder={t("timeRange")}
+              style={{ minWidth: 280 }}
+              options={MEAL_SLOTS.map((slot) => ({
+                value: slot.key,
+                label: `${slot.label}: ${String(slot.fromH).padStart(2, "0")}:${String(slot.fromM).padStart(2, "0")}-${String(slot.toH).padStart(2, "0")}:${String(slot.toM).padStart(2, "0")}`,
+              }))}
+            />
           </div>
 
           {/* Location toggle */}
@@ -895,6 +918,7 @@ export default function MealCheckManager() {
               icon={<Search size={15} />}
               onClick={handleCheck}
               loading={loading}
+              disabled={selectedSlots.length === 0}
               size="large"
               style={{
                 backgroundColor: "#b45309",
@@ -1001,6 +1025,14 @@ export default function MealCheckManager() {
               {t("exportExcel")}
             </Button>
             <Button
+              icon={<ImageDown size={15} />}
+              onClick={handleExportImage}
+              disabled={flatRows.length === 0}
+              style={{ fontWeight: 600 }}
+            >
+              {t("exportImage")}
+            </Button>
+            <Button
               icon={<RefreshCw size={15} className={syncing ? "animate-spin" : ""} />}
               onClick={handleSyncSheet}
               loading={syncing}
@@ -1021,19 +1053,21 @@ export default function MealCheckManager() {
       )}
 
       {/* Table */}
-      <Table
-        columns={columns}
-        dataSource={flatRows}
-        rowKey={(record, index) => `${record.stt}-${record.hoTen}-${index}`}
-        loading={loading && progress.total === 0}
-        pagination={false}
-        scroll={{ x: 800 + days.length * 105 }}
-        size="small"
-        bordered
-        rowClassName={(record) =>
-          record.isSection ? "bg-amber-50/60 font-semibold" : ""
-        }
-      />
+      <div ref={tableRef}>
+        <Table
+          columns={columns}
+          dataSource={flatRows}
+          rowKey={(record, index) => `${record.stt}-${record.hoTen}-${index}`}
+          loading={loading && progress.total === 0}
+          pagination={false}
+          scroll={{ x: 800 + days.length * 35 * activeSlots.length }}
+          size="small"
+          bordered
+          rowClassName={(record) =>
+            record.isSection ? "bg-amber-50/60 font-semibold" : ""
+          }
+        />
+      </div>
     </div>
   );
 }
