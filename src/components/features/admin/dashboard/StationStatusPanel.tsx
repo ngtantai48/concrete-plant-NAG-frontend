@@ -210,7 +210,7 @@ export default function StationStatusPanel({ stations, orders, deviceStationStat
 
   return (
     <>
-      <div className="grid w-full grid-cols-1 items-stretch gap-5 md:grid-cols-2 xl:grid-cols-3">
+      <div className="grid w-full grid-cols-1 items-stretch gap-2 md:grid-cols-2 xl:grid-cols-3">
         {workingStations.map((station) => {
           const theme = getStatusTheme(station.station_status);
           const stationVehicles = vehiclesByStation[station.station_id] || [];
@@ -230,40 +230,38 @@ export default function StationStatusPanel({ stations, orders, deviceStationStat
               style={{ borderColor: theme.borderGlow }}
             >
               {/* Left — Header + Vehicle Info */}
-              <div className="flex flex-col flex-1 min-w-0 p-4">
+              <div className="flex flex-col flex-1 min-w-0 px-3 py-1.5">
                 {/* Header — Name | RFID | Status */}
-                <div className="flex items-center justify-between gap-1.5 px-2 py-1 rounded-tl-[7px]">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <h3 className="text-base font-black whitespace-nowrap" style={{ color: 'var(--dd-text-primary)' }}>
-                      {station.station_name}
-                    </h3>
-                    <div className={`inline-flex items-center gap-1 dd-chip text-[10px] px-1.5 py-0.5 shrink-0 ${deviceStatus === 'connected' ? '' : 'animate-danger-blink'}`}
+                <div className="flex items-center flex-wrap gap-1.5 px-1 py-0.5 rounded-tl-[7px]">
+                  <h3 className="text-base font-black whitespace-nowrap" style={{ color: 'var(--dd-text-primary)' }}>
+                    {station.station_name}
+                  </h3>
+                  <div className={`inline-flex items-center gap-1 dd-chip text-[10px] px-1.5 py-0.5 shrink-0 ${deviceStatus === 'connected' ? '' : 'animate-danger-blink'}`}
+                    style={{
+                      background: deviceStatus === 'connected' ? 'var(--dd-emerald-glow)' : 'var(--dd-red-glow)',
+                      border: `1px solid ${deviceStatus === 'connected' ? 'var(--dd-emerald)' : 'var(--dd-red)'}`,
+                      color: deviceStatus === 'connected' ? 'var(--dd-emerald)' : 'var(--dd-red)',
+                    }}>
+                    <span className="h-1.5 w-1.5 rounded-sm"
                       style={{
-                        background: deviceStatus === 'connected' ? 'var(--dd-emerald-glow)' : 'var(--dd-red-glow)',
-                        border: `1px solid ${deviceStatus === 'connected' ? 'var(--dd-emerald)' : 'var(--dd-red)'}`,
-                        color: deviceStatus === 'connected' ? 'var(--dd-emerald)' : 'var(--dd-red)',
-                      }}>
-                      <span className="h-1.5 w-1.5 rounded-sm"
-                        style={{
-                          background: deviceStatus === 'connected' ? '#10b981' : '#ef4444',
-                          boxShadow: `0 0 4px ${deviceStatus === 'connected' ? 'rgba(16, 185, 129, 0.5)' : 'rgba(239, 68, 68, 0.5)'}`,
-                          display: 'inline-block',
-                        }} />
-                      RFID {deviceStatus === 'connected' ? t('connected') : t('disconnected')}
-                    </div>
+                        background: deviceStatus === 'connected' ? '#10b981' : '#ef4444',
+                        boxShadow: `0 0 4px ${deviceStatus === 'connected' ? 'rgba(16, 185, 129, 0.5)' : 'rgba(239, 68, 68, 0.5)'}`,
+                        display: 'inline-block',
+                      }} />
+                    RFID {deviceStatus === 'connected' ? t('connected') : t('disconnected')}
                   </div>
-                  <div className={`${theme.chipClass} text-[10px] px-2 py-0.5 shrink-0`}>
+                  <div className={`${theme.chipClass} text-[10px] px-2 py-0.5 shrink-0 ml-auto`}>
                     <span className="h-1.5 w-1.5 rounded-full" style={{ background: theme.dot, boxShadow: `0 0 4px ${theme.dotGlow}`, display: 'inline-block' }} />
                     {theme.label}
                   </div>
                 </div>
 
                 {/* Content — compact vehicle info */}
-                <div className="flex flex-col flex-1 gap-1 px-2 py-1.5">
+                <div className="flex flex-col flex-1 gap-1 px-1 py-1">
                   {/* Active Vehicle */}
-                  <div className="rounded-md px-2 py-1.5 shadow-sm" style={{ background: 'var(--dd-bg-surface)', border: '1px solid var(--dd-border)' }}>
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-[10px] font-bold uppercase" style={{ color: 'var(--dd-text-muted)' }}>
+                  <div className="rounded-md px-2 py-1 shadow-sm" style={{ background: 'var(--dd-bg-surface)', border: '1px solid var(--dd-border)' }}>
+                    <div className="flex items-center justify-between gap-2 min-h-[28px]">
+                      <span className="text-xs font-bold uppercase" style={{ color: 'var(--dd-text-muted)' }}>
                         {t('vehicleUnloading')}
                       </span>
                       {activeVehicle ? (
@@ -290,7 +288,7 @@ export default function StationStatusPanel({ stations, orders, deviceStationStat
                   </div>
 
                   {/* Divider */}
-                  <div className="flex items-center justify-center gap-1 px-1">
+                  {/* <div className="flex items-center justify-center gap-1 px-1">
                     <span className="h-px flex-1" style={{ background: 'var(--dd-border)' }} />
                     <span className="flex h-3.5 w-3.5 items-center justify-center rounded-full"
                       style={{
@@ -301,10 +299,10 @@ export default function StationStatusPanel({ stations, orders, deviceStationStat
                       {nextVehicle ? <ArrowUp className="h-3 w-3 animate-flow-arrow-up" /> : <LoaderCircle className="h-3 w-3 animate-soft-spin" />}
                     </span>
                     <span className="h-px flex-1" style={{ background: 'var(--dd-border)' }} />
-                  </div>
+                  </div> */}
 
                   {/* Next Vehicle */}
-                  <div className="rounded-md px-2 py-1.5 shadow-sm" style={{ background: 'var(--dd-bg-surface)', border: '1px solid var(--dd-border)' }}>
+                  {/* <div className="rounded-md px-2 py-1.5 shadow-sm" style={{ background: 'var(--dd-bg-surface)', border: '1px solid var(--dd-border)' }}>
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-[10px] font-bold uppercase" style={{ color: 'var(--dd-text-secondary)' }}>
                         {t('nextVehicle')}
@@ -318,12 +316,12 @@ export default function StationStatusPanel({ stations, orders, deviceStationStat
                         <span className="text-[10px] italic" style={{ color: 'var(--dd-text-muted)', opacity: 0.5 }}>{t('noNextVehicle')}</span>
                       )}
                     </div>
-                  </div>
+                  </div> */}
                 </div>
               </div>
 
-              {/* Right — Action Buttons stacked vertically */}
-              <div className="flex flex-col shrink-0" style={{ borderLeft: '1px solid var(--dd-border)' }}>
+              {/* Right — Action Buttons stacked vertically (HIDDEN) */}
+              {/* <div className="flex flex-col shrink-0" style={{ borderLeft: '1px solid var(--dd-border)' }}>
                 <Button
                   variant={btnConfig.variant}
                   size="sm"
@@ -352,7 +350,7 @@ export default function StationStatusPanel({ stations, orders, deviceStationStat
                     </div>
                   </Button>
                 )}
-              </div>
+              </div> */}
             </div>
           );
         })}

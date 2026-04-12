@@ -209,7 +209,7 @@ export default function AdminDashboard() {
   const { isConnected: socketConnected, lastSignal, lastSignalTime } = useRealtimeUpdates(fetchAll);
   const { stationStatusMap, isLedConnected } = useDeviceHeartbeat();
 
-  const inYardVehicles = useMemo(() => vtrackingVehicles.filter(v => v.inRange), [vtrackingVehicles]);
+  const inYardVehicles = useMemo(() => vtrackingVehicles.filter(v => v.inRange && v.vehicle_name?.toUpperCase().startsWith('X')), [vtrackingVehicles]);
 
   const stoppedMaintenanceList = useMemo(() => {
     const list: { id: string; label: string; statusLabel: string; chipClass: string }[] = [];
@@ -339,10 +339,10 @@ export default function AdminDashboard() {
 
   return (
     <div className={`dashboard-light bg-cover bg-center ${isFullScreen ? 'fixed inset-0 z-[100] bg-slate-50 h-screen' : 'h-[calc(100vh-64px)]'} overflow-hidden flex flex-col`}>
-      <div className={`p-2 lg:px-4 lg:py-2 mx-auto bg-transparent w-full flex-1 flex flex-col min-h-0`}>
+      <div className={`p-2 lg:p-4 mx-auto bg-transparent w-full flex-1 flex flex-col min-h-0`}>
 
         {/* ═══ HEADER ═══ */}
-        <div className="dd-header mb-1 px-3 py-2 shrink-0">
+        <div className="dd-header mb-2 p-3 shrink-0">
           <div className="flex items-center justify-between gap-3">
             {/* Title + Clock */}
             <div className="flex items-center gap-3 min-w-0">
@@ -502,8 +502,8 @@ export default function AdminDashboard() {
           </div>
 
           {/* ═══ STAT CARDS ═══ */}
-          {!isPastDate && (
-            <div className="mt-1.5 grid grid-cols-2 gap-2 md:grid-cols-5 shrink-0">
+          {/* {!isPastDate && (
+            <div className="mt-1 grid grid-cols-2 gap-1.5 md:grid-cols-5 shrink-0">
               {statCards.map((card, i) => (
                 <Card
                   key={i}
@@ -513,7 +513,7 @@ export default function AdminDashboard() {
                     animationDelay: `${i * 0.1}s`
                   } as React.CSSProperties}
                 >
-                  <CardContent className="p-2 lg:px-3 lg:py-1.5 flex items-center justify-between gap-2 h-full">
+                  <CardContent className="p-1.5 lg:px-2.5 lg:py-1 flex items-center justify-between gap-2 h-full">
                     <span className="text-sm font-extrabold uppercase truncate"
                       style={{ color: 'var(--dd-text-muted)' }}>
                       {card.label}
@@ -526,293 +526,410 @@ export default function AdminDashboard() {
                 </Card>
               ))}
             </div>
-          )}
+          )} */}
         </div>
 
-        {!isPastDate && (
-          <>
-            {/* ═══ SCHEDULE STATUS BANNER ═══ */}
-            {!loading && isTomorrowScheduleReady && (
-              <div
-                className="mb-1.5 shrink-0 rounded-lg border px-3 py-1.5"
-                style={{
-                  background: "linear-gradient(135deg, rgba(16, 185, 129, 0.08), rgba(5, 150, 105, 0.06))",
-                  borderColor: "rgba(16, 185, 129, 0.25)",
-                }}
-              >
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
-                  <span className="text-xs font-bold uppercase" style={{ color: "var(--dd-text-primary)" }}>
-                    {t("tomorrowScheduleReadyTitle")} — {t("tomorrowScheduleReadyDescription", { count: tomorrowOrders.length })}
-                  </span>
-                </div>
-              </div>
-            )}
-
-            {/* ═══ SYSTEM TELEMETRY ═══ */}
-            <div className="mb-1.5 shrink-0">
-              <StationStatusPanel stations={stations} orders={orders} deviceStationStatusMap={stationStatusMap} onStationUpdated={fetchAll} />
+        {!isPastDate && !loading && isTomorrowScheduleReady && (
+          <div
+            className="mb-1 shrink-0 rounded-lg border px-3 py-1"
+            style={{
+              background: "linear-gradient(135deg, rgba(16, 185, 129, 0.08), rgba(5, 150, 105, 0.06))",
+              borderColor: "rgba(16, 185, 129, 0.25)",
+            }}
+          >
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+              <span className="text-xs font-bold uppercase" style={{ color: "var(--dd-text-primary)" }}>
+                {t("tomorrowScheduleReadyTitle")} — {t("tomorrowScheduleReadyDescription", { count: tomorrowOrders.length })}
+              </span>
             </div>
-          </>
+          </div>
         )}
 
         {/* ═══ COMMAND CORE GRID ═══ */}
-        <div className={`grid grid-cols-1 ${isPastDate ? '' : 'lg:grid-cols-12'} gap-4 flex-1 min-h-0 overflow-hidden`}>
+        <div className={`flex ${isPastDate ? '' : 'gap-4'} flex-1 min-h-0 overflow-hidden`}>
 
-          {/* Left: Asset Management (col-span-3) */}
+          {/* Left: Stations + Vehicles + Dispatch Center (70%) */}
           {!isPastDate && (
-            <div className="lg:col-span-3 flex flex-col gap-1.5 h-full min-h-0 animate-fade-up" style={{ animationDelay: '0.2s' }}>
-              {/* Ready Vehicles */}
-              <div className="flex max-h-[45%] flex-col overflow-hidden dd-card">
-                <div className="flex items-center justify-between px-3 py-1.5 text-xs font-semibold uppercase"
-                  style={{ background: 'var(--dd-bg-header)', color: 'var(--dd-text-primary)', borderBottom: '1px solid var(--dd-border)' }}>
-                  <span>{t('readyVehiclesPanel')}</span>
-                  <span className="dd-chip dd-chip-emerald text-[10px] px-1.5 py-0.5">{inYardVehicles.length}</span>
-                </div>
-                <div className="overflow-y-auto p-0 flex-1">
-                  {inYardVehicles.length === 0 ? (
-                    <div className="flex h-full items-center justify-center p-3">
-                      <span className="text-xs font-bold uppercase" style={{ color: 'var(--dd-text-muted)' }}>{t('noReadyVehicles')}</span>
+            <div className="flex flex-col gap-1.5 h-full min-h-0 animate-fade-up" style={{ flex: '7 1 0%', animationDelay: '0.2s' }}>
+
+              {/* ═══ SYSTEM TELEMETRY ═══ */}
+              <div className="shrink-0">
+                <StationStatusPanel stations={stations} orders={orders} deviceStationStatusMap={stationStatusMap} onStationUpdated={fetchAll} />
+              </div>
+
+              {/* Vehicles + Dispatch side by side */}
+              <div className="flex gap-2 flex-1 min-h-0">
+
+                {/* Vehicles Column: Xe trong bãi + Dừng/Bảo trì stacked vertically */}
+                <div className="flex flex-col gap-1.5 shrink-0 min-h-0" style={{ width: '320px' }}>
+                  {/* Ready Vehicles */}
+                  <div className="flex flex-col overflow-hidden dd-card min-h-0" style={{ flex: '7 1 0%' }}>
+                    <div className="flex items-center justify-between px-3 py-1.5 text-sm font-extrabold uppercase"
+                      style={{ borderBottom: '1px solid var(--dd-border)' }}>
+                      <span>{t('readyVehiclesPanel')}</span>
+                      <span className="dd-chip dd-chip-emerald text-[10px] px-1.5 py-0.5">{inYardVehicles.length}</span>
                     </div>
-                  ) : (
-                    <ul className="flex flex-col gap-1 px-4 py-2">
-                      {inYardVehicles.map((v) => (
-                        <li key={v.device_id} className="flex items-center gap-2 px-2 py-1 transition-colors rounded-md border shadow-sm cursor-default hover:shadow-md"
-                          style={{ background: 'var(--dd-bg-surface)', borderColor: 'var(--dd-border)' }}
-                          onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--dd-emerald)'}
-                          onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--dd-border)'}>
-                          <div className="h-5 w-5 rounded-full flex items-center justify-center shrink-0 border" style={{ background: 'rgba(16, 185, 129, 0.1)', borderColor: 'rgba(16, 185, 129, 0.3)' }}>
-                            <Truck className="h-2.5 w-2.5 animate-drive-idle" style={{ color: 'var(--dd-emerald)' }} />
-                          </div>
-                          <div className="flex flex-col min-w-0">
-                            <span className="text-xs font-bold" style={{ color: 'var(--dd-text-primary)' }}>{v.license_plate}{v.vehicle_name ? ` | ${v.vehicle_name}` : ''}</span>
-                            <span className="text-[10px] font-semibold" style={{ color: 'var(--dd-text-muted)' }}>
-                              {v.distance >= 1000 ? `${(v.distance / 1000).toFixed(1)} km` : `${v.distance} m`}
-                            </span>
-                          </div>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              </div>
-
-              {/* Canceled / Stopped */}
-              <div className="flex flex-1 min-h-[60px] flex-col overflow-hidden dd-card" style={{ borderColor: 'rgba(245, 158, 11, 0.2)' }}>
-                <div className="flex items-center justify-between px-3 py-1.5 text-xs font-semibold uppercase"
-                  style={{ background: 'var(--dd-bg-header)', color: 'var(--dd-text-primary)', borderBottom: '1px solid var(--dd-border)' }}>
-                  <span>{t('stoppedMaintenance')}</span>
-                  <span className="dd-chip dd-chip-amber text-[10px] px-1.5 py-0.5">{stoppedMaintenanceList.length}</span>
-                </div>
-                <div className="flex-1 overflow-y-auto p-0">
-                  {stoppedMaintenanceList.length === 0 ? (
-                    <div className="flex h-full items-center justify-center p-2">
-                      <span className="text-xs font-bold uppercase" style={{ color: 'var(--dd-text-muted)' }}>{t('empty')}</span>
+                    <div className="overflow-y-auto p-0 flex-1">
+                      {inYardVehicles.length === 0 ? (
+                        <div className="flex h-full items-center justify-center p-3">
+                          <span className="text-xs font-bold uppercase" style={{ color: 'var(--dd-text-muted)' }}>{t('noReadyVehicles')}</span>
+                        </div>
+                      ) : (
+                        <ul className="flex flex-col gap-1 px-2 py-2">
+                          {inYardVehicles.map((v) => (
+                            <li key={v.device_id} className="justify-between flex items-center gap-2 px-3 py-2 transition-colors rounded-md border shadow-sm cursor-default hover:shadow-md"
+                              style={{ background: 'var(--dd-bg-surface)', borderColor: 'var(--dd-border)' }}
+                              onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--dd-emerald)'}
+                              onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--dd-border)'}>
+                              <div className="flex items-center gap-2 min-w-0">
+                                <div className="h-5 w-5 rounded-full flex items-center justify-center shrink-0 border" style={{ background: 'rgba(16, 185, 129, 0.1)', borderColor: 'rgba(16, 185, 129, 0.3)' }}>
+                                  <Truck className="h-2.5 w-2.5 animate-drive-idle" style={{ color: 'var(--dd-emerald)' }} />
+                                </div>
+                                <span className="font-bold text-sm truncate" style={{ color: 'var(--dd-text-primary)' }}>{v.license_plate}{v.vehicle_name ? ` | ${v.vehicle_name}` : ''}</span>
+                              </div>
+                              <div className="text-sm me-2 shrink-0">
+                                <span className="font-semibold" style={{ color: 'var(--dd-text-muted)' }}>
+                                  {v.distance >= 1000 ? `${(v.distance / 1000).toFixed(1)} km` : `${v.distance} m`}
+                                </span>
+                              </div>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
                     </div>
-                  ) : (
-                    <ul className="flex flex-col gap-1 px-4 py-2">
-                      {stoppedMaintenanceList.map((item) => (
-                        <li key={item.id} className="flex items-center justify-between px-2 py-1 rounded-md border shadow-sm cursor-default"
-                          style={{ background: 'var(--dd-bg-surface)', borderColor: 'var(--dd-border)' }}>
-                          <span className="text-xs font-bold truncate pr-2" style={{ color: 'var(--dd-text-primary)' }}>
-                            {item.label}
-                          </span>
-                          <span className={`dd-chip text-[10px] px-1.5 py-0.5 ${item.chipClass}`}>{item.statusLabel}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
+                  </div>
 
-          {/* Center: Command Core (col-span-6) */}
-          {!isPastDate && (
-            <div className="lg:col-span-6 flex flex-col h-full min-h-0 dd-card overflow-hidden animate-fade-up"
-              style={{ boxShadow: '0 0 20px rgba(14, 165, 233, 0.05)', border: '1px solid rgba(14, 165, 233, 0.2)', animationDelay: '0.4s' }}>
-
-              {/* Core Header with Toggle */}
-              <div className="flex items-center justify-between px-3 py-1.5 relative z-10"
-                style={{ background: 'var(--dd-bg-header)', borderBottom: '1px solid var(--dd-border)' }}>
-                <div className="flex items-center gap-1.5 min-w-0 pr-2">
-                  <div className="h-1.5 w-1.5 rounded-full animate-pulse shrink-0" style={{ background: '#0ea5e9', boxShadow: '0 0 10px rgba(14, 165, 233, 0.8)' }} />
-                  <span className="text-xs font-black uppercase truncate" style={{ color: 'var(--dd-text-primary)' }} title="TRUNG TÂM ĐIỀU PHỐI">
-                    TRUNG TÂM ĐIỀU PHỐI
-                  </span>
-                </div>
-
-                {/* Segmented Toggle HUD */}
-                <div className="flex items-center rounded-md p-0.5 backdrop-blur-md shrink-0"
-                  style={{ background: 'var(--dd-bg-surface)', border: '1px solid var(--dd-border)' }}>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setDispatchMode('auto')}
-                    className={`h-5 px-2 text-[10px] font-bold uppercase ${dispatchMode === 'auto'
-                      ? 'bg-sky-500/20 text-sky-600 border border-sky-500/30'
-                      : 'text-slate-500 border border-transparent hover:text-slate-700'
-                      }`}
-                  >
-                    AUTO
-                  </Button>
-                  <div className="w-[1px] h-3 mx-0.5 opacity-20" style={{ background: 'var(--dd-text-muted)' }} />
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setDispatchMode('manual')}
-                    className={`h-5 px-2 text-[10px] font-bold uppercase ${dispatchMode === 'manual'
-                      ? 'bg-indigo-500/20 text-indigo-600 border border-indigo-500/30'
-                      : 'text-slate-500 border border-transparent hover:text-slate-700'
-                      }`}
-                  >
-                    MANUAL
-                  </Button>
-                  <div className="w-[1px] h-3 mx-0.5 opacity-20" style={{ background: 'var(--dd-text-muted)' }} />
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setShowMap(true)}
-                    className="h-5 px-2 text-[10px] font-bold uppercase text-slate-500 border border-transparent hover:text-slate-700 hover:bg-slate-100"
-                  >
-                    <MapIcon className="h-3 w-3 shrink-0" />
-                    MAP
-                  </Button>
-                </div>
-              </div>
-
-              {/* Core Display Area */}
-              <div className="flex-1 overflow-hidden relative bg-transparent p-2">
-                <div className="flex h-full flex-col gap-2">
-                  <div className="min-h-0 flex-1 overflow-y-auto w-full scrollbar-hide">
-                    <div className="h-full">
-                      <ActivityFlow
-                        stations={stations}
-                        vehicles={vehicles}
-                        orders={activeFlowOrders}
-                        dispatchMode={dispatchMode}
-                        onOrdersUpdated={fetchAll}
-                      />
+                  {/* Canceled / Stopped */}
+                  <div className="flex flex-col overflow-hidden dd-card min-h-0" style={{ flex: '3 1 0%', borderColor: 'rgba(245, 158, 11, 0.2)' }}>
+                    <div className="flex items-center justify-between px-3 py-1.5 text-xs font-semibold uppercase"
+                      style={{ background: 'var(--dd-bg-header)', color: 'var(--dd-text-primary)', borderBottom: '1px solid var(--dd-border)' }}>
+                      <span>{t('stoppedMaintenance')}</span>
+                      <span className="dd-chip dd-chip-amber text-[10px] px-1.5 py-0.5">{stoppedMaintenanceList.length}</span>
+                    </div>
+                    <div className="flex-1 overflow-y-auto p-0">
+                      {stoppedMaintenanceList.length === 0 ? (
+                        <div className="flex h-full items-center justify-center p-2">
+                          <span className="text-xs font-bold uppercase" style={{ color: 'var(--dd-text-muted)' }}>{t('empty')}</span>
+                        </div>
+                      ) : (
+                        <ul className="flex flex-col gap-1 px-2 py-2">
+                          {stoppedMaintenanceList.map((item) => (
+                            <li key={item.id} className="flex items-center justify-between px-2 py-1 rounded-md border shadow-sm cursor-default"
+                              style={{ background: 'var(--dd-bg-surface)', borderColor: 'var(--dd-border)' }}>
+                              <span className="text-xs font-bold truncate pr-2" style={{ color: 'var(--dd-text-primary)' }}>
+                                {item.label}
+                              </span>
+                              <span className={`dd-chip text-[10px] px-1.5 py-0.5 ${item.chipClass}`}>{item.statusLabel}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      )}
                     </div>
                   </div>
                 </div>
-              </div>
-            </div>
-          )}
 
-          {/* Right: Today's Orders (col-span-3) */}
-          <div className={`${isPastDate ? '' : 'lg:col-span-3'} h-full min-h-0 animate-fade-up`} style={{ animationDelay: '0.6s' }}>
-            <div className="flex h-full flex-col overflow-hidden dd-card" style={{ borderColor: 'rgba(16, 185, 129, 0.2)' }}>
-              <div className="flex items-center justify-between px-3 py-1.5 text-xs font-semibold uppercase"
-                style={{ background: 'var(--dd-bg-header)', color: 'var(--dd-text-primary)', borderBottom: '1px solid var(--dd-border)' }}>
-                <div className="flex items-center gap-1.5">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
-                  <span>{t('completedToday')}</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  {ordersActive.length > 0 && (
-                    <span className="dd-chip text-[10px] px-1.5 py-0.5" style={{ background: 'rgba(14, 165, 233, 0.12)', color: '#0ea5e9', border: '1px solid rgba(14, 165, 233, 0.3)' }}>
-                      {ordersActive.length} {t('running')}
-                    </span>
-                  )}
-                  <span className="dd-chip dd-chip-emerald text-[10px] px-1.5 py-0.5">{ordersCompleted.length}</span>
-                </div>
-              </div>
-              <div className="flex-1 overflow-y-auto">
-                {ordersTodayPanel.length === 0 ? (
-                  <div className="flex items-center justify-center h-full">
-                    <div className="flex flex-col items-center justify-center">
-                      <div className="h-14 w-14 rounded-full flex items-center justify-center backdrop-blur-md"
-                        style={{ background: 'var(--dd-bg-surface)', border: '2px dashed var(--dd-border)' }}>
-                        <CheckCircle2 className="h-6 w-6 text-emerald-400 opacity-50" />
-                      </div>
-                      <span className="mt-3 text-xs font-bold uppercase"
-                        style={{ color: 'var(--dd-text-muted)' }}>
-                        {t('noCompletedToday')}
+                {/* Dispatch Center */}
+                <div className="flex flex-1 flex-col h-full min-h-0 dd-card overflow-hidden"
+                  style={{ boxShadow: '0 0 20px rgba(14, 165, 233, 0.05)', border: '1px solid rgba(14, 165, 233, 0.2)' }}>
+
+                  {/* Core Header with Toggle */}
+                  <div className="flex items-center justify-between px-3 py-1.5 relative z-10"
+                    style={{ background: 'var(--dd-bg-header)', borderBottom: '1px solid var(--dd-border)' }}>
+                    <div className="flex items-center gap-1.5 min-w-0 pr-2">
+                      <div className="h-1.5 w-1.5 rounded-full animate-pulse shrink-0" style={{ background: '#0ea5e9', boxShadow: '0 0 10px rgba(14, 165, 233, 0.8)' }} />
+                      <span className="text-sm font-extrabold uppercase" title="TRUNG TÂM ĐIỀU PHỐI">
+                        TRUNG TÂM ĐIỀU PHỐI
                       </span>
                     </div>
+
+                    {/* Segmented Toggle HUD */}
+                    <div className="flex items-center rounded-md p-0.5 backdrop-blur-md shrink-0"
+                      style={{ background: 'var(--dd-bg-surface)', border: '1px solid var(--dd-border)' }}>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setDispatchMode('auto')}
+                        className={`h-5 px-2 text-[10px] font-bold uppercase ${dispatchMode === 'auto'
+                          ? 'bg-sky-500/20 text-sky-600 border border-sky-500/30'
+                          : 'text-slate-500 border border-transparent hover:text-slate-700'
+                          }`}
+                      >
+                        AUTO
+                      </Button>
+                      <div className="w-[1px] h-3 mx-0.5 opacity-20" style={{ background: 'var(--dd-text-muted)' }} />
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setDispatchMode('manual')}
+                        className={`h-5 px-2 text-[10px] font-bold uppercase ${dispatchMode === 'manual'
+                          ? 'bg-indigo-500/20 text-indigo-600 border border-indigo-500/30'
+                          : 'text-slate-500 border border-transparent hover:text-slate-700'
+                          }`}
+                      >
+                        MANUAL
+                      </Button>
+                      <div className="w-[1px] h-3 mx-0.5 opacity-20" style={{ background: 'var(--dd-text-muted)' }} />
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setShowMap(true)}
+                        className="h-5 px-2 text-[10px] font-bold uppercase text-slate-500 border border-transparent hover:text-slate-700 hover:bg-slate-100"
+                      >
+                        <MapIcon className="h-3 w-3 shrink-0" />
+                        MAP
+                      </Button>
+                    </div>
                   </div>
-                ) : (
-                  <ul className="flex flex-col gap-1.5 p-2">
-                    {ordersTodayPanel.map((o) => {
-                      const isCompleted = o.order_status === "completed";
-                      const accentColor = isCompleted ? '#10b981' : '#0ea5e9';
-                      const hoverBorder = isCompleted ? 'rgba(16, 185, 129, 0.4)' : 'rgba(14, 165, 233, 0.4)';
-                      return (
-                        <li key={o.order_id} className="dd-surface px-2 py-1.5 transition-all relative overflow-hidden"
-                          style={{ borderRadius: '6px', border: '1px solid var(--dd-border)' }}
-                          onMouseEnter={e => e.currentTarget.style.borderColor = hoverBorder}
-                          onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--dd-border)'}>
-                          <div className="absolute left-0 top-0 bottom-0 w-1" style={{ background: accentColor }} />
 
-                          <div className="flex justify-between items-end pl-2">
-                            <div className="flex items-center gap-1.5">
-                              <Truck className="w-3.5 h-3.5" style={{ color: accentColor }} />
-                              <span className="text-xs font-bold" style={{ color: 'var(--dd-text-primary)' }}>
-                                {o.vehicles?.vehicle_license_plate ? `${o.vehicles.vehicle_license_plate}${o.vehicles.vehicle_name ? ` | ${o.vehicles.vehicle_name}` : ''}` : `#${o.order_id}`}
-                              </span>
-                            </div>
-                            {isCompleted ? (
-                              <span className="dd-chip dd-chip-emerald text-[10px] px-1.5 py-0.5">
-                                {t('completed')}
-                              </span>
-                            ) : (
-                              <span className="dd-chip text-[10px] px-1.5 py-0.5" style={{ background: 'rgba(14, 165, 233, 0.12)', color: '#0ea5e9', border: '1px solid rgba(14, 165, 233, 0.3)' }}>
-                                {o.order_status === "collecting" ? t('collecting') : t('running')}
-                              </span>
-                            )}
-                          </div>
-                          <div className="mt-1 pl-2 flex items-center justify-between">
-                            <div className="text-[10px] font-bold uppercase"
-                              style={{ color: 'var(--dd-text-muted)' }}>
-                              {o.stations?.station_name || t('unassigned')}
-                            </div>
-                            <div className="flex items-center gap-3">
-                              {o.order_start_datetime && o.order_end_datetime && (() => {
-                                const diffMs = new Date(o.order_end_datetime).getTime() - new Date(o.order_start_datetime).getTime();
-                                const diffMins = Math.floor(diffMs / 60000);
-                                const hours = Math.floor(diffMins / 60);
-                                const mins = diffMins % 60;
-                                return (
-                                  <div className="flex items-center gap-1 text-[10px] font-semibold" style={{ color: accentColor }}>
-                                    <Clock className="w-3 h-3" />
-                                    <span>{hours > 0 ? `${hours}h${mins.toString().padStart(2, '0')}m` : `${mins}m`}</span>
-                                  </div>
-                                );
-                              })()}
-                              {o.order_end_datetime && (
-                                <div className="text-[10px] font-semibold" style={{ color: 'var(--dd-text-muted)' }}>
-                                  {new Date(o.order_end_datetime).toLocaleTimeString(locale === 'vi' ? 'vi-VN' : 'en-US', { hour: '2-digit', minute: '2-digit' })}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Distance & Stops from order_multi */}
-                          {o.order_multi && (() => {
-                            const distanceKm = ((o.order_multi.distance_end - o.order_multi.distance_start) / 1000).toFixed(1);
-                            const stops = o.order_multi.nStop_end - o.order_multi.nStop_start;
-                            return (
-                              <div className="mt-1.5 pl-2 flex items-center gap-3">
-                                <div className="flex items-center gap-1 text-[10px] font-semibold" style={{ color: '#0ea5e9' }}>
-                                  <Route className="w-3 h-3" />
-                                  <span>{distanceKm} km</span>
-                                </div>
-                                <div className="flex items-center gap-1 text-[10px] font-semibold" style={{ color: '#f59e0b' }}>
-                                  <MapPin className="w-3 h-3" />
-                                  <span>{stops} {t('stops') || 'lần dừng'}</span>
-                                </div>
-                              </div>
-                            );
-                          })()}
-                        </li>
-                      );
-                    })}
-                  </ul>
-                )}
+                  {/* Core Display Area */}
+                  <div className="flex-1 overflow-hidden relative bg-transparent p-2">
+                    <div className="flex h-full flex-col gap-2">
+                      <div className="min-h-0 flex-1 overflow-y-auto w-full scrollbar-hide">
+                        <div className="h-full">
+                          <ActivityFlow
+                            stations={stations}
+                            vehicles={vehicles}
+                            orders={activeFlowOrders}
+                            dispatchMode={dispatchMode}
+                            onOrdersUpdated={fetchAll}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                {/* end: Vehicles + Dispatch side by side */}
               </div>
             </div>
-          </div>
+          )}
+
+
+          {/* Right: Today's Orders (30%) */}
+          {!isPastDate && (
+            <div className="flex flex-col h-full min-h-0 animate-fade-up" style={{ flex: '3 1 0%', animationDelay: '0.6s' }}>
+              <div className="flex h-full flex-col overflow-hidden dd-card" style={{ borderColor: 'rgba(16, 185, 129, 0.2)' }}>
+                <div className="flex items-center justify-between px-3 py-1.5 text-sm font-extrabold uppercase"
+                  style={{ borderBottom: '1px solid var(--dd-border)' }}>
+                  <div className="flex items-center gap-1.5">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                    <span>{t('completedToday')}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    {ordersActive.length > 0 && (
+                      <span className="dd-chip text-[10px] px-1.5 py-0.5" style={{ background: 'rgba(14, 165, 233, 0.12)', color: '#0ea5e9', border: '1px solid rgba(14, 165, 233, 0.3)' }}>
+                        {ordersActive.length} {t('running')}
+                      </span>
+                    )}
+                    <span className="dd-chip dd-chip-emerald text-[10px] px-1.5 py-0.5">{ordersCompleted.length}</span>
+                  </div>
+                </div>
+                <div className="flex-1 overflow-y-auto">
+                  {ordersTodayPanel.length === 0 ? (
+                    <div className="flex items-center justify-center h-full">
+                      <div className="flex flex-col items-center justify-center">
+                        <div className="h-14 w-14 rounded-full flex items-center justify-center backdrop-blur-md"
+                          style={{ background: 'var(--dd-bg-surface)', border: '2px dashed var(--dd-border)' }}>
+                          <CheckCircle2 className="h-6 w-6 text-emerald-400 opacity-50" />
+                        </div>
+                        <span className="mt-3 text-xs font-bold uppercase"
+                          style={{ color: 'var(--dd-text-muted)' }}>
+                          {t('noCompletedToday')}
+                        </span>
+                      </div>
+                    </div>
+                  ) : (
+                    <ul className="flex flex-col gap-1.5 p-2">
+                      {ordersTodayPanel.map((o) => {
+                        const isCompleted = o.order_status === "completed";
+                        const accentColor = isCompleted ? '#10b981' : '#0ea5e9';
+                        const hoverBorder = isCompleted ? 'rgba(16, 185, 129, 0.4)' : 'rgba(14, 165, 233, 0.4)';
+                        return (
+                          <li key={o.order_id} className="dd-surface px-2 py-1.5 transition-all relative overflow-hidden"
+                            style={{ borderRadius: '6px', border: '1px solid var(--dd-border)' }}
+                            onMouseEnter={e => e.currentTarget.style.borderColor = hoverBorder}
+                            onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--dd-border)'}>
+                            <div className="absolute left-0 top-0 bottom-0 w-1" style={{ background: accentColor }} />
+                            <div className="flex justify-between items-end pl-2">
+                              <div className="flex items-center gap-1.5">
+                                <Truck className="w-3.5 h-3.5" style={{ color: accentColor }} />
+                                <span className="text-xs font-bold" style={{ color: 'var(--dd-text-primary)' }}>
+                                  {o.vehicles?.vehicle_license_plate ? `${o.vehicles.vehicle_license_plate}${o.vehicles.vehicle_name ? ` | ${o.vehicles.vehicle_name}` : ''}` : `#${o.order_id}`}
+                                </span>
+                              </div>
+                              {isCompleted ? (
+                                <span className="dd-chip dd-chip-emerald text-[10px] px-1.5 py-0.5">
+                                  {t('completed')}
+                                </span>
+                              ) : (
+                                <span className="dd-chip text-[10px] px-1.5 py-0.5" style={{ background: 'rgba(14, 165, 233, 0.12)', color: '#0ea5e9', border: '1px solid rgba(14, 165, 233, 0.3)' }}>
+                                  {o.order_status === "collecting" ? t('collecting') : t('running')}
+                                </span>
+                              )}
+                            </div>
+                            <div className="mt-1 pl-2 flex items-center justify-between">
+                              <div className="text-[10px] font-bold uppercase"
+                                style={{ color: 'var(--dd-text-muted)' }}>
+                                {o.stations?.station_name || t('unassigned')}
+                              </div>
+                              <div className="flex items-center gap-3">
+                                {o.order_start_datetime && o.order_end_datetime && (() => {
+                                  const diffMs = new Date(o.order_end_datetime).getTime() - new Date(o.order_start_datetime).getTime();
+                                  const diffMins = Math.floor(diffMs / 60000);
+                                  const hours = Math.floor(diffMins / 60);
+                                  const mins = diffMins % 60;
+                                  return (
+                                    <div className="flex items-center gap-1 text-[10px] font-semibold" style={{ color: accentColor }}>
+                                      <Clock className="w-3 h-3" />
+                                      <span>{hours > 0 ? `${hours}h${mins.toString().padStart(2, '0')}m` : `${mins}m`}</span>
+                                    </div>
+                                  );
+                                })()}
+                                {o.order_end_datetime && (
+                                  <div className="text-[10px] font-semibold" style={{ color: 'var(--dd-text-muted)' }}>
+                                    {new Date(o.order_end_datetime).toLocaleTimeString(locale === 'vi' ? 'vi-VN' : 'en-US', { hour: '2-digit', minute: '2-digit' })}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            {o.order_multi && (() => {
+                              const distanceKm = ((o.order_multi.distance_end - o.order_multi.distance_start) / 1000).toFixed(1);
+                              const stops = o.order_multi.nStop_end - o.order_multi.nStop_start;
+                              return (
+                                <div className="mt-1.5 pl-2 flex items-center gap-3">
+                                  <div className="flex items-center gap-1 text-[10px] font-semibold" style={{ color: '#0ea5e9' }}>
+                                    <Route className="w-3 h-3" />
+                                    <span>{distanceKm} km</span>
+                                  </div>
+                                  <div className="flex items-center gap-1 text-[10px] font-semibold" style={{ color: '#f59e0b' }}>
+                                    <MapPin className="w-3 h-3" />
+                                    <span>{stops} {t('stops') || 'lần dừng'}</span>
+                                  </div>
+                                </div>
+                              );
+                            })()}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Past date: full-width Today's Orders */}
+          {isPastDate && (
+            <div className="flex-1 h-full min-h-0 animate-fade-up" style={{ animationDelay: '0.6s' }}>
+              <div className="flex h-full flex-col overflow-hidden dd-card" style={{ borderColor: 'rgba(16, 185, 129, 0.2)' }}>
+                <div className="flex items-center justify-between px-3 py-1.5 text-xs font-semibold uppercase"
+                  style={{ background: 'var(--dd-bg-header)', color: 'var(--dd-text-primary)', borderBottom: '1px solid var(--dd-border)' }}>
+                  <div className="flex items-center gap-1.5">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                    <span>{t('completedToday')}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    {ordersActive.length > 0 && (
+                      <span className="dd-chip text-[10px] px-1.5 py-0.5" style={{ background: 'rgba(14, 165, 233, 0.12)', color: '#0ea5e9', border: '1px solid rgba(14, 165, 233, 0.3)' }}>
+                        {ordersActive.length} {t('running')}
+                      </span>
+                    )}
+                    <span className="dd-chip dd-chip-emerald text-[10px] px-1.5 py-0.5">{ordersCompleted.length}</span>
+                  </div>
+                </div>
+                <div className="flex-1 overflow-y-auto">
+                  {ordersTodayPanel.length === 0 ? (
+                    <div className="flex items-center justify-center h-full">
+                      <div className="flex flex-col items-center justify-center">
+                        <div className="h-14 w-14 rounded-full flex items-center justify-center backdrop-blur-md"
+                          style={{ background: 'var(--dd-bg-surface)', border: '2px dashed var(--dd-border)' }}>
+                          <CheckCircle2 className="h-6 w-6 text-emerald-400 opacity-50" />
+                        </div>
+                        <span className="mt-3 text-xs font-bold uppercase"
+                          style={{ color: 'var(--dd-text-muted)' }}>
+                          {t('noCompletedToday')}
+                        </span>
+                      </div>
+                    </div>
+                  ) : (
+                    <ul className="flex flex-col gap-1.5 p-2">
+                      {ordersTodayPanel.map((o) => {
+                        const isCompleted = o.order_status === "completed";
+                        const accentColor = isCompleted ? '#10b981' : '#0ea5e9';
+                        const hoverBorder = isCompleted ? 'rgba(16, 185, 129, 0.4)' : 'rgba(14, 165, 233, 0.4)';
+                        return (
+                          <li key={o.order_id} className="dd-surface px-2 py-1.5 transition-all relative overflow-hidden"
+                            style={{ borderRadius: '6px', border: '1px solid var(--dd-border)' }}
+                            onMouseEnter={e => e.currentTarget.style.borderColor = hoverBorder}
+                            onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--dd-border)'}>
+                            <div className="absolute left-0 top-0 bottom-0 w-1" style={{ background: accentColor }} />
+                            <div className="flex justify-between items-end pl-2">
+                              <div className="flex items-center gap-1.5">
+                                <Truck className="w-3.5 h-3.5" style={{ color: accentColor }} />
+                                <span className="text-xs font-bold" style={{ color: 'var(--dd-text-primary)' }}>
+                                  {o.vehicles?.vehicle_license_plate ? `${o.vehicles.vehicle_license_plate}${o.vehicles.vehicle_name ? ` | ${o.vehicles.vehicle_name}` : ''}` : `#${o.order_id}`}
+                                </span>
+                              </div>
+                              {isCompleted ? (
+                                <span className="dd-chip dd-chip-emerald text-[10px] px-1.5 py-0.5">
+                                  {t('completed')}
+                                </span>
+                              ) : (
+                                <span className="dd-chip text-[10px] px-1.5 py-0.5" style={{ background: 'rgba(14, 165, 233, 0.12)', color: '#0ea5e9', border: '1px solid rgba(14, 165, 233, 0.3)' }}>
+                                  {o.order_status === "collecting" ? t('collecting') : t('running')}
+                                </span>
+                              )}
+                            </div>
+                            <div className="mt-1 pl-2 flex items-center justify-between">
+                              <div className="text-[10px] font-bold uppercase"
+                                style={{ color: 'var(--dd-text-muted)' }}>
+                                {o.stations?.station_name || t('unassigned')}
+                              </div>
+                              <div className="flex items-center gap-3">
+                                {o.order_start_datetime && o.order_end_datetime && (() => {
+                                  const diffMs = new Date(o.order_end_datetime).getTime() - new Date(o.order_start_datetime).getTime();
+                                  const diffMins = Math.floor(diffMs / 60000);
+                                  const hours = Math.floor(diffMins / 60);
+                                  const mins = diffMins % 60;
+                                  return (
+                                    <div className="flex items-center gap-1 text-[10px] font-semibold" style={{ color: accentColor }}>
+                                      <Clock className="w-3 h-3" />
+                                      <span>{hours > 0 ? `${hours}h${mins.toString().padStart(2, '0')}m` : `${mins}m`}</span>
+                                    </div>
+                                  );
+                                })()}
+                                {o.order_end_datetime && (
+                                  <div className="text-[10px] font-semibold" style={{ color: 'var(--dd-text-muted)' }}>
+                                    {new Date(o.order_end_datetime).toLocaleTimeString(locale === 'vi' ? 'vi-VN' : 'en-US', { hour: '2-digit', minute: '2-digit' })}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            {o.order_multi && (() => {
+                              const distanceKm = ((o.order_multi.distance_end - o.order_multi.distance_start) / 1000).toFixed(1);
+                              const stops = o.order_multi.nStop_end - o.order_multi.nStop_start;
+                              return (
+                                <div className="mt-1.5 pl-2 flex items-center gap-3">
+                                  <div className="flex items-center gap-1 text-[10px] font-semibold" style={{ color: '#0ea5e9' }}>
+                                    <Route className="w-3 h-3" />
+                                    <span>{distanceKm} km</span>
+                                  </div>
+                                  <div className="flex items-center gap-1 text-[10px] font-semibold" style={{ color: '#f59e0b' }}>
+                                    <MapPin className="w-3 h-3" />
+                                    <span>{stops} {t('stops') || 'lần dừng'}</span>
+                                  </div>
+                                </div>
+                              );
+                            })()}
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* ═══ FOOTER ═══ */}

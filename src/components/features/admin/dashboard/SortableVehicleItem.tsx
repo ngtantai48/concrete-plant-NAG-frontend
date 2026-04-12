@@ -138,7 +138,7 @@ function SortableVehicleItemBase({
 
         <div className="flex flex-wrap md:flex-nowrap items-center justify-between gap-2 pl-2 md:pl-0 shrink-0">
           <div className="flex flex-wrap md:flex-nowrap items-center gap-2">
-            {displayedStationName && (
+            {/* {displayedStationName && (
               <div
                 className="flex items-center text-[14px] font-bold"
                 style={{ color: isDropTarget ? 'var(--dd-sky)' : 'var(--dd-text-muted)' }}
@@ -148,7 +148,7 @@ function SortableVehicleItemBase({
                   {displayedStationName}
                 </span>
               </div>
-            )}
+            )} */}
 
             {isManualMode && isSelected && (
               <div className="flex items-center gap-2">
@@ -197,38 +197,38 @@ function SortableVehicleItemBase({
             )}
           </div>
 
-            {isManualMode && (
-              <div className="flex items-center gap-1 md:ml-auto">
-                <button
-                  type="button"
-                  onClick={(e) => { e.stopPropagation(); onReorder('up'); }}
-                  disabled={isBusy || !canMoveUp}
-                  title={t('moveUp')}
-                  className="flex h-8 w-8 items-center justify-center rounded-full transition-all disabled:cursor-not-allowed disabled:opacity-40"
-                  style={{
-                    background: 'var(--dd-bg-surface)',
-                    border: '1px solid var(--dd-border)',
-                    color: 'var(--dd-text-secondary)',
-                  }}
-                >
-                  <ChevronUp className="h-4 w-4" />
-                </button>
-                <button
-                  type="button"
-                  onClick={(e) => { e.stopPropagation(); onReorder('down'); }}
-                  disabled={isBusy || !canMoveDown}
-                  title={t('moveDown')}
-                  className="flex h-8 w-8 items-center justify-center rounded-full transition-all disabled:cursor-not-allowed disabled:opacity-40"
-                  style={{
-                    background: 'var(--dd-bg-surface)',
-                    border: '1px solid var(--dd-border)',
-                    color: 'var(--dd-text-secondary)',
-                  }}
-                >
-                  <ChevronDown className="h-4 w-4" />
-                </button>
-              </div>
-            )}
+          {isManualMode && (
+            <div className="flex items-center gap-1 md:ml-auto">
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onReorder('up'); }}
+                disabled={isBusy || !canMoveUp}
+                title={t('moveUp')}
+                className="flex h-8 w-8 items-center justify-center rounded-full transition-all disabled:cursor-not-allowed disabled:opacity-40"
+                style={{
+                  background: 'var(--dd-bg-surface)',
+                  border: '1px solid var(--dd-border)',
+                  color: 'var(--dd-text-secondary)',
+                }}
+              >
+                <ChevronUp className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onReorder('down'); }}
+                disabled={isBusy || !canMoveDown}
+                title={t('moveDown')}
+                className="flex h-8 w-8 items-center justify-center rounded-full transition-all disabled:cursor-not-allowed disabled:opacity-40"
+                style={{
+                  background: 'var(--dd-bg-surface)',
+                  border: '1px solid var(--dd-border)',
+                  color: 'var(--dd-text-secondary)',
+                }}
+              >
+                <ChevronDown className="h-4 w-4" />
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>
