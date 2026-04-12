@@ -135,8 +135,8 @@ export function useDeviceHeartbeat(): DeviceHeartbeatState {
   }, []);
 
   const isLedConnected = useMemo(() => {
-    // Theo backend, station_id = 1 là tín hiệu của LED
-    return stationStatusMap["1"]?.deviceStatus === "connected";
+    // Theo backend, station_id = 4 là tín hiệu của LED
+    return stationStatusMap["4"]?.deviceStatus === "connected";
   }, [stationStatusMap]);
 
   return useMemo(
