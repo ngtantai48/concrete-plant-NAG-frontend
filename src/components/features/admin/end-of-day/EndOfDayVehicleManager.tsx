@@ -143,9 +143,9 @@ export default function EndOfDayVehicleManager() {
   }
 
   return (
-    <div className="dashboard-light">
-      <div className="mx-auto space-y-2 p-6 md:p-10">
-        <div className="dd-header p-6 md:p-8">
+    <div className="dashboard-light flex min-h-[calc(100vh-64px)] flex-col">
+      <div className="mx-auto flex w-full flex-1 flex-col gap-2 p-6 md:p-10">
+        <div className="dd-header shrink-0 p-6 md:p-8">
           <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between w-full">
             <div className="space-y-4 shrink-0">
               <div className="flex items-center gap-3">
@@ -220,7 +220,7 @@ export default function EndOfDayVehicleManager() {
           </div>
         </div>
 
-        <div className="dd-card overflow-hidden">
+        <div className="dd-card flex flex-1 flex-col overflow-hidden">
           <div
             className="flex flex-col gap-3 border-b px-5 py-4 md:flex-row md:items-center md:justify-between"
             style={{ borderColor: "var(--dd-border)", background: "rgba(255,255,255,0.88)" }}
@@ -239,7 +239,7 @@ export default function EndOfDayVehicleManager() {
             </span>
           </div>
 
-          <div className="p-3 md:p-4">
+          <div className="flex-1 p-3 md:p-4">
             <ActivityFlow
               stations={stations}
               vehicles={[]}

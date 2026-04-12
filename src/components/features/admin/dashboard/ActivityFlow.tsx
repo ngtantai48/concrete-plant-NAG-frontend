@@ -1028,7 +1028,7 @@ export default function ActivityFlow({
     >
       <div className="h-full w-full">
         {!hasPendingOrders ? (
-          <div className="flex h-full min-h-[400px] items-center justify-center">
+          <div className="flex w-full min-h-[200px] items-center justify-center py-12">
             <div className="flex flex-col items-center gap-4">
               <div
                 className="flex h-16 w-16 items-center justify-center rounded-full animate-pulse"
