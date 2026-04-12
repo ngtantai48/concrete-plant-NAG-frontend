@@ -14,7 +14,8 @@
 # next.js
 /.next/
 /out/
-
+/vehicle-management-main/
+/.vscode/
 # production
 /build
 
