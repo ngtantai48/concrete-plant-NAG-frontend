@@ -67,6 +67,7 @@ export default function AdminDashboard() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [tomorrowOrders, setTomorrowOrders] = useState<Order[]>([]);
   const [realTomorrowOrders, setRealTomorrowOrders] = useState<Order[]>([]);
+  const [forgottenOrders, setForgottenOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isShiftSubmitting, setIsShiftSubmitting] = useState(false);
@@ -118,7 +119,8 @@ export default function AdminDashboard() {
         vehicleApi.getAll({ limit: 100 }),
         orderApi.getByInitDate(selectedDate),
         orderApi.getByInitDate(nextDate),
-      ];
+        orderApi.getAll({ order_status: 'pending' }),
+      ] as any[];
       if (needExtraFetch) {
         apiCalls.push(orderApi.getByInitDate(realTomorrow));
       }
@@ -146,8 +148,17 @@ export default function AdminDashboard() {
           setRealTomorrowOrders(tmRes.data?.data || tmRes.data || []);
         }
       }
-      if (needExtraFetch && results[4]?.status === 'fulfilled') {
-        const rtRes = results[4].value;
+      if (results[4]?.status === 'fulfilled') {
+        const pRes = results[4].value;
+        const allPending = pRes.data?.data || pRes.data || [];
+        setForgottenOrders(allPending.filter((o: Order) => 
+          o.order_status === 'pending' && 
+          o.order_init_datetime && 
+          o.order_init_datetime.slice(0, 10) < selectedDate
+        ));
+      }
+      if (needExtraFetch && results[5]?.status === 'fulfilled') {
+        const rtRes = results[5].value;
         setRealTomorrowOrders(rtRes.data?.data || rtRes.data || []);
       }
     } catch {
@@ -546,6 +557,47 @@ export default function AdminDashboard() {
           </div>
         )}
 
+        {/* Báo quên chốt ca */}
+        {!loading && ordersPending.length === 0 && forgottenOrders.length > 0 && (
+          <div
+            className="mb-1 shrink-0 rounded-lg border px-3 py-1 flex items-center justify-between shadow-sm animate-pulse"
+            style={{
+              background: "linear-gradient(135deg, rgba(239, 68, 68, 0.08), rgba(220, 38, 38, 0.04))",
+              borderColor: "rgba(239, 68, 68, 0.4)",
+            }}
+          >
+            <div className="flex items-center gap-2">
+              <div className="h-2 w-2 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.8)]" />
+              <span className="text-xs font-bold uppercase" style={{ color: "#b91c1c" }}>
+                Phát hiện {forgottenOrders.length} chuyến chờ từ các ca trước. Vui lòng chốt ca hôm trước!
+              </span>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={async () => {
+                const datesToClose = [...new Set(forgottenOrders.map(o => o.order_init_datetime?.slice(0, 10)))].filter(Boolean) as string[];
+                setIsShiftSubmitting(true);
+                try {
+                  for (const d of datesToClose) {
+                    await orderApi.shiftClose({ operation_date: d });
+                  }
+                  toast.success("Đã chốt các ca bị quên thành công!", { position: 'top-right' });
+                  await fetchAll();
+                } catch {
+                  toast.error("Có lỗi khi chốt ca hôm trước", { position: 'top-right' });
+                } finally {
+                  setIsShiftSubmitting(false);
+                }
+              }}
+              disabled={isShiftSubmitting}
+              className="h-6 px-2 text-[10px] font-bold uppercase bg-white hover:bg-red-50 border-red-200 text-red-600"
+            >
+              Chốt ca hôm trước
+            </Button>
+          </div>
+        )}
+
         {/* ═══ COMMAND CORE GRID ═══ */}
         <div className={`flex ${isPastDate ? '' : 'gap-4'} flex-1 min-h-0 overflow-hidden`}>
 
@@ -649,30 +701,6 @@ export default function AdminDashboard() {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => setDispatchMode('auto')}
-                        className={`h-5 px-2 text-[10px] font-bold uppercase ${dispatchMode === 'auto'
-                          ? 'bg-sky-500/20 text-sky-600 border border-sky-500/30'
-                          : 'text-slate-500 border border-transparent hover:text-slate-700'
-                          }`}
-                      >
-                        AUTO
-                      </Button>
-                      <div className="w-[1px] h-3 mx-0.5 opacity-20" style={{ background: 'var(--dd-text-muted)' }} />
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setDispatchMode('manual')}
-                        className={`h-5 px-2 text-[10px] font-bold uppercase ${dispatchMode === 'manual'
-                          ? 'bg-indigo-500/20 text-indigo-600 border border-indigo-500/30'
-                          : 'text-slate-500 border border-transparent hover:text-slate-700'
-                          }`}
-                      >
-                        MANUAL
-                      </Button>
-                      <div className="w-[1px] h-3 mx-0.5 opacity-20" style={{ background: 'var(--dd-text-muted)' }} />
-                      <Button
-                        variant="ghost"
-                        size="sm"
                         onClick={() => setShowMap(true)}
                         className="h-5 px-2 text-[10px] font-bold uppercase text-slate-500 border border-transparent hover:text-slate-700 hover:bg-slate-100"
                       >
@@ -721,7 +749,7 @@ export default function AdminDashboard() {
                         {ordersActive.length} {t('running')}
                       </span>
                     )}
-                    <span className="dd-chip dd-chip-emerald text-[10px] px-1.5 py-0.5">{ordersCompleted.length}</span>
+                    <span className="dd-chip dd-chip-emerald text-[10px] px-1.5 py-0.5">{ordersCompleted.length} {t('completed')}</span>
                   </div>
                 </div>
                 <div className="flex-1 overflow-y-auto">
@@ -792,8 +820,8 @@ export default function AdminDashboard() {
                                 )}
                               </div>
                             </div>
-                            {o.order_multi && (() => {
-                              const distanceKm = ((o.order_multi.distance_end - o.order_multi.distance_start) / 1000).toFixed(1);
+                            {isCompleted && o.order_multi && (() => {
+                              const distanceKm = (o.order_multi.distance_end - o.order_multi.distance_start).toFixed(1);
                               const stops = o.order_multi.nStop_end - o.order_multi.nStop_start;
                               return (
                                 <div className="mt-1.5 pl-2 flex items-center gap-3">
@@ -834,7 +862,7 @@ export default function AdminDashboard() {
                         {ordersActive.length} {t('running')}
                       </span>
                     )}
-                    <span className="dd-chip dd-chip-emerald text-[10px] px-1.5 py-0.5">{ordersCompleted.length}</span>
+                    <span className="dd-chip dd-chip-emerald text-[10px] px-1.5 py-0.5">{ordersCompleted.length} {t('completed')}</span>
                   </div>
                 </div>
                 <div className="flex-1 overflow-y-auto">
@@ -905,8 +933,8 @@ export default function AdminDashboard() {
                                 )}
                               </div>
                             </div>
-                            {o.order_multi && (() => {
-                              const distanceKm = ((o.order_multi.distance_end - o.order_multi.distance_start) / 1000).toFixed(1);
+                            {isCompleted && o.order_multi && (() => {
+                              const distanceKm = (o.order_multi.distance_end - o.order_multi.distance_start).toFixed(1);
                               const stops = o.order_multi.nStop_end - o.order_multi.nStop_start;
                               return (
                                 <div className="mt-1.5 pl-2 flex items-center gap-3">

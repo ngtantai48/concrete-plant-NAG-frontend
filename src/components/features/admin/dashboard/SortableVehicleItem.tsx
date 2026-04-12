@@ -117,13 +117,7 @@ function SortableVehicleItemBase({
             />
           )}
 
-          <div
-            {...attributes}
-            {...listeners}
-            className="p-1 -ml-1 transition-colors cursor-grab active:cursor-grabbing text-slate-400 hover:text-sky-500"
-          >
-            <GripVertical className="h-4 w-4" />
-          </div>
+
 
           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[11px] font-bold tracking-[0.05em] shadow-sm" style={{ color: 'var(--dd-text-secondary)', border: '1px solid var(--dd-border)' }}>
             #{(displayIndex ?? actualIndex) + 1}
