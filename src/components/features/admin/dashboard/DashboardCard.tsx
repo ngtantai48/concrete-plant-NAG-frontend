@@ -6,7 +6,7 @@ interface DashboardCardProps {
   label: string;
   value: number | string;
   icon: ReactNode;
-  accent: "blue" | "emerald" | "amber" | "slate" | "cyan" | "violet";
+  accent: "blue" | "emerald" | "amber" | "slate" | "cyan" | "green";
   subtitle?: string;
   index?: number;
 }
@@ -32,10 +32,10 @@ const accentMap = {
     glow: 'rgba(245, 158, 11, 0.12)',
     border: 'rgba(245, 158, 11, 0.2)',
   },
-  violet: {
-    color: '#a78bfa',
-    glow: 'rgba(139, 92, 246, 0.12)',
-    border: 'rgba(139, 92, 246, 0.2)',
+  green: {
+    color: '#4ade80',
+    glow: 'rgba(34, 197, 94, 0.12)',
+    border: 'rgba(34, 197, 94, 0.2)',
   },
   slate: {
     color: '#94a3b8',

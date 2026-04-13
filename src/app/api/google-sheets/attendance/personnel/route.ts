@@ -27,45 +27,20 @@ export async function GET() {
     const auth = getAuth();
     const sheets = google.sheets({ version: "v4", auth });
 
-    // Read DANH_MUC for full names and departments
+    // Read DANH_MUC for personnel list
     const dmRes = await sheets.spreadsheets.values.get({
       spreadsheetId,
       range: "DANH_MUC!A1:F500",
     });
     const dmRows = dmRes.data.values || [];
-    const mapNhanSu: Record<string, { hoTen: string; boPhan: string }> = {};
+    const personnel: { tenVT: string; hoTen: string; boPhan: string }[] = [];
     for (let i = 1; i < dmRows.length; i++) {
       const row = dmRows[i];
       const hoTen = normalize(row[1]);
       const tenVT = normalize(row[2]);
       const boPhan = normalize(row[3]);
       if (tenVT && hoTen) {
-        mapNhanSu[tenVT] = { hoTen, boPhan };
-      }
-    }
-
-    // Read BO_TRI_CV columns M-P for personnel list
-    const btcRes = await sheets.spreadsheets.values.get({
-      spreadsheetId,
-      range: "BO_TRI_CV!M5:P200",
-    });
-    const btcRows = btcRes.data.values || [];
-
-    const seen = new Set<string>();
-    const personnel: { tenVT: string; hoTen: string; boPhan: string }[] = [];
-
-    for (const row of btcRows) {
-      for (let j = 0; j < 4; j++) {
-        const ten = normalize(row?.[j]);
-        if (ten && !seen.has(ten)) {
-          seen.add(ten);
-          const info = mapNhanSu[ten];
-          personnel.push({
-            tenVT: ten,
-            hoTen: info ? info.hoTen : ten,
-            boPhan: info ? info.boPhan : "Khác",
-          });
-        }
+        personnel.push({ tenVT, hoTen, boPhan });
       }
     }
 

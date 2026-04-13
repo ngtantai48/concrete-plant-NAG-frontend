@@ -130,12 +130,12 @@ export async function POST(request: Request) {
         groupRow[1] = nhom.ten;
         headerRows.push(groupRow);
 
-        // Staff rows
-        for (const tenVT of nhom.nhanSu) {
-          const r = results.find((x) => x.hoTen === tenVT || x.boPhan === tenVT);
+        // Staff rows — nhanSu now contains hoTen values
+        for (const hoTen of nhom.nhanSu) {
+          const r = results.find((x) => x.hoTen === hoTen);
           const staffRow = new Array(36).fill("");
           staffRow[0] = String(stt);
-          staffRow[1] = r ? r.hoTen : tenVT;
+          staffRow[1] = r ? r.hoTen : hoTen;
           headerRows.push(staffRow);
           stt++;
         }
@@ -166,6 +166,135 @@ export async function POST(request: Request) {
     for (let i = 0; i < rows.length; i++) {
       const name = String(rows[i]?.[1] ?? "").trim();
       if (name) hoTenToRow[name] = i;
+    }
+
+    // --- Insert missing personnel into existing groups ---
+    if (existing) {
+      const sheetId = existing.properties?.sheetId ?? 0;
+
+      // Find group header rows and "Tổng cộng" row
+      const groupPositions: { key: string; headerIdx: number }[] = [];
+      let totalRowIdx = -1;
+
+      for (let i = 0; i < rows.length; i++) {
+        const colA = String(rows[i]?.[0] ?? "").trim();
+        for (const nhom of nhomNS) {
+          if (colA === nhom.key) {
+            groupPositions.push({ key: nhom.key, headerIdx: i });
+            break;
+          }
+        }
+        if (colA === "Tổng cộng") totalRowIdx = i;
+      }
+
+      groupPositions.sort((a, b) => a.headerIdx - b.headerIdx);
+
+      // Process bottom-to-top so row inserts don't shift earlier groups
+      let totalInserted = 0;
+
+      for (let g = groupPositions.length - 1; g >= 0; g--) {
+        const { key, headerIdx } = groupPositions[g];
+        const nhom = nhomNS.find((n) => n.key === key);
+        if (!nhom || nhom.nhanSu.length === 0) continue;
+
+        // Section boundary: next group header / total row / end
+        const sectionEnd =
+          g + 1 < groupPositions.length
+            ? groupPositions[g + 1].headerIdx
+            : totalRowIdx >= 0
+              ? totalRowIdx
+              : rows.length;
+
+        // Existing names in this section (both hoTen and tenVT)
+        const existingNames = new Set<string>();
+        for (let i = headerIdx + 1; i < sectionEnd; i++) {
+          const name = String(rows[i]?.[1] ?? "").trim();
+          if (name) existingNames.add(name);
+        }
+
+        // Find missing personnel — nhom.nhanSu now contains hoTen values
+        const missing: string[] = [];
+        for (const hoTen of nhom.nhanSu) {
+          if (!existingNames.has(hoTen)) {
+            missing.push(hoTen);
+          }
+        }
+
+        if (missing.length === 0) continue;
+
+        // Count existing staff rows in this section for STT numbering
+        let sectionStt = 0;
+        for (let i = headerIdx + 1; i < sectionEnd; i++) {
+          const n = parseInt(String(rows[i]?.[0] ?? ""), 10);
+          if (!isNaN(n)) sectionStt = Math.max(sectionStt, n);
+        }
+        // If section is empty, use total staff count before this group
+        if (sectionStt === 0) {
+          for (let gi = 0; gi < g; gi++) {
+            const prevEnd =
+              gi + 1 < groupPositions.length
+                ? groupPositions[gi + 1].headerIdx
+                : sectionEnd;
+            for (let i = groupPositions[gi].headerIdx + 1; i < prevEnd; i++) {
+              const n = parseInt(String(rows[i]?.[0] ?? ""), 10);
+              if (!isNaN(n)) sectionStt = Math.max(sectionStt, n);
+            }
+          }
+        }
+
+        // Insert blank rows at the end of this group section
+        await sheets.spreadsheets.batchUpdate({
+          spreadsheetId,
+          requestBody: {
+            requests: [
+              {
+                insertDimension: {
+                  range: {
+                    sheetId,
+                    dimension: "ROWS",
+                    startIndex: sectionEnd,
+                    endIndex: sectionEnd + missing.length,
+                  },
+                  inheritFromBefore: true,
+                },
+              },
+            ],
+          },
+        });
+
+        // Write data to newly inserted rows
+        const newRows = missing.map((hoTen, idx) => {
+          const row = new Array(36).fill("");
+          row[0] = String(sectionStt + idx + 1);
+          row[1] = hoTen;
+          return row;
+        });
+
+        await sheets.spreadsheets.values.update({
+          spreadsheetId,
+          range: `'${sheetName}'!A${sectionEnd + 1}`,
+          valueInputOption: "USER_ENTERED",
+          requestBody: { values: newRows },
+        });
+
+        totalInserted += missing.length;
+      }
+
+      // Re-read sheet and rebuild mapping after inserts
+      if (totalInserted > 0) {
+        const reRead = await sheets.spreadsheets.values.get({
+          spreadsheetId,
+          range: `'${sheetName}'!A1:AJ300`,
+        });
+        rows.length = 0;
+        rows.push(...(reRead.data.values || []));
+
+        Object.keys(hoTenToRow).forEach((k) => delete hoTenToRow[k]);
+        for (let i = 0; i < rows.length; i++) {
+          const name = String(rows[i]?.[1] ?? "").trim();
+          if (name) hoTenToRow[name] = i;
+        }
+      }
     }
 
     // Write attendance for the day column

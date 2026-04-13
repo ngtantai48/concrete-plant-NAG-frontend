@@ -44,6 +44,9 @@ export interface OrderMulti {
   nStop_start: number;
   distance_end: number;
   nStop_end: number;
+  stop_duration_seconds?: number;
+  checkin_time_station?: string | null;
+  checkout_time_station?: string | null;
 }
 
 export interface Order {
@@ -54,6 +57,8 @@ export interface Order {
   order_start_datetime: string | null;
   order_end_datetime: string | null;
   order_description: string | null;
+  checkin_time_station?: string | null;
+  checkout_time_station?: string | null;
   order_multi: OrderMulti | null;
   users: OrderUser;
   vehicles: OrderVehicle;

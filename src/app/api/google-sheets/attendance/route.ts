@@ -52,24 +52,27 @@ export async function GET(request: Request) {
     const auth = getAuth();
     const sheets = google.sheets({ version: "v4", auth });
 
-    // 1. Read DANH_MUC
+    // 1. Read DANH_MUC for personnel list
     const dmRes = await sheets.spreadsheets.values.get({
       spreadsheetId,
       range: "DANH_MUC!A1:F500",
     });
     const dmRows = dmRes.data.values || [];
-    const mapNhanSu: Record<string, { hoTen: string; boPhan: string }> = {};
+    const danhSachNS: NhanSu[] = [];
+    const danhSachTenVT = new Set<string>();
+
     for (let i = 1; i < dmRows.length; i++) {
       const row = dmRows[i];
       const hoTen = normalize(row[1]);
       const tenVT = normalize(row[2]);
       const boPhan = normalize(row[3]);
       if (tenVT && hoTen) {
-        mapNhanSu[tenVT] = { hoTen, boPhan };
+        danhSachTenVT.add(tenVT);
+        danhSachNS.push({ tenVT, hoTen, boPhan });
       }
     }
 
-    // 2. Read BO_TRI_CV
+    // 2. Read BO_TRI_CV for work assignments
     const btcRes = await sheets.spreadsheets.values.get({
       spreadsheetId,
       range: "BO_TRI_CV!A1:P200",
@@ -78,25 +81,6 @@ export async function GET(request: Request) {
 
     // Read date from E2
     const sheetDate = normalize(btcRows[1]?.[4]);
-
-    // Staff list from columns M-P (index 12-15), from row 5 (index 4)
-    const danhSachNS: NhanSu[] = [];
-    const danhSachTenVT = new Set<string>();
-
-    for (let i = 4; i < btcRows.length; i++) {
-      for (let j = 12; j <= 15; j++) {
-        const ten = normalize(btcRows[i]?.[j]);
-        if (ten && !danhSachTenVT.has(ten)) {
-          danhSachTenVT.add(ten);
-          const info = mapNhanSu[ten];
-          danhSachNS.push({
-            tenVT: ten,
-            hoTen: info ? info.hoTen : ten,
-            boPhan: info ? info.boPhan : "Khác",
-          });
-        }
-      }
-    }
 
     // Who worked: scan all work columns
     const nguoiDiLam = new Set<string>();
@@ -173,7 +157,7 @@ export async function GET(request: Request) {
       nhomNS: nhomNS.map((n) => ({
         key: n.key,
         ten: n.ten,
-        nhanSu: n.nhanSu.map((ns) => ns.tenVT),
+        nhanSu: n.nhanSu.map((ns) => ns.hoTen),
       })),
       summary: {
         total: results.length,
