@@ -12,7 +12,7 @@ import { DoubleLeftOutlined, DoubleRightOutlined } from "@ant-design/icons";
 import { createSelector } from "@reduxjs/toolkit";
 import { Avatar, Button, Layout, Menu, MenuProps } from "antd";
 import {
-  ArrowRightLeft, CalendarCheck, Car, ClipboardList, Gauge, Layers, MapPin, Settings, Truck, User, UtensilsCrossed, Wrench,
+  ArrowRightLeft, CalendarCheck, Car, Gauge, Layers, MapPin, Settings, Truck, User, UtensilsCrossed, Wrench,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import Image from "next/image";
@@ -115,7 +115,6 @@ export default function Sidebar() {
         roles: ["admin"],
         children: [
           { key: ADMIN.MEAL_CHECK, label: t("mealCheck"), icon: <UtensilsCrossed /> },
-          { key: ADMIN.DRIVER_RICE, label: t("driverRice"), icon: <ClipboardList /> },
           { key: ADMIN.ATTENDANCE, label: t("attendance"), icon: <CalendarCheck /> },
         ],
       },

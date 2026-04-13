@@ -97,9 +97,9 @@ const getOrderStationId = (order: Order) => order.stations?.station_id ?? 0;
 const isFlowStation = (station: Station) =>
   (station.station_types?.station_type_id ?? station.station_type_id) === FLOW_STATION_TYPE_ID;
 
-const getFlowStyle = (order: Order, isFirstPending: boolean): FlowStyle => {
+const getFlowStyle = (order: Order, isTopPriority: boolean): FlowStyle => {
   if (order.order_status === 'init' || order.order_status === 'pending') {
-    if (isFirstPending) {
+    if (isTopPriority) {
       return {
         text: 'LƯỢT TIẾP THEO',
         chipClass: 'dd-chip dd-chip-sky animate-pulse',
@@ -296,7 +296,7 @@ function StationQueueDropZone({
             <GripVertical className="h-4 w-4" />
           </div>
           <div
-            className="flex h-8 min-w-8 items-center justify-center rounded-full bg-slate-100 px-2 text-[11px] font-bold shadow-sm"
+            className="flex h-10 min-w-[40px] items-center justify-center rounded-full bg-slate-100 px-2 text-[14px] font-bold shadow-sm"
             style={{ color: 'var(--dd-text-secondary)', border: '1px solid var(--dd-border)' }}
           >
             ...
@@ -318,7 +318,7 @@ function StationQueueDropZone({
 
   const renderOrders = visibleOrders.flatMap((order, index) => {
     const actualIndex = index;
-    const style = getFlowStyle(order, actualIndex === 0);
+    const style = getFlowStyle(order, actualIndex < 3);
     const isBusy = reorderingKey === String(order.order_id);
     const orderItem = (
       <SortableVehicleItem
@@ -461,13 +461,21 @@ function DraggedVehiclePreview({
           <GripVertical className="h-4 w-4" />
         </div>
         <div
-          className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-[11px] font-bold shadow-sm"
+          className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-[14px] font-bold shadow-sm"
           style={{ color: 'var(--dd-text-secondary)', border: '1px solid var(--dd-border)' }}
         >
           #{actualIndex + 1}
         </div>
-        <div className="text-base font-black" style={{ color: 'var(--dd-text-primary)' }}>
-          {order.vehicles?.vehicle_license_plate ? `${order.vehicles.vehicle_license_plate}${order.vehicles.vehicle_name ? ` | ${order.vehicles.vehicle_name}` : ''}` : `ĐƠN: ${order.order_id}`}
+        <div className="min-w-0 flex-1 flex items-center gap-3">
+          <div className="text-base font-black truncate" style={{ color: 'var(--dd-text-primary)' }}>
+            {order.vehicles?.vehicle_license_plate ? `${order.vehicles.vehicle_license_plate}${order.vehicles.vehicle_name ? ` | ${order.vehicles.vehicle_name}` : ''}` : `ĐƠN: ${order.order_id}`}
+          </div>
+          {order.order_init_datetime && (
+            <div className="flex items-center gap-1 text-[11px] uppercase font-bold shrink-0" style={{ color: 'var(--dd-text-muted)' }}>
+              <Clock className="h-3 w-3" />
+              <span><span className="opacity-75">Vào lúc:</span> <span style={{ color: 'var(--dd-text-primary)' }}>{new Date(order.order_init_datetime).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}</span></span>
+            </div>
+          )}
         </div>
       </div>
 
@@ -609,26 +617,21 @@ export default function ActivityFlow({
   );
 
   const mergedFlowOrders = useMemo<MergedFlowOrder[]>(() => {
-    const longestQueueLength = groupedByStation.reduce(
-      (longest, group) => Math.max(longest, group.orders.length),
-      0,
-    );
-    const mergedQueue: MergedFlowOrder[] = [];
+    const allPendingOrders: { group: StationFlowGroup; order: Order }[] = [];
 
-    for (let actualIndex = 0; actualIndex < longestQueueLength; actualIndex += 1) {
-      groupedByStation.forEach((group) => {
-        const order = group.orders[actualIndex];
-        if (order) {
-          mergedQueue.push({
-            group,
-            order,
-            actualIndex,
-          });
-        }
+    groupedByStation.forEach((group) => {
+      group.orders.forEach((order) => {
+        allPendingOrders.push({ group, order });
       });
-    }
+    });
 
-    return mergedQueue;
+    allPendingOrders.sort((a, b) => a.order.order_number - b.order.order_number);
+
+    return allPendingOrders.map(({ group, order }, index) => ({
+      group,
+      order,
+      actualIndex: index,
+    }));
   }, [groupedByStation]);
 
   const selectedCount = selectedOrderIds.length;
@@ -674,7 +677,7 @@ export default function ActivityFlow({
       0,
       sourceGroup?.orders.findIndex((order) => order.order_id === activeOrder.order_id) ?? 0,
     );
-    const style = getFlowStyle(activeOrder, actualIndex === 0);
+    const style = getFlowStyle(activeOrder, actualIndex < 3);
 
     return {
       actualIndex,
@@ -1259,7 +1262,7 @@ export default function ActivityFlow({
                       order={order}
                       stationId={group.stationId}
                       actualIndex={actualIndex}
-                      style={getFlowStyle(order, actualIndex === 0)}
+                      style={getFlowStyle(order, actualIndex < 3)}
                       isBusy={reorderingKey === String(order.order_id)}
                       onReorder={(direction) => handleReorder(group.stationId, actualIndex, direction)}
                       canMoveUp={actualIndex > 0}
