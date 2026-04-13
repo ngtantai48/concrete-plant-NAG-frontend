@@ -56,7 +56,6 @@
     "vehicleMaintenances": "Vehicle Maintenance",
     "stations": "Station Management",
     "mealCheck": "Meal Check",
-    "driverRice": "Meal Config",
     "attendance": "Attendance",
     "role": {
       "admin": "Administrator",
@@ -629,25 +628,5 @@
     "fetchError": "Failed to fetch data",
     "syncSuccess": "Synced {count} people to sheet {sheet}",
     "syncError": "Sync error: {message}"
-  },
-  "DriverRice": {
-    "title": "Meal Configuration",
-    "description": "Manage vehicle list and assign driver names for meal reports",
-    "vehicleName": "Vehicle",
-    "licensePlate": "License Plate",
-    "driverName": "Driver Name",
-    "enterDriverName": "Enter driver name...",
-    "status": "Status",
-    "assigned": "Assigned",
-    "unassigned": "Unassigned",
-    "total": "Total",
-    "save": "Save",
-    "saveAll": "Save All",
-    "refresh": "Refresh",
-    "selectDriver": "Select driver...",
-    "fetchError": "Failed to load data",
-    "saveSuccess": "Saved driver name for {vehicle}",
-    "saveAllSuccess": "Saved {count} changes",
-    "saveError": "Save failed"
   }
 }

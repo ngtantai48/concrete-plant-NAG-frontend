@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/select';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { ArrowRight, ChevronUp, ChevronDown, GripVertical, X } from 'lucide-react';
+import { ArrowRight, ChevronUp, ChevronDown, GripVertical, X, Clock } from 'lucide-react';
 import type { Order } from '@/types/order';
 import type { Station } from '@/types/station';
 
@@ -119,14 +119,20 @@ function SortableVehicleItemBase({
 
 
 
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[11px] font-bold tracking-[0.05em] shadow-sm" style={{ color: 'var(--dd-text-secondary)', border: '1px solid var(--dd-border)' }}>
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[14px] font-bold tracking-[0.05em] shadow-sm" style={{ color: 'var(--dd-text-secondary)', border: '1px solid var(--dd-border)' }}>
             #{(displayIndex ?? actualIndex) + 1}
           </div>
 
-          <div className="min-w-0 flex-1">
+          <div className="min-w-0 flex-1 flex items-center gap-3">
             <div className="truncate text-base font-black" style={{ color: 'var(--dd-text-primary)' }}>
               {order.vehicles?.vehicle_license_plate ? `${order.vehicles.vehicle_license_plate}${order.vehicles.vehicle_name ? ` | ${order.vehicles.vehicle_name}` : ''}` : `ĐƠN: ${order.order_id}`}
             </div>
+            {order.order_init_datetime && (
+              <div className="flex items-center gap-1 text-[11px] uppercase font-bold" style={{ color: 'var(--dd-text-muted)' }}>
+                <Clock className="h-3 w-3" />
+                <span><span className="opacity-75">Vào lúc:</span> <span style={{ color: 'var(--dd-text-primary)' }}>{`${new Date(order.order_init_datetime).getHours()} giờ ${new Date(order.order_init_datetime).getMinutes().toString().padStart(2, '0')} phút`}</span></span>
+              </div>
+            )}
           </div>
         </div>
 

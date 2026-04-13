@@ -57,7 +57,6 @@
     "vehicleMaintenances": "Bảo trì xe",
     "stations": "Quản lý trạm",
     "mealCheck": "Cơm ca",
-    "driverRice": "Cấu hình cơm ca",
     "attendance": "Chấm công",
     "role": {
       "admin": "Quản trị viên",
@@ -633,25 +632,5 @@
     "fetchError": "Không thể lấy dữ liệu",
     "syncSuccess": "Đã đồng bộ {count} người vào sheet {sheet}",
     "syncError": "Lỗi đồng bộ: {message}"
-  },
-  "DriverRice": {
-    "title": "Cấu hình cơm ca",
-    "description": "Quản lý danh sách xe và gán tên tài xế cho báo cáo cơm ca",
-    "vehicleName": "Tên xe",
-    "licensePlate": "Biển số",
-    "driverName": "Tên tài xế",
-    "enterDriverName": "Nhập tên tài xế...",
-    "status": "Trạng thái",
-    "assigned": "Đã gán",
-    "unassigned": "Chưa gán",
-    "total": "Tổng",
-    "save": "Lưu",
-    "saveAll": "Lưu tất cả",
-    "refresh": "Làm mới",
-    "selectDriver": "Chọn tài xế...",
-    "fetchError": "Không thể tải dữ liệu",
-    "saveSuccess": "Đã lưu tên tài xế cho xe {vehicle}",
-    "saveAllSuccess": "Đã lưu {count} thay đổi",
-    "saveError": "Lỗi khi lưu"
   }
 }

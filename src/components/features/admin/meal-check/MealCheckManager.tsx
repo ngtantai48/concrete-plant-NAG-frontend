@@ -1,6 +1,5 @@
 "use client";
 
-import http from "@/lib/http";
 import vtrackingApi from "@/services/vtracking.service";
 import {
   Button,
@@ -195,8 +194,8 @@ export default function MealCheckManager() {
   // Data
   const [mealData, setMealData] = useState<MealData>({});
   const [personnelList, setPersonnelList] = useState<Personnel[]>([]);
-  const [driverMap, setDriverMap] = useState<Record<string, string>>({}); // license_plate -> driver_name
-  const [nameToPlateMap, setNameToPlateMap] = useState<Record<string, string>>({}); // driver_name -> license_plate
+  const [driverMap, setDriverMap] = useState<Record<string, string[]>>({}); // license_plate -> [hoTen]
+  const [nameToPlateMap, setNameToPlateMap] = useState<Record<string, string>>({}); // hoTen -> license_plate
   const [checked, setChecked] = useState(false);
   const tableRef = useRef<HTMLDivElement>(null);
   const [selectedSlots, setSelectedSlots] = useState<MealSlot["key"][]>([]);
@@ -218,25 +217,14 @@ export default function MealCheckManager() {
     setProgress({ current: 0, total: 0 });
 
     try {
-      // 1. Fetch driver-rice mapping
-      let drMap: Record<string, string> = {};
+      // 1. Fetch vehicle-personnel mapping from BO_TRI_CV
+      let drMap: Record<string, string[]> = {};
       let n2p: Record<string, string> = {};
       try {
-        const drRes = await http.get<{
-          data: { license_plate: string; driver_name: string | null }[];
-        }>("/driver-rice");
-        const drData = drRes.data?.data || drRes.data || [];
-        const list = Array.isArray(drData) ? drData : [];
-        drMap = Object.fromEntries(
-          list
-            .filter((d) => d.driver_name)
-            .map((d) => [d.license_plate, d.driver_name!])
-        );
-        n2p = Object.fromEntries(
-          list
-            .filter((d) => d.driver_name)
-            .map((d) => [d.driver_name!, d.license_plate])
-        );
+        const vpRes = await fetch("/api/google-sheets/attendance/vehicle-personnel");
+        const vpData = await vpRes.json();
+        drMap = vpData.plateToNames || {};
+        n2p = vpData.nameToPlate || {};
       } catch {
         // continue
       }
@@ -267,8 +255,8 @@ export default function MealCheckManager() {
       let step = 0;
 
       for (const vehicle of vehicles) {
-        const driverName = drMap[vehicle.license_plate];
-        if (!driverName) {
+        const driverNames = drMap[vehicle.license_plate];
+        if (!driverNames || driverNames.length === 0) {
           step += allDays.length * activeSlots.length;
           setProgress({ current: step, total: totalSteps });
           continue;
@@ -276,15 +264,21 @@ export default function MealCheckManager() {
 
         for (const day of allDays) {
           const dateStr = day.format("DD");
-          if (!data[driverName]) data[driverName] = {};
-          if (!data[driverName][dateStr])
-            data[driverName][dateStr] = { sang: false, trua: false, toi: false };
+          for (const name of driverNames) {
+            if (!data[name]) data[name] = {};
+            if (!data[name][dateStr])
+              data[name][dateStr] = { sang: false, trua: false, toi: false };
+          }
 
           for (const slot of activeSlots) {
             step++;
             setProgress({ current: step, total: totalSteps });
 
-            if (data[driverName][dateStr][slot.key]) continue; // already found
+            // Skip if all people on this vehicle already have this slot
+            const allHaveSlot = driverNames.every(
+              (name) => data[name]?.[dateStr]?.[slot.key]
+            );
+            if (allHaveSlot) continue;
 
             try {
               const dayStr = day.format("DD-MM-YYYY");
@@ -305,7 +299,10 @@ export default function MealCheckManager() {
                 if (!lat || !lng) continue;
                 const dist = haversine(latitude, longitude, lat, lng);
                 if (dist > radius) {
-                  data[driverName][dateStr][slot.key] = true;
+                  // Mark all people on this vehicle
+                  for (const name of driverNames) {
+                    data[name][dateStr][slot.key] = true;
+                  }
                   break;
                 }
               }

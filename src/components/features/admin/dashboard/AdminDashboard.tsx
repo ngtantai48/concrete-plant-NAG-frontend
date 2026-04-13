@@ -304,9 +304,23 @@ export default function AdminDashboard() {
 
   const sortedVehiclesWithTrips = useMemo(() => {
     return [...vehicles].sort((a, b) => {
-      const aTrips = vehicleTripMap.get(a.vehicle_id)?.length || 0;
-      const bTrips = vehicleTripMap.get(b.vehicle_id)?.length || 0;
-      if (bTrips !== aTrips) return bTrips - aTrips;
+      const aTrips = vehicleTripMap.get(a.vehicle_id) || [];
+      const bTrips = vehicleTripMap.get(b.vehicle_id) || [];
+
+      // Get latest update time for vehicle A
+      const aLatestTime = aTrips.length > 0 
+        ? Math.max(0, ...aTrips.map(o => o.updated_at ? new Date(o.updated_at).getTime() : 0))
+        : 0;
+
+      // Get latest update time for vehicle B
+      const bLatestTime = bTrips.length > 0 
+        ? Math.max(0, ...bTrips.map(o => o.updated_at ? new Date(o.updated_at).getTime() : 0))
+        : 0;
+
+      // Sort by latest time descending
+      if (bLatestTime !== aLatestTime) return bLatestTime - aLatestTime;
+
+      // Fallback to license plate
       return a.vehicle_license_plate.localeCompare(b.vehicle_license_plate);
     });
   }, [vehicles, vehicleTripMap]);
@@ -831,12 +845,12 @@ export default function AdminDashboard() {
                         const totalStopMins = Math.floor(totalStopSecs / 60);
                         const stopHours = Math.floor(totalStopMins / 60);
                         const stopMinsRemain = totalStopMins % 60;
-                        const stopDurationStr = stopHours > 0 ? `${stopHours}h${stopMinsRemain.toString().padStart(2, '0')}m` : `${totalStopMins}m`;
+                        const stopDurationStr = stopHours > 0 ? `${stopHours} giờ ${stopMinsRemain} phút` : `${totalStopMins} phút`;
 
                         const totalMixMins = Math.floor(totalMixMs / 60000);
                         const mixTotalHours = Math.floor(totalMixMins / 60);
                         const mixTotalMinsRemain = totalMixMins % 60;
-                        const mixTotalDurationStr = mixTotalHours > 0 ? `${mixTotalHours}h${mixTotalMinsRemain.toString().padStart(2, '0')}m` : `${totalMixMins}m`;
+                        const mixTotalDurationStr = mixTotalHours > 0 ? `${mixTotalHours} giờ ${mixTotalMinsRemain} phút` : `${totalMixMins} phút`;
                         return (
                           <li key={v.vehicle_id}
                             className="dd-surface px-2 py-1.5 transition-all relative overflow-hidden cursor-pointer"
@@ -884,7 +898,7 @@ export default function AdminDashboard() {
                                 {totalMins > 0 && (
                                   <div className="flex items-center gap-1 text-[10px] font-semibold" style={{ color: '#f59e0b' }}>
                                     <Clock className="w-3 h-3" />
-                                    <span>{hours > 0 ? `${hours}h${mins.toString().padStart(2, '0')}m` : `${mins}m`}</span>
+                                    <span>{hours > 0 ? `${hours} giờ ${mins} phút` : `${mins} phút`}</span>
                                   </div>
                                 )}
                                 {totalMixMs > 0 && (
@@ -978,12 +992,12 @@ export default function AdminDashboard() {
                         const totalStopMins = Math.floor(totalStopSecs / 60);
                         const stopHours = Math.floor(totalStopMins / 60);
                         const stopMinsRemain = totalStopMins % 60;
-                        const stopDurationStr = stopHours > 0 ? `${stopHours}h${stopMinsRemain.toString().padStart(2, '0')}m` : `${totalStopMins}m`;
+                        const stopDurationStr = stopHours > 0 ? `${stopHours} giờ ${stopMinsRemain} phút` : `${totalStopMins} phút`;
 
                         const totalMixMins = Math.floor(totalMixMs / 60000);
                         const mixTotalHours = Math.floor(totalMixMins / 60);
                         const mixTotalMinsRemain = totalMixMins % 60;
-                        const mixTotalDurationStr = mixTotalHours > 0 ? `${mixTotalHours}h${mixTotalMinsRemain.toString().padStart(2, '0')}m` : `${totalMixMins}m`;
+                        const mixTotalDurationStr = mixTotalHours > 0 ? `${mixTotalHours} giờ ${mixTotalMinsRemain} phút` : `${totalMixMins} phút`;
                         return (
                           <li key={v.vehicle_id}
                             className="dd-surface px-2 py-1.5 transition-all relative overflow-hidden cursor-pointer"
@@ -1031,7 +1045,7 @@ export default function AdminDashboard() {
                                 {totalMins > 0 && (
                                   <div className="flex items-center gap-1 text-[10px] font-semibold whitespace-nowrap" style={{ color: '#f59e0b' }}>
                                     <Clock className="w-3 h-3" />
-                                    <span>{hours > 0 ? `${hours}h${mins.toString().padStart(2, '0')}m` : `${mins}m`}</span>
+                                    <span>{hours > 0 ? `${hours} giờ ${mins} phút` : `${mins} phút`}</span>
                                   </div>
                                 )}
                                 {totalMixMs > 0 && (
@@ -1108,11 +1122,11 @@ export default function AdminDashboard() {
             const totalStopMins = Math.floor(totalStopSecs / 60);
             const stopHours = Math.floor(totalStopMins / 60);
             const stopMinsRemain = totalStopMins % 60;
-            const stopDurationStr = stopHours > 0 ? `${stopHours}h${stopMinsRemain.toString().padStart(2, '0')}m` : `${totalStopMins}m`;
+            const stopDurationStr = stopHours > 0 ? `${stopHours} giờ ${stopMinsRemain} phút` : `${totalStopMins} phút`;
             const totalMixMins = Math.floor(totalMixMs / 60000);
             const mixTotalHours = Math.floor(totalMixMins / 60);
             const mixTotalMinsRemain = totalMixMins % 60;
-            const mixTotalDurationStr = mixTotalHours > 0 ? `${mixTotalHours}h${mixTotalMinsRemain.toString().padStart(2, '0')}m` : `${totalMixMins}m`;
+            const mixTotalDurationStr = mixTotalHours > 0 ? `${mixTotalHours} giờ ${mixTotalMinsRemain} phút` : `${totalMixMins} phút`;
             return (
               <div className="flex flex-col h-full max-h-[80vh]">
                 {/* Header */}
@@ -1157,7 +1171,7 @@ export default function AdminDashboard() {
                         const stopMins = Math.floor(stopSecs / 60);
                         const stopH = Math.floor(stopMins / 60);
                         const stopM = stopMins % 60;
-                        const stopDurationStr = stopH > 0 ? `${stopH}h${stopM.toString().padStart(2, '0')}m` : `${stopMins}m`;
+                        const stopDurationStr = stopH > 0 ? `${stopH} giờ ${stopM} phút` : `${stopMins} phút`;
 
                         const mixInVal = o.order_multi?.checkin_time_station || o.checkin_time_station;
                         const mixOutVal = o.order_multi?.checkout_time_station || o.checkout_time_station;
@@ -1167,7 +1181,7 @@ export default function AdminDashboard() {
                         const mixMinsTotal = Math.floor(mixMs / 60000);
                         const mixH = Math.floor(mixMinsTotal / 60);
                         const mixM = mixMinsTotal % 60;
-                        const mixDurationStr = mixH > 0 ? `${mixH}h${mixM.toString().padStart(2, '0')}m` : `${mixMinsTotal}m`;
+                        const mixDurationStr = mixH > 0 ? `${mixH} giờ ${mixM} phút` : `${mixMinsTotal} phút`;
                         const isTripActive = o.order_status === 'running' || o.order_status === 'transporting';
                         const tripAccentColor = isTripActive ? '#0ea5e9' : '#10b981';
                         
@@ -1179,7 +1193,7 @@ export default function AdminDashboard() {
                               {/* Trip number + Station */}
                               <div className="flex items-center justify-between mb-2">
                                 <div className="flex items-center gap-2">
-                                  <span className="text-xs font-bold rounded-full px-2 py-0.5"
+                                  <span className="text-sm font-black rounded-full px-2.5 py-1"
                                     style={{ background: isTripActive ? 'rgba(14, 165, 233, 0.1)' : 'rgba(16, 185, 129, 0.1)', color: tripAccentColor, border: `1px solid ${isTripActive ? 'rgba(14, 165, 233, 0.3)' : 'rgba(16, 185, 129, 0.3)'}` }}>
                                     #{idx + 1}
                                   </span>
@@ -1209,7 +1223,7 @@ export default function AdminDashboard() {
                                 </div>
                                 {diffMins > 0 && (
                                   <span className="font-bold" style={{ color: '#f59e0b' }}>
-                                    {h > 0 ? `${h}h${m.toString().padStart(2, '0')}m` : `${m}m`}
+                                    {h > 0 ? `${h} giờ ${m} phút` : `${m} phút`}
                                   </span>
                                 )}
                               </div>
@@ -1268,7 +1282,7 @@ export default function AdminDashboard() {
                       {totalMins > 0 && (
                         <div className="flex items-center gap-1 text-xs font-bold whitespace-nowrap" style={{ color: '#f59e0b' }}>
                           <Clock className="w-3.5 h-3.5" />
-                          <span>{totalHours > 0 ? `${totalHours}h${totalRemainMins.toString().padStart(2, '0')}m` : `${totalRemainMins}m`}</span>
+                          <span>{totalHours > 0 ? `${totalHours} giờ ${totalRemainMins} phút` : `${totalRemainMins} phút`}</span>
                         </div>
                       )}
                       <div className="flex items-center gap-1 text-xs font-bold whitespace-nowrap" style={{ color: '#ec4899' }}>
