@@ -103,7 +103,7 @@ export default function Sidebar() {
     () => [
       { key: ADMIN.DASHBOARD, label: t("dashboard"), icon: <Gauge />, roles: ["admin"] },
       { key: ADMIN.END_OF_DAY_VEHICLES, label: t("endOfDayVehicles"), icon: <ArrowRightLeft />, roles: ["admin"] },
-      { key: ADMIN.DRIVERS, label: t("drivers"), icon: <Truck />, roles: ["admin"] },
+      // { key: ADMIN.DRIVERS, label: t("drivers"), icon: <Truck />, roles: ["admin"] },
       { key: ADMIN.VEHICLES, label: t("vehicles"), icon: <Car />, roles: ["admin"] },
       { key: ADMIN.VEHICLE_MAINTENANCES, label: t("vehicleMaintenances"), icon: <Wrench />, roles: ["admin"] },
       { key: ADMIN.VEHICLE_TYPES, label: t("vehicleTypes"), icon: <Layers />, roles: ["admin"] },
