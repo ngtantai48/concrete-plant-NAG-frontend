@@ -5,7 +5,7 @@ import type { DeviceStationStatus } from '@/hooks/useDeviceHeartbeat';
 import stationApi from '@/services/station.service';
 import type { Order } from '@/types/order';
 import type { Station } from '@/types/station';
-import { AlertTriangle, ArrowUp, LoaderCircle, Pause, Play } from 'lucide-react';
+import { Pause, Play, RotateCw } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -259,20 +259,16 @@ export default function StationStatusPanel({ stations, orders, deviceStationStat
                 {/* Content — compact vehicle info */}
                 <div className="flex flex-col flex-1 gap-1 px-1 py-1">
                   {/* Active Vehicle */}
-                  <div className="rounded-md px-2 py-1 shadow-sm" style={{ background: 'var(--dd-bg-surface)', border: '1px solid var(--dd-border)' }}>
-                    <div className="flex items-center justify-between gap-2 min-h-[28px]">
-                      <span className="text-xs font-bold uppercase" style={{ color: 'var(--dd-text-muted)' }}>
+                  <div className="rounded-md px-3 py-1 shadow-sm" style={{ border: '1px solid var(--dd-border)' }}>
+                    <div className="flex items-center justify-between min-h-[28px]">
+                      <span className="text-xs font-bold uppercase">
                         {t('vehicleUnloading')}
                       </span>
                       {activeVehicle ? (
-                        <div className="flex items-center gap-2">
-                          <span className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-bold"
-                            style={{
-                              background: 'var(--dd-cyan-glow)',
-                              border: '1px solid var(--dd-border-accent)',
-                              color: 'var(--dd-text-accent)',
-                            }}>
-                            <LoaderCircle className="h-2.5 w-2.5 animate-soft-spin" />
+                        <div className="flex items-center">
+                          <span className="inline-flex items-center gap-2 rounded-md px-1.5 py-0.5 text-sm font-extrabold"
+                            style={{ color: 'var(--dd-text-accent)' }}>
+                            <RotateCw className="h-3 w-3 animate-soft-spin" />
                             {activeVehicle.license_plate}
                           </span>
                           {remainingVehicles > 0 && (
@@ -282,7 +278,7 @@ export default function StationStatusPanel({ stations, orders, deviceStationStat
                           )}
                         </div>
                       ) : (
-                        <span className="text-xs italic" style={{ color: 'var(--dd-text-muted)', opacity: 0.5 }}>{t('noVehicleAtStation')}</span>
+                        <span className="text-xs italic">{t('noVehicleAtStation')}</span>
                       )}
                     </div>
                   </div>
