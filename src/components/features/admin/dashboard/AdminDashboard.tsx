@@ -145,17 +145,8 @@ export default function AdminDashboard() {
           setRealTomorrowOrders(tmRes.data?.data || tmRes.data || []);
         }
       }
-      if (results[4]?.status === 'fulfilled') {
-        const pRes = results[4].value;
-        const allPending = pRes.data?.data || pRes.data || [];
-        setForgottenOrders(allPending.filter((o: Order) =>
-          o.order_status === 'pending' &&
-          o.order_init_datetime &&
-          o.order_init_datetime.slice(0, 10) < selectedDate
-        ));
-      }
-      if (needExtraFetch && results[5]?.status === 'fulfilled') {
-        const rtRes = results[5].value;
+      if (needExtraFetch && results[4]?.status === 'fulfilled') {
+        const rtRes = results[4].value;
         setRealTomorrowOrders(rtRes.data?.data || rtRes.data || []);
       }
     } catch {
