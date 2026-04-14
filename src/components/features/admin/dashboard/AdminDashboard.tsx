@@ -6,7 +6,7 @@ import vehicleApi from "@/services/vehicle.service";
 import type { Vehicle } from "@/types/vehicle";
 import orderApi from "@/services/order.service";
 import type { Order } from "@/types/order";
-import { RefreshCw, Map as MapIcon, Maximize2, Minimize2, Truck, Radio, CheckCircle2, Clock, Route, MapPin, Search, Calendar, Timer, ArrowRight } from "lucide-react";
+import { RefreshCw, Map as MapIcon, Maximize2, Minimize2, Truck, Radio, CheckCircle2, Clock, Route, MapPin, Search, Calendar as CalendarIcon, Timer, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -14,6 +14,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { format } from "date-fns";
+import { cn } from "@/lib/utils";
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle as DlgTitle } from "@/components/ui/dialog";
 import { useLocale, useTranslations } from "next-intl";
@@ -70,6 +74,7 @@ export default function AdminDashboard() {
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedDate, setSelectedDate] = useState(getTodayDate());
+  const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const operationDate = selectedDate;
   const isPastDate = selectedDate < getTodayDate();
   const [clock, setClock] = useState("");
@@ -402,21 +407,36 @@ export default function AdminDashboard() {
               </Tooltip>
 
               {/* Date Picker */}
-              <div className="border-l pl-2 flex items-center gap-1.5" style={{ borderColor: "var(--dd-border)" }}>
-                <input
-                  type="date"
-                  value={selectedDate}
-                  onChange={(e) => {
-                    setSelectedDate(e.target.value);
-                    setLoading(true);
-                  }}
-                  className="h-7 px-2 text-xs font-bold uppercase rounded-md border bg-transparent cursor-pointer"
-                  style={{
-                    borderColor: 'var(--dd-border)',
-                    color: 'var(--dd-text-primary)',
-                    colorScheme: 'light',
-                  }}
-                />
+              <div className="border-l border-slate-200 pl-2 flex items-center gap-1.5">
+                <Popover open={isDatePickerOpen} onOpenChange={setIsDatePickerOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className={cn(
+                        "h-8 w-[150px] px-2 text-sm font-bold justify-start text-left border-slate-200 bg-white/80 transition-all shadow-none hover:bg-white hover:border-sky-400 focus-visible:ring-1 focus-visible:ring-sky-500",
+                        !selectedDate && "text-muted-foreground"
+                      )}
+                    >
+                      <CalendarIcon className="mr-2 text-sky-500" />
+                      {selectedDate ? format(new Date(selectedDate), "dd/MM/yyyy") : <span>Chọn ngày</span>}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0" align="end">
+                    <Calendar
+                      // captionLayout="dropdown"
+                      mode="single"
+                      selected={selectedDate ? new Date(selectedDate) : undefined}
+                      onSelect={(date) => {
+                        if (date) {
+                          setSelectedDate(format(date, "yyyy-MM-dd"));
+                          setLoading(true);
+                          setIsDatePickerOpen(false);
+                        }
+                      }}
+                      initialFocus
+                    />
+                  </PopoverContent>
+                </Popover>
               </div>
 
               {/* Sync Button */}
