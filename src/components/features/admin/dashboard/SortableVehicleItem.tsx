@@ -119,8 +119,10 @@ function SortableVehicleItemBase({
 
 
 
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[14px] font-bold tracking-[0.05em] shadow-sm" style={{ color: 'var(--dd-text-secondary)', border: '1px solid var(--dd-border)' }}>
-            #{(displayIndex ?? actualIndex) + 1}
+          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-sm font-extrabold"
+            style={{ color: 'var(--dd-text-secondary)', border: '1px solid var(--dd-border)' }}
+          >
+            {(displayIndex ?? actualIndex) + 1}
           </div>
 
           <div className="min-w-0 flex-1 flex items-center gap-3">

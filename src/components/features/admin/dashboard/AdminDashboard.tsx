@@ -145,8 +145,17 @@ export default function AdminDashboard() {
           setRealTomorrowOrders(tmRes.data?.data || tmRes.data || []);
         }
       }
-      if (needExtraFetch && results[4]?.status === 'fulfilled') {
-        const rtRes = results[4].value;
+      if (results[4]?.status === 'fulfilled') {
+        const pRes = results[4].value;
+        const allPending = pRes.data?.data || pRes.data || [];
+        setForgottenOrders(allPending.filter((o: Order) =>
+          o.order_status === 'pending' &&
+          o.order_init_datetime &&
+          o.order_init_datetime.slice(0, 10) < selectedDate
+        ));
+      }
+      if (needExtraFetch && results[5]?.status === 'fulfilled') {
+        const rtRes = results[5].value;
         setRealTomorrowOrders(rtRes.data?.data || rtRes.data || []);
       }
     } catch {
@@ -403,7 +412,6 @@ export default function AdminDashboard() {
 
               {/* Date Picker */}
               <div className="border-l pl-2 flex items-center gap-1.5" style={{ borderColor: "var(--dd-border)" }}>
-                <Calendar className="h-3 w-3" style={{ color: 'var(--dd-text-muted)' }} />
                 <input
                   type="date"
                   value={selectedDate}
@@ -535,7 +543,7 @@ export default function AdminDashboard() {
 
                   {/* Canceled / Stopped */}
                   <div className="flex flex-col overflow-hidden dd-card min-h-0" style={{ flex: '3 1 0%', borderColor: 'rgba(245, 158, 11, 0.2)' }}>
-                    <div className="flex items-center justify-between px-3 py-1.5 text-xs font-semibold uppercase"
+                    <div className="flex items-center justify-between px-3 py-1.5 text-sm font-extrabold uppercase"
                       style={{ background: 'var(--dd-bg-header)', color: 'var(--dd-text-primary)', borderBottom: '1px solid var(--dd-border)' }}>
                       <span>{t('stoppedMaintenance')}</span>
                       <span className="dd-chip dd-chip-amber text-[10px] px-1.5 py-0.5">{stoppedMaintenanceList.length}</span>
@@ -571,9 +579,7 @@ export default function AdminDashboard() {
                     style={{ background: 'var(--dd-bg-header)', borderBottom: '1px solid var(--dd-border)' }}>
                     <div className="flex items-center gap-1.5 min-w-0 pr-2">
                       <div className="h-1.5 w-1.5 rounded-full animate-pulse shrink-0" style={{ background: '#0ea5e9', boxShadow: '0 0 10px rgba(14, 165, 233, 0.8)' }} />
-                      <span className="text-sm font-extrabold uppercase" title="TRUNG TÂM ĐIỀU PHỐI">
-                        TRUNG TÂM ĐIỀU PHỐI
-                      </span>
+                      <span className="text-sm font-extrabold uppercase" title="TRUNG TÂM ĐIỀU PHỐI">TRUNG TÂM ĐIỀU PHỐI</span>
                     </div>
 
                     {/* Segmented Toggle HUD */}
@@ -656,7 +662,7 @@ export default function AdminDashboard() {
                         const accentColor = hasActive ? '#0ea5e9' : (hasTrips ? '#10b981' : '#94a3b8');
                         const hoverBorder = hasActive ? 'rgba(14, 165, 233, 0.4)' : (hasTrips ? 'rgba(16, 185, 129, 0.4)' : 'rgba(148, 163, 184, 0.3)');
                         const chipClass = hasActive ? 'dd-chip-sky' : 'dd-chip-emerald';
-                        
+
                         const totalDistanceKm = trips.reduce((sum, o) => {
                           if (o.order_multi) return sum + (o.order_multi.distance_end - o.order_multi.distance_start);
                           return sum;
@@ -1029,7 +1035,7 @@ export default function AdminDashboard() {
                         const mixDurationStr = mixH > 0 ? `${mixH} giờ ${mixM} phút` : `${mixMinsTotal} phút`;
                         const isTripActive = o.order_status === 'running' || o.order_status === 'transporting';
                         const tripAccentColor = isTripActive ? '#0ea5e9' : '#10b981';
-                        
+
                         return (
                           <li key={o.order_id} className="dd-surface p-3 relative overflow-hidden"
                             style={{ borderRadius: '8px', border: '1px solid var(--dd-border)' }}>
@@ -1110,7 +1116,7 @@ export default function AdminDashboard() {
                 {tripOrders.length > 0 && (
                   <div className="shrink-0 px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
                     style={{ borderTop: '1px solid var(--dd-border)', background: 'var(--dd-bg-surface)' }}>
-                    <span className="text-xs font-bold uppercase" style={{ color: 'var(--dd-text-muted)' }}>
+                    <span className="text-sm font-bold uppercase">
                       {t('tripSummary')}
                     </span>
                     <div className="flex flex-wrap items-center justify-start sm:justify-end gap-x-4 gap-y-2">
