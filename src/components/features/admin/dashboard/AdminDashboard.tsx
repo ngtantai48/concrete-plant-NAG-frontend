@@ -6,7 +6,7 @@ import vehicleApi from "@/services/vehicle.service";
 import type { Vehicle } from "@/types/vehicle";
 import orderApi from "@/services/order.service";
 import type { Order } from "@/types/order";
-import { RefreshCw, Map as MapIcon, Maximize2, Minimize2, Truck, Radio, CheckCircle2, Clock, Route, MapPin, Search, Calendar, Timer } from "lucide-react";
+import { RefreshCw, Map as MapIcon, Maximize2, Minimize2, Truck, Radio, CheckCircle2, Clock, Route, MapPin, Search, Calendar, Timer, ArrowRight } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -267,12 +267,12 @@ export default function AdminDashboard() {
       const bTrips = vehicleTripMap.get(b.vehicle_id) || [];
 
       // Get latest update time for vehicle A
-      const aLatestTime = aTrips.length > 0 
+      const aLatestTime = aTrips.length > 0
         ? Math.max(0, ...aTrips.map(o => o.updated_at ? new Date(o.updated_at).getTime() : 0))
         : 0;
 
       // Get latest update time for vehicle B
-      const bLatestTime = bTrips.length > 0 
+      const bLatestTime = bTrips.length > 0
         ? Math.max(0, ...bTrips.map(o => o.updated_at ? new Date(o.updated_at).getTime() : 0))
         : 0;
 
@@ -928,7 +928,7 @@ export default function AdminDashboard() {
 
       {/* ═══ TRIP DETAIL DIALOG ═══ */}
       <Dialog open={!!selectedVehicleTrips} onOpenChange={(open) => { if (!open) setSelectedVehicleTrips(null); }}>
-        <DialogContent className="max-w-2xl sm:max-w-2xl w-[95vw] max-h-[80vh] p-0 gap-0 overflow-hidden" showCloseButton={false}>
+        <DialogContent className="sm:max-w-4xl max-h-[80vh] p-0 gap-0 overflow-hidden" showCloseButton={false}>
           {selectedVehicleTrips && (() => {
             const { vehicle, orders: tripOrders } = selectedVehicleTrips;
             const totalDistanceKm = tripOrders.reduce((sum, o) => {
@@ -970,16 +970,14 @@ export default function AdminDashboard() {
             const mixTotalMinsRemain = totalMixMins % 60;
             const mixTotalDurationStr = mixTotalHours > 0 ? `${mixTotalHours} giờ ${mixTotalMinsRemain} phút` : `${totalMixMins} phút`;
             return (
-              <div className="flex flex-col h-full max-h-[80vh]">
+              <div className="flex flex-col h-full">
                 {/* Header */}
                 <div className="px-4 py-3 shrink-0" style={{ borderBottom: '1px solid var(--dd-border)', background: 'var(--dd-bg-header)' }}>
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Truck className="w-4 h-4 text-emerald-500" />
-                      <span className="text-sm font-bold uppercase" style={{ color: 'var(--dd-text-primary)' }}>
-                        {t('tripDetail')} — {vehicle.vehicle_license_plate}{vehicle.vehicle_name ? ` | ${vehicle.vehicle_name}` : ''}
-                      </span>
-                    </div>
+                    <DlgTitle className="flex items-center gap-2 text-base font-bold uppercase" style={{ color: 'var(--dd-text-primary)' }}>
+                      <Truck className="w-5 h-5 text-emerald-500" />
+                      {t('tripDetail')} — {vehicle.vehicle_license_plate}{vehicle.vehicle_name ? ` | ${vehicle.vehicle_name}` : ''}
+                    </DlgTitle>
                     <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setSelectedVehicleTrips(null)}>
                       <Minimize2 className="w-4 h-4" />
                     </Button>
@@ -994,7 +992,7 @@ export default function AdminDashboard() {
                         style={{ background: 'var(--dd-bg-surface)', border: '2px dashed var(--dd-border)' }}>
                         <Truck className="h-6 w-6 opacity-30" style={{ color: 'var(--dd-text-muted)' }} />
                       </div>
-                      <span className="mt-3 text-xs font-bold uppercase" style={{ color: 'var(--dd-text-muted)' }}>
+                      <span className="mt-3 text-sm font-bold uppercase" style={{ color: 'var(--dd-text-muted)' }}>
                         {t('noTrips')}
                       </span>
                     </div>
@@ -1025,78 +1023,85 @@ export default function AdminDashboard() {
                         const mixM = mixMinsTotal % 60;
                         const mixDurationStr = mixH > 0 ? `${mixH} giờ ${mixM} phút` : `${mixMinsTotal} phút`;
                         const isTripActive = o.order_status === 'running' || o.order_status === 'transporting';
-                        const tripAccentColor = isTripActive ? '#0ea5e9' : '#10b981';
 
                         return (
-                          <li key={o.order_id} className="dd-surface p-3 relative overflow-hidden"
-                            style={{ borderRadius: '8px', border: '1px solid var(--dd-border)' }}>
-                            <div className="absolute left-0 top-0 bottom-0 w-1" style={{ background: tripAccentColor }} />
-                            <div className="pl-2">
-                              {/* Trip number + Station */}
-                              <div className="flex items-center justify-between mb-2">
-                                <div className="flex items-center gap-2">
-                                  <span className="text-sm font-black rounded-full px-2.5 py-1"
-                                    style={{ background: isTripActive ? 'rgba(14, 165, 233, 0.1)' : 'rgba(16, 185, 129, 0.1)', color: tripAccentColor, border: `1px solid ${isTripActive ? 'rgba(14, 165, 233, 0.3)' : 'rgba(16, 185, 129, 0.3)'}` }}>
-                                    #{idx + 1}
-                                  </span>
-                                  <span className="text-xs font-bold uppercase" style={{ color: 'var(--dd-text-primary)' }}>
-                                    {o.stations?.station_name || t('unassigned')}
-                                  </span>
-                                </div>
-                                <span className={`dd-chip ${isTripActive ? 'dd-chip-sky' : 'dd-chip-emerald'} text-[10px] px-1.5 py-0.5`}>
-                                  {isTripActive ? 'Đang di chuyển' : t('completed')}
-                                </span>
-                              </div>
-                              {/* Time row */}
-                              <div className="flex items-center gap-4 text-[11px]" style={{ color: 'var(--dd-text-secondary)' }}>
-                                <div className="flex items-center gap-1">
-                                  <Clock className="w-3 h-3" style={{ color: '#0ea5e9' }} />
-                                  <span className="font-semibold">
-                                    {o.order_start_datetime
-                                      ? new Date(o.order_start_datetime).toLocaleTimeString(locale === 'vi' ? 'vi-VN' : 'en-US', { hour: '2-digit', minute: '2-digit' })
-                                      : '—'}
-                                  </span>
-                                  <span style={{ color: 'var(--dd-text-muted)' }}>→</span>
-                                  <span className="font-semibold">
-                                    {o.order_end_datetime
-                                      ? new Date(o.order_end_datetime).toLocaleTimeString(locale === 'vi' ? 'vi-VN' : 'en-US', { hour: '2-digit', minute: '2-digit' })
-                                      : '—'}
-                                  </span>
-                                </div>
-                                {diffMins > 0 && (
-                                  <span className="font-bold" style={{ color: '#f59e0b' }}>
-                                    {h > 0 ? `${h} giờ ${m} phút` : `${m} phút`}
-                                  </span>
-                                )}
-                              </div>
-                              {/* Distance + Stops */}
-                              <div className="flex flex-wrap items-center gap-x-4 gap-y-2 mt-1.5">
-                                {distanceKm > 0 && (
-                                  <div className="flex items-center gap-1 text-[11px] font-semibold whitespace-nowrap" style={{ color: '#0ea5e9' }}>
-                                    <Route className="w-3 h-3" />
-                                    <span>{distanceKm.toFixed(1)} km</span>
+                          <Card key={o.order_id} className="relative overflow-hidden border shadow-sm">
+                            <div className={`absolute left-0 top-0 bottom-0 w-1 ${isTripActive ? 'bg-sky-500' : 'bg-emerald-500'}`} />
+                            <CardContent>
+                              <div className="px-2 space-y-2">
+                                {/* Trip number + Station */}
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    <Badge
+                                      variant="outline"
+                                      className={`text-sm font-black rounded-full px-2.5 py-0.5 ${isTripActive
+                                        ? 'bg-sky-500/10 text-sky-600 border-sky-500/30'
+                                        : 'bg-emerald-500/10 text-emerald-600 border-emerald-500/30'
+                                        }`}
+                                    >
+                                      {tripOrders.length - idx}
+                                    </Badge>
+                                    <span className="text-sm font-bold uppercase text-slate-900">
+                                      {o.stations?.station_name || t('unassigned')}
+                                    </span>
                                   </div>
-                                )}
-                                <div className="flex items-center gap-1 text-[11px] font-semibold whitespace-nowrap" style={{ color: '#ec4899' }}>
-                                  <MapPin className="w-3 h-3" />
-                                  {Number.isNaN(stops) ? (
-                                    <>
-                                      <RefreshCw className="w-2.5 h-2.5 animate-spin" />
-                                      <span>Loading...</span>
-                                    </>
-                                  ) : (
-                                    <span>{stops} {t('stops')}{stopSecs > 0 ? ` ( ${stopDurationStr} )` : ''}</span>
+                                  <Badge variant="secondary"
+                                    className={`${isTripActive ? 'bg-sky-100 text-sky-600 hover:bg-sky-200' : 'bg-emerald-100 text-emerald-600 hover:bg-emerald-200'} text-sm px-2 py-0.5 font-semibold border-transparent shadow-none`}
+                                  >
+                                    {isTripActive ? 'Đang di chuyển' : t('completed')}
+                                  </Badge>
+                                </div>
+                                {/* Time row */}
+                                <div className="flex items-center gap-4 text-sm text-slate-500">
+                                  <div className="flex items-center gap-1.5">
+                                    <Clock size={14} className="text-sky-500" />
+                                    <span className="font-semibold text-slate-700">
+                                      {o.order_start_datetime
+                                        ? new Date(o.order_start_datetime).toLocaleTimeString(locale === 'vi' ? 'vi-VN' : 'en-US', { hour: '2-digit', minute: '2-digit' })
+                                        : '—'}
+                                    </span>
+                                    <ArrowRight size={14} />
+                                    <span className="font-semibold text-slate-700">
+                                      {o.order_end_datetime
+                                        ? new Date(o.order_end_datetime).toLocaleTimeString(locale === 'vi' ? 'vi-VN' : 'en-US', { hour: '2-digit', minute: '2-digit' })
+                                        : '—'}
+                                    </span>
+                                  </div>
+                                  {diffMins > 0 && (
+                                    <span className="font-bold text-amber-500">
+                                      {h > 0 ? `${h} giờ ${m} phút` : `${m} phút`}
+                                    </span>
                                   )}
                                 </div>
-                                {mixMs > 0 && (
-                                  <div className="flex items-center gap-1 text-[11px] font-semibold whitespace-nowrap" style={{ color: '#8b5cf6' }}>
-                                    <Timer className="w-3 h-3" />
-                                    <span>Trộn: {mixDurationStr}</span>
+                                {/* Distance + Stops */}
+                                <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                                  {distanceKm > 0 && (
+                                    <div className="flex items-center gap-1.5 text-sm font-semibold whitespace-nowrap text-sky-500">
+                                      <Route size={14} />
+                                      <span>{distanceKm.toFixed(1)} km</span>
+                                    </div>
+                                  )}
+                                  <div className="flex items-center gap-1.5 text-sm font-semibold whitespace-nowrap text-pink-500">
+                                    <MapPin size={14} />
+                                    {Number.isNaN(stops) ? (
+                                      <>
+                                        <RefreshCw size={14} className="animate-spin" />
+                                        <span>Loading...</span>
+                                      </>
+                                    ) : (
+                                      <span>{stops} {t('stops')}{stopSecs > 0 ? ` (${stopDurationStr})` : ''}</span>
+                                    )}
                                   </div>
-                                )}
+                                  {mixMs > 0 && (
+                                    <div className="flex items-center gap-1.5 text-sm font-semibold whitespace-nowrap text-violet-500">
+                                      <Timer size={14} />
+                                      <span>Trộn: {mixDurationStr}</span>
+                                    </div>
+                                  )}
+                                </div>
                               </div>
-                            </div>
-                          </li>
+                            </CardContent>
+                          </Card>
                         );
                       })}
                     </ul>
@@ -1105,42 +1110,41 @@ export default function AdminDashboard() {
 
                 {/* Summary Footer */}
                 {tripOrders.length > 0 && (
-                  <div className="shrink-0 px-4 py-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3"
-                    style={{ borderTop: '1px solid var(--dd-border)', background: 'var(--dd-bg-surface)' }}>
-                    <span className="text-sm font-bold uppercase">
+                  <div className="shrink-0 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <span className="text-base font-bold uppercase">
                       {t('tripSummary')}
                     </span>
                     <div className="flex flex-wrap items-center justify-start sm:justify-end gap-x-4 gap-y-2">
-                      <div className="flex items-center gap-1 text-xs font-bold whitespace-nowrap" style={{ color: '#10b981' }}>
-                        <CheckCircle2 className="w-3.5 h-3.5" />
+                      <div className="flex items-center gap-1.5 text-sm font-bold whitespace-nowrap" style={{ color: '#10b981' }}>
+                        <CheckCircle2 size={16} />
                         <span>{tripOrders.length} {t('completed')}</span>
                       </div>
                       {totalDistanceKm > 0 && (
-                        <div className="flex items-center gap-1 text-xs font-bold whitespace-nowrap" style={{ color: '#0ea5e9' }}>
-                          <Route className="w-3.5 h-3.5" />
+                        <div className="flex items-center gap-1.5 text-sm font-bold whitespace-nowrap" style={{ color: '#0ea5e9' }}>
+                          <Route size={16} />
                           <span>{totalDistanceKm.toFixed(1)} km</span>
                         </div>
                       )}
                       {totalMins > 0 && (
-                        <div className="flex items-center gap-1 text-xs font-bold whitespace-nowrap" style={{ color: '#f59e0b' }}>
-                          <Clock className="w-3.5 h-3.5" />
+                        <div className="flex items-center gap-1.5 text-sm font-bold whitespace-nowrap" style={{ color: '#f59e0b' }}>
+                          <Clock size={16} />
                           <span>{totalHours > 0 ? `${totalHours} giờ ${totalRemainMins} phút` : `${totalRemainMins} phút`}</span>
                         </div>
                       )}
-                      <div className="flex items-center gap-1 text-xs font-bold whitespace-nowrap" style={{ color: '#ec4899' }}>
-                        <MapPin className="w-3.5 h-3.5" />
+                      <div className="flex items-center gap-1.5 text-sm font-bold whitespace-nowrap" style={{ color: '#ec4899' }}>
+                        <MapPin size={16} />
                         {Number.isNaN(totalStops) ? (
                           <>
-                            <RefreshCw className="w-3 h-3 animate-spin" />
+                            <RefreshCw size={16} className="animate-spin" />
                             <span>Loading...</span>
                           </>
                         ) : (
-                          <span>{totalStops} {t('stops')}{totalStopSecs > 0 ? ` ( ${stopDurationStr} )` : ''}</span>
+                          <span>{totalStops} {t('stops')}{totalStopSecs > 0 ? ` (${stopDurationStr})` : ''}</span>
                         )}
                       </div>
                       {totalMixMs > 0 && (
-                        <div className="flex items-center gap-1 text-xs font-bold whitespace-nowrap" style={{ color: '#8b5cf6' }}>
-                          <Timer className="w-3.5 h-3.5" />
+                        <div className="flex items-center gap-1.5 text-sm font-bold whitespace-nowrap" style={{ color: '#8b5cf6' }}>
+                          <Timer size={16} />
                           <span>Trộn: {mixTotalDurationStr}</span>
                         </div>
                       )}
@@ -1159,7 +1163,7 @@ export default function AdminDashboard() {
           <div className="flex h-full overflow-hidden">
             {/* Left: Vehicle Search */}
             <div className="w-[300px] shrink-0 flex flex-col border-r" style={{ borderColor: 'var(--dd-border)' }}>
-              <DialogHeader className="px-4 py-3 shrink-0" style={{ borderBottom: '1px solid var(--dd-border)' }}>
+              <DialogHeader className="p-4 shrink-0" style={{ borderBottom: '1px solid var(--dd-border)' }}>
                 <DlgTitle className="text-base font-bold uppercase flex items-center gap-2">
                   <MapIcon className="w-4 h-4 text-sky-500" />
                   {t('searchVehicle')}

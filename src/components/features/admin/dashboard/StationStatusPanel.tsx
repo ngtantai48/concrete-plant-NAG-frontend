@@ -1,3 +1,4 @@
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
@@ -232,28 +233,34 @@ export default function StationStatusPanel({ stations, orders, deviceStationStat
               {/* Left — Header + Vehicle Info */}
               <div className="flex flex-col flex-1 min-w-0 px-3 py-1.5">
                 {/* Header — Name | RFID | Status */}
-                <div className="flex items-center flex-wrap gap-1.5 px-1 py-0.5 rounded-tl-[7px]">
-                  <h3 className="text-base font-black whitespace-nowrap" style={{ color: 'var(--dd-text-primary)' }}>
+                <div className="flex items-center flex-wrap gap-1.5 px-1 py-0.5">
+                  <h3 className="text-base font-black whitespace-nowrap text-slate-900">
                     {station.station_name}
                   </h3>
-                  <div className={`inline-flex items-center gap-1 dd-chip text-[10px] px-1.5 py-0.5 shrink-0 ${deviceStatus === 'connected' ? '' : 'animate-danger-blink'}`}
-                    style={{
-                      background: deviceStatus === 'connected' ? 'var(--dd-emerald-glow)' : 'var(--dd-red-glow)',
-                      border: `1px solid ${deviceStatus === 'connected' ? 'var(--dd-emerald)' : 'var(--dd-red)'}`,
-                      color: deviceStatus === 'connected' ? 'var(--dd-emerald)' : 'var(--dd-red)',
-                    }}>
-                    <span className="h-1.5 w-1.5 rounded-sm"
-                      style={{
-                        background: deviceStatus === 'connected' ? '#10b981' : '#ef4444',
-                        boxShadow: `0 0 4px ${deviceStatus === 'connected' ? 'rgba(16, 185, 129, 0.5)' : 'rgba(239, 68, 68, 0.5)'}`,
-                        display: 'inline-block',
-                      }} />
+
+                  <Badge
+                    variant="outline"
+                    className={`gap-1.5 text-sm font-bold px-2 py-0 shadow-none h-7 shrink-0 transition-all ${deviceStatus === 'connected'
+                      ? 'bg-emerald-50/50 text-emerald-600 border-emerald-200'
+                      : 'bg-red-50/50 text-red-600 border-red-200 animate-pulse'
+                      }`}
+                  >
+                    <span className={`h-1.5 w-1.5 rounded-full ${deviceStatus === 'connected' ? 'bg-emerald-500 shadow-[0_0_4px_rgba(16,185,129,0.5)]' : 'bg-red-500 shadow-[0_0_4px_rgba(239,68,68,0.5)]'
+                      }`} />
                     RFID {deviceStatus === 'connected' ? t('connected') : t('disconnected')}
-                  </div>
-                  <div className={`${theme.chipClass} text-[10px] px-2 py-0.5 shrink-0 ml-auto`}>
-                    <span className="h-1.5 w-1.5 rounded-full" style={{ background: theme.dot, boxShadow: `0 0 4px ${theme.dotGlow}`, display: 'inline-block' }} />
+                  </Badge>
+
+                  <Badge
+                    variant="secondary"
+                    className={`ml-auto gap-1.5 text-sm font-bold px-2.5 py-0 shadow-none h-7 shrink-0 ${station.station_status === 'operating' ? 'bg-emerald-100 text-emerald-700 border-transparent' :
+                      station.station_status === 'stopped' ? 'bg-amber-100 text-amber-700 border-transparent' :
+                        station.station_status === 'incident' ? 'bg-red-100 text-red-700 border-transparent' :
+                          station.station_status === 'collecting' ? 'bg-sky-100 text-sky-700 border-transparent' : 'bg-slate-100 text-slate-700 border-transparent'
+                      }`}
+                  >
+                    <span className="h-1.5 w-1.5 rounded-full" style={{ background: theme.dot }} />
                     {theme.label}
-                  </div>
+                  </Badge>
                 </div>
 
                 {/* Content — compact vehicle info */}
