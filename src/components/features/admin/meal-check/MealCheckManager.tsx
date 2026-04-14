@@ -93,6 +93,11 @@ interface FlatRow {
 
 // --- Helpers ---
 
+function normalizePlate(plate: string): string {
+  const digits = plate.replace(/\D/g, "");
+  return digits.slice(-5);
+}
+
 function haversine(lat1: number, lng1: number, lat2: number, lng2: number): number {
   const R = 6371000;
   const toRad = (d: number) => (d * Math.PI) / 180;
@@ -198,7 +203,7 @@ export default function MealCheckManager() {
   const [nameToPlateMap, setNameToPlateMap] = useState<Record<string, string>>({}); // hoTen -> license_plate
   const [checked, setChecked] = useState(false);
   const tableRef = useRef<HTMLDivElement>(null);
-  const [selectedSlots, setSelectedSlots] = useState<MealSlot["key"][]>([]);
+  const [selectedSlots, setSelectedSlots] = useState<MealSlot["key"][]>(["sang", "trua", "toi"]);
 
   const activeSlots = useMemo(
     () => MEAL_SLOTS.filter((s) => selectedSlots.includes(s.key)),
@@ -222,11 +227,23 @@ export default function MealCheckManager() {
       let n2p: Record<string, string> = {};
       try {
         const vpRes = await fetch("/api/google-sheets/attendance/vehicle-personnel");
-        const vpData = await vpRes.json();
-        drMap = vpData.plateToNames || {};
-        n2p = vpData.nameToPlate || {};
+        if (!vpRes.ok) {
+          const vpErr = await vpRes.json().catch(() => ({}));
+          message.warning(`Lỗi tải bố trí xe: ${vpErr.error || vpRes.statusText}`);
+        } else {
+          const vpData = await vpRes.json();
+          const rawPlateToNames: Record<string, string[]> = vpData.plateToNames || {};
+          // Normalize plate keys for matching
+          for (const [plate, names] of Object.entries(rawPlateToNames)) {
+            drMap[normalizePlate(plate)] = names;
+          }
+          const rawNameToPlate: Record<string, string> = vpData.nameToPlate || {};
+          for (const [name, plate] of Object.entries(rawNameToPlate)) {
+            n2p[name] = plate;
+          }
+        }
       } catch {
-        // continue
+        message.warning("Không kết nối được API bố trí xe");
       }
       setDriverMap(drMap);
       setNameToPlateMap(n2p);
@@ -235,16 +252,46 @@ export default function MealCheckManager() {
       let personnel: Personnel[] = [];
       try {
         const pRes = await fetch("/api/google-sheets/attendance/personnel");
-        const pData = await pRes.json();
-        personnel = pData.personnel || [];
+        if (!pRes.ok) {
+          const pErr = await pRes.json().catch(() => ({}));
+          message.warning(`Lỗi tải danh sách nhân viên: ${pErr.error || pRes.statusText}`);
+        } else {
+          const pData = await pRes.json();
+          personnel = pData.personnel || [];
+        }
       } catch {
-        // continue
+        message.warning("Không kết nối được API danh sách nhân viên");
       }
       setPersonnelList(personnel);
 
       // 3. Fetch vehicles
       const vehiclesRes = await vtrackingApi.fetchVehicles();
       const vehicles = vehiclesRes.data.vehicles || [];
+
+      if (Object.keys(drMap).length === 0) {
+        message.warning("Không có dữ liệu bố trí xe - nhân viên. Vui lòng kiểm tra Google Sheets.");
+      }
+      if (personnel.length === 0) {
+        message.warning("Danh sách nhân viên trống. Vui lòng kiểm tra Google Sheets.");
+      }
+      if (vehicles.length === 0) {
+        message.warning("Không lấy được danh sách xe từ VTracking.");
+        setLoading(false);
+        return;
+      }
+
+      // Count matched vehicles (those with driver names in the mapping)
+      const matchedVehicles = vehicles.filter(
+        (v) => {
+          const nPlate = normalizePlate(v.license_plate);
+          return drMap[nPlate] && drMap[nPlate].length > 0;
+        }
+      );
+      if (matchedVehicles.length === 0 && Object.keys(drMap).length > 0) {
+        message.warning(
+          "Không khớp được biển số xe VTracking với bố trí CV. Kiểm tra biển số trong Google Sheets."
+        );
+      }
 
       const allDays = getDaysInRange(dateRange[0], dateRange[1]);
       const totalSteps = vehicles.length * allDays.length * activeSlots.length;
@@ -255,7 +302,7 @@ export default function MealCheckManager() {
       let step = 0;
 
       for (const vehicle of vehicles) {
-        const driverNames = drMap[vehicle.license_plate];
+        const driverNames = drMap[normalizePlate(vehicle.license_plate)];
         if (!driverNames || driverNames.length === 0) {
           step += allDays.length * activeSlots.length;
           setProgress({ current: step, total: totalSteps });
