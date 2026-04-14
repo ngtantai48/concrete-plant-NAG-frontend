@@ -67,10 +67,8 @@ export default function AdminDashboard() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [tomorrowOrders, setTomorrowOrders] = useState<Order[]>([]);
   const [realTomorrowOrders, setRealTomorrowOrders] = useState<Order[]>([]);
-  const [forgottenOrders, setForgottenOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [isShiftSubmitting, setIsShiftSubmitting] = useState(false);
   const [selectedDate, setSelectedDate] = useState(getTodayDate());
   const operationDate = selectedDate;
   const isPastDate = selectedDate < getTodayDate();
@@ -119,7 +117,6 @@ export default function AdminDashboard() {
         vehicleApi.getAll({ limit: 100 }),
         orderApi.getByInitDate(selectedDate),
         orderApi.getByInitDate(nextDate),
-        orderApi.getAll({ order_status: 'pending' }),
       ] as any[];
       if (needExtraFetch) {
         apiCalls.push(orderApi.getByInitDate(realTomorrow));
@@ -148,17 +145,8 @@ export default function AdminDashboard() {
           setRealTomorrowOrders(tmRes.data?.data || tmRes.data || []);
         }
       }
-      if (results[4]?.status === 'fulfilled') {
-        const pRes = results[4].value;
-        const allPending = pRes.data?.data || pRes.data || [];
-        setForgottenOrders(allPending.filter((o: Order) =>
-          o.order_status === 'pending' &&
-          o.order_init_datetime &&
-          o.order_init_datetime.slice(0, 10) < selectedDate
-        ));
-      }
-      if (needExtraFetch && results[5]?.status === 'fulfilled') {
-        const rtRes = results[5].value;
+      if (needExtraFetch && results[4]?.status === 'fulfilled') {
+        const rtRes = results[4].value;
         setRealTomorrowOrders(rtRes.data?.data || rtRes.data || []);
       }
     } catch {
@@ -172,39 +160,10 @@ export default function AdminDashboard() {
     fetchAll();
   }, [fetchAll]);
 
-  const isShiftClosedForDate = useMemo(
-    () => orders.some((o) => o.order_status === "canceled"),
-    [orders],
-  );
-
   const isTomorrowScheduleReady = useMemo(
     () => realTomorrowOrders.some((o) => o.order_status === "pending"),
     [realTomorrowOrders],
   );
-
-  const handleShiftToggle = useCallback(async () => {
-    const todayDate = getTodayDate();
-    console.log(todayDate);
-    setIsShiftSubmitting(true);
-
-    try {
-      if (isShiftClosedForDate) {
-        await orderApi.shiftReopen({ operation_date: todayDate });
-        const [y, m, d] = todayDate.split("-");
-        toast.success(t('shiftReopenSuccess', { date: `${d}/${m}/${y}` }), { position: 'top-right' });
-      } else {
-        await orderApi.shiftClose({ operation_date: todayDate });
-        const [y, m, d] = todayDate.split("-");
-        toast.success(t('shiftCloseSuccess', { date: `${d}/${m}/${y}` }), { position: 'top-right' });
-      }
-
-      await fetchAll();
-    } catch {
-      toast.error(isShiftClosedForDate ? t('shiftReopenFailed') : t('shiftCloseFailed'), { position: 'top-right' });
-    } finally {
-      setIsShiftSubmitting(false);
-    }
-  }, [fetchAll, isShiftClosedForDate, t]);
 
   const activeStations = useMemo(
     () => stations.filter((s) => s.station_types?.station_type_id === 1 && s.station_status === "operating"),
@@ -471,79 +430,6 @@ export default function AdminDashboard() {
                 <RefreshCw className={`w-3 h-3 ${isRefreshing ? "animate-spin" : ""}`} />
                 {t('sync')}
               </Button> */}
-
-              {!isTomorrowScheduleReady && (
-                <div
-                  className="border-l pl-2 flex items-center"
-                  style={{ borderColor: "var(--dd-border)" }}
-                >
-                  <Button
-                    variant={isShiftClosedForDate ? "outline" : "secondary"}
-                    size="sm"
-                    onClick={handleShiftToggle}
-                    disabled={isShiftSubmitting}
-                    className="h-7 px-2.5 text-xs font-bold uppercase gap-1"
-                    style={{
-                      background: isShiftClosedForDate
-                        ? "linear-gradient(135deg, rgba(217, 119, 6, 0.14), rgba(245, 158, 11, 0.12))"
-                        : "linear-gradient(135deg, rgba(109, 40, 217, 0.14), rgba(14, 165, 233, 0.1))",
-                      border: isShiftClosedForDate
-                        ? "1px solid rgba(217, 119, 6, 0.2)"
-                        : "1px solid rgba(109, 40, 217, 0.2)",
-                      color: isShiftClosedForDate ? "#b45309" : "#6d28d9",
-                    }}
-                  >
-                    <span
-                      className={`inline-block h-1.5 w-1.5 rounded-full ${isShiftSubmitting ? "animate-pulse" : ""}`}
-                      style={{
-                        background: isShiftClosedForDate ? "#d97706" : "#6d28d9",
-                      }}
-                    />
-                    {isShiftClosedForDate
-                      ? t("shiftReopenAction")
-                      : t("shiftCloseAction")}
-                  </Button>
-                </div>
-              )}
-
-              {isTomorrowScheduleReady && (
-                <div
-                  className="border-l pl-2 flex items-center"
-                  style={{ borderColor: "var(--dd-border)" }}
-                >
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={async () => {
-                      setIsShiftSubmitting(true);
-                      try {
-                        const todayDate = getTodayDate();
-                        await orderApi.shiftReopen({ operation_date: todayDate });
-                        const [y, m, d] = todayDate.split("-");
-                        toast.success(t("shiftReopenSuccess", { date: `${d}/${m}/${y}` }), { position: "top-right" });
-                        await fetchAll();
-                      } catch {
-                        toast.error(t("shiftReopenFailed"), { position: "top-right" });
-                      } finally {
-                        setIsShiftSubmitting(false);
-                      }
-                    }}
-                    disabled={isShiftSubmitting}
-                    className="h-7 px-2.5 text-xs font-bold uppercase gap-1"
-                    style={{
-                      background: "linear-gradient(135deg, rgba(217, 119, 6, 0.14), rgba(245, 158, 11, 0.12))",
-                      border: "1px solid rgba(217, 119, 6, 0.2)",
-                      color: "#b45309",
-                    }}
-                  >
-                    <span
-                      className={`inline-block h-1.5 w-1.5 rounded-full ${isShiftSubmitting ? "animate-pulse" : ""}`}
-                      style={{ background: "#d97706" }}
-                    />
-                    {t("shiftReopenAction")}
-                  </Button>
-                </div>
-              )}
             </div>
           </div>
 
@@ -589,47 +475,6 @@ export default function AdminDashboard() {
                 {t("tomorrowScheduleReadyTitle")} — {t("tomorrowScheduleReadyDescription", { count: tomorrowOrders.length })}
               </span>
             </div>
-          </div>
-        )}
-
-        {/* Báo quên chốt ca */}
-        {!loading && ordersPending.length === 0 && forgottenOrders.length > 0 && (
-          <div
-            className="mb-1 shrink-0 rounded-lg border px-3 py-1 flex items-center justify-between shadow-sm animate-pulse"
-            style={{
-              background: "linear-gradient(135deg, rgba(239, 68, 68, 0.08), rgba(220, 38, 38, 0.04))",
-              borderColor: "rgba(239, 68, 68, 0.4)",
-            }}
-          >
-            <div className="flex items-center gap-2">
-              <div className="h-2 w-2 rounded-full bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.8)]" />
-              <span className="text-xs font-bold uppercase" style={{ color: "#b91c1c" }}>
-                Phát hiện {forgottenOrders.length} chuyến chờ từ các ca trước. Vui lòng chốt ca hôm trước!
-              </span>
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={async () => {
-                const datesToClose = [...new Set(forgottenOrders.map(o => o.order_init_datetime?.slice(0, 10)))].filter(Boolean) as string[];
-                setIsShiftSubmitting(true);
-                try {
-                  for (const d of datesToClose) {
-                    await orderApi.shiftClose({ operation_date: d });
-                  }
-                  toast.success("Đã chốt các ca bị quên thành công!", { position: 'top-right' });
-                  await fetchAll();
-                } catch {
-                  toast.error("Có lỗi khi chốt ca hôm trước", { position: 'top-right' });
-                } finally {
-                  setIsShiftSubmitting(false);
-                }
-              }}
-              disabled={isShiftSubmitting}
-              className="h-6 px-2 text-[10px] font-bold uppercase bg-white hover:bg-red-50 border-red-200 text-red-600"
-            >
-              Chốt ca hôm trước
-            </Button>
           </div>
         )}
 

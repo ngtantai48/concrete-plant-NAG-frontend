@@ -17,6 +17,16 @@ function normalize(s: unknown): string {
     .replace(/\s+/g, " ");
 }
 
+function extractPlate(raw: string): string {
+  const idx = raw.indexOf("(");
+  if (idx > 0) return raw.substring(0, idx).trim();
+  return raw.trim();
+}
+
+function isValidPlate(plate: string): boolean {
+  return /\d/.test(plate) && !/^(bi[eể]n|kh|xe)/i.test(plate);
+}
+
 interface VehiclePersonnel {
   licensePlate: string;
   type: "multi" | "single";
@@ -65,8 +75,9 @@ export async function GET() {
       const row = btcRows[i] || [];
 
       // Multi-crew vehicles: C = plate (index 2), D/E/F = tenVT (index 3/4/5)
-      const plateMulti = normalize(row[2]);
-      if (plateMulti) {
+      const rawPlateMulti = normalize(row[2]);
+      const plateMulti = extractPlate(rawPlateMulti);
+      if (plateMulti && isValidPlate(plateMulti)) {
         const crew: { tenVT: string; hoTen: string; boPhan: string }[] = [];
         for (const colIdx of [3, 4, 5]) {
           const tenVT = normalize(row[colIdx]);
@@ -88,13 +99,14 @@ export async function GET() {
         }
       }
 
-      // Single vehicles: H = plate (index 7), I/J = tenVT (index 8/9)
-      const plateSingle = normalize(row[7]);
-      if (plateSingle) {
+      // Single vehicles: H = vehicle code (X1,X2..), I = plate+name "73D-00691 (Thiệp)", J = tenVT, K = STT (skip), L = tenVT secondary
+      const rawSingleI = normalize(row[8]);
+      const singlePlate = extractPlate(rawSingleI);
+      if (singlePlate && isValidPlate(singlePlate)) {
         const crew: { tenVT: string; hoTen: string; boPhan: string }[] = [];
-        for (const colIdx of [8, 9]) {
+        for (const colIdx of [9, 11]) {
           const tenVT = normalize(row[colIdx]);
-          if (tenVT) {
+          if (tenVT && !/^\d+$/.test(tenVT)) {
             const info = tenVTMap.get(tenVT);
             crew.push({
               tenVT,
@@ -105,7 +117,7 @@ export async function GET() {
         }
         if (crew.length > 0) {
           vehicles.push({
-            licensePlate: plateSingle,
+            licensePlate: singlePlate,
             type: "single",
             personnel: crew,
           });
