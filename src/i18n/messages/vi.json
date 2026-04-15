@@ -461,7 +461,11 @@
     "tomorrowScheduleReadyDescription": "Đã chốt lịch {count} xe cho ngày mai",
     "undoScheduleAction": "Hủy chốt lịch",
     "undoScheduleSuccess": "Đã hủy chốt lịch ngày mai",
-    "undoScheduleFailed": "Không thể hủy chốt lịch"
+    "undoScheduleFailed": "Không thể hủy chốt lịch",
+    "cameraConnected": "Camera kết nối",
+    "cameraDisconnected": "Camera mất kết nối",
+    "confirmStopStationTitle": "Xác nhận dừng trạm",
+    "confirmStopStationDescription": "Bạn có chắc chắn muốn báo <strong>{stationName}</strong> dừng hoạt động không? Hành động này sẽ khiến trạm tạm thời không nhận thêm xe đổ bê tông."
   },
   "EndOfDayPage": {
     "title": "Quản lý xe cuối ngày",

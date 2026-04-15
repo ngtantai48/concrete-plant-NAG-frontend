@@ -231,7 +231,7 @@ const StationStatusPanel = ({ stations, orders, deviceStationStatusMap = {}, onS
               style={{ borderColor: theme.borderGlow }}
             >
               {/* Left — Header + Vehicle Info */}
-              <div className="flex flex-col flex-1 min-w-0 px-3 py-1.5">
+              <div className="flex flex-col flex-1 min-w-0 p-2">
                 {/* Header — Name | Camera | Status */}
                 <div className="flex items-center flex-wrap gap-1.5 px-1 py-0.5">
                   <h3 className="text-base font-black whitespace-nowrap text-slate-900">
@@ -247,7 +247,7 @@ const StationStatusPanel = ({ stations, orders, deviceStationStatusMap = {}, onS
                   >
                     {/* <span className={`h-1.5 w-1.5 rounded-full ${deviceStatus === 'connected' ? 'bg-emerald-500 shadow-[0_0_4px_rgba(16,185,129,0.5)]' : 'bg-red-500 shadow-[0_0_4px_rgba(239,68,68,0.5)]'
                       }`} /> */}
-                    {deviceStatus === 'connected' ? 'Camera Kết nối' : 'Camera mất kết nối'}
+                    {deviceStatus === 'connected' ? t('cameraConnected') : t('cameraDisconnected')}
                   </Badge>
 
                   <Badge
@@ -410,7 +410,7 @@ const StationStatusPanel = ({ stations, orders, deviceStationStatusMap = {}, onS
               disabled={!incidentDesc.trim() || submitting}
               className="font-bold uppercase"
             >
-              {submitting ? "Đang xử lý..." : t('sendAndStop')}
+              {submitting ? t('processing') : t('sendAndStop')}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -421,7 +421,10 @@ const StationStatusPanel = ({ stations, orders, deviceStationStatusMap = {}, onS
           <DialogHeader>
             <DialogTitle className="text-xl font-bold uppercase text-slate-900">{t('confirmPauseStation')}</DialogTitle>
             <DialogDescription className="text-lg text-slate-500">
-              Bạn có chắc chắn muốn báo <strong>{stationToPause?.station_name}</strong> dừng hoạt động không? Hành động này sẽ khiến trạm tạm thời không nhận thêm xe đổ bê tông.
+              {t.rich('confirmStopStationDescription', {
+                stationName: stationToPause?.station_name ?? '',
+                strong: (chunks) => <strong>{chunks}</strong>
+              })}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter className="mt-4 flex gap-3 sm:justify-end">
@@ -431,7 +434,7 @@ const StationStatusPanel = ({ stations, orders, deviceStationStatusMap = {}, onS
               onClick={() => stationToPause && performToggleStatus(stationToPause)}
               disabled={togglingId === stationToPause?.station_id}
             >
-              {togglingId === stationToPause?.station_id ? 'Đang xử lý...' : t('stopped')}
+              {togglingId === stationToPause?.station_id ? t('processing') : t('stopped')}
             </Button>
           </DialogFooter>
         </DialogContent>

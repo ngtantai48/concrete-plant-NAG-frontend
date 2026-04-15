@@ -62,9 +62,9 @@ export function useDeviceHeartbeat(): DeviceHeartbeatState {
           setStationStatusMap((prev) => {
             const flushed = { ...bufferRef.current };
             bufferRef.current = {}; // clear buffer ngay lập tức để nhận event mới
-            
+
             if (Object.keys(flushed).length === 0) return prev;
-            
+
             const nextMap = { ...prev };
             Object.keys(flushed).forEach((stationId) => {
               const existing = nextMap[stationId] || {
@@ -73,13 +73,13 @@ export function useDeviceHeartbeat(): DeviceHeartbeatState {
                 cameraStatus: "disconnected",
                 ledStatus: "disconnected",
               };
-              
+
               nextMap[stationId] = { ...existing, ...flushed[stationId] };
             });
-            
+
             return nextMap;
           });
-          
+
           timeoutRef.current = null;
         }, 800); // Batch các thay đổi trong 800ms
       }

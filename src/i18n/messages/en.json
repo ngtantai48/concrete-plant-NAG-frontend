@@ -441,7 +441,11 @@
     "tomorrowScheduleReadyDescription": "Confirmed {count} vehicles for tomorrow",
     "undoScheduleAction": "Undo schedule",
     "undoScheduleSuccess": "Tomorrow's schedule has been undone",
-    "undoScheduleFailed": "Unable to undo schedule"
+    "undoScheduleFailed": "Unable to undo schedule",
+    "cameraConnected": "Camera connected",
+    "cameraDisconnected": "Camera disconnected",
+    "confirmStopStationTitle": "Confirm station pause",
+    "confirmStopStationDescription": "Are you sure you want to pause <strong>{stationName}</strong>? This action will temporarily stop the station from receiving concrete trucks."
   },
   "EndOfDayPage": {
     "title": "End-of-day vehicle management",
