@@ -548,7 +548,7 @@ export default function ActivityFlow({
   const groupedByStation = useMemo(() => {
     const pendingOrders = effectiveOrders
       .filter((order) => orderStatusFilter.includes(order.order_status))
-      .sort((a, b) => a.order_number - b.order_number);
+      .sort((a, b) => new Date(a.order_init_datetime || 0).getTime() - new Date(b.order_init_datetime || 0).getTime());
 
     const ordersByStation = new Map<number, Order[]>();
 
@@ -625,7 +625,7 @@ export default function ActivityFlow({
       });
     });
 
-    allPendingOrders.sort((a, b) => a.order.order_number - b.order.order_number);
+    allPendingOrders.sort((a, b) => new Date(a.order.order_init_datetime || 0).getTime() - new Date(b.order.order_init_datetime || 0).getTime());
 
     return allPendingOrders.map(({ group, order }, index) => ({
       group,
