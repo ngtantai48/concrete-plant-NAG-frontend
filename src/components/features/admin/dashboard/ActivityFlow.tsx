@@ -510,7 +510,7 @@ function DraggedVehiclePreview({
   );
 }
 
-export default function ActivityFlow({
+const ActivityFlow = ({
   stations,
   vehicles,
   orders,
@@ -518,7 +518,7 @@ export default function ActivityFlow({
   layout = 'merged',
   orderStatusFilter = ['pending'],
   onOrdersUpdated,
-}: ActivityFlowProps) {
+}: ActivityFlowProps) => {
   const t = useTranslations('DashboardPage');
   const [selectedOrderIds, setSelectedOrderIds] = useState<number[]>([]);
   const [manualStationId, setManualStationId] = useState<string>('');
@@ -1301,4 +1301,6 @@ export default function ActivityFlow({
       </DragOverlay>
     </DndContext>
   );
-}
+};
+
+export default React.memo(ActivityFlow);

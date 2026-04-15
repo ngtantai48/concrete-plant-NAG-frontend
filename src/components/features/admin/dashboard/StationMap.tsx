@@ -1,5 +1,5 @@
 import "leaflet/dist/leaflet.css";
-import { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from "react-leaflet";
 import L from "leaflet";
 import type { NearbyVehicle } from "@/hooks/useNearbyVehicles";
@@ -81,7 +81,7 @@ function FlyToVehicle({ focusVehicle, focusDeviceId, markerRefs }: {
   return null;
 }
 
-export default function StationMap({ stationLongitude, stationLatitude, radius, vehicles, focusVehicle, focusDeviceId }: StationMapProps) {
+const StationMap = ({ stationLongitude, stationLatitude, radius, vehicles, focusVehicle, focusDeviceId }: StationMapProps) => {
   const [mounted, setMounted] = useState(false);
   const markerRefs = useRef<Record<string, L.Marker>>({});
 
@@ -185,4 +185,6 @@ export default function StationMap({ stationLongitude, stationLatitude, radius, 
       </MapContainer>
     </div>
   );
-}
+};
+
+export default React.memo(StationMap);

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -42,13 +42,13 @@ const STATUSES = [
   },
 ] as const;
 
-export default function VehicleStatusChange({
+const VehicleStatusChange = ({
   vehicleId,
   currentStatus,
   vehiclePlate,
   onStatusChanged,
   className,
-}: VehicleStatusChangeProps) {
+}: VehicleStatusChangeProps) => {
   // Track the "known server status" — starts from prop, updated after successful API call
   const knownStatus = useRef(currentStatus);
   const [selectedStatus, setSelectedStatus] = useState(currentStatus);
@@ -144,4 +144,6 @@ export default function VehicleStatusChange({
       </Popconfirm>
     </div>
   );
-}
+};
+
+export default React.memo(VehicleStatusChange);

@@ -74,6 +74,16 @@
     "settings": "Settings",
     "logout": "Logout"
   },
+  "Notification": {
+    "notification": "Notification",
+    "notification_empty": "No notifications",
+    "read": "Read",
+    "unknown_event": "You have a new notification",
+    "station_check_in": "Vehicle {vehicle} checked in at {station}",
+    "station_check_out": "Vehicle {vehicle} checked out from {station}",
+    "vehicle_check_in": "Vehicle {vehicle} checked in to the yard",
+    "vehicle_check_out": "Vehicle {vehicle} checked out from the yard"
+  },
   "Dashboard": {
     "title": "Dashboard",
     "overview": "Overview of tests and system statistics"
@@ -508,7 +518,10 @@
     "fromDate": "Start Date",
     "toDate": "End Date",
     "dateRange": "Maintenance Period",
-    "dateRangePlaceholder": ["From date", "To date"],
+    "dateRangePlaceholder": [
+      "From date",
+      "To date"
+    ],
     "distanceCovered": "Distance Covered (km)",
     "distancePlaceholder": "e.g. 15000",
     "description": "Work Description",

@@ -80,12 +80,38 @@ export default function DriverDisplay() {
   }, [fetchData]);
 
   // Subscribe to socket events → refetch data on any event
+  // OPTIMIZED: Debounce để tránh refetch storm - max 1 fetch mỗi 2 giây
   useEffect(() => {
+    let fetchTimeout: ReturnType<typeof setTimeout> | null = null;
+    let lastFetchTime = 0;
+    const DEBOUNCE_MS = 2000; // 2 giây giữa mỗi lần fetch
+
     const unsubscribe = onSocketEvent((eventName) => {
-      console.log(`[DriverDisplay] Nhận event "${eventName}", cập nhật dữ liệu...`);
-      fetchData();
+      console.log(`[DriverDisplay] Nhận event "${eventName}", lên lịch cập nhật dữ liệu...`);
+      
+      const now = Date.now();
+      const elapsed = now - lastFetchTime;
+
+      // Nếu đã qua 2 giây kể từ lần fetch cuối, fetch ngay
+      if (elapsed >= DEBOUNCE_MS) {
+        lastFetchTime = now;
+        fetchData();
+        return;
+      }
+
+      // Nếu chưa, delay fetch cho đến khi đủ 2 giây
+      if (fetchTimeout) clearTimeout(fetchTimeout);
+      fetchTimeout = setTimeout(() => {
+        lastFetchTime = Date.now();
+        fetchData();
+        fetchTimeout = null;
+      }, DEBOUNCE_MS - elapsed);
     });
-    return unsubscribe;
+
+    return () => {
+      unsubscribe();
+      if (fetchTimeout) clearTimeout(fetchTimeout);
+    };
   }, [onSocketEvent, fetchData]);
 
   // Fullscreen toggle — operates on the container element

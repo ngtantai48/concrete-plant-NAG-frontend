@@ -75,6 +75,16 @@
     "settings": "Cài đặt",
     "logout": "Đăng xuất"
   },
+  "Notification": {
+    "notification": "Thông báo",
+    "notification_empty": "Không có thông báo",
+    "read": "Đã đọc",
+    "unknown_event": "Bạn có một thông báo mới",
+    "station_check_in": "Xe {vehicle} đã vào {station}",
+    "station_check_out": "Xe {vehicle} đã rời {station}",
+    "vehicle_check_in": "Xe {vehicle} đã vào bãi",
+    "vehicle_check_out": "Xe {vehicle} đã rời bãi"
+  },
   "Dashboard": {
     "title": "Bảng điều khiển",
     "overview": "Tổng quan về các thử nghiệm và thống kê hệ thống"
