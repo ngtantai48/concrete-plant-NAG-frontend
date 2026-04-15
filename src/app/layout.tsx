@@ -6,15 +6,9 @@ import { Providers } from "@/store/providers";
 import InitAuth from "@/utils/init-auth";
 import type { Metadata } from "next";
 import { NextIntlClientProvider } from 'next-intl';
-// import { Barlow } from "next/font/google";
 import { Suspense } from "react";
 import "./globals.css";
 
-// const barlow = Barlow({
-//   subsets: ["latin"],
-//   variable: "--font-barlow",
-//   weight: ["400", "500", "600", "700", "800"],
-// });
 
 export const metadata: Metadata = {
   title: "Nguyen Anh Group",

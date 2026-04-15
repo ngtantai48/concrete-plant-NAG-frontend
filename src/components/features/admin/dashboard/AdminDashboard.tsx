@@ -6,7 +6,7 @@ import vehicleApi from "@/services/vehicle.service";
 import type { Vehicle } from "@/types/vehicle";
 import orderApi from "@/services/order.service";
 import type { Order } from "@/types/order";
-import { RefreshCw, Map as MapIcon, Maximize2, Minimize2, Truck, Radio, CheckCircle2, Clock, Route, MapPin, Search, Calendar as CalendarIcon, Timer, ArrowRight } from "lucide-react";
+import { RefreshCw, Map as MapIcon, Maximize2, Minimize2, Truck, Radio, CheckCircle2, Clock, Route, MapPin, Search, Calendar as CalendarIcon, Timer, ArrowRight, Ellipsis, X } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -32,6 +32,7 @@ import dynamic from "next/dynamic";
 
 import StationStatusPanel from "./StationStatusPanel";
 import ActivityFlow, { type DispatchMode } from "./ActivityFlow";
+import VehicleStatusChange from "./VehicleStatusChange";
 
 const StationMap = dynamic(
   () => import("@/components/features/admin/dashboard/StationMap"),
@@ -998,20 +999,26 @@ export default function AdminDashboard() {
             return (
               <div className="flex flex-col h-full">
                 {/* Header */}
-                <div className="px-4 py-3 shrink-0" style={{ borderBottom: '1px solid var(--dd-border)', background: 'var(--dd-bg-header)' }}>
+                <div className="bg-slate-300 px-4 py-3 shrink-0 border-b-1">
                   <div className="flex items-center justify-between">
-                    <DlgTitle className="flex items-center gap-2 text-base font-bold uppercase" style={{ color: 'var(--dd-text-primary)' }}>
-                      <Truck className="w-5 h-5 text-emerald-500" />
+                    <DlgTitle className="flex items-center gap-2 text-base font-bold uppercase">
                       {t('tripDetail')} — {vehicle.vehicle_license_plate}{vehicle.vehicle_name ? ` | ${vehicle.vehicle_name}` : ''}
                     </DlgTitle>
-                    <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setSelectedVehicleTrips(null)}>
-                      <Minimize2 className="w-4 h-4" />
-                    </Button>
+                    <div className="flex items-center gap-10 ms-2">
+                      <VehicleStatusChange
+                        vehicleId={vehicle.vehicle_id}
+                        currentStatus={vehicle.vehicle_status}
+                        vehiclePlate={vehicle.vehicle_license_plate}
+                        onStatusChanged={fetchAll}
+                      />
+                      <Button size="sm" variant="destructive" onClick={() => setSelectedVehicleTrips(null)}><X /></Button>
+                    </div>
+
                   </div>
                 </div>
 
                 {/* Trip List */}
-                <div className="flex-1 overflow-y-auto p-3">
+                <div className="flex-1 overflow-y-auto p-5">
                   {tripOrders.length === 0 ? (
                     <div className="flex flex-col items-center justify-center py-10">
                       <div className="h-14 w-14 rounded-full flex items-center justify-center"
@@ -1084,13 +1091,13 @@ export default function AdminDashboard() {
                                     <span className="font-semibold text-slate-700">
                                       {o.order_start_datetime
                                         ? new Date(o.order_start_datetime).toLocaleTimeString(locale === 'vi' ? 'vi-VN' : 'en-US', { hour: '2-digit', minute: '2-digit' })
-                                        : '—'}
+                                        : <Ellipsis size={20} />}
                                     </span>
                                     <ArrowRight size={14} />
                                     <span className="font-semibold text-slate-700">
                                       {o.order_end_datetime
                                         ? new Date(o.order_end_datetime).toLocaleTimeString(locale === 'vi' ? 'vi-VN' : 'en-US', { hour: '2-digit', minute: '2-digit' })
-                                        : '—'}
+                                        : <Ellipsis size={20} />}
                                     </span>
                                   </div>
                                   {diffMins > 0 && (
@@ -1136,7 +1143,7 @@ export default function AdminDashboard() {
 
                 {/* Summary Footer */}
                 {tripOrders.length > 0 && (
-                  <div className="shrink-0 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div className="shrink-0 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-t-1">
                     <span className="text-base font-bold uppercase">
                       {t('tripSummary')}
                     </span>
