@@ -65,6 +65,7 @@ export default function AdminDashboard() {
   const [stations, setStations] = useState<Station[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [pendingOrders, setPendingOrders] = useState<Order[]>([]);
   const [tomorrowOrders, setTomorrowOrders] = useState<Order[]>([]);
   const [realTomorrowOrders, setRealTomorrowOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
@@ -117,6 +118,7 @@ export default function AdminDashboard() {
         vehicleApi.getAll({ limit: 100 }),
         orderApi.getByInitDate(selectedDate),
         orderApi.getByInitDate(nextDate),
+        orderApi.getByStatus('pending'),
       ] as any[];
       if (needExtraFetch) {
         apiCalls.push(orderApi.getByInitDate(realTomorrow));
@@ -145,8 +147,12 @@ export default function AdminDashboard() {
           setRealTomorrowOrders(tmRes.data?.data || tmRes.data || []);
         }
       }
-      if (needExtraFetch && results[4]?.status === 'fulfilled') {
-        const rtRes = results[4].value;
+      if (results[4]?.status === 'fulfilled') {
+        const pRes = results[4].value;
+        setPendingOrders(pRes.data?.data || pRes.data || []);
+      }
+      if (needExtraFetch && results[5]?.status === 'fulfilled') {
+        const rtRes = results[5].value;
         setRealTomorrowOrders(rtRes.data?.data || rtRes.data || []);
       }
     } catch {
@@ -212,11 +218,11 @@ export default function AdminDashboard() {
   }, [vehicles, orders, t, tVehiclePage]);
 
   const activeFlowOrders = useMemo(() => {
-    return orders.filter(o => {
+    return pendingOrders.filter(o => {
       const vStatus = o.vehicles?.vehicle_status;
       return vStatus !== 'maintenance' && vStatus !== 'incident';
     });
-  }, [orders]);
+  }, [pendingOrders]);
 
   const ordersAtStation = useMemo(() => orders.filter(o => o.order_status === "collecting"), [orders]);
   const ordersPending = useMemo(() => {

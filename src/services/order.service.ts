@@ -15,6 +15,7 @@ const orderApi = {
     return http.get(`/orders?${query.toString()}`);
   },
   getByInitDate: (date: string) => http.get(`/orders/order-init=${date}?limit=1000`),
+  getByStatus: (status: string) => http.get(`/orders?order_status=${status}&limit=1000`),
   getById: (id: number) => http.get(`/orders/${id}`),
   update: (id: number, data: OrderUpdatePayload) => http.put(`/orders/${id}`, data),
   shiftClose: (data: ShiftOperationPayload) => http.post("/orders/shift-close", data),
