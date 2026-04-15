@@ -5,9 +5,5 @@ interface LoginLayoutProps {
 }
 
 export default function LoginLayout({ children }: LoginLayoutProps) {
-    return (
-        <>
-            {children}
-        </>
-    );
+    return <>{children}</>
 }

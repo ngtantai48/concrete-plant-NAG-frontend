@@ -289,7 +289,7 @@
 }
 
 /* ── Dark Scrollbar ── */
-.dashboard-light ::-webkit-scrollbar {
+/* .dashboard-light ::-webkit-scrollbar {
   width: 6px;
 }
 
@@ -305,7 +305,7 @@
 
 .dashboard-light ::-webkit-scrollbar-thumb:hover {
   background: rgba(56, 189, 248, 0.3);
-}
+} */
 
 /* ── Dark Button Styles ── */
 .dd-btn {

@@ -1,16 +1,13 @@
 import { useEffect, useRef, useState } from "react";
-import { io, Socket } from "socket.io-client";
+import { SocketManager } from "@/lib/socket";
+import { validateUpdateSignal } from "@/lib/socket/schema";
+import type { UpdateSignal } from "@/lib/socket/types";
 import { useAppSelector } from "@/hooks/use-app-selector";
-
-export interface UpdateSignal {
-  update_type: string | null;
-  update_id?: number;
-}
 
 const REFRESH_COOLDOWN_MS = 800;
 
-export function useRealtimeUpdates(onUpdate: () => void) {
-  const socketRef = useRef<Socket | null>(null);
+export function useRealtimeUpdates(onUpdate: (signal?: UpdateSignal) => void) {
+  const managerRef = useRef<SocketManager | null>(null);
   const onUpdateRef = useRef(onUpdate);
   const lastRefreshRef = useRef(0);
   const pendingRefreshRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -22,21 +19,46 @@ export function useRealtimeUpdates(onUpdate: () => void) {
 
   const tokenState = useAppSelector((state: any) => state.auth.token);
 
+  // Initialize socket manager (singleton)
   useEffect(() => {
-    const SOCKET_URL = process.env.NEXT_PUBLIC_SOCKET_URL;
-    if (!SOCKET_URL || !tokenState) return;
+    if (!process.env.NEXT_PUBLIC_SOCKET_URL || !tokenState) return;
 
-    const connectionUrl = `${SOCKET_URL}/updates`;
-
-    const socket = io(connectionUrl, {
-      transports: ["websocket"],
-      autoConnect: true,
-      auth: { token: `Bearer ${tokenState}` },
-      reconnection: true,
-      reconnectionAttempts: Infinity,
+    const manager = SocketManager.getInstance('updates', {
       reconnectionDelay: 2000,
+      reconnectionDelayMax: 5000,
     });
 
+    // Set auth provider cho token refresh
+    manager.setAuthProvider(() => tokenState);
+    
+    managerRef.current = manager;
+
+    // Connection state listener
+    const unsubscribeConnection = manager.onConnectionChange((connected) => {
+      setIsConnected(connected);
+      if (connected) {
+        console.log("[RealtimeUpdates] Da ket noi toi /updates");
+      } else {
+        console.warn("[RealtimeUpdates] Bi ngat ket noi");
+      }
+    });
+
+    // Connect
+    manager.connect();
+
+    return () => {
+      unsubscribeConnection();
+    };
+  }, [tokenState]);
+
+  // Setup event listeners
+  useEffect(() => {
+    const manager = managerRef.current;
+    if (!manager || !isConnected) return;
+
+    const unsubscribes: Array<() => void> = [];
+
+    // Throttled refresh function
     const triggerRefresh = (signal: UpdateSignal) => {
       setLastSignal(signal);
       setLastSignalTime(new Date());
@@ -46,7 +68,7 @@ export function useRealtimeUpdates(onUpdate: () => void) {
 
       if (elapsed >= REFRESH_COOLDOWN_MS) {
         lastRefreshRef.current = now;
-        onUpdateRef.current();
+        onUpdateRef.current(signal);
         return;
       }
 
@@ -56,86 +78,57 @@ export function useRealtimeUpdates(onUpdate: () => void) {
 
       pendingRefreshRef.current = setTimeout(() => {
         lastRefreshRef.current = Date.now();
-        onUpdateRef.current();
+        onUpdateRef.current(signal);
         pendingRefreshRef.current = null;
       }, REFRESH_COOLDOWN_MS - elapsed);
     };
 
-    const normalizeSignal = (eventName: string, payload?: unknown): UpdateSignal | null => {
-      if (eventName === "update" && payload && typeof payload === "object") {
-        return payload as UpdateSignal;
-      }
+    // 'update' event
+    unsubscribes.push(
+      manager.on('update', (payload: unknown) => {
+        const signal = validateUpdateSignal('update', payload);
+        if (!signal) return;
+        
+        console.log("[RealtimeUpdates] Nhan su kien update:", signal);
+        triggerRefresh(signal);
+      })
+    );
 
-      if (eventName === "ping") {
-        if (payload && typeof payload === "object") {
-          return payload as UpdateSignal;
+    // 'ping' event
+    unsubscribes.push(
+      manager.on('ping', (payload: unknown) => {
+        const signal = validateUpdateSignal('ping', payload);
+        if (!signal) return;
+        
+        console.log("[RealtimeUpdates] Nhan su kien ping:", signal);
+        triggerRefresh(signal);
+      })
+    );
+
+    // Catch-all for other events (chỉ những events không phải update/ping)
+    unsubscribes.push(
+      manager.onAny((eventName, payload) => {
+        if (eventName === 'update' || eventName === 'ping') {
+          return; // Already handled above
         }
 
-        return { update_type: "ping" };
-      }
+        const signal = validateUpdateSignal(eventName, payload);
+        if (!signal) return;
 
-      const lowerName = eventName.toLowerCase();
-      if (lowerName.includes("update") || lowerName.includes("refresh") || lowerName.includes("ping")) {
-        if (payload && typeof payload === "object") {
-          return payload as UpdateSignal;
-        }
-
-        return { update_type: eventName };
-      }
-
-      return null;
-    };
-
-    socketRef.current = socket;
-
-    socket.on("connect", () => {
-      console.log("[RealtimeUpdates] Da ket noi toi /updates");
-      setIsConnected(true);
-    });
-
-    socket.on("disconnect", (reason) => {
-      console.warn("[RealtimeUpdates] Bi ngat ket noi:", reason);
-      setIsConnected(false);
-    });
-
-    socket.on("connect_error", (error) => {
-      console.error("[RealtimeUpdates] Loi ket noi:", error.message);
-    });
-
-    socket.on("update", (signal: UpdateSignal) => {
-      console.log("[RealtimeUpdates] Nhan su kien update:", signal);
-      triggerRefresh(signal);
-    });
-
-    socket.on("ping", (signal?: UpdateSignal) => {
-      console.log("[RealtimeUpdates] Nhan su kien ping:", signal);
-      triggerRefresh(signal ?? { update_type: "ping" });
-    });
-
-    socket.onAny((eventName, payload) => {
-      if (eventName === "update" || eventName === "ping") {
-        return;
-      }
-
-      const signal = normalizeSignal(eventName, payload);
-      if (!signal) return;
-
-      console.log(`[RealtimeUpdates] Nhan su kien ${eventName}:`, payload);
-      triggerRefresh(signal);
-    });
+        console.log(`[RealtimeUpdates] Nhan su kien ${eventName}:`, payload);
+        triggerRefresh(signal);
+      })
+    );
 
     return () => {
+      unsubscribes.forEach((unsub) => unsub());
+      
       if (pendingRefreshRef.current) {
         clearTimeout(pendingRefreshRef.current);
         pendingRefreshRef.current = null;
       }
-
-      socket.offAny();
-      socket.removeAllListeners();
-      socket.disconnect();
-      socketRef.current = null;
     };
-  }, [tokenState]);
+  }, [isConnected]);
 
   return { isConnected, lastSignal, lastSignalTime };
 }
