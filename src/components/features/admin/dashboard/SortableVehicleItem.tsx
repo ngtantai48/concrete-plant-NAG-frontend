@@ -133,7 +133,7 @@ function SortableVehicleItemBase({
             {(displayIndex ?? actualIndex) + 1}
           </div>
 
-          <div className="min-w-0 flex-1 flex items-center gap-3">
+          <div className="min-w-0 flex-1 flex items-center gap-6">
             <div className="truncate text-base font-black" style={{ color: 'var(--dd-text-primary)' }}>
               {order.vehicles?.vehicle_license_plate ? `${order.vehicles.vehicle_license_plate}${order.vehicles.vehicle_name ? ` | ${order.vehicles.vehicle_name}` : ''}` : `ĐƠN: ${order.order_id}`}
             </div>

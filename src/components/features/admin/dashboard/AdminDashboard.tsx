@@ -591,7 +591,7 @@ export default function AdminDashboard() {
                     <div className="flex items-center justify-between px-3 py-1.5 text-sm font-extrabold uppercase"
                       style={{ borderBottom: '1px solid var(--dd-border)' }}>
                       <span>{t('readyVehiclesPanel')}</span>
-                      <span className="dd-chip dd-chip-emerald text-[10px] px-1.5 py-0.5">{inYardVehicles.length}</span>
+                      <span className="text-sm font-extrabold">{inYardVehicles.length} {t('vehicleCount')}</span>
                     </div>
                     <div className="overflow-y-auto p-0 flex-1">
                       {inYardVehicles.length === 0 ? (
@@ -628,7 +628,7 @@ export default function AdminDashboard() {
                     <div className="flex items-center justify-between px-3 py-1.5 text-sm font-extrabold uppercase"
                       style={{ background: 'var(--dd-bg-header)', color: 'var(--dd-text-primary)', borderBottom: '1px solid var(--dd-border)' }}>
                       <span>{t('stoppedMaintenance')}</span>
-                      <span className="dd-chip dd-chip-amber text-[10px] px-1.5 py-0.5">{stoppedMaintenanceList.length}</span>
+                      <span className="text-sm font-extrabold">{stoppedMaintenanceList.length} {t('vehicleCount')}</span>
                     </div>
                     <div className="flex-1 overflow-y-auto p-0">
                       {stoppedMaintenanceList.length === 0 ? (
@@ -657,11 +657,11 @@ export default function AdminDashboard() {
                   style={{ boxShadow: '0 0 20px rgba(14, 165, 233, 0.05)', border: '1px solid rgba(14, 165, 233, 0.2)' }}>
 
                   {/* Core Header with Toggle */}
-                  <div className="flex items-center justify-between px-3 py-1.5 relative z-10"
+                  <div className="flex items-center justify-between p-2 relative z-10"
                     style={{ background: 'var(--dd-bg-header)', borderBottom: '1px solid var(--dd-border)' }}>
-                    <div className="flex items-center gap-1.5 min-w-0 pr-2">
+                    <div className="flex items-center gap-2 ms-4">
                       <div className="h-1.5 w-1.5 rounded-full animate-pulse shrink-0" style={{ background: '#0ea5e9', boxShadow: '0 0 10px rgba(14, 165, 233, 0.8)' }} />
-                      <span className="text-sm font-extrabold uppercase" title="TRUNG TÂM ĐIỀU PHỐI">TRUNG TÂM ĐIỀU PHỐI</span>
+                      <span className="text-base font-extrabold uppercase" title="Thứ tự lốt xe">Thứ tự lốt xe</span>
                     </div>
 
                     {/* Segmented Toggle HUD */}
@@ -718,7 +718,7 @@ export default function AdminDashboard() {
                         {ordersCompleted.length} {t('completed')}
                       </span>
                     )}
-                    <span className="dd-chip dd-chip-slate text-[10px] px-1.5 py-0.5">{vehicles.length} xe</span>
+                    <span className="text-sm font-extrabold">{vehicles.length} {t('vehicleCount')}</span>
                   </div>
                 </div>
                 <div className="flex-1 overflow-y-auto">
@@ -1212,9 +1212,15 @@ export default function AdminDashboard() {
                       {t('tripSummary')}
                     </span>
                     <div className="flex flex-wrap items-center justify-start sm:justify-end gap-x-4 gap-y-2">
+                      {/* {tripOrders.filter(o => o.order_status === 'running' || o.order_status === 'transporting').length > 0 && (
+                        <div className="flex items-center gap-1.5 text-sm font-bold whitespace-nowrap" style={{ color: '#0ea5e9' }}>
+                          <Truck size={16} />
+                          <span>{tripOrders.filter(o => o.order_status === 'running' || o.order_status === 'transporting').length} Đang di chuyển</span>
+                        </div>
+                      )} */}
                       <div className="flex items-center gap-1.5 text-sm font-bold whitespace-nowrap" style={{ color: '#10b981' }}>
                         <CheckCircle2 size={16} />
-                        <span>{tripOrders.length} {t('completed')}</span>
+                        <span>{tripOrders.filter(o => o.order_status === 'completed').length} {t('completed')}</span>
                       </div>
                       {totalDistanceKm > 0 && (
                         <div className="flex items-center gap-1.5 text-sm font-bold whitespace-nowrap" style={{ color: '#0ea5e9' }}>

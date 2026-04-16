@@ -484,9 +484,14 @@ function DraggedVehiclePreview({
             {order.vehicles?.vehicle_license_plate ? `${order.vehicles.vehicle_license_plate}${order.vehicles.vehicle_name ? ` | ${order.vehicles.vehicle_name}` : ''}` : `ĐƠN: ${order.order_id}`}
           </div>
           {order.order_init_datetime && (
-            <div className="flex items-center gap-1 text-[11px] uppercase font-bold shrink-0" style={{ color: 'var(--dd-text-muted)' }}>
-              <Clock className="h-3 w-3" />
-              <span><span className="opacity-75">Vào lúc:</span> <span style={{ color: 'var(--dd-text-primary)' }}>{`${new Date(order.order_init_datetime).getHours()} giờ ${new Date(order.order_init_datetime).getMinutes().toString().padStart(2, '0')} phút`}</span></span>
+            <div className="flex items-center gap-1 text-sm font-bold shrink-0" style={{ color: 'var(--dd-text-muted)' }}>
+              <Clock size={14} />
+              <span>
+                <span className="opacity-75">Vào lúc: </span>
+                <span style={{ color: 'var(--dd-text-primary)' }}>
+                  {`${new Date(order.order_init_datetime).getHours()}h${new Date(order.order_init_datetime).getMinutes().toString().padStart(2, '0')}p`}
+                </span>
+              </span>
             </div>
           )}
         </div>
