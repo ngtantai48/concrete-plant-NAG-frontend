@@ -82,8 +82,8 @@
     "unknown_event": "Bạn có một thông báo mới",
     "station_check_in": "Xe {vehicle} đã vào {station}",
     "station_check_out": "Xe {vehicle} đã rời {station}",
-    "vehicle_check_in": "Xe {vehicle} đã vào bãi",
-    "vehicle_check_out": "Xe {vehicle} đã rời bãi"
+    "vehicle_check_in": "Xe {vehicle} đã rời bãi",
+    "vehicle_check_out": "Xe {vehicle} đã vào bãi"
   },
   "Dashboard": {
     "title": "Bảng điều khiển",
