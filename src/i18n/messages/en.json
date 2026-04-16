@@ -80,10 +80,10 @@
     "notification_empty": "No notifications",
     "read": "Read",
     "unknown_event": "You have a new notification",
-    "station_check_in": "Vehicle {vehicle} checked in at {station}",
-    "station_check_out": "Vehicle {vehicle} checked out from {station}",
-    "vehicle_check_in": "Vehicle {vehicle} checked in to the yard",
-    "vehicle_check_out": "Vehicle {vehicle} checked out from the yard"
+    "station_check_in": "Vehicle {vehicle} is receiving goods in {station}",
+    "station_check_out": "Vehicle {vehicle} has left {station}",
+    "vehicle_check_in": "Vehicle {vehicle} has entered the yard",
+    "vehicle_check_out": "Vehicle {vehicle} has left the yard"
   },
   "Dashboard": {
     "title": "Dashboard",

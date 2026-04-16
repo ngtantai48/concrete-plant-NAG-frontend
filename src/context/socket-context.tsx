@@ -120,7 +120,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const preferredVoice = pickVietnameseFemaleVoice(availableVoices);
 
     utterance.lang = VI_NOTIFICATION_LANG;
-    utterance.rate = 0.72;
+    utterance.rate = 0.7;
     utterance.pitch = 1;
     utterance.volume = 1;
 
@@ -188,12 +188,10 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       manager.on('notification:new', (payload: unknown) => {
         const validated = validateNotificationPayload(payload);
         if (!validated) return;
-
         const exists = notificationsRef.current.some((item) => item.id === validated.id);
         if (!exists) {
           speakNotification(validated);
         }
-
         setNotifications((prev) => {
           const exists = prev.find((n) => n.id === validated.id);
           if (exists) return prev; // Avoid duplicates
