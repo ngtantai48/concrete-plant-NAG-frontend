@@ -23,8 +23,8 @@ const NOTIFICATION_TEXT_TEMPLATES: Record<NotificationLocale, Record<string, str
   vi: {
     [NOTIFICATION_EVENTS.STATION_CHECK_IN]: "Xe {vehicle} đã vào {station}",
     [NOTIFICATION_EVENTS.STATION_CHECK_OUT]: "Xe {vehicle} đã rời {station}",
-    [NOTIFICATION_EVENTS.VEHICLE_CHECK_IN]: "Xe {vehicle} đã vào bãi",
-    [NOTIFICATION_EVENTS.VEHICLE_CHECK_OUT]: "Xe {vehicle} đã rời bãi",
+    [NOTIFICATION_EVENTS.VEHICLE_CHECK_IN]: "Xe {vehicle} đã rời bãi",
+    [NOTIFICATION_EVENTS.VEHICLE_CHECK_OUT]: "Xe {vehicle} đã vào bãi",
   },
   en: {
     [NOTIFICATION_EVENTS.STATION_CHECK_IN]: "Vehicle {vehicle} checked in at {station}",
