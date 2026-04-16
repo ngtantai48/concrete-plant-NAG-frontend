@@ -4,7 +4,6 @@ import React, { createContext, useCallback, useContext, useEffect, useRef, useSt
 import {
   getNotificationText,
   getNotificationTimestampValue,
-  getRuntimeNotificationLocale,
   shouldSpeakNotification,
 } from "@/lib/notification";
 import { SocketManager } from "@/lib/socket";
@@ -14,6 +13,33 @@ import { useAppSelector } from "@/hooks/use-app-selector";
 import { Notification } from "@/types/notification";
 
 type SocketEventHandler = (eventName: string, ...args: unknown[]) => void;
+
+const VI_NOTIFICATION_LOCALE = "vi";
+const VI_NOTIFICATION_LANG = "vi-VN";
+const FEMALE_VOICE_KEYWORDS = ["hoaimy", "female", "woman", "girl", "nu"];
+
+function getVoiceIdentity(voice: SpeechSynthesisVoice): string {
+  return `${voice.name} ${voice.voiceURI}`.toLowerCase();
+}
+
+function isVietnameseVoice(voice: SpeechSynthesisVoice): boolean {
+  return voice.lang.toLowerCase().startsWith("vi");
+}
+
+function isFemaleVoice(voice: SpeechSynthesisVoice): boolean {
+  const voiceIdentity = getVoiceIdentity(voice);
+  return FEMALE_VOICE_KEYWORDS.some((keyword) => voiceIdentity.includes(keyword));
+}
+
+function pickVietnameseFemaleVoice(voices: SpeechSynthesisVoice[]): SpeechSynthesisVoice | null {
+  return voices.find((voice) => isVietnameseVoice(voice) && isFemaleVoice(voice) && voice.localService)
+    ?? voices.find((voice) => isVietnameseVoice(voice) && isFemaleVoice(voice))
+    ?? voices.find((voice) => voice.lang.toLowerCase() === VI_NOTIFICATION_LANG.toLowerCase() && voice.localService)
+    ?? voices.find((voice) => voice.lang.toLowerCase() === VI_NOTIFICATION_LANG.toLowerCase())
+    ?? voices.find((voice) => isVietnameseVoice(voice) && voice.localService)
+    ?? voices.find((voice) => isVietnameseVoice(voice))
+    ?? null;
+}
 
 interface SocketContextType {
   isConnected: boolean;
@@ -87,22 +113,14 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
 
-    const locale = getRuntimeNotificationLocale();
-    const utterance = new SpeechSynthesisUtterance(getNotificationText(notification, locale));
-    const languageTag = locale === "en" ? "en-US" : "vi-VN";
-    const availableVoices = window.speechSynthesis.getVoices();
-    const preferredVoice = availableVoices.find((voice) =>
-      voice.lang.toLowerCase() === languageTag.toLowerCase() && voice.localService
-    ) ?? availableVoices.find((voice) =>
-      voice.lang.toLowerCase().startsWith(locale) && voice.localService
-    ) ?? availableVoices.find((voice) =>
-      voice.lang.toLowerCase() === languageTag.toLowerCase()
-    ) ?? availableVoices.find((voice) =>
-      voice.lang.toLowerCase().startsWith(locale)
+    const utterance = new SpeechSynthesisUtterance(
+      getNotificationText(notification, VI_NOTIFICATION_LOCALE)
     );
+    const availableVoices = window.speechSynthesis.getVoices();
+    const preferredVoice = pickVietnameseFemaleVoice(availableVoices);
 
-    utterance.lang = languageTag;
-    utterance.rate = locale === "vi" ? 0.70 : 0.75;
+    utterance.lang = VI_NOTIFICATION_LANG;
+    utterance.rate = 0.72;
     utterance.pitch = 1;
     utterance.volume = 1;
 
