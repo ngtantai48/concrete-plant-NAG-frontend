@@ -46,6 +46,7 @@ interface ActivityFlowProps {
   dispatchMode: DispatchMode;
   layout?: ActivityFlowLayout;
   orderStatusFilter?: Order['order_status'][];
+  hideStatus?: boolean;
   onOrdersUpdated?: () => Promise<void> | void;
 }
 
@@ -86,6 +87,7 @@ interface StationQueueDropZoneProps {
   onReorder: (index: number, direction: 'up' | 'down') => void;
   onToggleExpanded: () => void;
   isManualMode: boolean;
+  hideStatus?: boolean;
   t: ReturnType<typeof useTranslations>;
 }
 
@@ -262,6 +264,7 @@ function StationQueueDropZone({
   onReorder,
   onToggleExpanded,
   isManualMode,
+  hideStatus,
   t,
 }: StationQueueDropZoneProps) {
   const { setNodeRef, isOver } = useDroppable({
@@ -343,6 +346,7 @@ function StationQueueDropZone({
         canMoveDown={actualIndex < group.orders.length - 1}
         isDropTarget={dragOverOrderId === order.order_id && activeOrderId !== order.order_id}
         isManualMode={isManualMode}
+        hideStatus={hideStatus}
         t={t}
       />
     );
@@ -530,7 +534,8 @@ const ActivityFlow = ({
   orders,
   dispatchMode,
   layout = 'merged',
-  orderStatusFilter = ['pending'],
+  orderStatusFilter = ['init', 'pending', 'collecting', 'transporting', 'running', 'completed'],
+  hideStatus = false,
   onOrdersUpdated,
 }: ActivityFlowProps) => {
   const t = useTranslations('DashboardPage');
@@ -1133,21 +1138,6 @@ const ActivityFlow = ({
                   </div>
 
                   <div className="flex flex-col gap-2 text-[11px] font-bold uppercase md:items-end">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="dd-chip dd-chip-amber">
-                        {t('dragSourceStationBadge')}
-                      </span>
-                      <span style={{ color: 'var(--dd-text-primary)' }}>
-                        {sourceGroup?.stationName || t('unassigned')}
-                      </span>
-                      <ArrowRight className="h-3.5 w-3.5 text-sky-500" />
-                      <span className="dd-chip dd-chip-sky">
-                        {hoveredGroup ? t('dropHereBadge') : t('dragTargetStationBadge')}
-                      </span>
-                      <span style={{ color: hoveredGroup ? 'var(--dd-sky)' : 'var(--dd-text-muted)' }}>
-                        {hoveredGroup?.stationName || t('dragTargetStationHint')}
-                      </span>
-                    </div>
                     <span style={{ color: 'var(--dd-text-muted)' }}>
                       {t('dragAcrossStationsHint')}
                     </span>
@@ -1156,20 +1146,6 @@ const ActivityFlow = ({
               </div>
             )}
 
-            {layout === 'merged' && activeOrder && (
-              <div className="flex flex-wrap gap-3">
-                {groupedByStation.map((group) => (
-                  <StationDropTargetCard
-                    key={group.stationId}
-                    group={group}
-                    activeOrderId={activeOrderId}
-                    sourceStationId={sourceGroup?.stationId ?? null}
-                    hoveredStationId={hoveredStationId}
-                    t={t}
-                  />
-                ))}
-              </div>
-            )}
 
             {layout === 'board' ? (
               <div className="overflow-x-auto pb-2">
@@ -1242,6 +1218,7 @@ const ActivityFlow = ({
                           onReorder={(index, direction) => handleReorder(group.stationId, index, direction)}
                           onToggleExpanded={() => toggleStationExpanded(group.stationId)}
                           isManualMode={dispatchMode === 'manual'}
+                          hideStatus={hideStatus}
                           t={t}
                         />
                       </div>
@@ -1279,6 +1256,7 @@ const ActivityFlow = ({
                       onManualStationChange={(stationId: string) => handleManualOrderStationChange(order.order_id, stationId)}
                       onManualStationClear={() => clearManualOrderStation(order.order_id)}
                       isDropTarget={dragOverOrderId === order.order_id && activeOrderId !== order.order_id}
+                      hideStatus={hideStatus}
                       t={t}
                     />
                   ))}

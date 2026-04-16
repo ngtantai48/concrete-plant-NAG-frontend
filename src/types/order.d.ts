@@ -60,6 +60,11 @@ export interface Order {
   checkin_time_station?: string | null;
   checkout_time_station?: string | null;
   order_multi: OrderMulti | null;
+  shift_id?: number | null;
+  shift_closing?: {
+    shift_id: number;
+    shift_status: number;
+  } | null;
   users: OrderUser;
   vehicles: OrderVehicle;
   stations: OrderStation;
