@@ -52,27 +52,35 @@ export default function NotificationList({ notifications, onMarkAsRead }: Notifi
           <div className="py-8 text-center text-gray-500 text-sm">{t("notification_empty")}</div>
         ) : (
           <div className="flex flex-col cursor-pointer">
-            {notifications.map((item) => (
+            {notifications.map((item, index) => (
               <div
                 key={item.id}
                 onClick={() => onMarkAsRead(item.id)}
                 className={cn(
-                  "flex flex-col gap-1 px-4 py-3 border-b last:border-0 hover:bg-accent transition-colors text-left",
+                  "flex items-start gap-3 px-4 py-3 border-b last:border-0 hover:bg-accent transition-colors text-left",
                   !item.read ? "bg-blue-300/50" : "bg-transparent"
                 )}
               >
-                <span className="text-xs text-muted-foreground whitespace-nowrap">
-                  {formatTimestamp(item)}
-                  {item.read && <span className="ml-2 text-green-600 font-medium">({t("read")})</span>}
-                </span>
-                <span
-                  className={cn(
-                    "text-sm text-foreground wrap-break-word whitespace-normal",
-                    !item.read ? "font-semibold" : "font-normal"
-                  )}
-                >
-                  {formatContent(item)}
-                </span>
+                <div className={cn(
+                  "text-sm shrink-0 py-2",
+                  !item.read ? "font-bold text-foreground" : "font-medium text-muted-foreground"
+                )}>
+                  #{index + 1}
+                </div>
+                <div className="flex flex-col gap-1 flex-1 min-w-0">
+                  <span className="text-xs text-muted-foreground whitespace-nowrap">
+                    {formatTimestamp(item)}
+                    {item.read && <span className="ml-2 text-green-600 font-medium">({t("read")})</span>}
+                  </span>
+                  <span
+                    className={cn(
+                      "text-sm text-foreground wrap-break-word whitespace-normal",
+                      !item.read ? "font-semibold" : "font-normal"
+                    )}
+                  >
+                    {formatContent(item)}
+                  </span>
+                </div>
               </div>
             ))}
           </div>
