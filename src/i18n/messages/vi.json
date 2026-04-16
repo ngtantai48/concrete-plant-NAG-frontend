@@ -58,6 +58,7 @@
     "stations": "Quản lý trạm",
     "mealCheck": "Cơm ca",
     "attendance": "Chấm công",
+    "shiftSlots": "Quản lý lốt ca",
     "role": {
       "admin": "Quản trị viên",
       "user": "Người thử nghiệm",
@@ -465,7 +466,9 @@
     "cameraConnected": "Camera kết nối",
     "cameraDisconnected": "Camera mất kết nối",
     "confirmStopStationTitle": "Xác nhận dừng trạm",
-    "confirmStopStationDescription": "Bạn có chắc chắn muốn báo <strong>{stationName}</strong> dừng hoạt động không? Hành động này sẽ khiến trạm tạm thời không nhận thêm xe đổ bê tông."
+    "confirmStopStationDescription": "Bạn có chắc chắn muốn báo <strong>{stationName}</strong> dừng hoạt động không? Hành động này sẽ khiến trạm tạm thời không nhận thêm xe đổ bê tông.",
+    "forgotShiftSlotsBannerTitle": "Có thể bạn đã quên chốt lốt",
+    "forgotShiftSlotsBannerDescription": "Nhấn vào đây để chuyển sang trang Quản lý lốt ca"
   },
   "EndOfDayPage": {
     "title": "Quản lý xe cuối ngày",
@@ -528,6 +531,19 @@
     "alertForgotScheduleConfirmTitle": "Chưa chốt lịch hôm trước",
     "alertForgotScheduleConfirmDescription": "Ca hôm trước đã chốt nhưng lịch xe cho hôm nay chưa được xác nhận. Vui lòng chốt lịch.",
     "alertGoToPrevious": "Xử lý ngay"
+  },
+  "ShiftSlotsPage": {
+    "title": "Quản lý lốt ca",
+    "subtitle": "Danh sách xe được sắp xếp trong ngày. Kéo thả để sắp xếp lại hoặc chuyển trạm.",
+    "boardTitle": "Danh Sách Cuối Ngày",
+    "boardHint": "Kéo thả để sắp xếp lại thứ tự.",
+    "lastUpdated": "Cập nhật theo realtime",
+    "noCanceledOrders": "Không có xe chờ lốt",
+    "canceledCount": "{count} lệnh chờ lốt",
+    "operationDate": "Ngày vận hành",
+    "shiftOpenSlotAction": "Chốt lốt",
+    "shiftOpenSlotSuccess": "Đã chốt lốt thành công",
+    "shiftOpenSlotFailed": "Không thể chốt lốt"
   },
   "VehicleMaintenancePage": {
     "title": "Bảo trì & Bảo dưỡng xe",
