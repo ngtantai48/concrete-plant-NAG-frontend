@@ -227,7 +227,7 @@ export default function AdminDashboard() {
 
   const activeFlowOrders = useMemo(() => {
     return pendingOrders.filter(o => {
-      const vStatus = o.vehicles?.vehicle_status;
+      const vStatus = o.vehicles?.vehicle_status?.toLowerCase();
       const isShiftClosed = o.shift_closing?.shift_status === 1;
       return !isShiftClosed && vStatus !== 'maintenance' && vStatus !== 'incident';
     });
@@ -689,6 +689,7 @@ export default function AdminDashboard() {
                             vehicles={vehicles}
                             orders={activeFlowOrders}
                             dispatchMode={dispatchMode}
+                            disableDrag={true}
                             onOrdersUpdated={fetchAll}
                           />
                         </div>

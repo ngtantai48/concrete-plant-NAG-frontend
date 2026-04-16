@@ -42,6 +42,7 @@ interface SortableVehicleItemProps {
   onManualStationClear?: () => void;
   isDropTarget?: boolean;
   hideStatus?: boolean;
+  disableDrag?: boolean;
   t: (key: string) => string;
 }
 
@@ -66,6 +67,7 @@ function SortableVehicleItemBase({
   onManualStationClear,
   isDropTarget = false,
   hideStatus = false,
+  disableDrag = false,
   t,
 }: SortableVehicleItemProps) {
   const displayedStationName = isManualMode && isSelected
@@ -80,6 +82,7 @@ function SortableVehicleItemBase({
     isDragging,
   } = useSortable({
     id: order.order_id,
+    disabled: disableDrag,
     data: {
       type: 'order',
       orderId: order.order_id,
@@ -111,9 +114,9 @@ function SortableVehicleItemBase({
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div className="flex items-center gap-2">
           <div
-            {...attributes}
-            {...listeners}
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded text-slate-400 hover:text-slate-600 cursor-grab active:cursor-grabbing touch-none"
+            {...(disableDrag ? {} : attributes)}
+            {...(disableDrag ? {} : listeners)}
+            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded text-slate-400 ${disableDrag ? 'opacity-30 cursor-not-allowed' : 'hover:text-slate-600 cursor-grab active:cursor-grabbing touch-none'}`}
           >
             <GripVertical className="h-4 w-4" />
           </div>

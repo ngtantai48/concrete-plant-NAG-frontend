@@ -47,6 +47,7 @@ interface ActivityFlowProps {
   layout?: ActivityFlowLayout;
   orderStatusFilter?: Order['order_status'][];
   hideStatus?: boolean;
+  disableDrag?: boolean;
   onOrdersUpdated?: () => Promise<void> | void;
 }
 
@@ -88,6 +89,7 @@ interface StationQueueDropZoneProps {
   onToggleExpanded: () => void;
   isManualMode: boolean;
   hideStatus?: boolean;
+  disableDrag?: boolean;
   t: ReturnType<typeof useTranslations>;
 }
 
@@ -265,6 +267,7 @@ function StationQueueDropZone({
   onToggleExpanded,
   isManualMode,
   hideStatus,
+  disableDrag,
   t,
 }: StationQueueDropZoneProps) {
   const { setNodeRef, isOver } = useDroppable({
@@ -347,6 +350,7 @@ function StationQueueDropZone({
         isDropTarget={dragOverOrderId === order.order_id && activeOrderId !== order.order_id}
         isManualMode={isManualMode}
         hideStatus={hideStatus}
+        disableDrag={disableDrag}
         t={t}
       />
     );
@@ -536,6 +540,7 @@ const ActivityFlow = ({
   layout = 'merged',
   orderStatusFilter = ['init', 'pending', 'collecting', 'transporting', 'running', 'completed'],
   hideStatus = false,
+  disableDrag = false,
   onOrdersUpdated,
 }: ActivityFlowProps) => {
   const t = useTranslations('DashboardPage');
@@ -1219,6 +1224,7 @@ const ActivityFlow = ({
                           onToggleExpanded={() => toggleStationExpanded(group.stationId)}
                           isManualMode={dispatchMode === 'manual'}
                           hideStatus={hideStatus}
+                          disableDrag={disableDrag}
                           t={t}
                         />
                       </div>
@@ -1257,6 +1263,7 @@ const ActivityFlow = ({
                       onManualStationClear={() => clearManualOrderStation(order.order_id)}
                       isDropTarget={dragOverOrderId === order.order_id && activeOrderId !== order.order_id}
                       hideStatus={hideStatus}
+                      disableDrag={disableDrag}
                       t={t}
                     />
                   ))}
