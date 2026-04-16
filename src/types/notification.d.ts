@@ -3,6 +3,7 @@ export interface Notification {
     userId?: string | number;
     read: boolean;
     createdAt: string;
+    emittedAt?: string;
     visibleDate?: string;
     reader_list?: (string | number)[];
     code?: string;
@@ -14,6 +15,7 @@ export interface Notification {
     order_id?: number;
     order_number?: number;
     vehicle_id?: number;
+    vehicle_name?: string;
     vehicle_license_plate?: string;
     station_id?: number;
     station_name?: string;

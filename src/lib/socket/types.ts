@@ -18,11 +18,14 @@ export interface NotificationPayload {
   message?: string;
   created_at?: string;
   createdAt?: string;
+  emitted_at?: string;
+  emittedAt?: string;
   visible_date?: string;
   visibleDate?: string;
   reader_list?: (string | number)[];
   order_id?: string | number;
   vehicle_id?: string | number;
+  vehicle_name?: string;
   station_id?: string | number;
   [key: string]: unknown;
 }

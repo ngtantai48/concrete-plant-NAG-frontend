@@ -31,9 +31,17 @@ export function validateNotificationPayload(raw: unknown): NotificationPayload |
   }
 
   // Date validation
-  const createdAt = obj.created_at ?? obj.createdAt;
-  if (typeof createdAt !== 'string') {
-    obj.createdAt = new Date().toISOString();
+  const emittedAt = obj.emitted_at ?? obj.emittedAt;
+  if (typeof emittedAt === 'string') {
+    obj.emittedAt = emittedAt;
+  }
+
+  const createdAt = obj.created_at ?? obj.createdAt ?? emittedAt;
+  obj.createdAt = typeof createdAt === 'string' ? createdAt : new Date().toISOString();
+
+  const visibleDate = obj.visible_date ?? obj.visibleDate ?? emittedAt ?? createdAt;
+  if (typeof visibleDate === 'string') {
+    obj.visibleDate = visibleDate;
   }
 
   // reader_list validation
