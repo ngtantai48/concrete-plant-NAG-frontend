@@ -14,7 +14,7 @@ export const ADMIN = {
   DRIVER_DISPLAY: "/admin/driver-display",
   MEAL_CHECK: "/admin/meal-check",
   ATTENDANCE: "/admin/attendance",
-
+  SHIFT_SLOTS: "/admin/shift-slots",
 };
 
 export const SHARE = {

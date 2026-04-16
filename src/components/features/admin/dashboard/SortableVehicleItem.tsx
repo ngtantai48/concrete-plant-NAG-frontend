@@ -108,6 +108,14 @@ function SortableVehicleItemBase({
 
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div className="flex items-center gap-2">
+          <div
+            {...attributes}
+            {...listeners}
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded text-slate-400 hover:text-slate-600 cursor-grab active:cursor-grabbing touch-none"
+          >
+            <GripVertical className="h-4 w-4" />
+          </div>
+
           {isManualMode && (
             <Checkbox
               checked={isSelected}
@@ -116,8 +124,6 @@ function SortableVehicleItemBase({
               aria-label={t('manualSelectVehicle')}
             />
           )}
-
-
 
           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-sm font-extrabold"
             style={{ color: 'var(--dd-text-secondary)', border: '1px solid var(--dd-border)' }}

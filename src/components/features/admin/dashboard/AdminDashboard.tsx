@@ -6,7 +6,7 @@ import vehicleApi from "@/services/vehicle.service";
 import type { Vehicle } from "@/types/vehicle";
 import orderApi from "@/services/order.service";
 import type { Order } from "@/types/order";
-import { RefreshCw, Map as MapIcon, Maximize2, Minimize2, Truck, Radio, CheckCircle2, Clock, Route, MapPin, Search, Calendar as CalendarIcon, Timer, ArrowRight, Ellipsis, X } from "lucide-react";
+import { RefreshCw, Map as MapIcon, Maximize2, Minimize2, Truck, Radio, CheckCircle2, Clock, Route, MapPin, Search, Calendar as CalendarIcon, Timer, ArrowRight, Ellipsis, X, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -26,6 +26,7 @@ import { useNearbyVehicles } from "@/hooks/useNearbyVehicles";
 import { useDeviceHeartbeat } from "@/hooks/useDeviceHeartbeat";
 import { useRealtimeUpdates } from "@/hooks/useRealtimeUpdates";
 import dynamic from "next/dynamic";
+import { useRouter } from "next/navigation";
 
 
 
@@ -64,6 +65,7 @@ export default function AdminDashboard() {
   const t = useTranslations("DashboardPage");
   const tVehiclePage = useTranslations("VehiclePage");
   const locale = useLocale();
+  const router = useRouter();
 
   const [geofenceStation, setGeofenceStation] = useState<Station | null>(null);
   const [isFullScreen, setIsFullScreen] = useState(false);
@@ -253,6 +255,21 @@ export default function AdminDashboard() {
     );
   }, [ordersActive, ordersCompleted]);
 
+  const [isShiftClosing, setIsShiftClosing] = useState(false);
+
+  const handleShiftClose = useCallback(async () => {
+    setIsShiftClosing(true);
+    try {
+      await orderApi.shiftClose({ operation_date: selectedDate });
+      toast.success(t('shiftCloseSuccess', { date: selectedDate }));
+      fetchAll();
+    } catch {
+      toast.error(t('shiftCloseFailed'));
+    } finally {
+      setIsShiftClosing(false);
+    }
+  }, [selectedDate, t, fetchAll]);
+
   const [dispatchMode, setDispatchMode] = useState<DispatchMode>('auto');
   const [showMap, setShowMap] = useState(false);
 
@@ -413,6 +430,30 @@ export default function AdminDashboard() {
                 </TooltipContent>
               </Tooltip>
 
+              {/* Shift Close Button */}
+              {!isPastDate && pendingOrders.length > 0 && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={handleShiftClose}
+                      disabled={isShiftClosing}
+                      className="h-8 px-3 text-xs font-bold uppercase gap-1.5 border-amber-300 text-amber-700 bg-amber-50 hover:bg-amber-100 hover:border-amber-400"
+                    >
+                      {isShiftClosing
+                        ? <RefreshCw className="w-3 h-3 animate-spin" />
+                        : <ShieldCheck className="w-3 h-3" />
+                      }
+                      {t('shiftCloseAction')}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>{t('shiftCloseAction')} — {selectedDate}</p>
+                  </TooltipContent>
+                </Tooltip>
+              )}
+
               {/* Date Picker */}
               <div className="border-l border-slate-200 pl-2 flex items-center gap-1.5">
                 <Popover open={isDatePickerOpen} onOpenChange={setIsDatePickerOpen}>
@@ -500,6 +541,24 @@ export default function AdminDashboard() {
               <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
               <span className="text-xs font-bold uppercase" style={{ color: "var(--dd-text-primary)" }}>
                 {t("tomorrowScheduleReadyTitle")} — {t("tomorrowScheduleReadyDescription", { count: tomorrowOrders.length })}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {!isPastDate && !loading && pendingOrders.length === 0 && (
+          <div
+            className="mb-1 shrink-0 rounded-lg border px-3 py-1 cursor-pointer hover:bg-slate-50 transition-colors"
+            style={{
+              background: "linear-gradient(135deg, rgba(245, 158, 11, 0.08), rgba(217, 119, 6, 0.06))",
+              borderColor: "rgba(245, 158, 11, 0.25)",
+            }}
+            onClick={() => router.push('/admin/shift-slots')}
+          >
+            <div className="flex items-center gap-2">
+              <Clock className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+              <span className="text-xs font-bold uppercase" style={{ color: "var(--dd-text-primary)" }}>
+                {t("forgotShiftSlotsBannerTitle")} — <span style={{ color: "var(--dd-text-muted)" }}>{t("forgotShiftSlotsBannerDescription")}</span>
               </span>
             </div>
           </div>

@@ -57,6 +57,7 @@
     "stations": "Station Management",
     "mealCheck": "Meal Check",
     "attendance": "Attendance",
+    "shiftSlots": "Shift Slots",
     "role": {
       "admin": "Administrator",
       "user": "Tester",
@@ -445,7 +446,9 @@
     "cameraConnected": "Camera connected",
     "cameraDisconnected": "Camera disconnected",
     "confirmStopStationTitle": "Confirm station pause",
-    "confirmStopStationDescription": "Are you sure you want to pause <strong>{stationName}</strong>? This action will temporarily stop the station from receiving concrete trucks."
+    "confirmStopStationDescription": "Are you sure you want to pause <strong>{stationName}</strong>? This action will temporarily stop the station from receiving concrete trucks.",
+    "forgotShiftSlotsBannerTitle": "Forgot to confirm shift slots?",
+    "forgotShiftSlotsBannerDescription": "Click here to go to the Shift Slots Management page."
   },
   "EndOfDayPage": {
     "title": "End-of-day vehicle management",
@@ -508,6 +511,19 @@
     "alertForgotScheduleConfirmTitle": "Previous schedule not confirmed",
     "alertForgotScheduleConfirmDescription": "Yesterday's shift was closed but today's vehicle schedule has not been confirmed. Please confirm the schedule.",
     "alertGoToPrevious": "Resolve now"
+  },
+  "ShiftSlotsPage": {
+    "title": "Shift slot management",
+    "subtitle": "List of end-of-day slots. Drag and drop to reorder or reassign stations.",
+    "boardTitle": "End of Day Orders",
+    "boardHint": "Drag and drop orders to reorder.",
+    "lastUpdated": "Updated in realtime",
+    "noCanceledOrders": "No waiting slots",
+    "canceledCount": "{count} waiting slots",
+    "operationDate": "Operation date",
+    "shiftOpenSlotAction": "Confirm slots",
+    "shiftOpenSlotSuccess": "Slots confirmed successfully",
+    "shiftOpenSlotFailed": "Failed to confirm slots"
   },
   "VehicleMaintenancePage": {
     "title": "Vehicle Maintenance",

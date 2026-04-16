@@ -116,6 +116,15 @@ const getFlowStyle = (order: Order, isTopPriority: boolean): FlowStyle => {
     };
   }
 
+  if (order.order_status === 'canceled') {
+    return {
+      text: 'CHỜ LỐT',
+      chipClass: 'dd-chip dd-chip-amber opacity-80',
+      dot: '#f59e0b',
+      icon: <Clock className="h-3 w-3" />,
+    };
+  }
+
   return {
     text: order.order_status.toUpperCase(),
     chipClass: 'dd-chip dd-chip-slate',
@@ -548,7 +557,7 @@ const ActivityFlow = ({
   const groupedByStation = useMemo(() => {
     const pendingOrders = effectiveOrders
       .filter((order) => orderStatusFilter.includes(order.order_status))
-      .sort((a, b) => new Date(a.order_init_datetime || 0).getTime() - new Date(b.order_init_datetime || 0).getTime());
+      .sort((a, b) => (a.order_number || 0) - (b.order_number || 0));
 
     const ordersByStation = new Map<number, Order[]>();
 
@@ -625,7 +634,7 @@ const ActivityFlow = ({
       });
     });
 
-    allPendingOrders.sort((a, b) => new Date(a.order.order_init_datetime || 0).getTime() - new Date(b.order.order_init_datetime || 0).getTime());
+    allPendingOrders.sort((a, b) => (a.order.order_number || 0) - (b.order.order_number || 0));
 
     return allPendingOrders.map(({ group, order }, index) => ({
       group,
@@ -905,7 +914,7 @@ const ActivityFlow = ({
     setOptimisticOrders(optimistic);
 
     try {
-      await orderApi.update(currentOrder.order_id, { order_number: swapOrder.order_number });
+      await orderApi.update(currentOrder.order_id, { order_number: targetIndex + 1 });
       await onOrdersUpdated?.();
     } catch {
       toast.error(t('reorderFailed'), { position: 'top-right' });
@@ -964,52 +973,37 @@ const ActivityFlow = ({
     const isSameStation = sourceStationId === targetStationId;
     const isTargetOrder = overData?.type === 'order' && typeof overData.orderId === 'number';
 
+    if (!isSameStation) {
+      return;
+    }
+
     if (isSameStation && !isTargetOrder) {
       return;
     }
 
-    const targetOrder = isTargetOrder
-      ? targetGroup.orders.find((order) => order.order_id === overData.orderId)
-      : null;
+    const targetOrderIndex = overData?.orderId != null
+      ? targetGroup.orders.findIndex((order) => order.order_id === overData.orderId)
+      : -1;
+    const targetOrder = targetOrderIndex >= 0 ? targetGroup.orders[targetOrderIndex] : null;
 
-    if (isSameStation && targetOrder?.order_id === currentOrder.order_id) {
+    if (!targetOrder || targetOrder.order_id === currentOrder.order_id) {
       return;
     }
 
-    const nextOrderNumber = targetOrder
-      ? targetOrder.order_number
-      : (targetGroup.orders[targetGroup.orders.length - 1]?.order_number ?? 0) + 1;
-
-    const payload: OrderUpdatePayload = isSameStation
-      ? { order_number: nextOrderNumber }
-      : { station_id: targetStationId, order_number: nextOrderNumber };
-
     setReorderingKey(String(currentOrder.order_id));
 
-    if (isSameStation && targetOrder) {
-      const optimistic = effectiveOrders.map((o) => {
-        if (o.order_id === currentOrder.order_id) return { ...o, order_number: targetOrder.order_number };
-        if (o.order_id === targetOrder.order_id) return { ...o, order_number: currentOrder.order_number };
-        return o;
-      });
-      setOptimisticOrders(optimistic);
-    } else if (!isSameStation) {
-      const optimistic = effectiveOrders.map((o) => {
-        if (o.order_id !== currentOrder.order_id) return o;
-        return {
-          ...o,
-          stations: { ...o.stations, station_id: targetStationId, station_name: targetGroup.stationName },
-          order_number: nextOrderNumber,
-        };
-      });
-      setOptimisticOrders(optimistic);
-    }
+    const optimistic = effectiveOrders.map((o) => {
+      if (o.order_id === currentOrder.order_id) return { ...o, order_number: targetOrder.order_number };
+      if (o.order_id === targetOrder.order_id) return { ...o, order_number: currentOrder.order_number };
+      return o;
+    });
+    setOptimisticOrders(optimistic);
 
     try {
-      await orderApi.update(currentOrder.order_id, payload);
+      await orderApi.update(currentOrder.order_id, { order_number: targetOrderIndex + 1 });
       await onOrdersUpdated?.();
     } catch {
-      toast.error(isSameStation ? t('reorderFailed') : t('moveToStationFailed'), {
+      toast.error(t('reorderFailed'), {
         position: 'top-right',
       });
     } finally {

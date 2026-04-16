@@ -23,6 +23,8 @@ const orderApi = {
   shiftOpen: (data: ShiftOperationPayload) => http.post("/orders/shift-open", data),
   shiftReopenInit: (data: ShiftOperationPayload) => http.post("/orders/shift-reopen-init", data),
   shiftRebalance: (data: ShiftOperationPayload) => http.post("/orders/shift-rebalance", data),
+  reorder: (data: { order_id: number; target_position: number }) => http.put("/orders/reorder", data),
+  shiftOpenSlot: () => http.post("/orders/shift-open-slot"),
   delete: (id: number) => http.delete(`/orders/${id}`),
 };
 
