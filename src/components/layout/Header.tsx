@@ -66,10 +66,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({
   return (
     <Header
       className="sticky top-0 z-10 flex items-center justify-between flex-wrap gap-y-3 min-h-16 w-full border-b border-gray-200 shadow-md"
-      style={{
-        background: "#fff",
-        padding: "0 16px",
-      }}
+      style={{ background: "#fff", padding: "0 16px" }}
     >
       <div className="px-5 flex flex-wrap items-center gap-4 text-sm text-gray-600 w-full sm:w-auto">
         <div className="flex items-center gap-2">
