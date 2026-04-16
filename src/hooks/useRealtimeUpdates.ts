@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState } from "react";
+import { useAppSelector } from "@/hooks/use-app-selector";
 import { SocketManager } from "@/lib/socket";
 import { validateUpdateSignal } from "@/lib/socket/schema";
 import type { UpdateSignal } from "@/lib/socket/types";
-import { useAppSelector } from "@/hooks/use-app-selector";
+import { useEffect, useRef, useState } from "react";
 
 const REFRESH_COOLDOWN_MS = 800;
 
@@ -30,7 +30,7 @@ export function useRealtimeUpdates(onUpdate: (signal?: UpdateSignal) => void) {
 
     // Set auth provider cho token refresh
     manager.setAuthProvider(() => tokenState);
-    
+
     managerRef.current = manager;
 
     // Connection state listener
@@ -88,7 +88,7 @@ export function useRealtimeUpdates(onUpdate: (signal?: UpdateSignal) => void) {
       manager.on('update', (payload: unknown) => {
         const signal = validateUpdateSignal('update', payload);
         if (!signal) return;
-        
+
         console.log("[RealtimeUpdates] Nhan su kien update:", signal);
         triggerRefresh(signal);
       })
@@ -99,7 +99,7 @@ export function useRealtimeUpdates(onUpdate: (signal?: UpdateSignal) => void) {
       manager.on('ping', (payload: unknown) => {
         const signal = validateUpdateSignal('ping', payload);
         if (!signal) return;
-        
+
         console.log("[RealtimeUpdates] Nhan su kien ping:", signal);
         triggerRefresh(signal);
       })
@@ -122,7 +122,7 @@ export function useRealtimeUpdates(onUpdate: (signal?: UpdateSignal) => void) {
 
     return () => {
       unsubscribes.forEach((unsub) => unsub());
-      
+
       if (pendingRefreshRef.current) {
         clearTimeout(pendingRefreshRef.current);
         pendingRefreshRef.current = null;

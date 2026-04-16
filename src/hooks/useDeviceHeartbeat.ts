@@ -1,11 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from "react";
 import { SocketManager } from "@/lib/socket";
-import { validateDevicePayload, isStationHeartbeat } from "@/lib/socket/schema";
-import type { DeviceUpdatePayload, DeviceStationStatus as DeviceStationStatusType } from "@/lib/socket/types";
+import { isStationHeartbeat, validateDevicePayload } from "@/lib/socket/schema";
+import type { DeviceStationStatus as DeviceStationStatusType, DeviceUpdatePayload } from "@/lib/socket/types";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 // Re-export để backward compatible
-export type { DeviceStationStatusType as DeviceStationStatus };
-export type { DeviceUpdatePayload };
+export type { DeviceStationStatusType as DeviceStationStatus, DeviceUpdatePayload };
 
 interface DeviceHeartbeatState {
   isSocketConnected: boolean;

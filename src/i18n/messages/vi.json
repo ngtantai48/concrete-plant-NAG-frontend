@@ -80,9 +80,9 @@
     "notification_empty": "Không có thông báo",
     "read": "Đã đọc",
     "unknown_event": "Bạn có một thông báo mới",
-    "station_check_in": "Xe {vehicle} đã vào {station}",
+    "station_check_in": "Xe {vehicle} đang nhận hàng trong {station}",
     "station_check_out": "Xe {vehicle} đã rời {station}",
-    "vehicle_check_in": "Xe {vehicle} đã rời bãi",
+    "vehicle_check_in": "Xe {vehicle} đã rời khỏi bãi",
     "vehicle_check_out": "Xe {vehicle} đã vào bãi"
   },
   "Dashboard": {
@@ -396,7 +396,7 @@
     "waitingStatus": "Đang đợi",
     "enteringStation": "Vào trạm",
     "preparing": "Chuẩn bị",
-    "vehicleCount": "xe",
+    "vehicleCount": "Xe",
     "moreVehicles": "xe nữa",
     "showMoreVehicles": "Hiện thêm xe",
     "hideMoreVehicles": "Ẩn bớt xe",

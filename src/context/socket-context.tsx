@@ -188,12 +188,10 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       manager.on('notification:new', (payload: unknown) => {
         const validated = validateNotificationPayload(payload);
         if (!validated) return;
-
         const exists = notificationsRef.current.some((item) => item.id === validated.id);
         if (!exists) {
           speakNotification(validated);
         }
-
         setNotifications((prev) => {
           const exists = prev.find((n) => n.id === validated.id);
           if (exists) return prev; // Avoid duplicates
