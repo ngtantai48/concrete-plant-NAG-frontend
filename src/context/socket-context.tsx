@@ -1,6 +1,12 @@
 "use client";
 
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
+import {
+  getNotificationText,
+  getNotificationTimestampValue,
+  getRuntimeNotificationLocale,
+  shouldSpeakNotification,
+} from "@/lib/notification";
 import { SocketManager } from "@/lib/socket";
 import { validateNotificationPayload } from "@/lib/socket/schema";
 import type { NotificationPayload } from "@/lib/socket/types";
@@ -36,11 +42,11 @@ export const useSocket = () => {
 function createThrottle(ms: number) {
   let lastCall = 0;
   let timeout: ReturnType<typeof setTimeout> | null = null;
-  
+
   return (callback: () => void) => {
     const now = Date.now();
     const elapsed = now - lastCall;
-    
+
     if (elapsed >= ms) {
       lastCall = now;
       callback();
@@ -59,11 +65,53 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const managerRef = useRef<SocketManager | null>(null);
   const [isConnected, setIsConnected] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const notificationsRef = useRef<Notification[]>([]);
+  const spokenNotificationIdsRef = useRef<Set<string | number>>(new Set());
 
   const listenersRef = useRef<Set<SocketEventHandler>>(new Set());
-  
+
   const tokenState = useAppSelector((state: any) => state.auth.token);
-  const currentUserId = useAppSelector((state: any) => state.auth.user?.id);
+
+  useEffect(() => {
+    notificationsRef.current = notifications;
+  }, [notifications]);
+
+  const speakNotification = useCallback((notification: NotificationPayload | Notification) => {
+    if (!shouldSpeakNotification(notification)) return;
+
+    const notificationId = notification.id;
+    if (notificationId === undefined || notificationId === null) return;
+    if (spokenNotificationIdsRef.current.has(notificationId)) return;
+
+    spokenNotificationIdsRef.current.add(notificationId);
+
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) return;
+
+    const locale = getRuntimeNotificationLocale();
+    const utterance = new SpeechSynthesisUtterance(getNotificationText(notification, locale));
+    const languageTag = locale === "en" ? "en-US" : "vi-VN";
+    const availableVoices = window.speechSynthesis.getVoices();
+    const preferredVoice = availableVoices.find((voice) =>
+      voice.lang.toLowerCase() === languageTag.toLowerCase() && voice.localService
+    ) ?? availableVoices.find((voice) =>
+      voice.lang.toLowerCase().startsWith(locale) && voice.localService
+    ) ?? availableVoices.find((voice) =>
+      voice.lang.toLowerCase() === languageTag.toLowerCase()
+    ) ?? availableVoices.find((voice) =>
+      voice.lang.toLowerCase().startsWith(locale)
+    );
+
+    utterance.lang = languageTag;
+    utterance.rate = locale === "vi" ? 0.70 : 0.75;
+    utterance.pitch = 1;
+    utterance.volume = 1;
+
+    if (preferredVoice) {
+      utterance.voice = preferredVoice;
+    }
+
+    window.speechSynthesis.speak(utterance);
+  }, []);
 
   // Initialize socket manager (singleton)
   useEffect(() => {
@@ -77,7 +125,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     // Set auth provider cho token refresh
     manager.setAuthProvider(() => tokenState);
-    
+
     managerRef.current = manager;
 
     // Connection state listener
@@ -111,13 +159,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         const incoming = payload
           .map(validateNotificationPayload)
           .filter((n): n is NotificationPayload => n !== null)
-          .sort(
-            (a, b) => {
-              const dateA = new Date(a.visibleDate ?? a.createdAt ?? Date.now()).getTime();
-              const dateB = new Date(b.visibleDate ?? b.createdAt ?? Date.now()).getTime();
-              return dateB - dateA;
-            }
-          );
+          .sort((a, b) => getNotificationTimestampValue(b) - getNotificationTimestampValue(a));
 
         setNotifications(incoming as Notification[]);
       })
@@ -128,14 +170,17 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       manager.on('notification:new', (payload: unknown) => {
         const validated = validateNotificationPayload(payload);
         if (!validated) return;
-        
+
+        const exists = notificationsRef.current.some((item) => item.id === validated.id);
+        if (!exists) {
+          speakNotification(validated);
+        }
+
         setNotifications((prev) => {
           const exists = prev.find((n) => n.id === validated.id);
           if (exists) return prev; // Avoid duplicates
           return [...prev, validated as Notification].sort(
-            (a, b) =>
-              new Date(b.visibleDate || b.createdAt).getTime() -
-              new Date(a.visibleDate || a.createdAt).getTime()
+            (a, b) => getNotificationTimestampValue(b) - getNotificationTimestampValue(a)
           );
         });
       })
@@ -209,9 +254,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                 map.set(item.id, existing ? { ...existing, ...notification } : notification);
               });
               return Array.from(map.values()).sort(
-                (a, b) =>
-                  new Date(b.visibleDate ?? b.createdAt).getTime() -
-                  new Date(a.visibleDate ?? a.createdAt).getTime()
+                (a, b) => getNotificationTimestampValue(b) - getNotificationTimestampValue(a)
               );
             });
             return;
@@ -220,6 +263,11 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           if (typeof payload === 'object' && payload !== null) {
             const validated = validateNotificationPayload(payload);
             if (!validated) return;
+
+            const exists = notificationsRef.current.some((item) => item.id === validated.id);
+            if (!exists) {
+              speakNotification(validated);
+            }
 
             setNotifications((prev) => {
               const exists = prev.find((n) => n.id === validated.id);
@@ -236,7 +284,9 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
                   } as Notification;
                 });
               }
-              return [...prev, validated as Notification];
+              return [...prev, validated as Notification].sort(
+                (a, b) => getNotificationTimestampValue(b) - getNotificationTimestampValue(a)
+              );
             });
             return;
           }
@@ -263,11 +313,14 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return () => {
       unsubscribes.forEach((unsub) => unsub());
     };
-  }, [isConnected]);
+  }, [isConnected, speakNotification]);
 
   // Mark as read
   const markAsRead = useCallback(
     (id: string | number) => {
+      const target = notificationsRef.current.find((item) => item.id === id);
+      if (!target || target.read) return;
+
       setNotifications((prev) =>
         prev.map((item) => {
           if (item.id !== id || item.read) return item;
