@@ -72,7 +72,12 @@ export default function ShiftSlotsManager() {
         ).value.data;
         const arr = (orderData as { data?: Order[] })?.data || orderData || [];
         const allOrders = Array.isArray(arr) ? arr : [];
-        setCanceledOrders(allOrders.filter((o) => o.order_status === "pending" && o.shift_closing?.shift_status === 1));
+        setCanceledOrders(allOrders.filter((o) => {
+          const vStatus = o.vehicles?.vehicle_status?.toLowerCase();
+          return o.order_status !== "completed" && 
+                 o.shift_closing?.shift_status === 1 && 
+                 vStatus === 'available';
+        }));
       }
     } finally {
       setLoading(false);
@@ -207,7 +212,7 @@ export default function ShiftSlotsManager() {
                 orders={canceledOrders}
                 dispatchMode="auto"
                 layout="merged"
-                orderStatusFilter={["pending"]}
+                orderStatusFilter={["init", "pending", "collecting", "transporting", "running", "canceled"]}
                 hideStatus={true}
                 onOrdersUpdated={fetchAll}
               />
