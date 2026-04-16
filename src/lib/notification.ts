@@ -54,6 +54,15 @@ function getStringValue(value: unknown, fallback = ""): string {
   return fallback;
 }
 
+function getVehicleDisplayValue(notification: NotificationLike): string {
+  const licensePlate = getStringValue(notification.vehicle_license_plate);
+  if (licensePlate) {
+    return licensePlate.slice(-3);
+  }
+
+  return getStringValue(notification.vehicle_name, "-");
+}
+
 function fillTemplate(template: string, values: Record<string, string>): string {
   return template.replace(/\{(\w+)\}/g, (_, key: string) => values[key] ?? "-");
 }
@@ -102,10 +111,7 @@ export function getNotificationText(
   if (template) {
     return fillTemplate(template, {
       station: getStringValue(notification.station_name, "-"),
-      vehicle: getStringValue(
-        notification.vehicle_name,
-        getStringValue(notification.vehicle_license_plate, "-")
-      ),
+      vehicle: getVehicleDisplayValue(notification),
       orderNumber: getStringValue(notification.order_number, "-"),
       user: getStringValue(notification.user_name, "-"),
     });
