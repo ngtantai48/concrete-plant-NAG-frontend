@@ -388,7 +388,7 @@
     "confirmPauseStation": "Are you sure you want to pause this station?",
     "reorderSuccess": "Order sequence updated successfully",
     "reorderFailed": "Unable to update order sequence",
-    "dragAcrossStationsHint": "Drag the dotted handle to reorder within a station or move a vehicle to another station",
+    "dragAcrossStationsHint": "Drag the dotted handle to change the order sequence",
     "dropIntoStation": "Drop to move this vehicle to {stationName}",
     "draggingVehicleLabel": "Dragging vehicle",
     "dragSourceStationBadge": "Source station",

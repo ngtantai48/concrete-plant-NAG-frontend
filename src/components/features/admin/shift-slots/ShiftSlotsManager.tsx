@@ -72,7 +72,7 @@ export default function ShiftSlotsManager() {
         ).value.data;
         const arr = (orderData as { data?: Order[] })?.data || orderData || [];
         const allOrders = Array.isArray(arr) ? arr : [];
-        setCanceledOrders(allOrders.filter((o) => o.order_status === "canceled"));
+        setCanceledOrders(allOrders.filter((o) => o.order_status === "pending" && o.shift_closing?.shift_status === 1));
       }
     } finally {
       setLoading(false);
@@ -207,7 +207,8 @@ export default function ShiftSlotsManager() {
                 orders={canceledOrders}
                 dispatchMode="auto"
                 layout="merged"
-                orderStatusFilter={["canceled"]}
+                orderStatusFilter={["pending"]}
+                hideStatus={true}
                 onOrdersUpdated={fetchAll}
               />
             )}

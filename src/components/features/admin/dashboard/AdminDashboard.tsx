@@ -228,7 +228,8 @@ export default function AdminDashboard() {
   const activeFlowOrders = useMemo(() => {
     return pendingOrders.filter(o => {
       const vStatus = o.vehicles?.vehicle_status;
-      return vStatus !== 'maintenance' && vStatus !== 'incident';
+      const isShiftClosed = o.shift_closing?.shift_status === 1;
+      return !isShiftClosed && vStatus !== 'maintenance' && vStatus !== 'incident';
     });
   }, [pendingOrders]);
 
@@ -254,6 +255,10 @@ export default function AdminDashboard() {
       (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
     );
   }, [ordersActive, ordersCompleted]);
+
+  const hasUnclosedShift = useMemo(() => {
+    return pendingOrders.some((o) => o.shift_closing?.shift_status === 0);
+  }, [pendingOrders]);
 
   const [isShiftClosing, setIsShiftClosing] = useState(false);
 
@@ -431,7 +436,7 @@ export default function AdminDashboard() {
               </Tooltip>
 
               {/* Shift Close Button */}
-              {!isPastDate && pendingOrders.length > 0 && (
+              {!isPastDate && hasUnclosedShift && (
                 <Tooltip>
                   <TooltipTrigger asChild>
                     <Button
@@ -546,7 +551,7 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {!isPastDate && !loading && pendingOrders.length === 0 && (
+        {!isPastDate && !loading && !hasUnclosedShift && (
           <div
             className="mb-1 shrink-0 rounded-lg border px-3 py-1 cursor-pointer hover:bg-slate-50 transition-colors"
             style={{

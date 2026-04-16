@@ -41,6 +41,7 @@ interface SortableVehicleItemProps {
   onManualStationChange?: (stationId: string) => void;
   onManualStationClear?: () => void;
   isDropTarget?: boolean;
+  hideStatus?: boolean;
   t: (key: string) => string;
 }
 
@@ -64,6 +65,7 @@ function SortableVehicleItemBase({
   onManualStationChange,
   onManualStationClear,
   isDropTarget = false,
+  hideStatus = false,
   t,
 }: SortableVehicleItemProps) {
   const displayedStationName = isManualMode && isSelected
@@ -138,7 +140,7 @@ function SortableVehicleItemBase({
             {order.order_init_datetime && (
               <div className="flex items-center gap-1 text-[11px] uppercase font-bold" style={{ color: 'var(--dd-text-muted)' }}>
                 <Clock className="h-3 w-3" />
-                <span><span className="opacity-75">Vào lúc:</span> <span style={{ color: 'var(--dd-text-primary)' }}>{`${new Date(order.order_init_datetime).getHours()} giờ ${new Date(order.order_init_datetime).getMinutes().toString().padStart(2, '0')} phút`}</span></span>
+                <span><span className="opacity-75">Lần cuối cập nhật:</span> <span style={{ color: 'var(--dd-text-primary)' }}>{`${new Date(order.order_init_datetime).getHours()} giờ ${new Date(order.order_init_datetime).getMinutes().toString().padStart(2, '0')} phút`}</span></span>
               </div>
             )}
           </div>
@@ -193,10 +195,12 @@ function SortableVehicleItemBase({
               </div>
             )}
 
-            <div className={style.chipClass}>
-              {style.icon}
-              {style.text}
-            </div>
+            {!hideStatus && (
+              <div className={style.chipClass}>
+                {style.icon}
+                {style.text}
+              </div>
+            )}
 
             {isDropTarget && (
               <span className="text-[11px] font-bold uppercase tracking-[0.18em]" style={{ color: 'var(--dd-sky)' }}>

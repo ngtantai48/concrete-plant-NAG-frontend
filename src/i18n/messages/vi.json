@@ -408,7 +408,7 @@
     "confirmPauseStation": "Dừng trạm này?",
     "reorderSuccess": "Cập nhật thứ tự lệnh thành công",
     "reorderFailed": "Không thể cập nhật thứ tự lệnh",
-    "dragAcrossStationsHint": "Kéo dấu chấm ở đầu xe để đổi thứ tự hoặc chuyển sang trạm khác",
+    "dragAcrossStationsHint": "Kéo dấu chấm ở đầu xe để thay đổi thứ tự",
     "dropIntoStation": "Thả để chuyển xe vào {stationName}",
     "draggingVehicleLabel": "Đang kéo xe",
     "dragSourceStationBadge": "Trạm nguồn",
