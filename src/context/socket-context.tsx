@@ -120,7 +120,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const preferredVoice = pickVietnameseFemaleVoice(availableVoices);
 
     utterance.lang = VI_NOTIFICATION_LANG;
-    utterance.rate = 0.72;
+    utterance.rate = 0.7;
     utterance.pitch = 1;
     utterance.volume = 1;
 
