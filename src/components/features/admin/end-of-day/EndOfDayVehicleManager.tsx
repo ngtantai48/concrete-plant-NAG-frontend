@@ -4,10 +4,9 @@ import ActivityFlow from "@/components/features/admin/dashboard/ActivityFlow";
 import { useRealtimeUpdates } from "@/hooks/useRealtimeUpdates";
 import orderApi from "@/services/order.service";
 import stationApi from "@/services/station.service";
-import type { Order } from "@/types/order";
 import type { Station } from "@/types/station";
 import { Skeleton } from "antd";
-import { CheckCircle2, Save, Shuffle } from "lucide-react";
+import { Save, Shuffle } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -18,13 +17,6 @@ const getTodayDate = () => {
   const timezoneOffset = now.getTimezoneOffset() * 60 * 1000;
   return new Date(now.getTime() - timezoneOffset).toISOString().slice(0, 10);
 };
-const getTomorrowDate = () => {
-  const now = new Date();
-  const timezoneOffset = now.getTimezoneOffset() * 60 * 1000;
-  const today = new Date(now.getTime() - timezoneOffset);
-  today.setDate(today.getDate() + 1);
-  return today.toISOString().slice(0, 10);
-};
 
 export default function EndOfDayVehicleManager() {
   const tPage = useTranslations("EndOfDayPage");
@@ -32,7 +24,6 @@ export default function EndOfDayVehicleManager() {
   const locale = useLocale();
 
   const [stations, setStations] = useState<Station[]>([]);
-  const [tomorrowOrders, setTomorrowOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [isRebalancing, setIsRebalancing] = useState(false);
   const operationDate = getTodayDate();
@@ -68,19 +59,12 @@ export default function EndOfDayVehicleManager() {
     try {
       const results = await Promise.allSettled([
         stationApi.getAll(),
-        orderApi.getByInitDate(getTomorrowDate()),
       ]);
 
       if (results[0].status === "fulfilled") {
         const stationData = (results[0] as PromiseFulfilledResult<{ data: { data?: Station[] } | Station[] }>).value.data;
         const arr = (stationData as { data?: Station[] })?.data || stationData || [];
         setStations(Array.isArray(arr) ? arr : []);
-      }
-
-      if (results[1].status === "fulfilled") {
-        const tmData = (results[1] as PromiseFulfilledResult<{ data: { data?: Order[] } | Order[] }>).value.data;
-        const arr = (tmData as { data?: Order[] })?.data || tmData || [];
-        setTomorrowOrders(Array.isArray(arr) ? arr : []);
       }
     } finally {
       setLoading(false);
@@ -91,18 +75,6 @@ export default function EndOfDayVehicleManager() {
     fetchAll();
   }, [fetchAll]);
 
-  const isTomorrowConfirmed = useMemo(
-    () => tomorrowOrders.some((o) => o.order_status === "pending"),
-    [tomorrowOrders],
-  );
-
-  const pendingTomorrowOrders = useMemo(
-    () => tomorrowOrders.filter((o) => {
-      const vehicleStatus = o.vehicles?.vehicle_status;
-      return o.order_status === "pending" && vehicleStatus !== "maintenance" && vehicleStatus !== "incident";
-    }),
-    [tomorrowOrders],
-  );
 
   const handleRebalance = useCallback(async () => {
     setIsRebalancing(true);
@@ -195,21 +167,6 @@ export default function EndOfDayVehicleManager() {
                     {tPage("saveAction")}
                   </button> */}
 
-                  {isTomorrowConfirmed && (
-                    <div
-                      className="flex items-center gap-2 rounded-lg px-4 py-2"
-                      style={{
-                        background: "linear-gradient(135deg, rgba(16, 185, 129, 0.12), rgba(5, 150, 105, 0.08))",
-                        border: "1px solid rgba(16, 185, 129, 0.25)",
-                        color: "#047857",
-                      }}
-                    >
-                      <CheckCircle2 className="h-4 w-4" />
-                      <span className="text-sm font-bold uppercase">
-                        {tDashboard("tomorrowScheduleReadyTitle")}
-                      </span>
-                    </div>
-                  )}
                 </div>
               </div>
 
@@ -243,7 +200,7 @@ export default function EndOfDayVehicleManager() {
             <ActivityFlow
               stations={stations}
               vehicles={[]}
-              orders={pendingTomorrowOrders}
+              orders={[]}
               dispatchMode="auto"
               layout="board"
               orderStatusFilter={["pending"]}

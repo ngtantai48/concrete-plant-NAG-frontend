@@ -62,13 +62,6 @@ const getTodayDate = () => {
   const timezoneOffset = now.getTimezoneOffset() * 60 * 1000;
   return new Date(now.getTime() - timezoneOffset).toISOString().slice(0, 10);
 };
-const getTomorrowDate = () => {
-  const now = new Date();
-  const timezoneOffset = now.getTimezoneOffset() * 60 * 1000;
-  const today = new Date(now.getTime() - timezoneOffset);
-  today.setDate(today.getDate() + 1);
-  return today.toISOString().slice(0, 10);
-};
 
 
 export default function AdminDashboard() {
@@ -84,8 +77,6 @@ export default function AdminDashboard() {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [pendingOrders, setPendingOrders] = useState<Order[]>([]);
-  const [tomorrowOrders, setTomorrowOrders] = useState<Order[]>([]);
-  const [realTomorrowOrders, setRealTomorrowOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedDate, setSelectedDate] = useState(getTodayDate());
@@ -120,28 +111,15 @@ export default function AdminDashboard() {
 
 
 
-  const getNextDate = useCallback((date: string) => {
-    const d = new Date(date + 'T00:00:00');
-    d.setDate(d.getDate() + 1);
-    return d.toISOString().slice(0, 10);
-  }, []);
 
   const fetchAll = useCallback(async () => {
     try {
-      const nextDate = getNextDate(selectedDate);
-      const realTomorrow = getTomorrowDate();
-      const needExtraFetch = nextDate !== realTomorrow;
-
       const apiCalls = [
         stationApi.getAll(),
         vehicleApi.getAll({ limit: 100 }),
         orderApi.getByInitDate(selectedDate),
-        orderApi.getByInitDate(nextDate),
         orderApi.getByStatus('pending'),
       ] as any[];
-      if (needExtraFetch) {
-        apiCalls.push(orderApi.getByInitDate(realTomorrow));
-      }
 
       const results = await Promise.allSettled(apiCalls);
 
@@ -159,36 +137,20 @@ export default function AdminDashboard() {
         const oRes = results[2].value;
         setOrders(oRes.data?.data || oRes.data || []);
       }
-      if (results[3].status === 'fulfilled') {
-        const tmRes = results[3].value;
-        setTomorrowOrders(tmRes.data?.data || tmRes.data || []);
-        if (!needExtraFetch) {
-          setRealTomorrowOrders(tmRes.data?.data || tmRes.data || []);
-        }
-      }
-      if (results[4]?.status === 'fulfilled') {
-        const pRes = results[4].value;
+      if (results[3]?.status === 'fulfilled') {
+        const pRes = results[3].value;
         setPendingOrders(pRes.data?.data || pRes.data || []);
-      }
-      if (needExtraFetch && results[5]?.status === 'fulfilled') {
-        const rtRes = results[5].value;
-        setRealTomorrowOrders(rtRes.data?.data || rtRes.data || []);
       }
     } catch {
       //
     } finally {
       setLoading(false);
     }
-  }, [selectedDate, getNextDate]);
+  }, [selectedDate]);
 
   useEffect(() => {
     fetchAll();
   }, [fetchAll]);
-
-  const isTomorrowScheduleReady = useMemo(
-    () => realTomorrowOrders.some((o) => o.order_status === "pending"),
-    [realTomorrowOrders],
-  );
 
   const activeStations = useMemo(
     () => stations.filter((s) => s.station_types?.station_type_id === 1 && s.station_status === "operating"),
@@ -246,8 +208,8 @@ export default function AdminDashboard() {
 
   const ordersAtStation = useMemo(() => orders.filter(o => o.order_status === "collecting"), [orders]);
   const ordersPending = useMemo(() => {
-    return orders.filter(o => o.order_status === "pending" && o.order_init_datetime?.slice(0, 10) === operationDate && o.vehicles?.vehicle_status === "available");
-  }, [orders, operationDate]);
+    return pendingOrders.filter(o => o.vehicles?.vehicle_status === "available");
+  }, [pendingOrders]);
   const ordersInTransit = useMemo(() => orders.filter(o => o.order_status === "transporting" || o.order_status === "running"), [orders]);
   const ordersCompleted = useMemo(() => {
     return orders.filter(o => o.order_status === "completed");
@@ -571,22 +533,6 @@ export default function AdminDashboard() {
           )} */}
         </div>
 
-        {!isPastDate && !loading && isTomorrowScheduleReady && (
-          <div
-            className="mb-1 shrink-0 rounded-lg border px-3 py-1"
-            style={{
-              background: "linear-gradient(135deg, rgba(16, 185, 129, 0.08), rgba(5, 150, 105, 0.06))",
-              borderColor: "rgba(16, 185, 129, 0.25)",
-            }}
-          >
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
-              <span className="text-xs font-bold uppercase" style={{ color: "var(--dd-text-primary)" }}>
-                {t("tomorrowScheduleReadyTitle")} — {t("tomorrowScheduleReadyDescription", { count: tomorrowOrders.length })}
-              </span>
-            </div>
-          </div>
-        )}
 
         {!isPastDate && !loading && !hasUnclosedShift && (
           <div
