@@ -325,9 +325,9 @@ export default function TableVehicles() {
       });
       fetchVehiclesData(true);
     } catch (error) {
-      const message =
-        (error as any)?.response?.data?.message || (error as Error)?.message || t("saveFailed");
-      toast.error(t("failed"), { description: message });
+      // const message = (error as any)?.response?.data?.message || (error as Error)?.message || t("saveFailed");
+      // toast.error(t("failed"), { description: message });
+      toast.error(t("failed"), { description: t("saveFailed") })
     } finally {
       setSaving(false);
     }
@@ -461,6 +461,12 @@ export default function TableVehicles() {
         return (
           <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-red-50 text-red-700 border border-red-200/60 uppercase">
             Sự cố
+          </span>
+        );
+      case "other":
+        return (
+          <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-200/60 uppercase">
+            Việc khác
           </span>
         );
       default:
@@ -730,6 +736,7 @@ export default function TableVehicles() {
                   <SelectItem value="collecting">Đang nhận</SelectItem>
                   <SelectItem value="maintenance">{t("maintenance")}</SelectItem>
                   <SelectItem value="incident">Sự cố</SelectItem>
+                  <SelectItem value="other">Việc khác</SelectItem>
                 </SelectContent>
               </ShadcnSelect>
             )}
@@ -1001,6 +1008,7 @@ export default function TableVehicles() {
                     <Select.Option value="collecting">{t("collecting")}</Select.Option> */}
                     <Select.Option value="maintenance">{t("maintenanceOption")}</Select.Option>
                     <Select.Option value="incident">{t("incident")}</Select.Option>
+                    <Select.Option value="other">Việc khác</Select.Option>
                   </Select>
                 </Form.Item>
               </div>
