@@ -89,6 +89,7 @@ function createThrottle(ms: number) {
 
 export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const managerRef = useRef<SocketManager | null>(null);
+  const prevTokenRef = useRef<string | undefined>(undefined);
   const [isConnected, setIsConnected] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const notificationsRef = useRef<Notification[]>([]);
@@ -149,8 +150,16 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     // Connection state listener
     const unsubscribeConnection = manager.onConnectionChange(setIsConnected);
 
-    // Connect
-    manager.connect();
+    // Nếu token đã đổi (refresh), force reconnect để handshake lại với token mới.
+    // Lần đầu (prev === undefined) chỉ connect bình thường.
+    const prevToken = prevTokenRef.current;
+    prevTokenRef.current = tokenState;
+
+    if (prevToken && prevToken !== tokenState) {
+      manager.reconnect();
+    } else {
+      manager.connect();
+    }
 
     return () => {
       unsubscribeConnection();

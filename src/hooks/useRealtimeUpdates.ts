@@ -8,6 +8,7 @@ const REFRESH_COOLDOWN_MS = 800;
 
 export function useRealtimeUpdates(onUpdate: (signal?: UpdateSignal) => void) {
   const managerRef = useRef<SocketManager | null>(null);
+  const prevTokenRef = useRef<string | undefined>(undefined);
   const onUpdateRef = useRef(onUpdate);
   const lastRefreshRef = useRef(0);
   const pendingRefreshRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -43,8 +44,16 @@ export function useRealtimeUpdates(onUpdate: (signal?: UpdateSignal) => void) {
       }
     });
 
-    // Connect
-    manager.connect();
+    // Token đổi (refresh) thì force reconnect để handshake với token mới.
+    // Lần đầu chỉ connect bình thường.
+    const prevToken = prevTokenRef.current;
+    prevTokenRef.current = tokenState;
+
+    if (prevToken && prevToken !== tokenState) {
+      manager.reconnect();
+    } else {
+      manager.connect();
+    }
 
     return () => {
       unsubscribeConnection();
