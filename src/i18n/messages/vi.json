@@ -424,6 +424,8 @@
     "shiftCloseSuccess": "Đã chốt ca cho ngày {date}",
     "shiftCloseFailed": "Không thể chốt ca cho ngày đã chọn",
     "shiftCloseDateRequired": "Vui lòng chọn ngày vận hành trước khi chốt ca",
+    "confirmShiftCloseTitle": "Xác nhận chốt ca",
+    "confirmShiftCloseDescription": "Bạn có chắc chắn muốn chốt ca không?",
     "shiftReopenAction": "Hủy chốt",
     "shiftReopenSuccess": "Đã hủy chốt ca cho ngày {date}",
     "shiftReopenFailed": "Không thể hủy chốt ca cho ngày đã chọn",
@@ -543,7 +545,9 @@
     "operationDate": "Ngày vận hành",
     "shiftOpenSlotAction": "Chốt lốt",
     "shiftOpenSlotSuccess": "Đã chốt lốt thành công",
-    "shiftOpenSlotFailed": "Không thể chốt lốt"
+    "shiftOpenSlotFailed": "Không thể chốt lốt",
+    "confirmShiftOpenSlotTitle": "Xác nhận chốt lốt",
+    "confirmShiftOpenSlotDescription": "Bạn có chắc chắn muốn chốt danh sách lốt xe không?"
   },
   "VehicleMaintenancePage": {
     "title": "Bảo trì & Bảo dưỡng xe",

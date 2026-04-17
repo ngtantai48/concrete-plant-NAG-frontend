@@ -404,6 +404,8 @@
     "shiftCloseSuccess": "Shift closed for {date}",
     "shiftCloseFailed": "Unable to close the shift for the selected date",
     "shiftCloseDateRequired": "Please choose an operation date before closing the shift",
+    "confirmShiftCloseTitle": "Confirm shift close",
+    "confirmShiftCloseDescription": "Are you sure you want to close the shift?",
     "shiftReopenAction": "Reopen shift",
     "shiftReopenSuccess": "Shift reopened for {date}",
     "shiftReopenFailed": "Unable to reopen the shift for the selected date",
@@ -523,7 +525,9 @@
     "operationDate": "Operation date",
     "shiftOpenSlotAction": "Confirm slots",
     "shiftOpenSlotSuccess": "Slots confirmed successfully",
-    "shiftOpenSlotFailed": "Failed to confirm slots"
+    "shiftOpenSlotFailed": "Failed to confirm slots",
+    "confirmShiftOpenSlotTitle": "Confirm shift slots",
+    "confirmShiftOpenSlotDescription": "Are you sure you want to confirm the shift slots?"
   },
   "VehicleMaintenancePage": {
     "title": "Vehicle Maintenance",

@@ -11,6 +11,17 @@ import { CheckCircle2 } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import { format } from "date-fns";
 
 const getTodayDate = () => {
   const now = new Date();
@@ -21,6 +32,7 @@ const getTodayDate = () => {
 export default function ShiftSlotsManager() {
   const t = useTranslations("ShiftSlotsPage");
   const tDashboard = useTranslations("DashboardPage");
+  const tCommon = useTranslations("Common");
   const locale = useLocale();
 
   const [stations, setStations] = useState<Station[]>([]);
@@ -74,9 +86,9 @@ export default function ShiftSlotsManager() {
         const allOrders = Array.isArray(arr) ? arr : [];
         setCanceledOrders(allOrders.filter((o) => {
           const vStatus = o.vehicles?.vehicle_status?.toLowerCase();
-          return o.order_status !== "completed" && 
-                 o.shift_closing?.shift_status === 1 && 
-                 vStatus === 'available';
+          return o.order_status !== "completed" &&
+            o.shift_closing?.shift_status === 1 &&
+            vStatus === 'available';
         }));
       }
     } finally {
@@ -91,8 +103,10 @@ export default function ShiftSlotsManager() {
   useRealtimeUpdates(fetchAll);
 
   const [isSlotClosing, setIsSlotClosing] = useState(false);
+  const [isSlotClosingDialogOpen, setIsSlotClosingDialogOpen] = useState(false);
 
   const handleShiftOpenSlot = useCallback(async () => {
+    setIsSlotClosingDialogOpen(false);
     setIsSlotClosing(true);
     try {
       await orderApi.shiftOpen({ operation_date: operationDate });
@@ -149,7 +163,7 @@ export default function ShiftSlotsManager() {
                 )}
                 <button
                   type="button"
-                  onClick={handleShiftOpenSlot}
+                  onClick={() => setIsSlotClosingDialogOpen(true)}
                   disabled={isSlotClosing}
                   className="dd-btn flex items-center gap-2 disabled:opacity-50"
                   style={{
@@ -161,6 +175,27 @@ export default function ShiftSlotsManager() {
                   <CheckCircle2 className={`h-4 w-4 ${isSlotClosing ? "animate-spin" : ""}`} />
                   {t("shiftOpenSlotAction")}
                 </button>
+
+                <AlertDialog open={isSlotClosingDialogOpen} onOpenChange={setIsSlotClosingDialogOpen}>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>{t("confirmShiftOpenSlotTitle")}</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        {t("confirmShiftOpenSlotDescription")}
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>{tCommon("cancel")}</AlertDialogCancel>
+                      <AlertDialogAction 
+                        onClick={handleShiftOpenSlot} 
+                        disabled={isSlotClosing}
+                        className="bg-emerald-600 text-white hover:bg-emerald-700"
+                      >
+                        {t("shiftOpenSlotAction")}
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
               </div>
               <div
                 className="text-base font-bold uppercase"
