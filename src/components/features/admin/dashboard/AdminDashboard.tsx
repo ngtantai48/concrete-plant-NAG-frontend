@@ -20,6 +20,16 @@ import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle as DlgTitle } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useLocale, useTranslations } from "next-intl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNearbyVehicles } from "@/hooks/useNearbyVehicles";
@@ -57,6 +67,7 @@ const getTodayDate = () => {
 export default function AdminDashboard() {
   const t = useTranslations("DashboardPage");
   const tVehiclePage = useTranslations("VehiclePage");
+  const tCommon = useTranslations("Common");
   const locale = useLocale();
   const router = useRouter();
 
@@ -223,8 +234,10 @@ export default function AdminDashboard() {
   }, [pendingOrders]);
 
   const [isShiftClosing, setIsShiftClosing] = useState(false);
+  const [isShiftCloseDialogOpen, setIsShiftCloseDialogOpen] = useState(false);
 
   const handleShiftClose = useCallback(async () => {
+    setIsShiftCloseDialogOpen(false);
     setIsShiftClosing(true);
     try {
       await orderApi.shiftClose({ operation_date: selectedDate });
@@ -362,7 +375,7 @@ export default function AdminDashboard() {
               {/* LED Status */}
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <div className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 border text-xs font-bold uppercase cursor-default ${isLedConnected
+                  <div className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 border text-sm font-bold uppercase cursor-default ${isLedConnected
                     ? "border-emerald-200 text-emerald-700 animate-flash-bg"
                     : "border-red-200 bg-red-50 text-red-700"
                     }`}>
@@ -381,7 +394,7 @@ export default function AdminDashboard() {
               {/* Network Status */}
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <div key={lastSignalTime?.toISOString() || 'offline'} className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 border text-xs font-bold uppercase cursor-default ${socketConnected
+                  <div key={lastSignalTime?.toISOString() || 'offline'} className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 border text-sm font-bold uppercase cursor-default ${socketConnected
                     ? "border-emerald-200 text-emerald-700 animate-flash-bg"
                     : "border-red-200 bg-red-50 text-red-700"
                     }`}>
@@ -397,61 +410,85 @@ export default function AdminDashboard() {
                 </TooltipContent>
               </Tooltip>
 
-              {/* Shift Close Button */}
-              {!isPastDate && hasUnclosedShift && (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={handleShiftClose}
-                      disabled={isShiftClosing}
-                      className="h-8 px-3 text-xs font-bold uppercase gap-1.5 border-amber-300 text-amber-700 bg-amber-50 hover:bg-amber-100 hover:border-amber-400"
-                    >
-                      {isShiftClosing
-                        ? <RefreshCw className="w-3 h-3 animate-spin" />
-                        : <ShieldCheck className="w-3 h-3" />
-                      }
-                      {t('shiftCloseAction')}
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>{t('shiftCloseAction')} — {selectedDate}</p>
-                  </TooltipContent>
-                </Tooltip>
-              )}
-
               {/* Date Picker */}
+              <Popover open={isDatePickerOpen} onOpenChange={setIsDatePickerOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "h-8 w-[150px] px-2 text-sm font-bold justify-start text-left border-slate-200 bg-white/80 transition-all shadow-none hover:bg-white hover:border-sky-400 focus-visible:ring-1 focus-visible:ring-sky-500",
+                      !selectedDate && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 text-sky-500" />
+                    {selectedDate ? format(new Date(selectedDate), "dd/MM/yyyy") : <span>Chọn ngày</span>}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="end">
+                  <Calendar
+                    // captionLayout="dropdown"
+                    mode="single"
+                    selected={selectedDate ? new Date(selectedDate) : undefined}
+                    onSelect={(date) => {
+                      if (date) {
+                        setSelectedDate(format(date, "yyyy-MM-dd"));
+                        setLoading(true);
+                        setIsDatePickerOpen(false);
+                      }
+                    }}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+
+              {/* Shift Close Button */}
               <div className="border-l border-slate-200 pl-2 flex items-center gap-1.5">
-                <Popover open={isDatePickerOpen} onOpenChange={setIsDatePickerOpen}>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className={cn(
-                        "h-8 w-[150px] px-2 text-sm font-bold justify-start text-left border-slate-200 bg-white/80 transition-all shadow-none hover:bg-white hover:border-sky-400 focus-visible:ring-1 focus-visible:ring-sky-500",
-                        !selectedDate && "text-muted-foreground"
-                      )}
-                    >
-                      <CalendarIcon className="mr-2 text-sky-500" />
-                      {selectedDate ? format(new Date(selectedDate), "dd/MM/yyyy") : <span>Chọn ngày</span>}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="end">
-                    <Calendar
-                      // captionLayout="dropdown"
-                      mode="single"
-                      selected={selectedDate ? new Date(selectedDate) : undefined}
-                      onSelect={(date) => {
-                        if (date) {
-                          setSelectedDate(format(date, "yyyy-MM-dd"));
-                          setLoading(true);
-                          setIsDatePickerOpen(false);
-                        }
-                      }}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
+                {!isPastDate && hasUnclosedShift && (
+                  <>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          size="sm"
+                          variant="primary"
+                          onClick={() => setIsShiftCloseDialogOpen(true)}
+                          disabled={isShiftClosing}
+                          className="uppercase"
+                        >
+                          {isShiftClosing ? <RefreshCw className="animate-spin" /> : <ShieldCheck />}
+                          {t('shiftCloseAction')}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent >
+                        <p>{t('shiftCloseAction')} {format(new Date(selectedDate), "dd/MM/yyyy")}</p>
+                      </TooltipContent>
+                    </Tooltip>
+
+                    <AlertDialog open={isShiftCloseDialogOpen} onOpenChange={setIsShiftCloseDialogOpen}>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>{t('confirmShiftCloseTitle')}</AlertDialogTitle>
+                          {/* <AlertDialogDescription>
+                            {t.rich('confirmShiftCloseDescription', { 
+                              date: format(new Date(selectedDate), "dd/MM/yyyy"),
+                              strong: (chunks) => <strong>{chunks}</strong>
+                            })}
+                          </AlertDialogDescription> */}
+                          <AlertDialogDescription>{t('confirmShiftCloseDescription')}</AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>{tCommon('cancel')}</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={handleShiftClose}
+                            disabled={isShiftClosing}
+                            className="bg-primary text-primary-foreground hover:bg-primary/90"
+                          >
+                            {t('shiftCloseAction')}
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </>
+                )}
               </div>
 
               {/* Sync Button */}
@@ -653,10 +690,9 @@ export default function AdminDashboard() {
           {!isPastDate && (
             <div className="flex flex-col h-full min-h-0 animate-fade-up" style={{ flex: '3 1 0%', animationDelay: '0.6s' }}>
               <div className="flex h-full flex-col overflow-hidden dd-card" style={{ borderColor: 'rgba(16, 185, 129, 0.2)' }}>
-                <div className="flex items-center justify-between px-3 py-1.5 text-sm font-extrabold uppercase"
+                <div className="flex items-center justify-between px-3 py-2 text-sm font-extrabold uppercase"
                   style={{ borderBottom: '1px solid var(--dd-border)' }}>
                   <div className="flex items-center gap-1.5">
-                    <Truck className="w-3.5 h-3.5 text-emerald-500" />
                     <span>{t('completedToday')}</span>
                   </div>
                   <div className="flex items-center gap-1.5">
@@ -741,8 +777,8 @@ export default function AdminDashboard() {
                             <div className="absolute left-0 top-0 bottom-0 w-1" style={{ background: accentColor }} />
                             <div className="flex justify-between items-center pl-2">
                               <div className="flex items-center gap-1.5">
-                                <Truck className="w-3.5 h-3.5" style={{ color: accentColor }} />
-                                <span className="text-xs font-bold" style={{ color: 'var(--dd-text-primary)' }}>
+                                {/* <Truck className="w-3.5 h-3.5" style={{ color: accentColor }} /> */}
+                                <span className="text-sm font-bold" style={{ color: 'var(--dd-text-primary)' }}>
                                   {v.vehicle_license_plate}{v.vehicle_name ? ` | ${v.vehicle_name}` : ''}
                                 </span>
                               </div>

@@ -12,10 +12,13 @@ interface DeviceHeartbeatState {
   stationStatusMap: Record<string, DeviceStationStatusType>;
 }
 
+// Persist the status map across component unmounts/remounts
+let globalStationStatusMap: Record<string, DeviceStationStatusType> = {};
+
 export function useDeviceHeartbeat(): DeviceHeartbeatState {
   const managerRef = useRef<SocketManager | null>(null);
   const [isSocketConnected, setIsSocketConnected] = useState(false);
-  const [stationStatusMap, setStationStatusMap] = useState<Record<string, DeviceStationStatusType>>({});
+  const [stationStatusMap, setStationStatusMap] = useState<Record<string, DeviceStationStatusType>>(globalStationStatusMap);
 
   const bufferRef = useRef<Record<string, Partial<DeviceStationStatusType>>>({});
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -76,6 +79,7 @@ export function useDeviceHeartbeat(): DeviceHeartbeatState {
               nextMap[stationId] = { ...existing, ...flushed[stationId] };
             });
 
+            globalStationStatusMap = nextMap;
             return nextMap;
           });
 

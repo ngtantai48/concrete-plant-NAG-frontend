@@ -323,7 +323,7 @@
     "stationLabelWord": "Trạm",
     "readyVehiclesPanel": "Xe trong bãi",
     "noReadyVehicles": "Không có xe trong bãi",
-    "stoppedMaintenance": "Dừng / Bảo trì",
+    "stoppedMaintenance": "Sự cố / Bảo trì",
     "empty": "Trống",
     "stopped": "Tạm dừng",
     "outsideStation": "Lưu thông / Ngoài trạm",
@@ -424,6 +424,8 @@
     "shiftCloseSuccess": "Đã chốt ca cho ngày {date}",
     "shiftCloseFailed": "Không thể chốt ca cho ngày đã chọn",
     "shiftCloseDateRequired": "Vui lòng chọn ngày vận hành trước khi chốt ca",
+    "confirmShiftCloseTitle": "Xác nhận chốt ca",
+    "confirmShiftCloseDescription": "Bạn có chắc chắn muốn chốt ca không?",
     "shiftReopenAction": "Hủy chốt",
     "shiftReopenSuccess": "Đã hủy chốt ca cho ngày {date}",
     "shiftReopenFailed": "Không thể hủy chốt ca cho ngày đã chọn",
@@ -468,7 +470,8 @@
     "confirmStopStationTitle": "Xác nhận dừng trạm",
     "confirmStopStationDescription": "Bạn có chắc chắn muốn báo <strong>{stationName}</strong> dừng hoạt động không? Hành động này sẽ khiến trạm tạm thời không nhận thêm xe đổ bê tông.",
     "forgotShiftSlotsBannerTitle": "Có thể bạn đã quên chốt lốt",
-    "forgotShiftSlotsBannerDescription": "Nhấn vào đây để chuyển sang trang Quản lý lốt ca"
+    "forgotShiftSlotsBannerDescription": "Nhấn vào đây để chuyển sang trang Quản lý lốt ca",
+    "lastUpdatedAt": "Lần cuối cập nhật: "
   },
   "EndOfDayPage": {
     "title": "Quản lý xe cuối ngày",
@@ -543,7 +546,9 @@
     "operationDate": "Ngày vận hành",
     "shiftOpenSlotAction": "Chốt lốt",
     "shiftOpenSlotSuccess": "Đã chốt lốt thành công",
-    "shiftOpenSlotFailed": "Không thể chốt lốt"
+    "shiftOpenSlotFailed": "Không thể chốt lốt",
+    "confirmShiftOpenSlotTitle": "Xác nhận chốt lốt",
+    "confirmShiftOpenSlotDescription": "Bạn có chắc chắn muốn chốt danh sách lốt xe không?"
   },
   "VehicleMaintenancePage": {
     "title": "Bảo trì & Bảo dưỡng xe",
