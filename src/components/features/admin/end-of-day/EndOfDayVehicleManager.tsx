@@ -8,7 +8,7 @@ import type { Station } from "@/types/station";
 import { Skeleton } from "antd";
 import { Save, Shuffle } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 const FLOW_STATION_TYPE_ID = 1;
