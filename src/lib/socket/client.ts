@@ -97,11 +97,12 @@ export class SocketManager {
       return this.socket;
     }
 
-    const auth = this.buildAuth();
-
     this.socket = io(this.connectionUrl, {
       ...this.config,
-      auth,
+      auth: (cb: (data: Record<string, string>) => void) => {
+        const token = this.authProvider?.();
+        cb(token ? { token: `Bearer ${token}` } : {});
+      },
     });
 
     this.setupConnectionEvents();
@@ -221,14 +222,6 @@ export class SocketManager {
   // ============================================================
   // Private Methods
   // ============================================================
-
-  private buildAuth(): Record<string, string> | undefined {
-    const token = this.authProvider?.();
-    if (token) {
-      return { token: `Bearer ${token}` };
-    }
-    return undefined;
-  }
 
   private setupConnectionEvents(): void {
     if (!this.socket) return;
