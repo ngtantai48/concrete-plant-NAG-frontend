@@ -5,7 +5,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Popconfirm } from "antd";
-import { CheckCircle2, AlertTriangle, Wrench, Loader2 } from "lucide-react";
+import { CheckCircle2, AlertTriangle, Wrench, Loader2, HelpCircle } from "lucide-react";
 import vehicleApi from "@/services/vehicle.service";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -39,6 +39,13 @@ const STATUSES = [
     icon: Wrench,
     activeClass: "border-amber-400 bg-amber-50 text-amber-700 shadow-sm shadow-amber-100",
     dotClass: "bg-amber-500",
+  },
+  {
+    value: "other",
+    label: "Việc khác",
+    icon: HelpCircle,
+    activeClass: "border-purple-400 bg-purple-50 text-purple-700 shadow-sm shadow-purple-100",
+    dotClass: "bg-purple-500",
   },
 ] as const;
 
@@ -95,7 +102,7 @@ const VehicleStatusChange = ({
               key={status.value}
               htmlFor={`status-${vehicleId}-${status.value}`}
               className={cn(
-                "flex items-center gap-1.5 cursor-pointer rounded-lg border px-2.5 py-1 text-sm font-bold transition-all select-none",
+                "flex items-center gap-1.5 cursor-pointer rounded-md border px-2.5 py-1 text-xs font-semibold transition-all select-none",
                 isSelected
                   ? status.activeClass
                   : "border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:bg-slate-50"
