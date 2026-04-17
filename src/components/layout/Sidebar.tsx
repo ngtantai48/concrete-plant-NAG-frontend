@@ -104,7 +104,7 @@ export default function Sidebar() {
       { key: ADMIN.DASHBOARD, label: t("dashboard"), icon: <Gauge />, roles: ["admin"] },
 
       // { key: ADMIN.DRIVERS, label: t("drivers"), icon: <Truck />, roles: ["admin"] },
-      { key: ADMIN.SHIFT_SLOTS, label: t("shiftSlots"), icon: <ClipboardList />, roles: ["admin"] },
+      // { key: ADMIN.SHIFT_SLOTS, label: t("shiftSlots"), icon: <ClipboardList />, roles: ["admin"] },
       { key: ADMIN.VEHICLES, label: t("vehicles"), icon: <Car />, roles: ["admin"] },
       { key: ADMIN.VEHICLE_MAINTENANCES, label: t("vehicleMaintenances"), icon: <Wrench />, roles: ["admin"] },
       { key: ADMIN.VEHICLE_TYPES, label: t("vehicleTypes"), icon: <Layers />, roles: ["admin"] },
