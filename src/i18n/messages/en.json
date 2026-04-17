@@ -303,7 +303,7 @@
     "stationLabelWord": "Station",
     "readyVehiclesPanel": "Vehicles in Yard",
     "noReadyVehicles": "No vehicles in yard",
-    "stoppedMaintenance": "Stopped / Maintenance",
+    "stoppedMaintenance": "Problem / Maintenance",
     "empty": "Empty",
     "stopped": "Stopped",
     "outsideStation": "Transit / Outside Station",
@@ -404,6 +404,8 @@
     "shiftCloseSuccess": "Shift closed for {date}",
     "shiftCloseFailed": "Unable to close the shift for the selected date",
     "shiftCloseDateRequired": "Please choose an operation date before closing the shift",
+    "confirmShiftCloseTitle": "Confirm shift close",
+    "confirmShiftCloseDescription": "Are you sure you want to close the shift?",
     "shiftReopenAction": "Reopen shift",
     "shiftReopenSuccess": "Shift reopened for {date}",
     "shiftReopenFailed": "Unable to reopen the shift for the selected date",
@@ -448,7 +450,8 @@
     "confirmStopStationTitle": "Confirm station pause",
     "confirmStopStationDescription": "Are you sure you want to pause <strong>{stationName}</strong>? This action will temporarily stop the station from receiving concrete trucks.",
     "forgotShiftSlotsBannerTitle": "Forgot to confirm shift slots?",
-    "forgotShiftSlotsBannerDescription": "Click here to go to the Shift Slots Management page."
+    "forgotShiftSlotsBannerDescription": "Click here to go to the Shift Slots Management page.",
+    "lastUpdatedAt": "Last updated: "
   },
   "EndOfDayPage": {
     "title": "End-of-day vehicle management",
@@ -523,7 +526,9 @@
     "operationDate": "Operation date",
     "shiftOpenSlotAction": "Confirm slots",
     "shiftOpenSlotSuccess": "Slots confirmed successfully",
-    "shiftOpenSlotFailed": "Failed to confirm slots"
+    "shiftOpenSlotFailed": "Failed to confirm slots",
+    "confirmShiftOpenSlotTitle": "Confirm shift slots",
+    "confirmShiftOpenSlotDescription": "Are you sure you want to confirm the shift slots?"
   },
   "VehicleMaintenancePage": {
     "title": "Vehicle Maintenance",
