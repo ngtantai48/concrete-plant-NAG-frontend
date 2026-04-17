@@ -182,13 +182,14 @@ export default function AdminDashboard() {
     const list: { id: string; label: string; statusLabel: string; chipClass: string }[] = [];
 
     vehicles.forEach(v => {
-      if (v.vehicle_status === "incident" || v.vehicle_status === "maintenance") {
+      if (v.vehicle_status === "incident" || v.vehicle_status === "maintenance" || v.vehicle_status === "other") {
         const isIncident = v.vehicle_status === "incident";
+        const isOther = v.vehicle_status === "other";
         list.push({
           id: `veh-${v.vehicle_id}`,
           label: v.vehicle_license_plate ? `${v.vehicle_license_plate}${v.vehicle_name ? ` | ${v.vehicle_name}` : ''}` : '',
-          statusLabel: isIncident ? (t('incident') || 'Sự cố') : (tVehiclePage('maintenanceOption') || 'Bảo dưỡng'),
-          chipClass: isIncident ? 'dd-chip-red' : 'dd-chip-amber'
+          statusLabel: isIncident ? (t('incident') || 'Sự cố') : isOther ? 'Việc khác' : (tVehiclePage('maintenanceOption') || 'Bảo dưỡng'),
+          chipClass: isIncident ? 'dd-chip-red' : isOther ? 'dd-chip-slate' : 'dd-chip-amber'
         });
       }
     });
