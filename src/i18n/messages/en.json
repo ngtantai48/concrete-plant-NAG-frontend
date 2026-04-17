@@ -303,7 +303,7 @@
     "stationLabelWord": "Station",
     "readyVehiclesPanel": "Vehicles in Yard",
     "noReadyVehicles": "No vehicles in yard",
-    "stoppedMaintenance": "Stopped / Maintenance",
+    "stoppedMaintenance": "Problem / Maintenance",
     "empty": "Empty",
     "stopped": "Stopped",
     "outsideStation": "Transit / Outside Station",
@@ -450,7 +450,8 @@
     "confirmStopStationTitle": "Confirm station pause",
     "confirmStopStationDescription": "Are you sure you want to pause <strong>{stationName}</strong>? This action will temporarily stop the station from receiving concrete trucks.",
     "forgotShiftSlotsBannerTitle": "Forgot to confirm shift slots?",
-    "forgotShiftSlotsBannerDescription": "Click here to go to the Shift Slots Management page."
+    "forgotShiftSlotsBannerDescription": "Click here to go to the Shift Slots Management page.",
+    "lastUpdatedAt": "Last updated: "
   },
   "EndOfDayPage": {
     "title": "End-of-day vehicle management",

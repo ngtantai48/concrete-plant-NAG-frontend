@@ -113,13 +113,15 @@ function SortableVehicleItemBase({
 
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div className="flex items-center gap-2">
-          <div
-            {...(disableDrag ? {} : attributes)}
-            {...(disableDrag ? {} : listeners)}
-            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded text-slate-400 ${disableDrag ? 'opacity-30 cursor-not-allowed' : 'hover:text-slate-600 cursor-grab active:cursor-grabbing touch-none'}`}
-          >
-            <GripVertical className="h-4 w-4" />
-          </div>
+          {!disableDrag && (
+            <div
+              {...attributes}
+              {...listeners}
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded text-slate-400 hover:text-slate-600 cursor-grab active:cursor-grabbing touch-none"
+            >
+              <GripVertical className="h-4 w-4" />
+            </div>
+          )}
 
           {isManualMode && (
             <Checkbox
@@ -141,9 +143,14 @@ function SortableVehicleItemBase({
               {order.vehicles?.vehicle_license_plate ? `${order.vehicles.vehicle_license_plate}${order.vehicles.vehicle_name ? ` | ${order.vehicles.vehicle_name}` : ''}` : `ĐƠN: ${order.order_id}`}
             </div>
             {order.order_init_datetime && (
-              <div className="flex items-center gap-1 text-[11px] uppercase font-bold" style={{ color: 'var(--dd-text-muted)' }}>
-                <Clock className="h-3 w-3" />
-                <span><span className="opacity-75">Lần cuối cập nhật:</span> <span style={{ color: 'var(--dd-text-primary)' }}>{`${new Date(order.order_init_datetime).getHours()} giờ ${new Date(order.order_init_datetime).getMinutes().toString().padStart(2, '0')} phút`}</span></span>
+              <div className="flex items-center gap-1 text-sm font-extrabold mx-4" style={{ color: 'var(--dd-text-muted)' }}>
+                <Clock size={14} />
+                <span>
+                  <span className="opacity-85">{t('lastUpdatedAt')}</span>
+                  <span style={{ color: 'var(--dd-text-primary)' }}>
+                    {`${new Date(order.order_init_datetime).getHours()}h${new Date(order.order_init_datetime).getMinutes().toString().padStart(2, '0')}p`}
+                  </span>
+                </span>
               </div>
             )}
           </div>

@@ -323,7 +323,7 @@
     "stationLabelWord": "Trạm",
     "readyVehiclesPanel": "Xe trong bãi",
     "noReadyVehicles": "Không có xe trong bãi",
-    "stoppedMaintenance": "Dừng / Bảo trì",
+    "stoppedMaintenance": "Sự cố / Bảo trì",
     "empty": "Trống",
     "stopped": "Tạm dừng",
     "outsideStation": "Lưu thông / Ngoài trạm",
@@ -470,7 +470,8 @@
     "confirmStopStationTitle": "Xác nhận dừng trạm",
     "confirmStopStationDescription": "Bạn có chắc chắn muốn báo <strong>{stationName}</strong> dừng hoạt động không? Hành động này sẽ khiến trạm tạm thời không nhận thêm xe đổ bê tông.",
     "forgotShiftSlotsBannerTitle": "Có thể bạn đã quên chốt lốt",
-    "forgotShiftSlotsBannerDescription": "Nhấn vào đây để chuyển sang trang Quản lý lốt ca"
+    "forgotShiftSlotsBannerDescription": "Nhấn vào đây để chuyển sang trang Quản lý lốt ca",
+    "lastUpdatedAt": "Lần cuối cập nhật: "
   },
   "EndOfDayPage": {
     "title": "Quản lý xe cuối ngày",
