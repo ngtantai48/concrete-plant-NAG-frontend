@@ -128,21 +128,31 @@ export default function AdminDashboard() {
         const fetchedStations = sRes.data?.data || sRes.data || [];
         setStations(fetchedStations);
         setGeofenceStation(fetchedStations.find((s: Station) => s.station_gps_longitude != null && s.station_gps_latitude != null) || fetchedStations[0] || null);
+      } else {
+        console.warn('[fetchAll] stations failed:', results[0].reason);
       }
       if (results[1].status === 'fulfilled') {
         const vRes = results[1].value;
         setVehicles(vRes.data?.data || vRes.data || []);
+      } else {
+        console.warn('[fetchAll] vehicles failed:', results[1].reason);
       }
       if (results[2].status === 'fulfilled') {
         const oRes = results[2].value;
         setOrders(oRes.data?.data || oRes.data || []);
+      } else {
+        console.warn('[fetchAll] ordersByDate failed:', results[2].reason);
       }
       if (results[3]?.status === 'fulfilled') {
         const pRes = results[3].value;
-        setPendingOrders(pRes.data?.data || pRes.data || []);
+        const list = pRes.data?.data || pRes.data || [];
+        setPendingOrders(list);
+        console.log('[fetchAll] pending count:', Array.isArray(list) ? list.length : 'n/a');
+      } else {
+        console.warn('[fetchAll] pending failed:', results[3]?.reason);
       }
-    } catch {
-      //
+    } catch (err) {
+      console.error('[fetchAll] unexpected:', err);
     } finally {
       setLoading(false);
     }

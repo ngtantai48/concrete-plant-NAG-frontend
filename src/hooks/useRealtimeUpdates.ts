@@ -117,12 +117,18 @@ export function useRealtimeUpdates(onUpdate: (signal?: UpdateSignal) => void) {
     // Catch-all for other events (chỉ những events không phải update/ping)
     unsubscribes.push(
       manager.onAny((eventName, payload) => {
+        // DIAGNOSTIC: log raw event name for every event on /updates
+        console.log('[updates raw]', eventName, payload);
+
         if (eventName === 'update' || eventName === 'ping') {
           return; // Already handled above
         }
 
         const signal = validateUpdateSignal(eventName, payload);
-        if (!signal) return;
+        if (!signal) {
+          console.warn(`[RealtimeUpdates] Event "${eventName}" bi loc boi validateUpdateSignal`);
+          return;
+        }
 
         console.log(`[RealtimeUpdates] Nhan su kien ${eventName}:`, payload);
         triggerRefresh(signal);
