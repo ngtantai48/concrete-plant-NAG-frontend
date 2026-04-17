@@ -6,7 +6,7 @@ import vehicleApi from "@/services/vehicle.service";
 import type { Vehicle } from "@/types/vehicle";
 import orderApi from "@/services/order.service";
 import type { Order } from "@/types/order";
-import { RefreshCw, Map as MapIcon, Maximize2, Minimize2, Truck, Radio, CheckCircle2, Clock, Route, MapPin, Search, Calendar as CalendarIcon, Timer, ArrowRight, Ellipsis, X, ShieldCheck } from "lucide-react";
+import { RefreshCw, Map as MapIcon, Maximize2, Minimize2, Truck, Radio, CheckCircle2, Clock, Route, MapPin, Search, Calendar as CalendarIcon, Timer, ArrowRight, Ellipsis, X, ShieldCheck, FileSpreadsheet } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -261,6 +261,69 @@ export default function AdminDashboard() {
     }
   }, [selectedDate, t, fetchAll]);
 
+  const [isSyncingShift, setIsSyncingShift] = useState(false);
+  const [isSyncShiftDialogOpen, setIsSyncShiftDialogOpen] = useState(false);
+
+  const handleSyncShift = useCallback(async () => {
+    setIsSyncShiftDialogOpen(false);
+    setIsSyncingShift(true);
+    try {
+      // Build maToStt from pending orders, sorted by order_number (matches ActivityFlow display)
+      const sorted = [...activeFlowOrders].sort(
+        (a, b) => (a.order_number || 0) - (b.order_number || 0),
+      );
+      const maToStt: Record<string, number> = {};
+      const skipped: { order_number: number; reason: string; raw: unknown }[] = [];
+      let stt = 1;
+      for (const o of sorted) {
+        const raw = o.vehicles?.vehicle_name;
+        if (!raw) {
+          skipped.push({ order_number: o.order_number, reason: 'no_vehicle_name', raw });
+          continue;
+        }
+        // Normalize: trim + uppercase + strip whitespace + strip leading zeros after X
+        // e.g. "X02" -> "X2", "X09" -> "X9" so it matches sheet entries "X2", "X9"
+        const upper = String(raw).trim().toUpperCase().replace(/\s+/g, "");
+        const m = upper.match(/^X0*(\d+)$/);
+        const maX = m ? `X${m[1]}` : upper;
+        // Only accept valid X-codes (X1, X2, ..., X21); skip duplicates (first occurrence wins)
+        if (!/^X\d+$/.test(maX)) {
+          skipped.push({ order_number: o.order_number, reason: 'invalid_format', raw });
+          continue;
+        }
+        if (maX in maToStt) {
+          skipped.push({ order_number: o.order_number, reason: 'duplicate', raw: maX });
+          continue;
+        }
+        maToStt[maX] = stt++;
+      }
+
+      console.log('[handleSyncShift] total pending:', sorted.length, '| unique mã X:', Object.keys(maToStt).length);
+      console.log('[handleSyncShift] maToStt:', maToStt);
+      if (skipped.length > 0) console.log('[handleSyncShift] skipped:', skipped);
+
+      const res = await fetch("/api/google-sheets/bo-tri-cv/sync-lot", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ maToStt }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || "Sync failed");
+
+      console.log('[handleSyncShift] server response:', data);
+      if (data.unmatchedMaX?.length > 0) {
+        console.warn('[handleSyncShift] mã X không có trong sheet cột H:', data.unmatchedMaX);
+      }
+
+      toast.success(t('syncShiftSuccess', { count: data.updated ?? Object.keys(maToStt).length }));
+    } catch (err) {
+      console.error('[handleSyncShift] error:', err);
+      toast.error(t('syncShiftFailed'));
+    } finally {
+      setIsSyncingShift(false);
+    }
+  }, [activeFlowOrders, t]);
+
   const [dispatchMode, setDispatchMode] = useState<DispatchMode>('auto');
   const [showMap, setShowMap] = useState(false);
 
@@ -452,11 +515,12 @@ export default function AdminDashboard() {
                 </PopoverContent>
               </Popover>
 
-              {/* Shift Close Button */}
+              {/* Sync Shift Button (replaces hidden Chốt ca button) */}
               <div className="border-l border-slate-200 pl-2 flex items-center gap-1.5">
                 {!isPastDate && hasUnclosedShift && (
                   <>
-                    <Tooltip>
+                    {/* Chốt ca button hidden — keeping handleShiftClose for potential re-enable */}
+                    {/* <Tooltip>
                       <TooltipTrigger asChild>
                         <Button
                           size="sm"
@@ -469,7 +533,7 @@ export default function AdminDashboard() {
                           {t('shiftCloseAction')}
                         </Button>
                       </TooltipTrigger>
-                      <TooltipContent >
+                      <TooltipContent>
                         <p>{t('shiftCloseAction')} {format(new Date(selectedDate), "dd/MM/yyyy")}</p>
                       </TooltipContent>
                     </Tooltip>
@@ -478,12 +542,6 @@ export default function AdminDashboard() {
                       <AlertDialogContent>
                         <AlertDialogHeader>
                           <AlertDialogTitle>{t('confirmShiftCloseTitle')}</AlertDialogTitle>
-                          {/* <AlertDialogDescription>
-                            {t.rich('confirmShiftCloseDescription', { 
-                              date: format(new Date(selectedDate), "dd/MM/yyyy"),
-                              strong: (chunks) => <strong>{chunks}</strong>
-                            })}
-                          </AlertDialogDescription> */}
                           <AlertDialogDescription>{t('confirmShiftCloseDescription')}</AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
@@ -494,6 +552,43 @@ export default function AdminDashboard() {
                             className="bg-primary text-primary-foreground hover:bg-primary/90"
                           >
                             {t('shiftCloseAction')}
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog> */}
+
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          size="sm"
+                          variant="primary"
+                          onClick={() => setIsSyncShiftDialogOpen(true)}
+                          disabled={isSyncingShift}
+                          className="uppercase"
+                        >
+                          {isSyncingShift ? <RefreshCw className="animate-spin" /> : <FileSpreadsheet />}
+                          {t('syncShiftAction')}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>{t('syncShiftAction')} {format(new Date(selectedDate), "dd/MM/yyyy")}</p>
+                      </TooltipContent>
+                    </Tooltip>
+
+                    <AlertDialog open={isSyncShiftDialogOpen} onOpenChange={setIsSyncShiftDialogOpen}>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>{t('confirmSyncShiftTitle')}</AlertDialogTitle>
+                          <AlertDialogDescription>{t('confirmSyncShiftDescription')}</AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>{tCommon('cancel')}</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={handleSyncShift}
+                            disabled={isSyncingShift}
+                            className="bg-primary text-primary-foreground hover:bg-primary/90"
+                          >
+                            {t('syncShiftAction')}
                           </AlertDialogAction>
                         </AlertDialogFooter>
                       </AlertDialogContent>
