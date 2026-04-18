@@ -17,8 +17,18 @@ const iconDefault = L.icon({
 });
 
 // Normalize Vtracking status to one of: 'run' | 'park' | 'offline'
-// Vtracking API returns various values: run, stop, park, idle, parking, etc.
-function normalizeStatus(status: string): 'run' | 'park' | 'offline' {
+// Note: speed field is the LAST RECORDED speed, not real-time.
+// Offline is determined by signal age (timestamp), matching Vtracking's ~10 min threshold.
+const OFFLINE_THRESHOLD_MS = 10 * 60 * 1000; // 10 minutes
+
+function normalizeStatus(status: string, timestamp?: number): 'run' | 'park' | 'offline' {
+  // Check if signal is stale (no data for over 10 minutes = offline)
+  if (timestamp) {
+    const age = Date.now() - timestamp;
+    if (age > OFFLINE_THRESHOLD_MS) return 'offline';
+  }
+
+  // Check status field from Vtracking API
   const s = (status || '').toLowerCase();
   if (s === 'run' || s === 'running') return 'run';
   if (s === 'stop' || s === 'park' || s === 'idle' || s === 'parking' || s === 'stopped') return 'park';
@@ -189,10 +199,10 @@ const StationMap = ({ stationLongitude, stationLatitude, radius, vehicles, focus
   const stationLng = stationLongitude;
   const stationLat = stationLatitude;
 
-  // Vehicle status counts (using normalized status)
-  const runCount = vehicles.filter(v => normalizeStatus(v.status) === 'run').length;
-  const parkCount = vehicles.filter(v => normalizeStatus(v.status) === 'park').length;
-  const offlineCount = vehicles.filter(v => normalizeStatus(v.status) === 'offline').length;
+  // Vehicle status counts (using normalized status with speed + timestamp)
+  const runCount = vehicles.filter(v => normalizeStatus(v.status, v.timestamp) === 'run').length;
+  const parkCount = vehicles.filter(v => normalizeStatus(v.status, v.timestamp) === 'park').length;
+  const offlineCount = vehicles.filter(v => normalizeStatus(v.status, v.timestamp) === 'offline').length;
 
   return (
     <div className="w-full h-full relative z-0 rounded-lg overflow-hidden" style={{ border: '1px solid rgba(56, 189, 248, 0.1)' }}>
@@ -250,7 +260,7 @@ const StationMap = ({ stationLongitude, stationLatitude, radius, vehicles, focus
 
         {/* Vehicle markers - rotated car icon (Vtracking style) */}
         {vehicles.map((v) => {
-          const nStatus = normalizeStatus(v.status);
+          const nStatus = normalizeStatus(v.status, v.timestamp);
           const icon = createVehicleIcon(nStatus, v.direction, v.speed, zoom, v.vehicle_name, v.license_plate);
 
           return (
@@ -265,11 +275,11 @@ const StationMap = ({ stationLongitude, stationLatitude, radius, vehicles, focus
                       <span className="text-xs text-slate-500 truncate max-w-[200px]">{v.vehicle_name}</span>
                     </div>
                     <span className={`ml-auto shrink-0 font-semibold px-2 py-0.5 rounded-full text-[11px] ${
-                      normalizeStatus(v.status) === "run" ? "bg-emerald-50 text-emerald-700 border border-emerald-100" :
-                      normalizeStatus(v.status) === "park" ? "bg-amber-50 text-amber-700 border border-amber-100" :
+                      normalizeStatus(v.status, v.timestamp) === "run" ? "bg-emerald-50 text-emerald-700 border border-emerald-100" :
+                      normalizeStatus(v.status, v.timestamp) === "park" ? "bg-amber-50 text-amber-700 border border-amber-100" :
                       "bg-slate-50 text-slate-500 border border-slate-100"
                     }`}>
-                      {normalizeStatus(v.status) === "run" ? "Đang chạy" : normalizeStatus(v.status) === "park" ? "Đang dừng" : "Mất kết nối"}
+                      {normalizeStatus(v.status, v.timestamp) === "run" ? "Đang chạy" : normalizeStatus(v.status, v.timestamp) === "park" ? "Đang dừng" : "Mất kết nối"}
                     </span>
                   </div>
 

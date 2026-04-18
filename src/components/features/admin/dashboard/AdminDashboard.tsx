@@ -172,7 +172,7 @@ export default function AdminDashboard() {
     geofenceStation?.station_gps_longitude ?? null,
     geofenceStation?.station_gps_latitude ?? null,
     geofenceStation?.station_gps_geofencing || 500,
-    30000,
+    45000,
   );
 
   const { isConnected: socketConnected, lastSignal, lastSignalTime } = useRealtimeUpdates(fetchAll);
@@ -448,19 +448,16 @@ export default function AdminDashboard() {
 
             {/* Right Controls */}
             <div className="flex items-center gap-2 shrink-0">
-              {/* Zoom Control */}
+              {/* Zoom Control - LED style */}
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button
-                    variant="outline"
-                    size="sm"
+                  <button
                     onClick={() => {
                       setZoomLevel(z => {
                         const nextZoom = z === 1 ? 0.75 : 1;
                         const sidebarBtn = document.getElementById('sidebar-toggle-btn');
                         if (sidebarBtn) {
                           const isCollapsed = sidebarBtn.getAttribute('data-collapsed') === 'true';
-                          // Thu nhỏ thì gập sidebar, phóng to thì mở sidebar
                           if (nextZoom === 0.75 && !isCollapsed) {
                             sidebarBtn.click();
                           } else if (nextZoom === 1 && isCollapsed) {
@@ -470,10 +467,18 @@ export default function AdminDashboard() {
                         return nextZoom;
                       });
                     }}
-                    className="h-8 w-8 p-0 border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-900 shadow-none transition-all rounded-full"
+                    className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 border text-sm font-bold uppercase cursor-pointer transition-all ${
+                      zoomLevel === 1
+                        ? 'border-emerald-200 text-emerald-700 hover:bg-emerald-50'
+                        : 'border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100'
+                    }`}
                   >
-                    {zoomLevel === 1 ? <ZoomOut className="h-4 w-4" /> : <ZoomIn className="h-4 w-4" />}
-                  </Button>
+                    {zoomLevel === 1
+                      ? <Radio className="h-2.5 w-2.5 text-emerald-500 animate-pulse" />
+                      : <Radio className="h-2.5 w-2.5 text-sky-500 animate-pulse" />
+                    }
+                    MONITOR
+                  </button>
                 </TooltipTrigger>
                 <TooltipContent>
                   <p>{zoomLevel === 1 ? 'Thu nhỏ giao diện (75%)' : 'Khôi phục (100%)'}</p>
@@ -1454,7 +1459,14 @@ export default function AdminDashboard() {
                         <div className="flex items-center gap-2.5">
                           <div className="h-3 w-3 rounded-full shrink-0 border-2 border-white shadow-sm"
                             style={{
-                              background: (['run','running'].includes(v.status?.toLowerCase())) ? '#10b981' : (['stop','park','idle','parking','stopped'].includes(v.status?.toLowerCase())) ? '#f59e0b' : '#94a3b8',
+                              background: (() => {
+                                const isStale = v.timestamp && (Date.now() - v.timestamp > 10 * 60 * 1000);
+                                if (isStale) return '#94a3b8';
+                                const s = (v.status || '').toLowerCase();
+                                if (['run', 'running'].includes(s)) return '#10b981';
+                                if (['stop', 'park', 'idle', 'parking', 'stopped'].includes(s)) return '#f59e0b';
+                                return '#94a3b8';
+                              })()
                             }}
                           />
                           <span className="text-sm font-bold" style={{ color: 'var(--dd-text-primary)' }}>
@@ -1462,7 +1474,14 @@ export default function AdminDashboard() {
                           </span>
                         </div>
                         <div className="mt-1.5 pl-5 flex items-center justify-between text-xs" style={{ color: 'var(--dd-text-muted)' }}>
-                          <span>{(['run','running'].includes(v.status?.toLowerCase())) ? t('running') : (['stop','park','idle','parking','stopped'].includes(v.status?.toLowerCase())) ? t('stopped') : t('disconnected')}</span>
+                          <span>{(() => {
+                            const isStale = v.timestamp && (Date.now() - v.timestamp > 10 * 60 * 1000);
+                            if (isStale) return t('disconnected');
+                            const s = (v.status || '').toLowerCase();
+                            if (['run', 'running'].includes(s)) return t('running');
+                            if (['stop', 'park', 'idle', 'parking', 'stopped'].includes(s)) return t('stopped');
+                            return t('disconnected');
+                          })()}</span>
                           <span className="font-semibold tabular-nums">{v.speed} km/h</span>
                         </div>
                         <div className="mt-0.5 pl-5 text-xs text-left" style={{ color: 'var(--dd-text-muted)' }}>

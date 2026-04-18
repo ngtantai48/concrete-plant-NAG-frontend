@@ -49,6 +49,10 @@ interface SocketContextType {
   markAllAsRead: () => void;
   clearNotifications: () => void;
   refreshNotifications: () => void;
+  /** Whether voice notifications are muted */
+  isMuted: boolean;
+  /** Toggle voice notification mute on/off */
+  toggleMute: () => void;
   /**
    * Subscribe to all socket events. Returns an unsubscribe function.
    */
@@ -95,6 +99,8 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const notificationsRef = useRef<Notification[]>([]);
   const spokenNotificationIdsRef = useRef<Set<string | number>>(new Set());
+  const [isMuted, setIsMuted] = useState(false);
+  const isMutedRef = useRef(false);
 
   const listenersRef = useRef<Set<SocketEventHandler>>(new Set());
 
@@ -105,6 +111,8 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   }, [notifications]);
 
   const speakNotification = useCallback((notification: NotificationPayload | Notification) => {
+    // Skip speech if user has muted voice notifications
+    if (isMutedRef.current) return;
     if (!shouldSpeakNotification(notification)) return;
 
     const notificationId = notification.id;
@@ -412,6 +420,18 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         markAllAsRead,
         clearNotifications,
         refreshNotifications,
+        isMuted,
+        toggleMute: () => {
+          setIsMuted(prev => {
+            const next = !prev;
+            isMutedRef.current = next;
+            // Stop any currently speaking utterance when muting
+            if (next && typeof window !== 'undefined' && 'speechSynthesis' in window) {
+              window.speechSynthesis.cancel();
+            }
+            return next;
+          });
+        },
         onSocketEvent,
       }}
     >
