@@ -351,20 +351,28 @@ export default function AdminDashboard() {
       const aTrips = vehicleTripMap.get(a.vehicle_id) || [];
       const bTrips = vehicleTripMap.get(b.vehicle_id) || [];
 
-      // Get latest update time for vehicle A
+      // Priority score: running=2, transporting=1, rest=0
+      const getPriority = (trips: typeof aTrips) => {
+        if (trips.some(o => o.order_status === 'running')) return 2;
+        if (trips.some(o => o.order_status === 'transporting')) return 1;
+        return 0;
+      };
+      const aPriority = getPriority(aTrips);
+      const bPriority = getPriority(bTrips);
+
+      // Sort by priority group first
+      if (aPriority !== bPriority) return bPriority - aPriority;
+
+      // Within same group: sort by latest updated_at descending
       const aLatestTime = aTrips.length > 0
         ? Math.max(0, ...aTrips.map(o => o.updated_at ? new Date(o.updated_at).getTime() : 0))
         : 0;
-
-      // Get latest update time for vehicle B
       const bLatestTime = bTrips.length > 0
         ? Math.max(0, ...bTrips.map(o => o.updated_at ? new Date(o.updated_at).getTime() : 0))
         : 0;
-
-      // Sort by latest time descending
       if (bLatestTime !== aLatestTime) return bLatestTime - aLatestTime;
 
-      // Fallback to license plate
+      // Fallback: license plate A-Z
       return a.vehicle_license_plate.localeCompare(b.vehicle_license_plate);
     });
   }, [vehicles, vehicleTripMap]);
@@ -1273,7 +1281,7 @@ export default function AdminDashboard() {
                                   <Badge variant="secondary"
                                     className={`${isTripActive ? 'bg-sky-100 text-sky-600 hover:bg-sky-200' : 'bg-emerald-100 text-emerald-600 hover:bg-emerald-200'} text-sm px-2 py-0.5 font-semibold border-transparent shadow-none`}
                                   >
-                                    {isTripActive ? 'Đang di chuyển' : t('completed')}
+                                    {o.order_status === 'running' ? 'Đang di chuyển' : o.order_status === 'transporting' ? 'Đã lấy hàng' : t('completed')}
                                   </Badge>
                                 </div>
                                 {/* Time row */}
