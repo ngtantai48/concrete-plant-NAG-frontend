@@ -242,6 +242,8 @@ export default function Sidebar() {
                 </div>
               )}
               <Button
+                id="sidebar-toggle-btn"
+                data-collapsed={collapsed}
                 type="text"
                 icon={collapsed ? <DoubleRightOutlined /> : <DoubleLeftOutlined />}
                 onClick={toggleCollapsed}
