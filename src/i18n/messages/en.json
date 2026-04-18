@@ -57,6 +57,7 @@
     "stations": "Station Management",
     "mealCheck": "Meal Check",
     "attendance": "Attendance",
+    "shiftSlots": "Shift Slots",
     "role": {
       "admin": "Administrator",
       "user": "Tester",
@@ -79,10 +80,10 @@
     "notification_empty": "No notifications",
     "read": "Read",
     "unknown_event": "You have a new notification",
-    "station_check_in": "Vehicle {vehicle} checked in at {station}",
-    "station_check_out": "Vehicle {vehicle} checked out from {station}",
-    "vehicle_check_in": "Vehicle {vehicle} checked in to the yard",
-    "vehicle_check_out": "Vehicle {vehicle} checked out from the yard"
+    "station_check_in": "Vehicle {vehicle} is receiving goods in {station}",
+    "station_check_out": "Vehicle {vehicle} has left {station}",
+    "vehicle_check_in": "Vehicle {vehicle} has entered the yard",
+    "vehicle_check_out": "Vehicle {vehicle} has left the yard"
   },
   "Dashboard": {
     "title": "Dashboard",
@@ -302,7 +303,7 @@
     "stationLabelWord": "Station",
     "readyVehiclesPanel": "Vehicles in Yard",
     "noReadyVehicles": "No vehicles in yard",
-    "stoppedMaintenance": "Stopped / Maintenance",
+    "stoppedMaintenance": "Problem / Maintenance / Other",
     "empty": "Empty",
     "stopped": "Stopped",
     "outsideStation": "Transit / Outside Station",
@@ -387,7 +388,7 @@
     "confirmPauseStation": "Are you sure you want to pause this station?",
     "reorderSuccess": "Order sequence updated successfully",
     "reorderFailed": "Unable to update order sequence",
-    "dragAcrossStationsHint": "Drag the dotted handle to reorder within a station or move a vehicle to another station",
+    "dragAcrossStationsHint": "Drag the dotted handle to change the order sequence",
     "dropIntoStation": "Drop to move this vehicle to {stationName}",
     "draggingVehicleLabel": "Dragging vehicle",
     "dragSourceStationBadge": "Source station",
@@ -403,6 +404,13 @@
     "shiftCloseSuccess": "Shift closed for {date}",
     "shiftCloseFailed": "Unable to close the shift for the selected date",
     "shiftCloseDateRequired": "Please choose an operation date before closing the shift",
+    "confirmShiftCloseTitle": "Confirm shift close",
+    "confirmShiftCloseDescription": "Are you sure you want to close the shift?",
+    "syncShiftAction": "Sync shift",
+    "confirmSyncShiftTitle": "Confirm shift sync",
+    "confirmSyncShiftDescription": "Do you want to sync to the shift slot sheet?",
+    "syncShiftSuccess": "Synced {count} shift slots to sheet",
+    "syncShiftFailed": "Unable to sync shift slot sheet",
     "shiftReopenAction": "Reopen shift",
     "shiftReopenSuccess": "Shift reopened for {date}",
     "shiftReopenFailed": "Unable to reopen the shift for the selected date",
@@ -445,7 +453,10 @@
     "cameraConnected": "Camera connected",
     "cameraDisconnected": "Camera disconnected",
     "confirmStopStationTitle": "Confirm station pause",
-    "confirmStopStationDescription": "Are you sure you want to pause <strong>{stationName}</strong>? This action will temporarily stop the station from receiving concrete trucks."
+    "confirmStopStationDescription": "Are you sure you want to pause <strong>{stationName}</strong>? This action will temporarily stop the station from receiving concrete trucks.",
+    "forgotShiftSlotsBannerTitle": "Forgot to confirm shift slots?",
+    "forgotShiftSlotsBannerDescription": "Click here to go to the Shift Slots Management page.",
+    "lastUpdatedAt": "Last updated: "
   },
   "EndOfDayPage": {
     "title": "End-of-day vehicle management",
@@ -508,6 +519,21 @@
     "alertForgotScheduleConfirmTitle": "Previous schedule not confirmed",
     "alertForgotScheduleConfirmDescription": "Yesterday's shift was closed but today's vehicle schedule has not been confirmed. Please confirm the schedule.",
     "alertGoToPrevious": "Resolve now"
+  },
+  "ShiftSlotsPage": {
+    "title": "Shift slot management",
+    "subtitle": "List of end-of-day slots. Drag and drop to reorder or reassign stations.",
+    "boardTitle": "End of Day Orders",
+    "boardHint": "Drag and drop orders to reorder.",
+    "lastUpdated": "Updated in realtime",
+    "noCanceledOrders": "No waiting slots",
+    "canceledCount": "{count} waiting slots",
+    "operationDate": "Operation date",
+    "shiftOpenSlotAction": "Confirm slots",
+    "shiftOpenSlotSuccess": "Slots confirmed successfully",
+    "shiftOpenSlotFailed": "Failed to confirm slots",
+    "confirmShiftOpenSlotTitle": "Confirm shift slots",
+    "confirmShiftOpenSlotDescription": "Are you sure you want to confirm the shift slots?"
   },
   "VehicleMaintenancePage": {
     "title": "Vehicle Maintenance",

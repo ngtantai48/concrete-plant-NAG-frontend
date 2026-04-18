@@ -89,6 +89,7 @@ function createThrottle(ms: number) {
 
 export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const managerRef = useRef<SocketManager | null>(null);
+  const prevTokenRef = useRef<string | undefined>(undefined);
   const [isConnected, setIsConnected] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const notificationsRef = useRef<Notification[]>([]);
@@ -149,8 +150,16 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     // Connection state listener
     const unsubscribeConnection = manager.onConnectionChange(setIsConnected);
 
-    // Connect
-    manager.connect();
+    // Nếu token đã đổi (refresh), force reconnect để handshake lại với token mới.
+    // Lần đầu (prev === undefined) chỉ connect bình thường.
+    const prevToken = prevTokenRef.current;
+    prevTokenRef.current = tokenState;
+
+    if (prevToken && prevToken !== tokenState) {
+      manager.reconnect();
+    } else {
+      manager.connect();
+    }
 
     return () => {
       unsubscribeConnection();
@@ -188,12 +197,10 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       manager.on('notification:new', (payload: unknown) => {
         const validated = validateNotificationPayload(payload);
         if (!validated) return;
-
         const exists = notificationsRef.current.some((item) => item.id === validated.id);
         if (!exists) {
           speakNotification(validated);
         }
-
         setNotifications((prev) => {
           const exists = prev.find((n) => n.id === validated.id);
           if (exists) return prev; // Avoid duplicates

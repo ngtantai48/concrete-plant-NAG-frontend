@@ -41,6 +41,8 @@ interface SortableVehicleItemProps {
   onManualStationChange?: (stationId: string) => void;
   onManualStationClear?: () => void;
   isDropTarget?: boolean;
+  hideStatus?: boolean;
+  disableDrag?: boolean;
   t: (key: string) => string;
 }
 
@@ -64,6 +66,8 @@ function SortableVehicleItemBase({
   onManualStationChange,
   onManualStationClear,
   isDropTarget = false,
+  hideStatus = false,
+  disableDrag = false,
   t,
 }: SortableVehicleItemProps) {
   const displayedStationName = isManualMode && isSelected
@@ -78,6 +82,7 @@ function SortableVehicleItemBase({
     isDragging,
   } = useSortable({
     id: order.order_id,
+    disabled: disableDrag,
     data: {
       type: 'order',
       orderId: order.order_id,
@@ -108,6 +113,16 @@ function SortableVehicleItemBase({
 
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div className="flex items-center gap-2">
+          {!disableDrag && (
+            <div
+              {...attributes}
+              {...listeners}
+              className="flex h-8 w-8 shrink-0 items-center justify-center rounded text-slate-400 hover:text-slate-600 cursor-grab active:cursor-grabbing touch-none"
+            >
+              <GripVertical className="h-4 w-4" />
+            </div>
+          )}
+
           {isManualMode && (
             <Checkbox
               checked={isSelected}
@@ -117,22 +132,25 @@ function SortableVehicleItemBase({
             />
           )}
 
-
-
           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-sm font-extrabold"
             style={{ color: 'var(--dd-text-secondary)', border: '1px solid var(--dd-border)' }}
           >
             {(displayIndex ?? actualIndex) + 1}
           </div>
 
-          <div className="min-w-0 flex-1 flex items-center gap-3">
+          <div className="min-w-0 flex-1 flex items-center gap-6">
             <div className="truncate text-base font-black" style={{ color: 'var(--dd-text-primary)' }}>
               {order.vehicles?.vehicle_license_plate ? `${order.vehicles.vehicle_license_plate}${order.vehicles.vehicle_name ? ` | ${order.vehicles.vehicle_name}` : ''}` : `ĐƠN: ${order.order_id}`}
             </div>
             {order.order_init_datetime && (
-              <div className="flex items-center gap-1 text-[11px] uppercase font-bold" style={{ color: 'var(--dd-text-muted)' }}>
-                <Clock className="h-3 w-3" />
-                <span><span className="opacity-75">Vào lúc:</span> <span style={{ color: 'var(--dd-text-primary)' }}>{`${new Date(order.order_init_datetime).getHours()} giờ ${new Date(order.order_init_datetime).getMinutes().toString().padStart(2, '0')} phút`}</span></span>
+              <div className="flex items-center gap-1 text-sm font-extrabold mx-4" style={{ color: 'var(--dd-text-muted)' }}>
+                <Clock size={14} />
+                <span>
+                  <span className="opacity-85">{t('lastUpdatedAt')}</span>
+                  <span style={{ color: 'var(--dd-text-primary)' }}>
+                    {`${new Date(order.order_init_datetime).getHours()}h${new Date(order.order_init_datetime).getMinutes().toString().padStart(2, '0')}p`}
+                  </span>
+                </span>
               </div>
             )}
           </div>
@@ -187,10 +205,12 @@ function SortableVehicleItemBase({
               </div>
             )}
 
-            <div className={style.chipClass}>
-              {style.icon}
-              {style.text}
-            </div>
+            {!hideStatus && (
+              <div className={style.chipClass}>
+                {style.icon}
+                {style.text}
+              </div>
+            )}
 
             {isDropTarget && (
               <span className="text-[11px] font-bold uppercase tracking-[0.18em]" style={{ color: 'var(--dd-sky)' }}>

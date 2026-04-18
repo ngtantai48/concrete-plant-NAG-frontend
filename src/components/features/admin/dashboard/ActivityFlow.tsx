@@ -46,6 +46,8 @@ interface ActivityFlowProps {
   dispatchMode: DispatchMode;
   layout?: ActivityFlowLayout;
   orderStatusFilter?: Order['order_status'][];
+  hideStatus?: boolean;
+  disableDrag?: boolean;
   onOrdersUpdated?: () => Promise<void> | void;
 }
 
@@ -86,6 +88,8 @@ interface StationQueueDropZoneProps {
   onReorder: (index: number, direction: 'up' | 'down') => void;
   onToggleExpanded: () => void;
   isManualMode: boolean;
+  hideStatus?: boolean;
+  disableDrag?: boolean;
   t: ReturnType<typeof useTranslations>;
 }
 
@@ -110,6 +114,15 @@ const getFlowStyle = (order: Order, isTopPriority: boolean): FlowStyle => {
 
     return {
       text: 'CHỜ ĐẾN LƯỢT',
+      chipClass: 'dd-chip dd-chip-amber opacity-80',
+      dot: '#f59e0b',
+      icon: <Clock className="h-3 w-3" />,
+    };
+  }
+
+  if (order.order_status === 'canceled') {
+    return {
+      text: 'CHỜ LỐT',
       chipClass: 'dd-chip dd-chip-amber opacity-80',
       dot: '#f59e0b',
       icon: <Clock className="h-3 w-3" />,
@@ -253,6 +266,8 @@ function StationQueueDropZone({
   onReorder,
   onToggleExpanded,
   isManualMode,
+  hideStatus,
+  disableDrag,
   t,
 }: StationQueueDropZoneProps) {
   const { setNodeRef, isOver } = useDroppable({
@@ -334,6 +349,8 @@ function StationQueueDropZone({
         canMoveDown={actualIndex < group.orders.length - 1}
         isDropTarget={dragOverOrderId === order.order_id && activeOrderId !== order.order_id}
         isManualMode={isManualMode}
+        hideStatus={hideStatus}
+        disableDrag={disableDrag}
         t={t}
       />
     );
@@ -471,9 +488,14 @@ function DraggedVehiclePreview({
             {order.vehicles?.vehicle_license_plate ? `${order.vehicles.vehicle_license_plate}${order.vehicles.vehicle_name ? ` | ${order.vehicles.vehicle_name}` : ''}` : `ĐƠN: ${order.order_id}`}
           </div>
           {order.order_init_datetime && (
-            <div className="flex items-center gap-1 text-[11px] uppercase font-bold shrink-0" style={{ color: 'var(--dd-text-muted)' }}>
-              <Clock className="h-3 w-3" />
-              <span><span className="opacity-75">Vào lúc:</span> <span style={{ color: 'var(--dd-text-primary)' }}>{`${new Date(order.order_init_datetime).getHours()} giờ ${new Date(order.order_init_datetime).getMinutes().toString().padStart(2, '0')} phút`}</span></span>
+            <div className="flex items-center gap-1 text-sm font-bold shrink-0" style={{ color: 'var(--dd-text-muted)' }}>
+              <Clock size={14} />
+              <span>
+                <span className="opacity-75">Vào lúc: </span>
+                <span style={{ color: 'var(--dd-text-primary)' }}>
+                  {`${new Date(order.order_init_datetime).getHours()}h${new Date(order.order_init_datetime).getMinutes().toString().padStart(2, '0')}p`}
+                </span>
+              </span>
             </div>
           )}
         </div>
@@ -516,7 +538,9 @@ const ActivityFlow = ({
   orders,
   dispatchMode,
   layout = 'merged',
-  orderStatusFilter = ['pending'],
+  orderStatusFilter = ['init', 'pending', 'collecting', 'transporting', 'running', 'completed'],
+  hideStatus = false,
+  disableDrag = false,
   onOrdersUpdated,
 }: ActivityFlowProps) => {
   const t = useTranslations('DashboardPage');
@@ -548,7 +572,7 @@ const ActivityFlow = ({
   const groupedByStation = useMemo(() => {
     const pendingOrders = effectiveOrders
       .filter((order) => orderStatusFilter.includes(order.order_status))
-      .sort((a, b) => new Date(a.order_init_datetime || 0).getTime() - new Date(b.order_init_datetime || 0).getTime());
+      .sort((a, b) => (a.order_number || 0) - (b.order_number || 0));
 
     const ordersByStation = new Map<number, Order[]>();
 
@@ -625,7 +649,7 @@ const ActivityFlow = ({
       });
     });
 
-    allPendingOrders.sort((a, b) => new Date(a.order.order_init_datetime || 0).getTime() - new Date(b.order.order_init_datetime || 0).getTime());
+    allPendingOrders.sort((a, b) => (a.order.order_number || 0) - (b.order.order_number || 0));
 
     return allPendingOrders.map(({ group, order }, index) => ({
       group,
@@ -905,7 +929,7 @@ const ActivityFlow = ({
     setOptimisticOrders(optimistic);
 
     try {
-      await orderApi.update(currentOrder.order_id, { order_number: swapOrder.order_number });
+      await orderApi.update(currentOrder.order_id, { order_number: targetIndex + 1 });
       await onOrdersUpdated?.();
     } catch {
       toast.error(t('reorderFailed'), { position: 'top-right' });
@@ -964,52 +988,37 @@ const ActivityFlow = ({
     const isSameStation = sourceStationId === targetStationId;
     const isTargetOrder = overData?.type === 'order' && typeof overData.orderId === 'number';
 
+    if (!isSameStation) {
+      return;
+    }
+
     if (isSameStation && !isTargetOrder) {
       return;
     }
 
-    const targetOrder = isTargetOrder
-      ? targetGroup.orders.find((order) => order.order_id === overData.orderId)
-      : null;
+    const targetOrderIndex = overData?.orderId != null
+      ? targetGroup.orders.findIndex((order) => order.order_id === overData.orderId)
+      : -1;
+    const targetOrder = targetOrderIndex >= 0 ? targetGroup.orders[targetOrderIndex] : null;
 
-    if (isSameStation && targetOrder?.order_id === currentOrder.order_id) {
+    if (!targetOrder || targetOrder.order_id === currentOrder.order_id) {
       return;
     }
 
-    const nextOrderNumber = targetOrder
-      ? targetOrder.order_number
-      : (targetGroup.orders[targetGroup.orders.length - 1]?.order_number ?? 0) + 1;
-
-    const payload: OrderUpdatePayload = isSameStation
-      ? { order_number: nextOrderNumber }
-      : { station_id: targetStationId, order_number: nextOrderNumber };
-
     setReorderingKey(String(currentOrder.order_id));
 
-    if (isSameStation && targetOrder) {
-      const optimistic = effectiveOrders.map((o) => {
-        if (o.order_id === currentOrder.order_id) return { ...o, order_number: targetOrder.order_number };
-        if (o.order_id === targetOrder.order_id) return { ...o, order_number: currentOrder.order_number };
-        return o;
-      });
-      setOptimisticOrders(optimistic);
-    } else if (!isSameStation) {
-      const optimistic = effectiveOrders.map((o) => {
-        if (o.order_id !== currentOrder.order_id) return o;
-        return {
-          ...o,
-          stations: { ...o.stations, station_id: targetStationId, station_name: targetGroup.stationName },
-          order_number: nextOrderNumber,
-        };
-      });
-      setOptimisticOrders(optimistic);
-    }
+    const optimistic = effectiveOrders.map((o) => {
+      if (o.order_id === currentOrder.order_id) return { ...o, order_number: targetOrder.order_number };
+      if (o.order_id === targetOrder.order_id) return { ...o, order_number: currentOrder.order_number };
+      return o;
+    });
+    setOptimisticOrders(optimistic);
 
     try {
-      await orderApi.update(currentOrder.order_id, payload);
+      await orderApi.update(currentOrder.order_id, { order_number: targetOrderIndex + 1 });
       await onOrdersUpdated?.();
     } catch {
-      toast.error(isSameStation ? t('reorderFailed') : t('moveToStationFailed'), {
+      toast.error(t('reorderFailed'), {
         position: 'top-right',
       });
     } finally {
@@ -1134,21 +1143,6 @@ const ActivityFlow = ({
                   </div>
 
                   <div className="flex flex-col gap-2 text-[11px] font-bold uppercase md:items-end">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="dd-chip dd-chip-amber">
-                        {t('dragSourceStationBadge')}
-                      </span>
-                      <span style={{ color: 'var(--dd-text-primary)' }}>
-                        {sourceGroup?.stationName || t('unassigned')}
-                      </span>
-                      <ArrowRight className="h-3.5 w-3.5 text-sky-500" />
-                      <span className="dd-chip dd-chip-sky">
-                        {hoveredGroup ? t('dropHereBadge') : t('dragTargetStationBadge')}
-                      </span>
-                      <span style={{ color: hoveredGroup ? 'var(--dd-sky)' : 'var(--dd-text-muted)' }}>
-                        {hoveredGroup?.stationName || t('dragTargetStationHint')}
-                      </span>
-                    </div>
                     <span style={{ color: 'var(--dd-text-muted)' }}>
                       {t('dragAcrossStationsHint')}
                     </span>
@@ -1157,20 +1151,6 @@ const ActivityFlow = ({
               </div>
             )}
 
-            {layout === 'merged' && activeOrder && (
-              <div className="flex flex-wrap gap-3">
-                {groupedByStation.map((group) => (
-                  <StationDropTargetCard
-                    key={group.stationId}
-                    group={group}
-                    activeOrderId={activeOrderId}
-                    sourceStationId={sourceGroup?.stationId ?? null}
-                    hoveredStationId={hoveredStationId}
-                    t={t}
-                  />
-                ))}
-              </div>
-            )}
 
             {layout === 'board' ? (
               <div className="overflow-x-auto pb-2">
@@ -1243,6 +1223,8 @@ const ActivityFlow = ({
                           onReorder={(index, direction) => handleReorder(group.stationId, index, direction)}
                           onToggleExpanded={() => toggleStationExpanded(group.stationId)}
                           isManualMode={dispatchMode === 'manual'}
+                          hideStatus={hideStatus}
+                          disableDrag={disableDrag}
                           t={t}
                         />
                       </div>
@@ -1280,6 +1262,8 @@ const ActivityFlow = ({
                       onManualStationChange={(stationId: string) => handleManualOrderStationChange(order.order_id, stationId)}
                       onManualStationClear={() => clearManualOrderStation(order.order_id)}
                       isDropTarget={dragOverOrderId === order.order_id && activeOrderId !== order.order_id}
+                      hideStatus={hideStatus}
+                      disableDrag={disableDrag}
                       t={t}
                     />
                   ))}

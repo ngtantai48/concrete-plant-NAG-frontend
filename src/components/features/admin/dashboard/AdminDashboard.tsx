@@ -6,7 +6,7 @@ import vehicleApi from "@/services/vehicle.service";
 import type { Vehicle } from "@/types/vehicle";
 import orderApi from "@/services/order.service";
 import type { Order } from "@/types/order";
-import { RefreshCw, Map as MapIcon, Maximize2, Minimize2, Truck, Radio, CheckCircle2, Clock, Route, MapPin, Search, Calendar as CalendarIcon, Timer, ArrowRight, Ellipsis, X } from "lucide-react";
+import { RefreshCw, Map as MapIcon, Maximize2, Minimize2, Truck, Radio, CheckCircle2, Clock, Route, MapPin, Search, Calendar as CalendarIcon, Timer, ArrowRight, Ellipsis, X, ShieldCheck, FileSpreadsheet } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -20,12 +20,23 @@ import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle as DlgTitle } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useLocale, useTranslations } from "next-intl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNearbyVehicles } from "@/hooks/useNearbyVehicles";
 import { useDeviceHeartbeat } from "@/hooks/useDeviceHeartbeat";
 import { useRealtimeUpdates } from "@/hooks/useRealtimeUpdates";
 import dynamic from "next/dynamic";
+import { useRouter } from "next/navigation";
 
 
 
@@ -51,19 +62,14 @@ const getTodayDate = () => {
   const timezoneOffset = now.getTimezoneOffset() * 60 * 1000;
   return new Date(now.getTime() - timezoneOffset).toISOString().slice(0, 10);
 };
-const getTomorrowDate = () => {
-  const now = new Date();
-  const timezoneOffset = now.getTimezoneOffset() * 60 * 1000;
-  const today = new Date(now.getTime() - timezoneOffset);
-  today.setDate(today.getDate() + 1);
-  return today.toISOString().slice(0, 10);
-};
 
 
 export default function AdminDashboard() {
   const t = useTranslations("DashboardPage");
   const tVehiclePage = useTranslations("VehiclePage");
+  const tCommon = useTranslations("Common");
   const locale = useLocale();
+  const router = useRouter();
 
   const [geofenceStation, setGeofenceStation] = useState<Station | null>(null);
   const [isFullScreen, setIsFullScreen] = useState(false);
@@ -71,8 +77,6 @@ export default function AdminDashboard() {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [pendingOrders, setPendingOrders] = useState<Order[]>([]);
-  const [tomorrowOrders, setTomorrowOrders] = useState<Order[]>([]);
-  const [realTomorrowOrders, setRealTomorrowOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [selectedDate, setSelectedDate] = useState(getTodayDate());
@@ -107,28 +111,15 @@ export default function AdminDashboard() {
 
 
 
-  const getNextDate = useCallback((date: string) => {
-    const d = new Date(date + 'T00:00:00');
-    d.setDate(d.getDate() + 1);
-    return d.toISOString().slice(0, 10);
-  }, []);
 
   const fetchAll = useCallback(async () => {
     try {
-      const nextDate = getNextDate(selectedDate);
-      const realTomorrow = getTomorrowDate();
-      const needExtraFetch = nextDate !== realTomorrow;
-
       const apiCalls = [
         stationApi.getAll(),
         vehicleApi.getAll({ limit: 100 }),
         orderApi.getByInitDate(selectedDate),
-        orderApi.getByInitDate(nextDate),
         orderApi.getByStatus('pending'),
       ] as any[];
-      if (needExtraFetch) {
-        apiCalls.push(orderApi.getByInitDate(realTomorrow));
-      }
 
       const results = await Promise.allSettled(apiCalls);
 
@@ -137,45 +128,39 @@ export default function AdminDashboard() {
         const fetchedStations = sRes.data?.data || sRes.data || [];
         setStations(fetchedStations);
         setGeofenceStation(fetchedStations.find((s: Station) => s.station_gps_longitude != null && s.station_gps_latitude != null) || fetchedStations[0] || null);
+      } else {
+        console.warn('[fetchAll] stations failed:', results[0].reason);
       }
       if (results[1].status === 'fulfilled') {
         const vRes = results[1].value;
         setVehicles(vRes.data?.data || vRes.data || []);
+      } else {
+        console.warn('[fetchAll] vehicles failed:', results[1].reason);
       }
       if (results[2].status === 'fulfilled') {
         const oRes = results[2].value;
         setOrders(oRes.data?.data || oRes.data || []);
+      } else {
+        console.warn('[fetchAll] ordersByDate failed:', results[2].reason);
       }
-      if (results[3].status === 'fulfilled') {
-        const tmRes = results[3].value;
-        setTomorrowOrders(tmRes.data?.data || tmRes.data || []);
-        if (!needExtraFetch) {
-          setRealTomorrowOrders(tmRes.data?.data || tmRes.data || []);
-        }
+      if (results[3]?.status === 'fulfilled') {
+        const pRes = results[3].value;
+        const list = pRes.data?.data || pRes.data || [];
+        setPendingOrders(list);
+        console.log('[fetchAll] pending count:', Array.isArray(list) ? list.length : 'n/a');
+      } else {
+        console.warn('[fetchAll] pending failed:', results[3]?.reason);
       }
-      if (results[4]?.status === 'fulfilled') {
-        const pRes = results[4].value;
-        setPendingOrders(pRes.data?.data || pRes.data || []);
-      }
-      if (needExtraFetch && results[5]?.status === 'fulfilled') {
-        const rtRes = results[5].value;
-        setRealTomorrowOrders(rtRes.data?.data || rtRes.data || []);
-      }
-    } catch {
-      //
+    } catch (err) {
+      console.error('[fetchAll] unexpected:', err);
     } finally {
       setLoading(false);
     }
-  }, [selectedDate, getNextDate]);
+  }, [selectedDate]);
 
   useEffect(() => {
     fetchAll();
   }, [fetchAll]);
-
-  const isTomorrowScheduleReady = useMemo(
-    () => realTomorrowOrders.some((o) => o.order_status === "pending"),
-    [realTomorrowOrders],
-  );
 
   const activeStations = useMemo(
     () => stations.filter((s) => s.station_types?.station_type_id === 1 && s.station_status === "operating"),
@@ -197,13 +182,14 @@ export default function AdminDashboard() {
     const list: { id: string; label: string; statusLabel: string; chipClass: string }[] = [];
 
     vehicles.forEach(v => {
-      if (v.vehicle_status === "incident" || v.vehicle_status === "maintenance") {
+      if (v.vehicle_status === "incident" || v.vehicle_status === "maintenance" || v.vehicle_status === "other") {
         const isIncident = v.vehicle_status === "incident";
+        const isOther = v.vehicle_status === "other";
         list.push({
           id: `veh-${v.vehicle_id}`,
           label: v.vehicle_license_plate ? `${v.vehicle_license_plate}${v.vehicle_name ? ` | ${v.vehicle_name}` : ''}` : '',
-          statusLabel: isIncident ? (t('incident') || 'Sự cố') : (tVehiclePage('maintenanceOption') || 'Bảo dưỡng'),
-          chipClass: isIncident ? 'dd-chip-red' : 'dd-chip-amber'
+          statusLabel: isIncident ? (t('incident') || 'Sự cố') : isOther ? 'Việc khác' : (tVehiclePage('maintenanceOption') || 'Bảo dưỡng'),
+          chipClass: isIncident ? 'dd-chip-red' : isOther ? 'dd-chip-slate' : 'dd-chip-amber'
         });
       }
     });
@@ -225,15 +211,16 @@ export default function AdminDashboard() {
 
   const activeFlowOrders = useMemo(() => {
     return pendingOrders.filter(o => {
-      const vStatus = o.vehicles?.vehicle_status;
-      return vStatus !== 'maintenance' && vStatus !== 'incident';
+      const vStatus = o.vehicles?.vehicle_status?.toLowerCase();
+      const isShiftClosed = o.shift_closing?.shift_status === 1;
+      return !isShiftClosed && vStatus !== 'maintenance' && vStatus !== 'incident';
     });
   }, [pendingOrders]);
 
   const ordersAtStation = useMemo(() => orders.filter(o => o.order_status === "collecting"), [orders]);
   const ordersPending = useMemo(() => {
-    return orders.filter(o => o.order_status === "pending" && o.order_init_datetime?.slice(0, 10) === operationDate && o.vehicles?.vehicle_status === "available");
-  }, [orders, operationDate]);
+    return pendingOrders.filter(o => o.vehicles?.vehicle_status === "available");
+  }, [pendingOrders]);
   const ordersInTransit = useMemo(() => orders.filter(o => o.order_status === "transporting" || o.order_status === "running"), [orders]);
   const ordersCompleted = useMemo(() => {
     return orders.filter(o => o.order_status === "completed");
@@ -252,6 +239,90 @@ export default function AdminDashboard() {
       (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
     );
   }, [ordersActive, ordersCompleted]);
+
+  const hasUnclosedShift = useMemo(() => {
+    return pendingOrders.some((o) => o.shift_closing?.shift_status === 0);
+  }, [pendingOrders]);
+
+  const [isShiftClosing, setIsShiftClosing] = useState(false);
+  const [isShiftCloseDialogOpen, setIsShiftCloseDialogOpen] = useState(false);
+
+  const handleShiftClose = useCallback(async () => {
+    setIsShiftCloseDialogOpen(false);
+    setIsShiftClosing(true);
+    try {
+      await orderApi.shiftClose({ operation_date: selectedDate });
+      toast.success(t('shiftCloseSuccess', { date: selectedDate }));
+      fetchAll();
+    } catch {
+      toast.error(t('shiftCloseFailed'));
+    } finally {
+      setIsShiftClosing(false);
+    }
+  }, [selectedDate, t, fetchAll]);
+
+  const [isSyncingShift, setIsSyncingShift] = useState(false);
+  const [isSyncShiftDialogOpen, setIsSyncShiftDialogOpen] = useState(false);
+
+  const handleSyncShift = useCallback(async () => {
+    setIsSyncShiftDialogOpen(false);
+    setIsSyncingShift(true);
+    try {
+      // Build maToStt from pending orders, sorted by order_number (matches ActivityFlow display)
+      const sorted = [...activeFlowOrders].sort(
+        (a, b) => (a.order_number || 0) - (b.order_number || 0),
+      );
+      const maToStt: Record<string, number> = {};
+      const skipped: { order_number: number; reason: string; raw: unknown }[] = [];
+      let stt = 1;
+      for (const o of sorted) {
+        const raw = o.vehicles?.vehicle_name;
+        if (!raw) {
+          skipped.push({ order_number: o.order_number, reason: 'no_vehicle_name', raw });
+          continue;
+        }
+        // Normalize: trim + uppercase + strip whitespace + strip leading zeros after X
+        // e.g. "X02" -> "X2", "X09" -> "X9" so it matches sheet entries "X2", "X9"
+        const upper = String(raw).trim().toUpperCase().replace(/\s+/g, "");
+        const m = upper.match(/^X0*(\d+)$/);
+        const maX = m ? `X${m[1]}` : upper;
+        // Only accept valid X-codes (X1, X2, ..., X21); skip duplicates (first occurrence wins)
+        if (!/^X\d+$/.test(maX)) {
+          skipped.push({ order_number: o.order_number, reason: 'invalid_format', raw });
+          continue;
+        }
+        if (maX in maToStt) {
+          skipped.push({ order_number: o.order_number, reason: 'duplicate', raw: maX });
+          continue;
+        }
+        maToStt[maX] = stt++;
+      }
+
+      console.log('[handleSyncShift] total pending:', sorted.length, '| unique mã X:', Object.keys(maToStt).length);
+      console.log('[handleSyncShift] maToStt:', maToStt);
+      if (skipped.length > 0) console.log('[handleSyncShift] skipped:', skipped);
+
+      const res = await fetch("/api/google-sheets/bo-tri-cv/sync-lot", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ maToStt }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || "Sync failed");
+
+      console.log('[handleSyncShift] server response:', data);
+      if (data.unmatchedMaX?.length > 0) {
+        console.warn('[handleSyncShift] mã X không có trong sheet cột H:', data.unmatchedMaX);
+      }
+
+      toast.success(t('syncShiftSuccess', { count: data.updated ?? Object.keys(maToStt).length }));
+    } catch (err) {
+      console.error('[handleSyncShift] error:', err);
+      toast.error(t('syncShiftFailed'));
+    } finally {
+      setIsSyncingShift(false);
+    }
+  }, [activeFlowOrders, t]);
 
   const [dispatchMode, setDispatchMode] = useState<DispatchMode>('auto');
   const [showMap, setShowMap] = useState(false);
@@ -378,7 +449,7 @@ export default function AdminDashboard() {
               {/* LED Status */}
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <div className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 border text-xs font-bold uppercase cursor-default ${isLedConnected
+                  <div className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 border text-sm font-bold uppercase cursor-default ${isLedConnected
                     ? "border-emerald-200 text-emerald-700 animate-flash-bg"
                     : "border-red-200 bg-red-50 text-red-700"
                     }`}>
@@ -397,7 +468,7 @@ export default function AdminDashboard() {
               {/* Network Status */}
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <div key={lastSignalTime?.toISOString() || 'offline'} className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 border text-xs font-bold uppercase cursor-default ${socketConnected
+                  <div key={lastSignalTime?.toISOString() || 'offline'} className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 border text-sm font-bold uppercase cursor-default ${socketConnected
                     ? "border-emerald-200 text-emerald-700 animate-flash-bg"
                     : "border-red-200 bg-red-50 text-red-700"
                     }`}>
@@ -414,36 +485,116 @@ export default function AdminDashboard() {
               </Tooltip>
 
               {/* Date Picker */}
+              <Popover open={isDatePickerOpen} onOpenChange={setIsDatePickerOpen}>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "h-8 w-[150px] px-2 text-sm font-bold justify-start text-left border-slate-200 bg-white/80 transition-all shadow-none hover:bg-white hover:border-sky-400 focus-visible:ring-1 focus-visible:ring-sky-500",
+                      !selectedDate && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 text-sky-500" />
+                    {selectedDate ? format(new Date(selectedDate), "dd/MM/yyyy") : <span>Chọn ngày</span>}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="end">
+                  <Calendar
+                    // captionLayout="dropdown"
+                    mode="single"
+                    selected={selectedDate ? new Date(selectedDate) : undefined}
+                    onSelect={(date) => {
+                      if (date) {
+                        setSelectedDate(format(date, "yyyy-MM-dd"));
+                        setLoading(true);
+                        setIsDatePickerOpen(false);
+                      }
+                    }}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
+
+              {/* Sync Shift Button (replaces hidden Chốt ca button) */}
               <div className="border-l border-slate-200 pl-2 flex items-center gap-1.5">
-                <Popover open={isDatePickerOpen} onOpenChange={setIsDatePickerOpen}>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className={cn(
-                        "h-8 w-[150px] px-2 text-sm font-bold justify-start text-left border-slate-200 bg-white/80 transition-all shadow-none hover:bg-white hover:border-sky-400 focus-visible:ring-1 focus-visible:ring-sky-500",
-                        !selectedDate && "text-muted-foreground"
-                      )}
-                    >
-                      <CalendarIcon className="mr-2 text-sky-500" />
-                      {selectedDate ? format(new Date(selectedDate), "dd/MM/yyyy") : <span>Chọn ngày</span>}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="end">
-                    <Calendar
-                      // captionLayout="dropdown"
-                      mode="single"
-                      selected={selectedDate ? new Date(selectedDate) : undefined}
-                      onSelect={(date) => {
-                        if (date) {
-                          setSelectedDate(format(date, "yyyy-MM-dd"));
-                          setLoading(true);
-                          setIsDatePickerOpen(false);
-                        }
-                      }}
-                      initialFocus
-                    />
-                  </PopoverContent>
-                </Popover>
+                {!isPastDate && hasUnclosedShift && (
+                  <>
+                    {/* Chốt ca button hidden — keeping handleShiftClose for potential re-enable */}
+                    {/* <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          size="sm"
+                          variant="primary"
+                          onClick={() => setIsShiftCloseDialogOpen(true)}
+                          disabled={isShiftClosing}
+                          className="uppercase"
+                        >
+                          {isShiftClosing ? <RefreshCw className="animate-spin" /> : <ShieldCheck />}
+                          {t('shiftCloseAction')}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>{t('shiftCloseAction')} {format(new Date(selectedDate), "dd/MM/yyyy")}</p>
+                      </TooltipContent>
+                    </Tooltip>
+
+                    <AlertDialog open={isShiftCloseDialogOpen} onOpenChange={setIsShiftCloseDialogOpen}>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>{t('confirmShiftCloseTitle')}</AlertDialogTitle>
+                          <AlertDialogDescription>{t('confirmShiftCloseDescription')}</AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>{tCommon('cancel')}</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={handleShiftClose}
+                            disabled={isShiftClosing}
+                            className="bg-primary text-primary-foreground hover:bg-primary/90"
+                          >
+                            {t('shiftCloseAction')}
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog> */}
+
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          size="sm"
+                          variant="primary"
+                          onClick={() => setIsSyncShiftDialogOpen(true)}
+                          disabled={isSyncingShift}
+                          className="uppercase"
+                        >
+                          {isSyncingShift ? <RefreshCw className="animate-spin" /> : <FileSpreadsheet />}
+                          {t('syncShiftAction')}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>{t('syncShiftAction')} {format(new Date(selectedDate), "dd/MM/yyyy")}</p>
+                      </TooltipContent>
+                    </Tooltip>
+
+                    <AlertDialog open={isSyncShiftDialogOpen} onOpenChange={setIsSyncShiftDialogOpen}>
+                      <AlertDialogContent>
+                        <AlertDialogHeader>
+                          <AlertDialogTitle>{t('confirmSyncShiftTitle')}</AlertDialogTitle>
+                          <AlertDialogDescription>{t('confirmSyncShiftDescription')}</AlertDialogDescription>
+                        </AlertDialogHeader>
+                        <AlertDialogFooter>
+                          <AlertDialogCancel>{tCommon('cancel')}</AlertDialogCancel>
+                          <AlertDialogAction
+                            onClick={handleSyncShift}
+                            disabled={isSyncingShift}
+                            className="bg-primary text-primary-foreground hover:bg-primary/90"
+                          >
+                            {t('syncShiftAction')}
+                          </AlertDialogAction>
+                        </AlertDialogFooter>
+                      </AlertDialogContent>
+                    </AlertDialog>
+                  </>
+                )}
               </div>
 
               {/* Sync Button */}
@@ -488,18 +639,20 @@ export default function AdminDashboard() {
           )} */}
         </div>
 
-        {!isPastDate && !loading && isTomorrowScheduleReady && (
+
+        {!isPastDate && !loading && !hasUnclosedShift && (
           <div
-            className="mb-1 shrink-0 rounded-lg border px-3 py-1"
+            className="mb-1 shrink-0 rounded-lg border px-3 py-1 cursor-pointer hover:bg-slate-50 transition-colors"
             style={{
-              background: "linear-gradient(135deg, rgba(16, 185, 129, 0.08), rgba(5, 150, 105, 0.06))",
-              borderColor: "rgba(16, 185, 129, 0.25)",
+              background: "linear-gradient(135deg, rgba(245, 158, 11, 0.08), rgba(217, 119, 6, 0.06))",
+              borderColor: "rgba(245, 158, 11, 0.25)",
             }}
+            onClick={() => router.push('/admin/shift-slots')}
           >
             <div className="flex items-center gap-2">
-              <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+              <Clock className="h-3.5 w-3.5 text-amber-500 shrink-0" />
               <span className="text-xs font-bold uppercase" style={{ color: "var(--dd-text-primary)" }}>
-                {t("tomorrowScheduleReadyTitle")} — {t("tomorrowScheduleReadyDescription", { count: tomorrowOrders.length })}
+                {t("forgotShiftSlotsBannerTitle")} — <span style={{ color: "var(--dd-text-muted)" }}>{t("forgotShiftSlotsBannerDescription")}</span>
               </span>
             </div>
           </div>
@@ -527,7 +680,7 @@ export default function AdminDashboard() {
                     <div className="flex items-center justify-between px-3 py-1.5 text-sm font-extrabold uppercase"
                       style={{ borderBottom: '1px solid var(--dd-border)' }}>
                       <span>{t('readyVehiclesPanel')}</span>
-                      <span className="dd-chip dd-chip-emerald text-[10px] px-1.5 py-0.5">{inYardVehicles.length}</span>
+                      <span className="text-sm font-extrabold">{inYardVehicles.length} {t('vehicleCount')}</span>
                     </div>
                     <div className="overflow-y-auto p-0 flex-1">
                       {inYardVehicles.length === 0 ? (
@@ -564,7 +717,7 @@ export default function AdminDashboard() {
                     <div className="flex items-center justify-between px-3 py-1.5 text-sm font-extrabold uppercase"
                       style={{ background: 'var(--dd-bg-header)', color: 'var(--dd-text-primary)', borderBottom: '1px solid var(--dd-border)' }}>
                       <span>{t('stoppedMaintenance')}</span>
-                      <span className="dd-chip dd-chip-amber text-[10px] px-1.5 py-0.5">{stoppedMaintenanceList.length}</span>
+                      <span className="text-sm font-extrabold">{stoppedMaintenanceList.length} {t('vehicleCount')}</span>
                     </div>
                     <div className="flex-1 overflow-y-auto p-0">
                       {stoppedMaintenanceList.length === 0 ? (
@@ -593,11 +746,11 @@ export default function AdminDashboard() {
                   style={{ boxShadow: '0 0 20px rgba(14, 165, 233, 0.05)', border: '1px solid rgba(14, 165, 233, 0.2)' }}>
 
                   {/* Core Header with Toggle */}
-                  <div className="flex items-center justify-between px-3 py-1.5 relative z-10"
+                  <div className="flex items-center justify-between p-2 relative z-10"
                     style={{ background: 'var(--dd-bg-header)', borderBottom: '1px solid var(--dd-border)' }}>
-                    <div className="flex items-center gap-1.5 min-w-0 pr-2">
+                    <div className="flex items-center gap-2 ms-4">
                       <div className="h-1.5 w-1.5 rounded-full animate-pulse shrink-0" style={{ background: '#0ea5e9', boxShadow: '0 0 10px rgba(14, 165, 233, 0.8)' }} />
-                      <span className="text-sm font-extrabold uppercase" title="TRUNG TÂM ĐIỀU PHỐI">TRUNG TÂM ĐIỀU PHỐI</span>
+                      <span className="text-base font-extrabold uppercase" title="Thứ tự lốt xe">Thứ tự lốt xe</span>
                     </div>
 
                     {/* Segmented Toggle HUD */}
@@ -625,6 +778,7 @@ export default function AdminDashboard() {
                             vehicles={vehicles}
                             orders={activeFlowOrders}
                             dispatchMode={dispatchMode}
+                            disableDrag={true}
                             onOrdersUpdated={fetchAll}
                           />
                         </div>
@@ -642,10 +796,9 @@ export default function AdminDashboard() {
           {!isPastDate && (
             <div className="flex flex-col h-full min-h-0 animate-fade-up" style={{ flex: '3 1 0%', animationDelay: '0.6s' }}>
               <div className="flex h-full flex-col overflow-hidden dd-card" style={{ borderColor: 'rgba(16, 185, 129, 0.2)' }}>
-                <div className="flex items-center justify-between px-3 py-1.5 text-sm font-extrabold uppercase"
+                <div className="flex items-center justify-between px-3 py-2 text-sm font-extrabold uppercase"
                   style={{ borderBottom: '1px solid var(--dd-border)' }}>
                   <div className="flex items-center gap-1.5">
-                    <Truck className="w-3.5 h-3.5 text-emerald-500" />
                     <span>{t('completedToday')}</span>
                   </div>
                   <div className="flex items-center gap-1.5">
@@ -654,7 +807,7 @@ export default function AdminDashboard() {
                         {ordersCompleted.length} {t('completed')}
                       </span>
                     )}
-                    <span className="dd-chip dd-chip-slate text-[10px] px-1.5 py-0.5">{vehicles.length} xe</span>
+                    <span className="text-sm font-extrabold">{vehicles.length} {t('vehicleCount')}</span>
                   </div>
                 </div>
                 <div className="flex-1 overflow-y-auto">
@@ -730,8 +883,8 @@ export default function AdminDashboard() {
                             <div className="absolute left-0 top-0 bottom-0 w-1" style={{ background: accentColor }} />
                             <div className="flex justify-between items-center pl-2">
                               <div className="flex items-center gap-1.5">
-                                <Truck className="w-3.5 h-3.5" style={{ color: accentColor }} />
-                                <span className="text-xs font-bold" style={{ color: 'var(--dd-text-primary)' }}>
+                                {/* <Truck className="w-3.5 h-3.5" style={{ color: accentColor }} /> */}
+                                <span className="text-sm font-bold" style={{ color: 'var(--dd-text-primary)' }}>
                                   {v.vehicle_license_plate}{v.vehicle_name ? ` | ${v.vehicle_name}` : ''}
                                 </span>
                               </div>
@@ -1148,9 +1301,15 @@ export default function AdminDashboard() {
                       {t('tripSummary')}
                     </span>
                     <div className="flex flex-wrap items-center justify-start sm:justify-end gap-x-4 gap-y-2">
+                      {/* {tripOrders.filter(o => o.order_status === 'running' || o.order_status === 'transporting').length > 0 && (
+                        <div className="flex items-center gap-1.5 text-sm font-bold whitespace-nowrap" style={{ color: '#0ea5e9' }}>
+                          <Truck size={16} />
+                          <span>{tripOrders.filter(o => o.order_status === 'running' || o.order_status === 'transporting').length} Đang di chuyển</span>
+                        </div>
+                      )} */}
                       <div className="flex items-center gap-1.5 text-sm font-bold whitespace-nowrap" style={{ color: '#10b981' }}>
                         <CheckCircle2 size={16} />
-                        <span>{tripOrders.length} {t('completed')}</span>
+                        <span>{tripOrders.filter(o => o.order_status === 'completed').length} {t('completed')}</span>
                       </div>
                       {totalDistanceKm > 0 && (
                         <div className="flex items-center gap-1.5 text-sm font-bold whitespace-nowrap" style={{ color: '#0ea5e9' }}>

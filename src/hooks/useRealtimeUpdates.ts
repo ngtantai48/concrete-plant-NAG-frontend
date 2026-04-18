@@ -1,13 +1,14 @@
-import { useEffect, useRef, useState } from "react";
+import { useAppSelector } from "@/hooks/use-app-selector";
 import { SocketManager } from "@/lib/socket";
 import { validateUpdateSignal } from "@/lib/socket/schema";
 import type { UpdateSignal } from "@/lib/socket/types";
-import { useAppSelector } from "@/hooks/use-app-selector";
+import { useEffect, useRef, useState } from "react";
 
 const REFRESH_COOLDOWN_MS = 800;
 
 export function useRealtimeUpdates(onUpdate: (signal?: UpdateSignal) => void) {
   const managerRef = useRef<SocketManager | null>(null);
+  const prevTokenRef = useRef<string | undefined>(undefined);
   const onUpdateRef = useRef(onUpdate);
   const lastRefreshRef = useRef(0);
   const pendingRefreshRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -30,7 +31,7 @@ export function useRealtimeUpdates(onUpdate: (signal?: UpdateSignal) => void) {
 
     // Set auth provider cho token refresh
     manager.setAuthProvider(() => tokenState);
-    
+
     managerRef.current = manager;
 
     // Connection state listener
@@ -43,8 +44,16 @@ export function useRealtimeUpdates(onUpdate: (signal?: UpdateSignal) => void) {
       }
     });
 
-    // Connect
-    manager.connect();
+    // Token đổi (refresh) thì force reconnect để handshake với token mới.
+    // Lần đầu chỉ connect bình thường.
+    const prevToken = prevTokenRef.current;
+    prevTokenRef.current = tokenState;
+
+    if (prevToken && prevToken !== tokenState) {
+      manager.reconnect();
+    } else {
+      manager.connect();
+    }
 
     return () => {
       unsubscribeConnection();
@@ -88,7 +97,7 @@ export function useRealtimeUpdates(onUpdate: (signal?: UpdateSignal) => void) {
       manager.on('update', (payload: unknown) => {
         const signal = validateUpdateSignal('update', payload);
         if (!signal) return;
-        
+
         console.log("[RealtimeUpdates] Nhan su kien update:", signal);
         triggerRefresh(signal);
       })
@@ -99,7 +108,7 @@ export function useRealtimeUpdates(onUpdate: (signal?: UpdateSignal) => void) {
       manager.on('ping', (payload: unknown) => {
         const signal = validateUpdateSignal('ping', payload);
         if (!signal) return;
-        
+
         console.log("[RealtimeUpdates] Nhan su kien ping:", signal);
         triggerRefresh(signal);
       })
@@ -108,12 +117,18 @@ export function useRealtimeUpdates(onUpdate: (signal?: UpdateSignal) => void) {
     // Catch-all for other events (chỉ những events không phải update/ping)
     unsubscribes.push(
       manager.onAny((eventName, payload) => {
+        // DIAGNOSTIC: log raw event name for every event on /updates
+        console.log('[updates raw]', eventName, payload);
+
         if (eventName === 'update' || eventName === 'ping') {
           return; // Already handled above
         }
 
         const signal = validateUpdateSignal(eventName, payload);
-        if (!signal) return;
+        if (!signal) {
+          console.warn(`[RealtimeUpdates] Event "${eventName}" bi loc boi validateUpdateSignal`);
+          return;
+        }
 
         console.log(`[RealtimeUpdates] Nhan su kien ${eventName}:`, payload);
         triggerRefresh(signal);
@@ -122,7 +137,7 @@ export function useRealtimeUpdates(onUpdate: (signal?: UpdateSignal) => void) {
 
     return () => {
       unsubscribes.forEach((unsub) => unsub());
-      
+
       if (pendingRefreshRef.current) {
         clearTimeout(pendingRefreshRef.current);
         pendingRefreshRef.current = null;

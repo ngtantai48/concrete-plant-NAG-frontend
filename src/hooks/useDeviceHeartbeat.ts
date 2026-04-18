@@ -1,11 +1,10 @@
-import { useEffect, useMemo, useRef, useState } from "react";
 import { SocketManager } from "@/lib/socket";
-import { validateDevicePayload, isStationHeartbeat } from "@/lib/socket/schema";
-import type { DeviceUpdatePayload, DeviceStationStatus as DeviceStationStatusType } from "@/lib/socket/types";
+import { isStationHeartbeat, validateDevicePayload } from "@/lib/socket/schema";
+import type { DeviceStationStatus as DeviceStationStatusType, DeviceUpdatePayload } from "@/lib/socket/types";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 // Re-export để backward compatible
-export type { DeviceStationStatusType as DeviceStationStatus };
-export type { DeviceUpdatePayload };
+export type { DeviceStationStatusType as DeviceStationStatus, DeviceUpdatePayload };
 
 interface DeviceHeartbeatState {
   isSocketConnected: boolean;
@@ -13,10 +12,13 @@ interface DeviceHeartbeatState {
   stationStatusMap: Record<string, DeviceStationStatusType>;
 }
 
+// Persist the status map across component unmounts/remounts
+let globalStationStatusMap: Record<string, DeviceStationStatusType> = {};
+
 export function useDeviceHeartbeat(): DeviceHeartbeatState {
   const managerRef = useRef<SocketManager | null>(null);
   const [isSocketConnected, setIsSocketConnected] = useState(false);
-  const [stationStatusMap, setStationStatusMap] = useState<Record<string, DeviceStationStatusType>>({});
+  const [stationStatusMap, setStationStatusMap] = useState<Record<string, DeviceStationStatusType>>(globalStationStatusMap);
 
   const bufferRef = useRef<Record<string, Partial<DeviceStationStatusType>>>({});
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -77,6 +79,7 @@ export function useDeviceHeartbeat(): DeviceHeartbeatState {
               nextMap[stationId] = { ...existing, ...flushed[stationId] };
             });
 
+            globalStationStatusMap = nextMap;
             return nextMap;
           });
 

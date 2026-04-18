@@ -36,7 +36,7 @@ const DEFAULT_CONFIG: SocketConfig = {
 
 export class SocketManager {
   private static instances = new Map<string, SocketManager>();
-  
+
   private socket: Socket | null = null;
   private config: SocketConfig;
   private connectionUrl: string;
@@ -97,11 +97,12 @@ export class SocketManager {
       return this.socket;
     }
 
-    const auth = this.buildAuth();
-
     this.socket = io(this.connectionUrl, {
       ...this.config,
-      auth,
+      auth: (cb: (data: Record<string, string>) => void) => {
+        const token = this.authProvider?.();
+        cb(token ? { token: `Bearer ${token}` } : {});
+      },
     });
 
     this.setupConnectionEvents();
@@ -133,7 +134,7 @@ export class SocketManager {
   ): () => void {
     if (!this.socket) {
       console.warn(`[SocketManager] Cannot register listener "${String(eventName)}" - socket not connected`);
-      return () => {};
+      return () => { };
     }
 
     const key = String(eventName);
@@ -166,7 +167,7 @@ export class SocketManager {
   onAny(handler: (eventName: string, ...args: unknown[]) => void): () => void {
     if (!this.socket) {
       console.warn('[SocketManager] Cannot register onAny listener - socket not connected');
-      return () => {};
+      return () => { };
     }
 
     this.socket.onAny(handler);
@@ -222,14 +223,6 @@ export class SocketManager {
   // Private Methods
   // ============================================================
 
-  private buildAuth(): Record<string, string> | undefined {
-    const token = this.authProvider?.();
-    if (token) {
-      return { token: `Bearer ${token}` };
-    }
-    return undefined;
-  }
-
   private setupConnectionEvents(): void {
     if (!this.socket) return;
 
@@ -249,7 +242,7 @@ export class SocketManager {
     this.socket.on('connect_error', (error: Error) => {
       console.error(`[SocketManager] Connection error: ${error.message}`);
       this.reconnectAttempts++;
-      
+
       // Sau 10 lần reconnect thất bại, có thể cần refresh token
       if (this.reconnectAttempts >= 10 && this.authProvider) {
         console.warn('[SocketManager] Too many reconnect attempts, token may be expired');
