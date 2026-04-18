@@ -447,25 +447,25 @@ export default function TableVehicles() {
       case "transporting":
         return (
           <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-indigo-50 text-indigo-700 border border-indigo-200/60 uppercase">
-            Đang giao
+            {t("transporting") || "Đang giao"}
           </span>
         );
       case "collecting":
         return (
           <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-cyan-50 text-cyan-700 border border-cyan-200/60 uppercase">
-            Đang nhận
+            {t("collecting") || "Đang nhận"}
           </span>
         );
       case "incident":
         return (
           <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-red-50 text-red-700 border border-red-200/60 uppercase">
-            Sự cố
+            {t("incident") || "Sự cố"}
           </span>
         );
       case "other":
         return (
           <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-200/60 uppercase">
-            Việc khác
+            {t("otherOption") || "Việc khác"}
           </span>
         );
       default:
@@ -696,19 +696,19 @@ export default function TableVehicles() {
                 <SelectContent>
                   <SelectItem value="all">{t("all")}</SelectItem>
                   <SelectItem value="available">{t("active")}</SelectItem>
-                  <SelectItem value="running">Đang chạy</SelectItem>
-                  <SelectItem value="transporting">Đang giao</SelectItem>
-                  <SelectItem value="collecting">Đang nhận</SelectItem>
+                  <SelectItem value="running">{t("running") || "Đang chạy"}</SelectItem>
+                  <SelectItem value="transporting">{t("transporting") || "Đang giao"}</SelectItem>
+                  <SelectItem value="collecting">{t("collecting") || "Đang nhận"}</SelectItem>
                   <SelectItem value="maintenance">{t("maintenance")}</SelectItem>
-                  <SelectItem value="incident">Sự cố</SelectItem>
-                  <SelectItem value="other">Việc khác</SelectItem>
+                  <SelectItem value="incident">{t("incident") || "Sự cố"}</SelectItem>
+                  <SelectItem value="other">{t("otherOption") || "Việc khác"}</SelectItem>
                 </SelectContent>
               </ShadcnSelect>
             )}
 
             {/* Commit Button */}
             <Button type="button" onClick={handleSearchCommit} className="sm:w-auto w-full">
-              Tìm kiếm
+              {tCommon("search") || "Tìm kiếm"}
             </Button>
           </ButtonGroup>
         </div>
@@ -945,7 +945,7 @@ export default function TableVehicles() {
                     <Select.Option value="collecting">{t("collecting")}</Select.Option> */}
                     <Select.Option value="maintenance">{t("maintenanceOption")}</Select.Option>
                     <Select.Option value="incident">{t("incident")}</Select.Option>
-                    <Select.Option value="other">Việc khác</Select.Option>
+                    <Select.Option value="other">{t("otherOption")}</Select.Option>
                   </Select>
                 </Form.Item>
               </div>

@@ -190,7 +190,7 @@ export default function AdminDashboard() {
         list.push({
           id: `veh-${v.vehicle_id}`,
           label: v.vehicle_license_plate ? `${v.vehicle_license_plate}${v.vehicle_name ? ` | ${v.vehicle_name}` : ''}` : '',
-          statusLabel: isIncident ? (t('incident') || 'Sự cố') : isOther ? 'Việc khác' : (tVehiclePage('maintenanceOption') || 'Bảo dưỡng'),
+          statusLabel: isIncident ? (t('incident') || 'Sự cố') : isOther ? (t('otherStatus') || 'Việc khác') : (tVehiclePage('maintenanceOption') || 'Bảo dưỡng'),
           chipClass: isIncident ? 'dd-chip-red' : isOther ? 'dd-chip-slate' : 'dd-chip-amber'
         });
       }
@@ -215,7 +215,7 @@ export default function AdminDashboard() {
     return pendingOrders.filter(o => {
       const vStatus = o.vehicles?.vehicle_status?.toLowerCase();
       const isShiftClosed = o.shift_closing?.shift_status === 1;
-      return !isShiftClosed && vStatus !== 'maintenance' && vStatus !== 'incident';
+      return !isShiftClosed && vStatus !== 'maintenance' && vStatus !== 'incident' && vStatus !== 'other';
     });
   }, [pendingOrders]);
 
@@ -916,12 +916,12 @@ export default function AdminDashboard() {
                         const totalStopMins = Math.floor(totalStopSecs / 60);
                         const stopHours = Math.floor(totalStopMins / 60);
                         const stopMinsRemain = totalStopMins % 60;
-                        const stopDurationStr = stopHours > 0 ? `${stopHours} giờ ${stopMinsRemain} phút` : `${totalStopMins} phút`;
+                        const stopDurationStr = stopHours > 0 ? `${stopHours} ${tCommon('hour')} ${stopMinsRemain} ${tCommon('minute')}` : `${totalStopMins} ${tCommon('minute')}`;
 
                         const totalMixMins = Math.floor(totalMixMs / 60000);
                         const mixTotalHours = Math.floor(totalMixMins / 60);
                         const mixTotalMinsRemain = totalMixMins % 60;
-                        const mixTotalDurationStr = mixTotalHours > 0 ? `${mixTotalHours} giờ ${mixTotalMinsRemain} phút` : `${totalMixMins} phút`;
+                        const mixTotalDurationStr = mixTotalHours > 0 ? `${mixTotalHours} ${tCommon('hour')} ${mixTotalMinsRemain} ${tCommon('minute')}` : `${totalMixMins} ${tCommon('minute')}`;
                         return (
                           <li key={v.vehicle_id}
                             className="dd-surface px-2 py-1.5 transition-all relative overflow-hidden cursor-pointer"
@@ -939,7 +939,7 @@ export default function AdminDashboard() {
                               </div>
                               {hasTrips ? (
                                 <span className={`dd-chip ${chipClass} text-[10px] px-1.5 py-0.5`}>
-                                  {hasRunning ? 'Đang di chuyển' : hasTransporting ? 'Đã lấy hàng' : t('tripCount', { count: trips.length })}
+                                  {hasRunning ? t('moving') : hasTransporting ? t('collected') : t('tripCount', { count: trips.length })}
                                 </span>
                               ) : (
                                 <span className="dd-chip dd-chip-slate text-[10px] px-1.5 py-0.5">
@@ -969,13 +969,13 @@ export default function AdminDashboard() {
                                 {totalMins > 0 && (
                                   <div className="flex items-center gap-1 text-[10px] font-semibold" style={{ color: '#f59e0b' }}>
                                     <Clock className="w-3 h-3" />
-                                    <span>{hours > 0 ? `${hours} giờ ${mins} phút` : `${mins} phút`}</span>
+                                    <span>{hours > 0 ? `${hours} ${tCommon('hour')} ${mins} ${tCommon('minute')}` : `${mins} ${tCommon('minute')}`}</span>
                                   </div>
                                 )}
                                 {totalMixMs > 0 && (
                                   <div className="flex items-center gap-1 text-[10px] font-semibold whitespace-nowrap" style={{ color: '#8b5cf6' }}>
                                     <Timer className="w-3 h-3" />
-                                    <span>Trộn: {mixTotalDurationStr}</span>
+                                    <span>{t("mixing")}: {mixTotalDurationStr}</span>
                                   </div>
                                 )}
                               </div>
@@ -1157,7 +1157,7 @@ export default function AdminDashboard() {
 
       {/* ═══ TRIP DETAIL DIALOG ═══ */}
       <Dialog open={!!selectedVehicleTrips} onOpenChange={(open) => { if (!open) setSelectedVehicleTrips(null); }}>
-        <DialogContent className="sm:max-w-4xl max-h-[80vh] p-0 gap-0 overflow-hidden" showCloseButton={false}>
+        <DialogContent className="sm:max-w-4xl max-h-[80vh] p-0 gap-0 overflow-hidden flex flex-col" showCloseButton={false}>
           {selectedVehicleTrips && (() => {
             const { vehicle, orders: tripOrders } = selectedVehicleTrips;
             const totalDistanceKm = tripOrders.reduce((sum, o) => {
@@ -1193,13 +1193,13 @@ export default function AdminDashboard() {
             const totalStopMins = Math.floor(totalStopSecs / 60);
             const stopHours = Math.floor(totalStopMins / 60);
             const stopMinsRemain = totalStopMins % 60;
-            const stopDurationStr = stopHours > 0 ? `${stopHours} giờ ${stopMinsRemain} phút` : `${totalStopMins} phút`;
+            const stopDurationStr = stopHours > 0 ? `${stopHours} ${tCommon('hour')} ${stopMinsRemain} ${tCommon('minute')}` : `${totalStopMins} ${tCommon('minute')}`;
             const totalMixMins = Math.floor(totalMixMs / 60000);
             const mixTotalHours = Math.floor(totalMixMins / 60);
             const mixTotalMinsRemain = totalMixMins % 60;
-            const mixTotalDurationStr = mixTotalHours > 0 ? `${mixTotalHours} giờ ${mixTotalMinsRemain} phút` : `${totalMixMins} phút`;
+            const mixTotalDurationStr = mixTotalHours > 0 ? `${mixTotalHours} ${tCommon('hour')} ${mixTotalMinsRemain} ${tCommon('minute')}` : `${totalMixMins} ${tCommon('minute')}`;
             return (
-              <div className="flex flex-col h-full">
+              <div className="flex flex-col flex-1 min-h-0">
                 {/* Header */}
                 <div className="bg-slate-300 px-4 py-3 shrink-0 border-b-1">
                   <div className="flex items-center justify-between">
@@ -1246,7 +1246,7 @@ export default function AdminDashboard() {
                         const stopMins = Math.floor(stopSecs / 60);
                         const stopH = Math.floor(stopMins / 60);
                         const stopM = stopMins % 60;
-                        const stopDurationStr = stopH > 0 ? `${stopH} giờ ${stopM} phút` : `${stopMins} phút`;
+                        const stopDurationStr = stopH > 0 ? `${stopH} ${tCommon('hour')} ${stopM} ${tCommon('minute')}` : `${stopMins} ${tCommon('minute')}`;
 
                         const mixInVal = o.order_multi?.checkin_time_station || o.checkin_time_station;
                         const mixOutVal = o.order_multi?.checkout_time_station || o.checkout_time_station;
@@ -1256,7 +1256,7 @@ export default function AdminDashboard() {
                         const mixMinsTotal = Math.floor(mixMs / 60000);
                         const mixH = Math.floor(mixMinsTotal / 60);
                         const mixM = mixMinsTotal % 60;
-                        const mixDurationStr = mixH > 0 ? `${mixH} giờ ${mixM} phút` : `${mixMinsTotal} phút`;
+                        const mixDurationStr = mixH > 0 ? `${mixH} ${tCommon('hour')} ${mixM} ${tCommon('minute')}` : `${mixMinsTotal} ${tCommon('minute')}`;
                         const isTripActive = o.order_status === 'running' || o.order_status === 'transporting';
 
                         return (
@@ -1283,7 +1283,7 @@ export default function AdminDashboard() {
                                   <Badge variant="secondary"
                                     className={`${isTripActive ? 'bg-sky-100 text-sky-600 hover:bg-sky-200' : 'bg-emerald-100 text-emerald-600 hover:bg-emerald-200'} text-sm px-2 py-0.5 font-semibold border-transparent shadow-none`}
                                   >
-                                    {o.order_status === 'running' ? 'Đang di chuyển' : o.order_status === 'transporting' ? 'Đã lấy hàng' : t('completed')}
+                                    {o.order_status === 'running' ? t('moving') : o.order_status === 'transporting' ? t('collected') : t('completed')}
                                   </Badge>
                                 </div>
                                 {/* Time row */}
@@ -1304,7 +1304,7 @@ export default function AdminDashboard() {
                                   </div>
                                   {diffMins > 0 && (
                                     <span className="font-bold text-amber-500">
-                                      {h > 0 ? `${h} giờ ${m} phút` : `${m} phút`}
+                                      {h > 0 ? `${h} ${tCommon('hour')} ${m} ${tCommon('minute')}` : `${m} ${tCommon('minute')}`}
                                     </span>
                                   )}
                                 </div>
@@ -1330,7 +1330,7 @@ export default function AdminDashboard() {
                                   {mixMs > 0 && (
                                     <div className="flex items-center gap-1.5 text-sm font-semibold whitespace-nowrap text-violet-500">
                                       <Timer size={14} />
-                                      <span>Trộn: {mixDurationStr}</span>
+                                      <span>{t('mixing')}: {mixDurationStr}</span>
                                     </div>
                                   )}
                                 </div>

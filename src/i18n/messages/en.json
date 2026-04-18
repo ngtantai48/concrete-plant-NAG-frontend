@@ -95,6 +95,8 @@
     "back": "Return Home"
   },
   "Common": {
+    "save": "Save",
+    "update": "Update",
     "back": "Back",
     "confirm": "Confirm",
     "cancel": "Cancel",
@@ -105,7 +107,9 @@
     "refreshData": "Refresh Data",
     "messages": {
       "commonError": "An error has occurred. Please try again later."
-    }
+    },
+    "hour": "h",
+    "minute": "min"
   },
   "DriverPage": {
     "title": "Driver Configuration",
@@ -185,9 +189,9 @@
     "status": "Status",
     "actions": "Actions",
     "active": "Ready",
-    "activeOption": "Ready for dispatch",
+    "activeOption": "Ready",
     "maintenance": "Maintenance",
-    "maintenanceOption": "Under maintenance",
+    "maintenanceOption": "Maintenance",
     "running": "Running",
     "transporting": "Transporting",
     "collecting": "Collecting",
@@ -195,6 +199,7 @@
     "inactive": "Inactive",
     "inactiveOption": "Deactivated",
     "all": "All statuses",
+    "otherOption": "Other",
     "searchPlaceholder": "Search plate, driver...",
     "addTooltip": "Add new vehicle",
     "editTooltip": "Edit",
@@ -210,6 +215,8 @@
     "loadFailed": "Failed to load vehicle data",
     "failed": "Failed",
     "save": "Save Vehicle",
+    "confirmChangeStatus": "Confirm status change",
+    "confirmChangePlate": "Change status of vehicle {plate} to {status}?",
     "cancel": "Cancel",
     "okText": "Delete",
     "cancelText": "Cancel",
@@ -280,6 +287,9 @@
   },
   "DashboardPage": {
     "title": "Control Center",
+    "moving": "In transit",
+    "collected": "Collected",
+    "mixing": "Mixing",
     "systemTime": "System time",
     "network": "Network",
     "data": "Data",
@@ -318,6 +328,7 @@
     "startTime": "Start",
     "endTime": "End",
     "tripSummary": "Summary",
+    "otherStatus": "Other",
     "searchVehicle": "Search vehicle",
     "all": "All",
     "waitingSignal": "Waiting for dispatch signal",

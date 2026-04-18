@@ -88,7 +88,9 @@
   },
   "Dashboard": {
     "title": "Bảng điều khiển",
-    "overview": "Tổng quan về các thử nghiệm và thống kê hệ thống"
+    "overview": "Tổng quan về các thử nghiệm và thống kê hệ thống",
+    "moving": "Đang di chuyển",
+    "mixing": "Trộn"
   },
   "Forbidden": {
     "access_forbidden": "Truy cập bị từ chối",
@@ -115,8 +117,10 @@
     "waitingList": "ĐANG CHỜ"
   },
   "Common": {
+    "save": "Lưu",
+    "update": "Cập nhật",
     "back": "Quay lại",
-    "confirm": "Tiếp tục xoá",
+    "confirm": "Xác nhận",
     "cancel": "Hủy",
     "delete": "Xóa",
     "edit": "Chỉnh sửa",
@@ -125,7 +129,9 @@
     "refreshData": "Tải lại dữ liệu",
     "messages": {
       "commonError": "Đã xảy ra lỗi. Vui lòng thử lại sau."
-    }
+    },
+    "hour": "giờ",
+    "minute": "phút"
   },
   "DriverPage": {
     "title": "Cấu hình tài xế",
@@ -205,9 +211,9 @@
     "status": "Trạng thái",
     "actions": "Thao tác",
     "active": "Sẵn sàng",
-    "activeOption": "Sẵn sàng điều phối",
+    "activeOption": "Sẵn sàng",
     "maintenance": "Bảo dưỡng",
-    "maintenanceOption": "Đang bảo dưỡng",
+    "maintenanceOption": "Bảo dưỡng",
     "running": "Đang chạy",
     "transporting": "Đang giao",
     "collecting": "Đang nhận",
@@ -215,6 +221,7 @@
     "inactive": "Ngưng HD",
     "inactiveOption": "Ngưng hoạt động",
     "all": "Tất cả trạng thái",
+    "otherOption": "Việc khác",
     "searchPlaceholder": "Tìm biển số, tài xế...",
     "addTooltip": "Thêm xe mới",
     "editTooltip": "Chỉnh sửa",
@@ -230,6 +237,8 @@
     "loadFailed": "Tải dữ liệu phương tiện thất bại",
     "failed": "Thất bại",
     "save": "Lưu phương tiện",
+    "confirmChangeStatus": "Xác nhận thay đổi trạng thái",
+    "confirmChangePlate": "Chuyển trạng thái xe {plate} sang {status}?",
     "cancel": "Huỷ",
     "okText": "Xoá",
     "cancelText": "Huỷ",
@@ -300,6 +309,9 @@
   },
   "DashboardPage": {
     "title": "Trung tâm điều khiển",
+    "moving": "Đang di chuyển",
+    "collected": "Đã lấy hàng",
+    "mixing": "Trộn",
     "systemTime": "Giờ hệ thống",
     "network": "Mạng",
     "data": "Dữ liệu",
@@ -338,6 +350,7 @@
     "startTime": "Bắt đầu",
     "endTime": "Kết thúc",
     "tripSummary": "Tổng kết",
+    "otherStatus": "Việc khác",
     "searchVehicle": "Tìm kiếm xe",
     "all": "Tất cả",
     "waitingSignal": "Đang chờ tín hiệu điều phối",
