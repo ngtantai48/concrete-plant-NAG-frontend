@@ -34,7 +34,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({
   const authLoading = useAppSelector((state: any) => state.auth.loading);
   const [localUserName, setLocalUserName] = useState<string | undefined>(userName);
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
-  const { notifications, unreadCount, markAsRead } = useSocket();
+  const { notifications, unreadCount, markAsRead, markAllAsRead } = useSocket();
 
   useEffect(() => {
     if (userName) {
@@ -108,7 +108,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({
                 className="z-1000 p-0 w-[360px] shadow-lg border-none"
                 sideOffset={5}
               >
-                <NotificationList notifications={notifications} onMarkAsRead={markAsRead} />
+                <NotificationList notifications={notifications} onMarkAsRead={markAsRead} onMarkAllAsRead={markAllAsRead} />
               </PopoverContent>
             </Popover>
 

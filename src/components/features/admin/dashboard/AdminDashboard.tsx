@@ -6,7 +6,7 @@ import vehicleApi from "@/services/vehicle.service";
 import type { Vehicle } from "@/types/vehicle";
 import orderApi from "@/services/order.service";
 import type { Order } from "@/types/order";
-import { RefreshCw, Map as MapIcon, Maximize2, Minimize2, Truck, Radio, CheckCircle2, Clock, Route, MapPin, Search, Calendar as CalendarIcon, Timer, ArrowRight, Ellipsis, X, ShieldCheck, FileSpreadsheet } from "lucide-react";
+import { RefreshCw, Map as MapIcon, Maximize2, Minimize2, Truck, Radio, CheckCircle2, Clock, Route, MapPin, Search, Calendar as CalendarIcon, Timer, ArrowRight, Ellipsis, X, ShieldCheck, FileSpreadsheet, ZoomOut, ZoomIn } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -79,6 +79,7 @@ export default function AdminDashboard() {
   const [pendingOrders, setPendingOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [zoomLevel, setZoomLevel] = useState<number>(1);
   const [selectedDate, setSelectedDate] = useState(getTodayDate());
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const operationDate = selectedDate;
@@ -428,7 +429,7 @@ export default function AdminDashboard() {
 
   return (
     <div className={`dashboard-light bg-cover bg-center ${isFullScreen ? 'fixed inset-0 z-[100] bg-slate-50 h-screen' : 'h-[calc(100vh-64px)]'} overflow-hidden flex flex-col`}>
-      <div className={`p-2 lg:p-4 mx-auto bg-transparent w-full flex-1 flex flex-col min-h-0`}>
+      <div className={`p-2 lg:p-4 mx-auto bg-transparent w-full flex-1 flex flex-col min-h-0`} style={{ zoom: zoomLevel }}>
 
         {/* ═══ HEADER ═══ */}
         <div className="dd-header mb-2 p-3 shrink-0">
@@ -446,6 +447,38 @@ export default function AdminDashboard() {
 
             {/* Right Controls */}
             <div className="flex items-center gap-2 shrink-0">
+              {/* Zoom Control */}
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setZoomLevel(z => {
+                        const nextZoom = z === 1 ? 0.75 : 1;
+                        const sidebarBtn = document.getElementById('sidebar-toggle-btn');
+                        if (sidebarBtn) {
+                          const isCollapsed = sidebarBtn.getAttribute('data-collapsed') === 'true';
+                          // Thu nhỏ thì gập sidebar, phóng to thì mở sidebar
+                          if (nextZoom === 0.75 && !isCollapsed) {
+                            sidebarBtn.click();
+                          } else if (nextZoom === 1 && isCollapsed) {
+                            sidebarBtn.click();
+                          }
+                        }
+                        return nextZoom;
+                      });
+                    }}
+                    className="h-8 w-8 p-0 border-slate-200 text-slate-600 hover:bg-slate-100 hover:text-slate-900 shadow-none transition-all rounded-full"
+                  >
+                    {zoomLevel === 1 ? <ZoomOut className="h-4 w-4" /> : <ZoomIn className="h-4 w-4" />}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>{zoomLevel === 1 ? 'Thu nhỏ giao diện (75%)' : 'Khôi phục (100%)'}</p>
+                </TooltipContent>
+              </Tooltip>
+
               {/* LED Status */}
               <Tooltip>
                 <TooltipTrigger asChild>

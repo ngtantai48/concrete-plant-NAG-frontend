@@ -46,6 +46,7 @@ interface SocketContextType {
   notifications: Notification[];
   unreadCount: number;
   markAsRead: (id: string | number) => void;
+  markAllAsRead: () => void;
   clearNotifications: () => void;
   refreshNotifications: () => void;
   /**
@@ -364,6 +365,26 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     [isConnected]
   );
 
+  // Mark all as read
+  const markAllAsRead = useCallback(() => {
+    const unreadItems = notificationsRef.current.filter((item) => !item.read);
+    if (unreadItems.length === 0) return;
+
+    setNotifications((prev) =>
+      prev.map((item) => (item.read ? item : { ...item, read: true }))
+    );
+
+    const manager = managerRef.current;
+    if (!manager || !isConnected) return;
+
+    unreadItems.forEach((item) => {
+      manager.emit('notification:mark_read', {
+        user_id: 'all',
+        noti_id: item.id,
+      });
+    });
+  }, [isConnected]);
+
   const clearNotifications = useCallback(() => {
     setNotifications([]);
   }, []);
@@ -388,6 +409,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         notifications,
         unreadCount: notifications.filter((item) => !item.read).length,
         markAsRead,
+        markAllAsRead,
         clearNotifications,
         refreshNotifications,
         onSocketEvent,

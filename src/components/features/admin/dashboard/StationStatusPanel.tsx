@@ -6,9 +6,9 @@ import type { DeviceStationStatus } from '@/hooks/useDeviceHeartbeat';
 import stationApi from '@/services/station.service';
 import type { Order } from '@/types/order';
 import type { Station } from '@/types/station';
-import { Pause, Play, RotateCw } from 'lucide-react';
+import { Pause, Play, RotateCw, Video } from 'lucide-react';
 import { useTranslations } from 'next-intl';
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { toast } from 'sonner';
 
 interface StationStatusPanelProps {
@@ -37,6 +37,15 @@ const StationStatusPanel = ({ stations, orders, deviceStationStatusMap = {}, onS
   const [incidentDesc, setIncidentDesc] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [stationToPause, setStationToPause] = useState<Station | null>(null);
+  const [viewingCameraStation, setViewingCameraStation] = useState<Station | null>(null);
+  const [cameraKey, setCameraKey] = useState(Date.now());
+
+  // Khởi động load frame đầu tiên khi mở camera
+  useEffect(() => {
+    if (viewingCameraStation) {
+      setCameraKey(Date.now());
+    }
+  }, [viewingCameraStation]);
 
   const vehiclesByStation = useMemo(() => {
     const map: Record<number, { license_plate: string; status: string; order_number: number }[]> = {};
@@ -240,13 +249,13 @@ const StationStatusPanel = ({ stations, orders, deviceStationStatusMap = {}, onS
 
                   <Badge
                     variant="outline"
-                    className={`gap-1.5 text-sm font-normal px-2 py-0 shadow-none h-7 shrink-0 transition-all ${deviceStatus === 'connected'
+                    onClick={() => setViewingCameraStation(station)}
+                    className={`gap-1.5 text-sm font-normal px-2 py-0 shadow-none h-7 shrink-0 transition-all cursor-pointer hover:bg-slate-100 ${deviceStatus === 'connected'
                       ? 'bg-emerald-50/50 text-emerald-600 border-emerald-200'
                       : 'bg-red-50/50 text-red-600 border-red-200 animate-pulse'
                       }`}
                   >
-                    {/* <span className={`h-1.5 w-1.5 rounded-full ${deviceStatus === 'connected' ? 'bg-emerald-500 shadow-[0_0_4px_rgba(16,185,129,0.5)]' : 'bg-red-500 shadow-[0_0_4px_rgba(239,68,68,0.5)]'
-                      }`} /> */}
+                    <Video className="w-3.5 h-3.5" />
                     {deviceStatus === 'connected' ? t('cameraConnected') : t('cameraDisconnected')}
                   </Badge>
 
@@ -437,6 +446,45 @@ const StationStatusPanel = ({ stations, orders, deviceStationStatusMap = {}, onS
               {togglingId === stationToPause?.station_id ? t('processing') : t('stopped')}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!viewingCameraStation} onOpenChange={(isOpen) => !isOpen && setViewingCameraStation(null)}>
+        <DialogContent className="sm:max-w-3xl max-h-[90vh] flex flex-col p-4 bg-white/95 backdrop-blur-md">
+          <DialogHeader className="flex-none">
+            <DialogTitle className="text-xl font-black text-slate-800 flex items-center gap-2">
+              <Video className="w-5 h-5 text-indigo-500" />
+              Camera Giám Sát - {viewingCameraStation?.station_name}
+            </DialogTitle>
+            <DialogDescription className="text-sm font-medium text-slate-500">
+              IP: {viewingCameraStation?.station_ip_address || 'Chưa cấu hình'} | Port: {viewingCameraStation?.station_port || 'Chưa cấu hình'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="w-full aspect-video bg-black rounded-md overflow-hidden relative border border-slate-200 shadow-inner flex items-center justify-center">
+            {viewingCameraStation?.station_ip_address ? (
+              <img
+                src={`/api/camera/proxy?ip=${viewingCameraStation.station_ip_address}&port=${viewingCameraStation.station_id === 1 ? '81' : viewingCameraStation.station_id === 2 ? '82' : viewingCameraStation.station_id === 3 ? '80' : '80'}&t=${cameraKey}`}
+                className="w-full h-full object-contain bg-black"
+                alt={`Camera ${viewingCameraStation.station_name}`}
+                onLoad={() => {
+                  // Tải frame tiếp theo ngay sau khi frame hiện tại tải xong (tạo hiệu ứng video mượt)
+                  setTimeout(() => {
+                     setCameraKey(Date.now());
+                  }, 80); // Đặt ở mức 80ms (~10-12 FPS) để bảo vệ Camera không bị sập
+                }}
+                onError={(e) => {
+                  // Nếu lỗi mạng tạm thời, thử lại sau 2 giây
+                  setTimeout(() => {
+                     setCameraKey(Date.now());
+                  }, 2000);
+                }}
+              />
+            ) : (
+              <div className="flex items-center justify-center w-full h-full text-slate-400 font-medium">
+                Vui lòng cấu hình IP và Port cho camera của trạm này trong phần quản lý trạm.
+              </div>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
     </>
