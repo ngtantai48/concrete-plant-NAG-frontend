@@ -351,20 +351,28 @@ export default function AdminDashboard() {
       const aTrips = vehicleTripMap.get(a.vehicle_id) || [];
       const bTrips = vehicleTripMap.get(b.vehicle_id) || [];
 
-      // Get latest update time for vehicle A
+      // Priority score: running=2, transporting=1, rest=0
+      const getPriority = (trips: typeof aTrips) => {
+        if (trips.some(o => o.order_status === 'running')) return 2;
+        if (trips.some(o => o.order_status === 'transporting')) return 1;
+        return 0;
+      };
+      const aPriority = getPriority(aTrips);
+      const bPriority = getPriority(bTrips);
+
+      // Sort by priority group first
+      if (aPriority !== bPriority) return bPriority - aPriority;
+
+      // Within same group: sort by latest updated_at descending
       const aLatestTime = aTrips.length > 0
         ? Math.max(0, ...aTrips.map(o => o.updated_at ? new Date(o.updated_at).getTime() : 0))
         : 0;
-
-      // Get latest update time for vehicle B
       const bLatestTime = bTrips.length > 0
         ? Math.max(0, ...bTrips.map(o => o.updated_at ? new Date(o.updated_at).getTime() : 0))
         : 0;
-
-      // Sort by latest time descending
       if (bLatestTime !== aLatestTime) return bLatestTime - aLatestTime;
 
-      // Fallback to license plate
+      // Fallback: license plate A-Z
       return a.vehicle_license_plate.localeCompare(b.vehicle_license_plate);
     });
   }, [vehicles, vehicleTripMap]);
@@ -868,7 +876,9 @@ export default function AdminDashboard() {
                       {sortedVehiclesWithTrips.map((v) => {
                         const trips = vehicleTripMap.get(v.vehicle_id) || [];
                         const hasTrips = trips.length > 0;
-                        const hasActive = trips.some(o => o.order_status === 'running' || o.order_status === 'transporting');
+                        const hasRunning = trips.some(o => o.order_status === 'running');
+                        const hasTransporting = trips.some(o => o.order_status === 'transporting');
+                        const hasActive = hasRunning || hasTransporting;
                         const accentColor = hasActive ? '#0ea5e9' : (hasTrips ? '#10b981' : '#94a3b8');
                         const hoverBorder = hasActive ? 'rgba(14, 165, 233, 0.4)' : (hasTrips ? 'rgba(16, 185, 129, 0.4)' : 'rgba(148, 163, 184, 0.3)');
                         const chipClass = hasActive ? 'dd-chip-sky' : 'dd-chip-emerald';
@@ -929,7 +939,7 @@ export default function AdminDashboard() {
                               </div>
                               {hasTrips ? (
                                 <span className={`dd-chip ${chipClass} text-[10px] px-1.5 py-0.5`}>
-                                  {hasActive ? 'Đang di chuyển' : t('tripCount', { count: trips.length })}
+                                  {hasRunning ? 'Đang di chuyển' : hasTransporting ? 'Đã lấy hàng' : t('tripCount', { count: trips.length })}
                                 </span>
                               ) : (
                                 <span className="dd-chip dd-chip-slate text-[10px] px-1.5 py-0.5">
@@ -1273,7 +1283,7 @@ export default function AdminDashboard() {
                                   <Badge variant="secondary"
                                     className={`${isTripActive ? 'bg-sky-100 text-sky-600 hover:bg-sky-200' : 'bg-emerald-100 text-emerald-600 hover:bg-emerald-200'} text-sm px-2 py-0.5 font-semibold border-transparent shadow-none`}
                                   >
-                                    {isTripActive ? 'Đang di chuyển' : t('completed')}
+                                    {o.order_status === 'running' ? 'Đang di chuyển' : o.order_status === 'transporting' ? 'Đã lấy hàng' : t('completed')}
                                   </Badge>
                                 </div>
                                 {/* Time row */}
