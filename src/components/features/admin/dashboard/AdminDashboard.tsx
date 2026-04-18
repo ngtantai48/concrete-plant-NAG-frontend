@@ -172,6 +172,7 @@ export default function AdminDashboard() {
     geofenceStation?.station_gps_longitude ?? null,
     geofenceStation?.station_gps_latitude ?? null,
     geofenceStation?.station_gps_geofencing || 500,
+    30000,
   );
 
   const { isConnected: socketConnected, lastSignal, lastSignalTime } = useRealtimeUpdates(fetchAll);
@@ -1453,7 +1454,7 @@ export default function AdminDashboard() {
                         <div className="flex items-center gap-2.5">
                           <div className="h-3 w-3 rounded-full shrink-0 border-2 border-white shadow-sm"
                             style={{
-                              background: v.status === 'run' ? '#10b981' : v.status === 'park' ? '#f59e0b' : '#94a3b8',
+                              background: (['run','running'].includes(v.status?.toLowerCase())) ? '#10b981' : (['stop','park','idle','parking','stopped'].includes(v.status?.toLowerCase())) ? '#f59e0b' : '#94a3b8',
                             }}
                           />
                           <span className="text-sm font-bold" style={{ color: 'var(--dd-text-primary)' }}>
@@ -1461,7 +1462,7 @@ export default function AdminDashboard() {
                           </span>
                         </div>
                         <div className="mt-1.5 pl-5 flex items-center justify-between text-xs" style={{ color: 'var(--dd-text-muted)' }}>
-                          <span>{v.status === 'run' ? t('running') : v.status === 'park' ? t('stopped') : t('disconnected')}</span>
+                          <span>{(['run','running'].includes(v.status?.toLowerCase())) ? t('running') : (['stop','park','idle','parking','stopped'].includes(v.status?.toLowerCase())) ? t('stopped') : t('disconnected')}</span>
                           <span className="font-semibold tabular-nums">{v.speed} km/h</span>
                         </div>
                         <div className="mt-0.5 pl-5 text-xs text-left" style={{ color: 'var(--dd-text-muted)' }}>
