@@ -9,6 +9,7 @@ import { CheckCircle2, AlertTriangle, Wrench, Loader2, HelpCircle } from "lucide
 import vehicleApi from "@/services/vehicle.service";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { useTranslations } from "next-intl";
 
 interface VehicleStatusChangeProps {
   vehicleId: number;
@@ -56,6 +57,9 @@ const VehicleStatusChange = ({
   onStatusChanged,
   className,
 }: VehicleStatusChangeProps) => {
+  const tVehiclePage = useTranslations('VehiclePage');
+  const tCommon = useTranslations('Common');
+  const tDashboard = useTranslations('DashboardPage');
   // Track the "known server status" — starts from prop, updated after successful API call
   const knownStatus = useRef(currentStatus);
   const [selectedStatus, setSelectedStatus] = useState(currentStatus);
@@ -92,7 +96,7 @@ const VehicleStatusChange = ({
       <RadioGroup
         value={selectedStatus}
         onValueChange={setSelectedStatus}
-        className="flex items-center gap-1"
+        className="flex items-center gap-1 flex-nowrap"
       >
         {STATUSES.map((status) => {
           const Icon = status.icon;
@@ -102,7 +106,7 @@ const VehicleStatusChange = ({
               key={status.value}
               htmlFor={`status-${vehicleId}-${status.value}`}
               className={cn(
-                "flex items-center gap-1.5 cursor-pointer rounded-md border px-2.5 py-1 text-xs font-semibold transition-all select-none",
+                "flex items-center gap-1.5 cursor-pointer rounded-md border px-2.5 py-1 text-xs font-semibold whitespace-nowrap transition-all select-none",
                 isSelected
                   ? status.activeClass
                   : "border-slate-200 bg-white text-slate-500 hover:border-slate-300 hover:bg-slate-50"
@@ -114,23 +118,29 @@ const VehicleStatusChange = ({
                 className="sr-only"
               />
               <Icon className="h-3.5 w-3.5" />
-              {status.label}
+              {status.value === 'available' ? tVehiclePage('activeOption') :
+                status.value === 'incident' ? tVehiclePage('incident') :
+                  status.value === 'maintenance' ? tVehiclePage('maintenanceOption') :
+                    tVehiclePage('otherOption')}
             </Label>
           );
         })}
       </RadioGroup>
 
       <Popconfirm
-        title="Xác nhận thay đổi trạng thái"
+        title={tVehiclePage("confirmChangeStatus")}
         description={
-          <>
-            Chuyển trạng thái xe <strong>{vehiclePlate}</strong> sang{" "}
-            <strong>{STATUSES.find((s) => s.value === selectedStatus)?.label}</strong>?
-          </>
+          tVehiclePage("confirmChangePlate", {
+            plate: vehiclePlate,
+            status: selectedStatus === 'available' ? tVehiclePage('activeOption') :
+                   selectedStatus === 'incident' ? tVehiclePage('incident') :
+                   selectedStatus === 'maintenance' ? tVehiclePage('maintenanceOption') :
+                   tVehiclePage('otherOption')
+          })
         }
         onConfirm={handleUpdate}
-        okText="Xác nhận"
-        cancelText="Hủy"
+        okText={tCommon("confirm")}
+        cancelText={tCommon("cancel")}
         okButtonProps={{ loading: isUpdating }}
         disabled={!hasChanged || isUpdating}
         getPopupContainer={(triggerNode) => triggerNode.parentNode as HTMLElement}
@@ -146,7 +156,7 @@ const VehicleStatusChange = ({
               : "bg-slate-100 text-slate-400 cursor-not-allowed"
           )}
         >
-          {isUpdating ? (<Loader2 className="h-3.5 w-3.5 animate-spin" />) : ("Cập nhật")}
+          {isUpdating ? (<Loader2 className="h-3.5 w-3.5 animate-spin" />) : (tCommon("update") || "Cập nhật")}
         </Button>
       </Popconfirm>
     </div>
