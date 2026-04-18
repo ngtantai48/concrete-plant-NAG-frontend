@@ -9,7 +9,7 @@ import { useSocket } from "@/context/socket-context";
 import { useAppSelector } from "@/hooks/use-app-selector";
 import { UserOutlined } from "@ant-design/icons";
 import { Avatar, Dropdown, Layout, MenuProps, Space } from "antd";
-import { BellRing } from "lucide-react";
+import { BellRing, Volume2, VolumeX } from "lucide-react";
 import { useTranslations } from "next-intl";
 import React, { useEffect, useState } from "react";
 
@@ -34,7 +34,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({
   const authLoading = useAppSelector((state: any) => state.auth.loading);
   const [localUserName, setLocalUserName] = useState<string | undefined>(userName);
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
-  const { notifications, unreadCount, markAsRead, markAllAsRead } = useSocket();
+  const { notifications, unreadCount, markAsRead, markAllAsRead, isMuted, toggleMute } = useSocket();
 
   useEffect(() => {
     if (userName) {
@@ -111,6 +111,19 @@ const AppHeader: React.FC<AppHeaderProps> = ({
                 <NotificationList notifications={notifications} onMarkAsRead={markAsRead} onMarkAllAsRead={markAllAsRead} />
               </PopoverContent>
             </Popover>
+
+            {/* Voice notification mute toggle */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={toggleMute}
+              className={`relative hover:bg-gray-300 transition-colors ${
+                isMuted ? 'text-red-500' : 'text-slate-600'
+              }`}
+              title={isMuted ? 'Bật âm thanh thông báo' : 'Tắt âm thanh thông báo'}
+            >
+              {isMuted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
+            </Button>
 
             <LanguageSwitcher />
 

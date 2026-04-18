@@ -257,7 +257,6 @@ export default function TableVehicles() {
       vehicle_license_plate: record.vehicle_license_plate,
       vehicle_status: record.vehicle_status,
       vehicle_description: record.vehicle_description,
-      vehicle_rfid: record.vehicle_rfid,
       vehicle_type_id: record.vehicle_type_id,
       user_id: record.user_id ?? record.users?.user_id,
     });
@@ -538,19 +537,7 @@ export default function TableVehicles() {
         </div>
       ),
     },
-    {
-      title: t("rfid"),
-      dataIndex: "vehicle_rfid",
-      key: "vehicle_rfid",
-      render: (val: string | null) =>
-        val ? (
-          <span className="font-mono text-xs bg-indigo-50 text-indigo-700 px-2 py-1 rounded border border-indigo-200">
-            {val}
-          </span>
-        ) : (
-          <span className="text-slate-400 italic">-</span>
-        ),
-    },
+
     {
       title: t("vehicleType"),
       dataIndex: "vehicle_type_id",
@@ -561,29 +548,7 @@ export default function TableVehicles() {
         return found?.vehicle_type_name || `#${val}`;
       },
     },
-    {
-      title: t("assignedDriver"),
-      dataIndex: "user_id",
-      key: "user_id",
-      render: (value: number | null | undefined, record: Vehicle) => {
-        if (record.users?.user_full_name) {
-          return (
-            <div className="leading-tight">
-              <div className="font-medium text-slate-800">{record.users.user_full_name}</div>
-              {record.users.username && (
-                <div className="text-xs text-slate-500">@{record.users.username}</div>
-              )}
-            </div>
-          );
-        }
 
-        if (value) {
-          return <span className="text-xs text-slate-500">#{value}</span>;
-        }
-
-        return <span className="text-slate-400 italic">{t("unassigned")}</span>;
-      },
-    },
     {
       title: t("description"),
       dataIndex: "vehicle_description",
@@ -965,35 +930,7 @@ export default function TableVehicles() {
                   />
                 </Form.Item>
 
-                <Form.Item
-                  label={<span className="font-medium text-slate-700">{t("rfidLabel")}</span>}
-                  name="vehicle_rfid"
-                  className="mb-0"
-                >
-                  <Input
-                    placeholder={t("rfidPlaceholder")}
-                    className="rounded-lg font-mono tracking-wider"
-                    suffix={
-                      <Tooltip title={isScanning ? "Đang đợi thẻ..." : "Bấm để quét thẻ RFID"}>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          className="h-8 w-8 p-0"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            if (isScanning) disconnect();
-                            else connect();
-                          }}
-                        >
-                          <Scan
-                            className={`w-4 h-4 ${isScanning ? "text-blue-500 animate-pulse" : "text-slate-400"
-                              }`}
-                          />
-                        </Button>
-                      </Tooltip>
-                    }
-                  />
-                </Form.Item>
+
 
                 <Form.Item
                   label={<span className="font-medium text-slate-700">{t("status")}</span>}
