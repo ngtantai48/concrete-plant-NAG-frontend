@@ -17,6 +17,7 @@ export function useRealtimeUpdates(onUpdate: (signal?: UpdateSignal) => void) {
   const [isConnected, setIsConnected] = useState(false);
   const [lastSignal, setLastSignal] = useState<UpdateSignal | null>(null);
   const [lastSignalTime, setLastSignalTime] = useState<Date | null>(null);
+  const lastSignalTimeRef = useRef<Date | null>(null);
 
   const tokenState = useAppSelector((state: any) => state.auth.token);
 
@@ -70,7 +71,9 @@ export function useRealtimeUpdates(onUpdate: (signal?: UpdateSignal) => void) {
     // Throttled refresh function
     const triggerRefresh = (signal: UpdateSignal) => {
       setLastSignal(signal);
-      setLastSignalTime(new Date());
+      const nowDt = new Date();
+      setLastSignalTime(nowDt);
+      lastSignalTimeRef.current = nowDt;
 
       const now = Date.now();
       const elapsed = now - lastRefreshRef.current;
@@ -142,6 +145,75 @@ export function useRealtimeUpdates(onUpdate: (signal?: UpdateSignal) => void) {
         clearTimeout(pendingRefreshRef.current);
         pendingRefreshRef.current = null;
       }
+    };
+  }, [isConnected]);
+
+  // Tab visibility / focus listeners to handle tab sleep/wake
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        console.log("[RealtimeUpdates] Tab active tro lai, lam moi du lieu");
+        onUpdateRef.current({ update_type: 'visibility_wake' });
+        if (managerRef.current && !isConnected) {
+          managerRef.current.reconnect();
+        }
+      }
+    };
+
+    const handleFocus = () => {
+      console.log("[RealtimeUpdates] Window focus, lam moi du lieu");
+      onUpdateRef.current({ update_type: 'window_focus' });
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [isConnected]);
+
+  // Fallback polling bằng Web Worker để bypass tính năng ngủ đông của tab
+  // Trình duyệt không giới hạn Web Worker, nên setInterval trong này chạy full tốc độ kể cả khi thu nhỏ tab.
+  useEffect(() => {
+    const workerCode = `
+      let intervalId = null;
+      self.onmessage = function(e) {
+        if (e.data === 'start') {
+          intervalId = setInterval(() => {
+            self.postMessage('tick');
+          }, 15000);
+        } else if (e.data === 'stop') {
+          clearInterval(intervalId);
+        }
+      };
+    `;
+    const blob = new Blob([workerCode], { type: 'application/javascript' });
+    const workerUrl = URL.createObjectURL(blob);
+    const worker = new Worker(workerUrl);
+
+    worker.onmessage = () => {
+      const now = Date.now();
+      const last = lastSignalTimeRef.current ? lastSignalTimeRef.current.getTime() : 0;
+      // Nếu mất mạng ngầm quá 30s hoặc hiển thị offline, ép fetch lại
+      if (!isConnected || now - last > 30000) {
+        console.log("[RealtimeUpdates] Worker ngầm đang fetch lại data (Background Polling)");
+        onUpdateRef.current({ update_type: 'background_polling' });
+        
+        // Thử kích lại socket nếu đang rớt
+        if (managerRef.current && !managerRef.current.isConnected) {
+          managerRef.current.reconnect();
+        }
+      }
+    };
+
+    worker.postMessage('start');
+
+    return () => {
+      worker.postMessage('stop');
+      worker.terminate();
+      URL.revokeObjectURL(workerUrl);
     };
   }, [isConnected]);
 
