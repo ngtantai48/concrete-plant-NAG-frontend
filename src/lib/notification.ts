@@ -25,12 +25,16 @@ const NOTIFICATION_TEXT_TEMPLATES: Record<NotificationLocale, Record<string, str
     [NOTIFICATION_EVENTS.STATION_CHECK_OUT]: "Xe {vehicle} đã rời {station}",
     [NOTIFICATION_EVENTS.VEHICLE_CHECK_IN]: "Xe {vehicle} đã rời bãi",
     [NOTIFICATION_EVENTS.VEHICLE_CHECK_OUT]: "Xe {vehicle} đã vào bãi",
+    [NOTIFICATION_EVENTS.STATION_CHECKOUT_VEHICLE_CHECKIN_WARNING]: "Cảnh báo xe {vehicle} đã ở bãi 10 phút kể từ khi lấy hàng thành công,  làm mới lốt xe sau 5 phút nữa",
+    [NOTIFICATION_EVENTS.STATION_CHECKOUT_VEHICLE_CHECKIN_TIMEOUT_RESET]: "Đã làm mới lốt xe của xe {vehicle}",
   },
   en: {
     [NOTIFICATION_EVENTS.STATION_CHECK_IN]: "Vehicle {vehicle} checked in at {station}",
     [NOTIFICATION_EVENTS.STATION_CHECK_OUT]: "Vehicle {vehicle} checked out from {station}",
     [NOTIFICATION_EVENTS.VEHICLE_CHECK_IN]: "Vehicle {vehicle} checked in to the yard",
     [NOTIFICATION_EVENTS.VEHICLE_CHECK_OUT]: "Vehicle {vehicle} checked out from the yard",
+    [NOTIFICATION_EVENTS.STATION_CHECKOUT_VEHICLE_CHECKIN_WARNING]: "Warning: Vehicle {vehicle} has been at the station for 10 minutes since successful pickup",
+    [NOTIFICATION_EVENTS.STATION_CHECKOUT_VEHICLE_CHECKIN_TIMEOUT_RESET]: "Vehicle {vehicle} slot has been reset",
   },
 };
 
