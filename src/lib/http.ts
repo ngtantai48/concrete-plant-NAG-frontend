@@ -102,7 +102,57 @@ http.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
 
 http.interceptors.response.use(
     (response) => response,
-    (error) => handleHttpError(error)
+    async (error) => {
+        const originalRequest = error.config;
+        const status = error.response?.status;
+
+        // If 401 or 403 error and hasn't retried yet
+        if ((status === 401 || status === 403) && !originalRequest._retry) {
+            // Do not retry if the request is refresh or login itself
+            if (originalRequest.url?.includes("/auth/refresh") || originalRequest.url?.includes("/auth/login")) {
+                return handleHttpError(error);
+            }
+
+            originalRequest._retry = true;
+
+            if (!refreshTokenPromise) {
+                refreshTokenPromise = authApi.refreshToken()
+                    .then((res) => {
+                        const newToken = res.data.accessToken;
+                        storeInstance?.dispatch({
+                            type: "auth/login/fulfilled",
+                            payload: {
+                                user_id: res.data.user_id,
+                                role: res.data.role,
+                                role_id: res.data.role_id,
+                                accessToken: newToken,
+                                user_full_name: res.data.user_full_name,
+                            },
+                        });
+                        return newToken;
+                    })
+                    .catch((err) => {
+                        storeInstance?.dispatch(logoutSuccess());
+                        throw err;
+                    })
+                    .finally(() => {
+                        refreshTokenPromise = null;
+                    });
+            }
+
+            try {
+                const newToken = await refreshTokenPromise;
+                if (originalRequest.headers) {
+                    originalRequest.headers.Authorization = `Bearer ${newToken}`;
+                }
+                return http(originalRequest);
+            } catch (retryError) {
+                return Promise.reject(retryError);
+            }
+        }
+
+        return handleHttpError(error);
+    }
 );
 
 export default http;

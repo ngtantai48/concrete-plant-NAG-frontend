@@ -101,7 +101,7 @@ export function useRealtimeUpdates(onUpdate: (signal?: UpdateSignal) => void) {
         const signal = validateUpdateSignal('update', payload);
         if (!signal) return;
 
-        console.log("[RealtimeUpdates] Nhan su kien update:", signal);
+        console.log("[RealtimeUpdates] Received update event:", signal);
         triggerRefresh(signal);
       })
     );
@@ -112,12 +112,12 @@ export function useRealtimeUpdates(onUpdate: (signal?: UpdateSignal) => void) {
         const signal = validateUpdateSignal('ping', payload);
         if (!signal) return;
 
-        console.log("[RealtimeUpdates] Nhan su kien ping:", signal);
+        console.log("[RealtimeUpdates] Received ping event:", signal);
         triggerRefresh(signal);
       })
     );
 
-    // Catch-all for other events (chỉ những events không phải update/ping)
+    // Catch-all for other events (excluding update/ping)
     unsubscribes.push(
       manager.onAny((eventName, payload) => {
         // DIAGNOSTIC: log raw event name for every event on /updates
@@ -129,11 +129,11 @@ export function useRealtimeUpdates(onUpdate: (signal?: UpdateSignal) => void) {
 
         const signal = validateUpdateSignal(eventName, payload);
         if (!signal) {
-          console.warn(`[RealtimeUpdates] Event "${eventName}" bi loc boi validateUpdateSignal`);
+          console.warn(`[RealtimeUpdates] Event "${eventName}" filtered by validateUpdateSignal`);
           return;
         }
 
-        console.log(`[RealtimeUpdates] Nhan su kien ${eventName}:`, payload);
+        console.log(`[RealtimeUpdates] Received event ${eventName}:`, payload);
         triggerRefresh(signal);
       })
     );
@@ -152,7 +152,6 @@ export function useRealtimeUpdates(onUpdate: (signal?: UpdateSignal) => void) {
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
-        console.log("[RealtimeUpdates] Tab active tro lai, lam moi du lieu");
         onUpdateRef.current({ update_type: 'visibility_wake' });
         if (managerRef.current && !isConnected) {
           managerRef.current.reconnect();
@@ -161,7 +160,6 @@ export function useRealtimeUpdates(onUpdate: (signal?: UpdateSignal) => void) {
     };
 
     const handleFocus = () => {
-      console.log("[RealtimeUpdates] Window focus, lam moi du lieu");
       onUpdateRef.current({ update_type: 'window_focus' });
     };
 
@@ -174,8 +172,8 @@ export function useRealtimeUpdates(onUpdate: (signal?: UpdateSignal) => void) {
     };
   }, [isConnected]);
 
-  // Fallback polling bằng Web Worker để bypass tính năng ngủ đông của tab
-  // Trình duyệt không giới hạn Web Worker, nên setInterval trong này chạy full tốc độ kể cả khi thu nhỏ tab.
+  // Fallback polling using Web Worker to bypass tab suspension
+  // Browsers don't throttle Web Workers, so setInterval here runs at full speed even when minimized.
   useEffect(() => {
     const workerCode = `
       let intervalId = null;
@@ -196,12 +194,11 @@ export function useRealtimeUpdates(onUpdate: (signal?: UpdateSignal) => void) {
     worker.onmessage = () => {
       const now = Date.now();
       const last = lastSignalTimeRef.current ? lastSignalTimeRef.current.getTime() : 0;
-      // Nếu mất mạng ngầm quá 30s hoặc hiển thị offline, ép fetch lại
+      // If silent for > 30s or offline, force fetch again
       if (!isConnected || now - last > 30000) {
-        console.log("[RealtimeUpdates] Worker ngầm đang fetch lại data (Background Polling)");
         onUpdateRef.current({ update_type: 'background_polling' });
         
-        // Thử kích lại socket nếu đang rớt
+        // Try to reconnect socket if disconnected
         if (managerRef.current && !managerRef.current.isConnected) {
           managerRef.current.reconnect();
         }
