@@ -17,6 +17,9 @@ type NotificationLike = {
   created_at?: unknown;
   emittedAt?: unknown;
   emitted_at?: unknown;
+  warning_threshold_minutes?: unknown;
+  timeout_threshold_minutes?: unknown;
+  elapsed_minutes?: unknown;
 };
 
 const NOTIFICATION_TEXT_TEMPLATES: Record<NotificationLocale, Record<string, string>> = {
@@ -25,7 +28,7 @@ const NOTIFICATION_TEXT_TEMPLATES: Record<NotificationLocale, Record<string, str
     [NOTIFICATION_EVENTS.STATION_CHECK_OUT]: "Xe {vehicle} đã rời {station}",
     [NOTIFICATION_EVENTS.VEHICLE_CHECK_IN]: "Xe {vehicle} đã rời bãi",
     [NOTIFICATION_EVENTS.VEHICLE_CHECK_OUT]: "Xe {vehicle} đã vào bãi",
-    [NOTIFICATION_EVENTS.STATION_CHECKOUT_VEHICLE_CHECKIN_WARNING]: "Cảnh báo xe {vehicle} đã ở bãi 10 phút kể từ khi lấy hàng thành công,  làm mới lốt xe sau 5 phút nữa",
+    [NOTIFICATION_EVENTS.STATION_CHECKOUT_VEHICLE_CHECKIN_WARNING]: "Cảnh báo xe {vehicle} đã ở bãi {elapsed_minutes} phút kể từ khi lấy hàng thành công,  làm mới lốt xe sau {remaining_minutes} phút nữa",
     [NOTIFICATION_EVENTS.STATION_CHECKOUT_VEHICLE_CHECKIN_TIMEOUT_RESET]: "Đã làm mới lốt xe của xe {vehicle}",
   },
   en: {
@@ -33,7 +36,7 @@ const NOTIFICATION_TEXT_TEMPLATES: Record<NotificationLocale, Record<string, str
     [NOTIFICATION_EVENTS.STATION_CHECK_OUT]: "Vehicle {vehicle} checked out from {station}",
     [NOTIFICATION_EVENTS.VEHICLE_CHECK_IN]: "Vehicle {vehicle} checked in to the yard",
     [NOTIFICATION_EVENTS.VEHICLE_CHECK_OUT]: "Vehicle {vehicle} checked out from the yard",
-    [NOTIFICATION_EVENTS.STATION_CHECKOUT_VEHICLE_CHECKIN_WARNING]: "Warning: Vehicle {vehicle} has been at the station for 10 minutes since successful pickup",
+    [NOTIFICATION_EVENTS.STATION_CHECKOUT_VEHICLE_CHECKIN_WARNING]: "Warning: Vehicle {vehicle} has been at the yard for {elapsed_minutes} minutes since successful pickup",
     [NOTIFICATION_EVENTS.STATION_CHECKOUT_VEHICLE_CHECKIN_TIMEOUT_RESET]: "Vehicle {vehicle} slot has been reset",
   },
 };
@@ -118,6 +121,10 @@ export function getNotificationText(
       vehicle: getVehicleDisplayValue(notification),
       orderNumber: getStringValue(notification.order_number, "-"),
       user: getStringValue(notification.user_name, "-"),
+      warning_threshold_minutes: getStringValue(notification.warning_threshold_minutes, "0"),
+      timeout_threshold_minutes: getStringValue(notification.timeout_threshold_minutes, "0"),
+      elapsed_minutes: Math.round(Number(notification.elapsed_minutes || 0)).toString(),
+      remaining_minutes: Math.max(0, Math.round(Number(notification.timeout_threshold_minutes || 0) - Number(notification.elapsed_minutes || 0))).toString(),
     });
   }
 

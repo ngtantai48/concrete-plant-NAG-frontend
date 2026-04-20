@@ -59,6 +59,7 @@
     "mealCheck": "Cơm ca",
     "attendance": "Chấm công",
     "shiftSlots": "Quản lý lốt ca",
+    "systemSettings": "Cấu hình hệ thống",
     "role": {
       "admin": "Quản trị viên",
       "user": "Người thử nghiệm",
@@ -685,5 +686,20 @@
     "fetchError": "Không thể lấy dữ liệu",
     "syncSuccess": "Đã đồng bộ {count} người vào sheet {sheet}",
     "syncError": "Lỗi đồng bộ: {message}"
+  },
+  "SystemSettingsPage": {
+    "title": "Cấu hình hệ thống",
+    "transportsRuntime": "Cấu hình ngưỡng vận hành",
+    "cmr_station_min_stay_minutes": "Thời gian tối thiểu xe ra vào trạm để được tính là lấy hàng hợp lệ (phút)",
+    "station_checkout_vehicle_checkin_warning_minutes": "Cảnh báo xe chưa ra khỏi bãi sau khi lấy hàng thành công (sau ... phút)",
+    "station_checkout_vehicle_checkin_timeout_minutes": "Đặt lại lốt xe của chuyến xe (sau ... phút)",
+    "placeholder": "Nhập số phút...",
+    "validation": {
+      "required": "Trường này là bắt buộc",
+      "nonNegative": "Không được nhập số âm",
+      "warningLessThanTimeout": "Thời gian cảnh báo phải nhỏ hơn thời gian reset"
+    },
+    "saveSuccess": "Cập nhật cấu hình thành công",
+    "saveError": "Không thể cập nhật cấu hình"
   }
 }

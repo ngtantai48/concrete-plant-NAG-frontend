@@ -58,6 +58,7 @@
     "mealCheck": "Meal Check",
     "attendance": "Attendance",
     "shiftSlots": "Shift Slots",
+    "systemSettings": "System Settings",
     "role": {
       "admin": "Administrator",
       "user": "Tester",
@@ -682,5 +683,20 @@
     "fetchError": "Failed to fetch data",
     "syncSuccess": "Synced {count} people to sheet {sheet}",
     "syncError": "Sync error: {message}"
+  },
+  "SystemSettingsPage": {
+    "title": "System Settings",
+    "transportsRuntime": "Operational Thresholds",
+    "cmr_station_min_stay_minutes": "Min stay at station (min)",
+    "station_checkout_vehicle_checkin_warning_minutes": "Warning after (min)",
+    "station_checkout_vehicle_checkin_timeout_minutes": "Reset after (min)",
+    "placeholder": "Enter minutes...",
+    "validation": {
+      "required": "This field is required",
+      "nonNegative": "Must be non-negative",
+      "warningLessThanTimeout": "Warning time must be less than reset time"
+    },
+    "saveSuccess": "Configuration updated successfully",
+    "saveError": "Failed to update configuration"
   }
 }

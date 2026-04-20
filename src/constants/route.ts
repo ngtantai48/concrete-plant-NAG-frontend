@@ -15,6 +15,7 @@ export const ADMIN = {
   MEAL_CHECK: "/admin/meal-check",
   ATTENDANCE: "/admin/attendance",
   SHIFT_SLOTS: "/admin/shift-slots",
+  SYSTEM_SETTINGS: "/admin/system-settings",
 };
 
 export const SHARE = {
