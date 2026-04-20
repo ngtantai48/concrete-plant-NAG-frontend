@@ -43,6 +43,9 @@ interface SortableVehicleItemProps {
   isDropTarget?: boolean;
   hideStatus?: boolean;
   disableDrag?: boolean;
+  showPositionPicker?: boolean;
+  totalPositions?: number;
+  onChangePosition?: (target: number) => void;
   t: (key: string) => string;
 }
 
@@ -68,8 +71,13 @@ function SortableVehicleItemBase({
   isDropTarget = false,
   hideStatus = false,
   disableDrag = false,
+  showPositionPicker = false,
+  totalPositions = 0,
+  onChangePosition,
   t,
 }: SortableVehicleItemProps) {
+  const pickerActive = showPositionPicker && !!onChangePosition && totalPositions > 1;
+  const currentPosition = (displayIndex ?? actualIndex) + 1;
   const displayedStationName = isManualMode && isSelected
     ? (manualTargetStationName || stationName)
     : stationName;
@@ -132,11 +140,38 @@ function SortableVehicleItemBase({
             />
           )}
 
-          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-sm font-extrabold"
-            style={{ color: 'var(--dd-text-secondary)', border: '1px solid var(--dd-border)' }}
-          >
-            {(displayIndex ?? actualIndex) + 1}
-          </div>
+          {pickerActive ? (
+            <Select
+              value={String(currentPosition)}
+              onValueChange={(val) => {
+                const target = Number(val);
+                if (Number.isFinite(target) && target !== currentPosition) {
+                  onChangePosition?.(target);
+                }
+              }}
+              disabled={isBusy}
+            >
+              <SelectTrigger
+                size="sm"
+                className="h-8 w-[64px] shrink-0 text-sm font-extrabold"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent className="max-h-[280px]">
+                {Array.from({ length: totalPositions }, (_, i) => i + 1).map((pos) => (
+                  <SelectItem key={pos} value={String(pos)}>
+                    {pos}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : (
+            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-sm font-extrabold"
+              style={{ color: 'var(--dd-text-secondary)', border: '1px solid var(--dd-border)' }}
+            >
+              {currentPosition}
+            </div>
+          )}
 
           <div className="min-w-0 flex-1 flex items-center gap-6">
             <div className="truncate text-base font-black" style={{ color: 'var(--dd-text-primary)' }}>

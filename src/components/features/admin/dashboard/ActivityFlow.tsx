@@ -906,6 +906,21 @@ const ActivityFlow = ({
     }
   }, [effectiveOrders, flowStationOptions, groupedByStation, manualOrderStationMap, manualStationId, mergedFlowOrders, onOrdersUpdated, selectedAssignedCount, selectedOrderIds, t]);
 
+  const handleChangePosition = useCallback(async (order: Order, targetPosition: number) => {
+    if (!Number.isFinite(targetPosition) || targetPosition < 1) return;
+    if ((order.order_number || 0) === targetPosition) return;
+
+    setReorderingKey(String(order.order_id));
+    try {
+      await orderApi.update(order.order_id, { order_number: targetPosition });
+      await onOrdersUpdated?.();
+    } catch {
+      toast.error(t('reorderFailed'), { position: 'top-right' });
+    } finally {
+      setReorderingKey(null);
+    }
+  }, [onOrdersUpdated, t]);
+
   const handleReorder = useCallback(async (groupStationId: number, index: number, direction: 'up' | 'down') => {
     const group = groupedByStation.find((item) => item.stationId === groupStationId);
     if (!group) {
@@ -1058,65 +1073,6 @@ const ActivityFlow = ({
           </div>
         ) : (
           <div className="space-y-4 p-3 bg-transparent">
-            {layout === 'merged' && dispatchMode === 'manual' && (
-              <div
-                className="rounded-lg border px-4 py-3"
-                style={{
-                  background: 'var(--dd-bg-surface)',
-                  borderColor: 'var(--dd-border)',
-                }}
-              >
-                <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-                  <span className="dd-chip dd-chip-sky">
-                    {t('manualSelectedVehicles', { count: selectedCount })}
-                  </span>
-
-                  <div className="flex w-full flex-col gap-3 md:w-auto md:flex-row md:items-center md:justify-end">
-                    <div className="flex w-full items-center gap-2 md:w-auto">
-                      <Select
-                        value={manualStationId}
-                        onValueChange={(value) => {
-                          setManualStationId(value);
-                          setManualOrderStationMap({});
-                        }}
-                      >
-                        <SelectTrigger className="w-full bg-white md:w-[130px]">
-                          <SelectValue placeholder={t('manualChooseStation')} />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {flowStationOptions.map((station) => (
-                            <SelectItem key={station.station_id} value={String(station.station_id)}>
-                              {station.station_name}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-
-                      {manualStationId && (
-                        <button
-                          type="button"
-                          onClick={() => setManualStationId('')}
-                          className="flex h-9 w-9 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-500 transition-all hover:text-slate-700"
-                          title={t('manualClearStation')}
-                        >
-                          <X className="h-4 w-4" />
-                        </button>
-                      )}
-                    </div>
-
-                    <Button
-                      type="button"
-                      variant="primary"
-                      onClick={handleManualAssign}
-                      disabled={selectedCount === 0 || reorderingKey?.startsWith('manual-')}
-                    >
-                      {t('manualAssignAction')}
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            )}
-
             {activeOrder && (
               <div
                 className="rounded-lg border px-4 py-4"
@@ -1222,7 +1178,7 @@ const ActivityFlow = ({
                           reorderingKey={reorderingKey}
                           onReorder={(index, direction) => handleReorder(group.stationId, index, direction)}
                           onToggleExpanded={() => toggleStationExpanded(group.stationId)}
-                          isManualMode={dispatchMode === 'manual'}
+                          isManualMode={false}
                           hideStatus={hideStatus}
                           disableDrag={disableDrag}
                           t={t}
@@ -1251,9 +1207,12 @@ const ActivityFlow = ({
                       canMoveDown={actualIndex < group.orders.length - 1}
                       displayIndex={displayIndex}
                       stationName={group.stationName}
-                      isManualMode={dispatchMode === 'manual'}
-                      isSelected={selectedOrderIds.includes(order.order_id)}
-                      onToggleSelect={(checked: boolean) => toggleOrderSelection(order.order_id, checked)}
+                      isManualMode={false}
+                      isSelected={false}
+                      onToggleSelect={() => {}}
+                      showPositionPicker={dispatchMode === 'manual'}
+                      totalPositions={mergedFlowOrders.length}
+                      onChangePosition={(target) => handleChangePosition(order, target)}
                       manualStationOptions={flowStationOptions}
                       manualStationValue={manualOrderStationMap[order.order_id]}
                       manualTargetStationName={flowStationNameById.get(
