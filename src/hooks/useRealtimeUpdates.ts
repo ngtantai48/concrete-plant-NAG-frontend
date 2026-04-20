@@ -12,12 +12,12 @@ export function useRealtimeUpdates(onUpdate: (signal?: UpdateSignal) => void) {
   const onUpdateRef = useRef(onUpdate);
   const lastRefreshRef = useRef(0);
   const pendingRefreshRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastSignalTimeRef = useRef<Date | null>(null);
   onUpdateRef.current = onUpdate;
 
   const [isConnected, setIsConnected] = useState(false);
   const [lastSignal, setLastSignal] = useState<UpdateSignal | null>(null);
   const [lastSignalTime, setLastSignalTime] = useState<Date | null>(null);
-  const lastSignalTimeRef = useRef<Date | null>(null);
 
   const tokenState = useAppSelector((state: any) => state.auth.token);
 
@@ -148,14 +148,15 @@ export function useRealtimeUpdates(onUpdate: (signal?: UpdateSignal) => void) {
     };
   }, [isConnected]);
 
-  // Tab visibility / focus listeners to handle tab sleep/wake
+  // ============================================================
+  // Tab visibility & focus: force data refresh khi tab trở lại
+  // Reconnection được xử lý bởi SocketManager.setupVisibilityHandler()
+  // Ở đây chỉ cần đảm bảo data được cập nhật ngay khi user quay lại
+  // ============================================================
   useEffect(() => {
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
         onUpdateRef.current({ update_type: 'visibility_wake' });
-        if (managerRef.current && !isConnected) {
-          managerRef.current.reconnect();
-        }
       }
     };
 
@@ -170,18 +171,23 @@ export function useRealtimeUpdates(onUpdate: (signal?: UpdateSignal) => void) {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('focus', handleFocus);
     };
-  }, [isConnected]);
+  }, []); // Không cần deps — dùng onUpdateRef (stable ref)
 
-  // Fallback polling using Web Worker to bypass tab suspension
-  // Browsers don't throttle Web Workers, so setInterval here runs at full speed even when minimized.
+  // ============================================================
+  // Background keep-alive via Web Worker
+  // Browser throttle setTimeout/setInterval ở background tabs,
+  // nhưng Web Workers thì KHÔNG bị throttle.
+  // Worker tick mỗi 15s, nếu socket im lặng >30s → trigger data refresh.
+  // Reconnection do SocketManager tự xử lý (visibilitychange + auto reconnect).
+  // ============================================================
   useEffect(() => {
+    if (typeof Worker === 'undefined') return; // SSR guard
+
     const workerCode = `
       let intervalId = null;
       self.onmessage = function(e) {
         if (e.data === 'start') {
-          intervalId = setInterval(() => {
-            self.postMessage('tick');
-          }, 15000);
+          intervalId = setInterval(() => { self.postMessage('tick'); }, 15000);
         } else if (e.data === 'stop') {
           clearInterval(intervalId);
         }
@@ -193,15 +199,10 @@ export function useRealtimeUpdates(onUpdate: (signal?: UpdateSignal) => void) {
 
     worker.onmessage = () => {
       const now = Date.now();
-      const last = lastSignalTimeRef.current ? lastSignalTimeRef.current.getTime() : 0;
-      // If silent for > 30s or offline, force fetch again
-      if (!isConnected || now - last > 30000) {
+      const last = lastSignalTimeRef.current?.getTime() ?? 0;
+      // Nếu socket im lặng >30s → force data refresh để bắt kịp dữ liệu
+      if (now - last > 30_000) {
         onUpdateRef.current({ update_type: 'background_polling' });
-        
-        // Try to reconnect socket if disconnected
-        if (managerRef.current && !managerRef.current.isConnected) {
-          managerRef.current.reconnect();
-        }
       }
     };
 
@@ -212,7 +213,7 @@ export function useRealtimeUpdates(onUpdate: (signal?: UpdateSignal) => void) {
       worker.terminate();
       URL.revokeObjectURL(workerUrl);
     };
-  }, [isConnected]);
+  }, []); // ← Stable: Worker tạo 1 lần duy nhất, dùng refs cho mọi state check
 
   return { isConnected, lastSignal, lastSignalTime };
 }

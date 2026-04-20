@@ -3,8 +3,9 @@
 import { getNotificationText, getNotificationTimestamp } from "@/lib/notification";
 import { cn } from "@/lib/utils";
 import { Notification } from "@/types/notification";
-import { Bell, CheckCheck, Circle, Clock } from "lucide-react";
+import { Bell, CheckCheck, Circle, Clock, Search, X } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
+import { useMemo, useState } from "react";
 
 interface NotificationListProps {
   notifications: Notification[];
@@ -17,6 +18,16 @@ export default function NotificationList({ notifications, onMarkAsRead, onMarkAl
   const locale = useLocale();
   const dateLocale = locale.startsWith("en") ? "en-US" : "vi-VN";
   const unreadCount = notifications.filter((item) => !item.read).length;
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const filteredNotifications = useMemo(() => {
+    if (!searchQuery.trim()) return notifications;
+    const query = searchQuery.trim().toLowerCase();
+    return notifications.filter((item) => {
+      const text = getNotificationText(item, locale).toLowerCase();
+      return text.includes(query);
+    });
+  }, [notifications, searchQuery, locale]);
 
   const formatContent = (item: Notification) => {
     return getNotificationText(item, locale);
@@ -51,9 +62,9 @@ export default function NotificationList({ notifications, onMarkAsRead, onMarkAl
           <div className="h-8 w-8 rounded-full bg-white/10 flex items-center justify-center">
             <Bell className="h-4 w-4 text-white" />
           </div>
-          <div>
-            <h4 className="text-sm font-bold text-white tracking-wide">{t("notification")}</h4>
-            <span className="text-[11px] text-slate-300">
+          <div className="flex flex-row gap-4 justify-between items-center">
+            <h4 className="text-sm font-bold text-white">{t("notification")}</h4>
+            <span className="text-xs text-slate-300">
               {unreadCount > 0
                 ? `${unreadCount} ${locale === 'vi' ? 'chưa đọc' : 'unread'}`
                 : (locale === 'vi' ? 'Đã đọc hết' : 'All read')}
@@ -65,6 +76,28 @@ export default function NotificationList({ notifications, onMarkAsRead, onMarkAl
             <span className="text-[11px] font-bold text-white bg-red-500 rounded-full h-5 min-w-[20px] flex items-center justify-center px-1.5">
               {unreadCount > 99 ? "99+" : unreadCount}
             </span>
+          )}
+        </div>
+      </div>
+
+      {/* Search bar */}
+      <div className="px-3 py-2 bg-slate-50 border-b border-slate-200">
+        <div className="relative">
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 pointer-events-none" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder={locale === 'vi' ? 'Tìm kiếm thông báo...' : 'Search notifications...'}
+            className="w-full pl-8 pr-8 py-1.5 text-xs rounded-md border border-slate-200 bg-white focus:outline-none focus:ring-1 focus:ring-sky-400 focus:border-sky-400 placeholder:text-slate-400 transition-all"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery("")}
+              className="cursor-pointer absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 rounded-full bg-slate-200 hover:bg-slate-300 flex items-center justify-center transition-colors"
+            >
+              <X className="h-2.5 w-2.5 text-slate-500" />
+            </button>
           )}
         </div>
       </div>
@@ -82,16 +115,24 @@ export default function NotificationList({ notifications, onMarkAsRead, onMarkAl
 
       {/* Notification items */}
       <div className="max-h-[420px] overflow-y-auto">
-        {notifications.length === 0 ? (
+        {filteredNotifications.length === 0 ? (
           <div className="py-12 flex flex-col items-center justify-center gap-2">
             <div className="h-10 w-10 rounded-full bg-slate-100 flex items-center justify-center">
-              <Bell className="h-5 w-5 text-slate-300" />
+              {searchQuery ? (
+                <Search className="h-5 w-5 text-slate-300" />
+              ) : (
+                <Bell className="h-5 w-5 text-slate-300" />
+              )}
             </div>
-            <span className="text-sm text-slate-400 font-medium">{t("notification_empty")}</span>
+            <span className="text-sm text-slate-400 font-medium">
+              {searchQuery
+                ? (locale === 'vi' ? 'Không tìm thấy thông báo' : 'No notifications found')
+                : t("notification_empty")}
+            </span>
           </div>
         ) : (
           <div className="flex flex-col">
-            {notifications.map((item) => (
+            {filteredNotifications.map((item) => (
               <div
                 key={item.id}
                 onClick={() => onMarkAsRead(item.id)}
@@ -138,9 +179,13 @@ export default function NotificationList({ notifications, onMarkAsRead, onMarkAl
       {notifications.length > 0 && (
         <div className="px-4 py-2 bg-slate-50 border-t border-slate-100 text-center">
           <span className="text-[11px] text-slate-400 font-medium">
-            {locale === 'vi'
-              ? `Tổng ${notifications.length} thông báo`
-              : `${notifications.length} notifications total`}
+            {searchQuery
+              ? (locale === 'vi'
+                ? `Tìm thấy ${filteredNotifications.length}/${notifications.length} thông báo`
+                : `Found ${filteredNotifications.length}/${notifications.length} notifications`)
+              : (locale === 'vi'
+                ? `Tổng ${notifications.length} thông báo`
+                : `${notifications.length} notifications total`)}
           </span>
         </div>
       )}
