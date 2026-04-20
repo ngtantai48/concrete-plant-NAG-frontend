@@ -45,6 +45,7 @@ export class SocketManager {
   private eventListeners = new Map<string, Set<Function>>();
   private reconnectAttempts = 0;
   private authProvider?: () => string | undefined;
+  private visibilityHandler: (() => void) | null = null;
 
   private constructor(namespace: string, config?: Partial<SocketConfig>) {
     const baseUrl = process.env.NEXT_PUBLIC_SOCKET_URL;
@@ -106,6 +107,7 @@ export class SocketManager {
     });
 
     this.setupConnectionEvents();
+    this.setupVisibilityHandler();
     this.socket.connect();
 
     return this.socket;
@@ -115,6 +117,7 @@ export class SocketManager {
    * Ngắt kết nối và cleanup
    */
   disconnect(): void {
+    this.teardownVisibilityHandler();
     if (this.socket) {
       this.socket.removeAllListeners();
       this.socket.disconnect();
@@ -248,6 +251,39 @@ export class SocketManager {
         console.warn('[SocketManager] Too many reconnect attempts, token may be expired');
       }
     });
+  }
+
+  /**
+   * Đăng ký visibilitychange listener để tự động reconnect khi tab trở lại foreground.
+   * Giải quyết vấn đề browser throttle timers ở background tab khiến server timeout ping/pong
+   * và ngắt kết nối. Khi user chuyển lại tab, handler kiểm tra ngay và reconnect nếu cần.
+   */
+  private setupVisibilityHandler(): void {
+    if (typeof document === 'undefined') return; // SSR guard
+    if (this.visibilityHandler) return; // Tránh đăng ký nhiều lần
+
+    this.visibilityHandler = () => {
+      if (document.visibilityState === 'visible') {
+        // Tab vừa trở lại foreground
+        if (this.socket && !this.socket.connected) {
+          console.log(`[SocketManager] Tab visible — socket disconnected, reconnecting ${this.connectionUrl}`);
+          this.socket.connect();
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', this.visibilityHandler);
+  }
+
+  /**
+   * Gỡ bỏ visibilitychange listener khi disconnect
+   */
+  private teardownVisibilityHandler(): void {
+    if (typeof document === 'undefined') return;
+    if (this.visibilityHandler) {
+      document.removeEventListener('visibilitychange', this.visibilityHandler);
+      this.visibilityHandler = null;
+    }
   }
 
   private notifyConnectionListeners(connected: boolean): void {

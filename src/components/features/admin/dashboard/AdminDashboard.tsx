@@ -19,7 +19,8 @@ import { Calendar } from "@/components/ui/calendar";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 
-import { Dialog, DialogContent, DialogHeader, DialogTitle as DlgTitle } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle as DlgTitle } from "@/components/ui/dialog";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -326,6 +327,48 @@ export default function AdminDashboard() {
     }
   }, [activeFlowOrders, t]);
 
+  const [selectedSyncOrderIds, setSelectedSyncOrderIds] = useState<number[]>([]);
+  const [isApplyingToEnd, setIsApplyingToEnd] = useState(false);
+
+  const sortedActiveFlowOrders = useMemo(() => {
+    return [...activeFlowOrders].sort((a, b) => (a.order_number || 0) - (b.order_number || 0));
+  }, [activeFlowOrders]);
+
+  useEffect(() => {
+    if (!isSyncShiftDialogOpen) {
+      setSelectedSyncOrderIds([]);
+    }
+  }, [isSyncShiftDialogOpen]);
+
+  const handleApplyToEnd = useCallback(async () => {
+    if (selectedSyncOrderIds.length === 0) {
+      toast.error(t('syncShiftNoSelection'));
+      return;
+    }
+    setIsApplyingToEnd(true);
+    try {
+      const vehicleIds = activeFlowOrders
+        .filter((o) => selectedSyncOrderIds.includes(o.order_id))
+        .map((o) => o.vehicles?.vehicle_id)
+        .filter((id): id is number => typeof id === 'number');
+
+      if (vehicleIds.length === 0) {
+        toast.error(t('syncShiftApplyToEndFailed'));
+        return;
+      }
+
+      await orderApi.arrangeTime({ vehicle_ids: vehicleIds });
+      await fetchAll();
+      setSelectedSyncOrderIds([]);
+      toast.success(t('syncShiftApplyToEndSuccess', { count: vehicleIds.length }));
+    } catch (err) {
+      console.error('[handleApplyToEnd] error:', err);
+      toast.error(t('syncShiftApplyToEndFailed'));
+    } finally {
+      setIsApplyingToEnd(false);
+    }
+  }, [selectedSyncOrderIds, activeFlowOrders, t, fetchAll]);
+
   const [dispatchMode, setDispatchMode] = useState<DispatchMode>('auto');
   const [showMap, setShowMap] = useState(false);
 
@@ -622,24 +665,128 @@ export default function AdminDashboard() {
                       </TooltipContent>
                     </Tooltip>
 
-                    <AlertDialog open={isSyncShiftDialogOpen} onOpenChange={setIsSyncShiftDialogOpen}>
-                      <AlertDialogContent>
-                        <AlertDialogHeader>
-                          <AlertDialogTitle>{t('confirmSyncShiftTitle')}</AlertDialogTitle>
-                          <AlertDialogDescription>{t('confirmSyncShiftDescription')}</AlertDialogDescription>
-                        </AlertDialogHeader>
-                        <AlertDialogFooter>
-                          <AlertDialogCancel>{tCommon('cancel')}</AlertDialogCancel>
-                          <AlertDialogAction
-                            onClick={handleSyncShift}
-                            disabled={isSyncingShift}
-                            className="bg-primary text-primary-foreground hover:bg-primary/90"
+                    <Dialog open={isSyncShiftDialogOpen} onOpenChange={setIsSyncShiftDialogOpen}>
+                      <DialogContent className="sm:max-w-3xl max-h-[85vh] flex flex-col">
+                        <DialogHeader>
+                          <DlgTitle>{t('syncShiftPopupTitle')}</DlgTitle>
+                          <DialogDescription>{t('syncShiftPopupDescription')}</DialogDescription>
+                        </DialogHeader>
+
+                        <div className="flex-1 overflow-auto rounded-md border">
+                          <table className="w-full text-sm">
+                            <thead className="sticky top-0 bg-muted/60 border-b">
+                              <tr>
+                                <th className="w-10 px-3 py-2 text-left">
+                                  <Checkbox
+                                    checked={
+                                      sortedActiveFlowOrders.length > 0 &&
+                                      selectedSyncOrderIds.length === sortedActiveFlowOrders.length
+                                    }
+                                    onCheckedChange={(checked) => {
+                                      if (checked) {
+                                        setSelectedSyncOrderIds(sortedActiveFlowOrders.map((o) => o.order_id));
+                                      } else {
+                                        setSelectedSyncOrderIds([]);
+                                      }
+                                    }}
+                                    aria-label={t('syncShiftSelectAll')}
+                                  />
+                                </th>
+                                <th className="w-16 px-3 py-2 text-left font-bold uppercase">
+                                  {t('syncShiftSttColumn')}
+                                </th>
+                                <th className="px-3 py-2 text-left font-bold uppercase">
+                                  {t('syncShiftVehicleColumn')}
+                                </th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {sortedActiveFlowOrders.map((o, idx) => {
+                                const isChecked = selectedSyncOrderIds.includes(o.order_id);
+                                return (
+                                  <tr
+                                    key={o.order_id}
+                                    className="border-b last:border-0 hover:bg-muted/30 cursor-pointer"
+                                    onClick={() => {
+                                      setSelectedSyncOrderIds((prev) =>
+                                        prev.includes(o.order_id)
+                                          ? prev.filter((id) => id !== o.order_id)
+                                          : [...prev, o.order_id],
+                                      );
+                                    }}
+                                  >
+                                    <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
+                                      <Checkbox
+                                        checked={isChecked}
+                                        onCheckedChange={(checked) => {
+                                          setSelectedSyncOrderIds((prev) =>
+                                            checked
+                                              ? [...prev, o.order_id]
+                                              : prev.filter((id) => id !== o.order_id),
+                                          );
+                                        }}
+                                      />
+                                    </td>
+                                    <td className="px-3 py-2 font-bold">{idx + 1}</td>
+                                    <td className="px-3 py-2">
+                                      <span className="font-semibold">
+                                        {o.vehicles?.vehicle_license_plate}
+                                      </span>
+                                      {o.vehicles?.vehicle_name && (
+                                        <span className="ml-2 text-muted-foreground">
+                                          ({o.vehicles.vehicle_name})
+                                        </span>
+                                      )}
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                              {sortedActiveFlowOrders.length === 0 && (
+                                <tr>
+                                  <td colSpan={3} className="px-3 py-8 text-center text-muted-foreground">
+                                    {t('syncShiftEmpty')}
+                                  </td>
+                                </tr>
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+
+                        <DialogFooter className="sm:justify-between gap-2">
+                          <Button
+                            variant="outline"
+                            onClick={() => setIsSyncShiftDialogOpen(false)}
+                            disabled={isApplyingToEnd || isSyncingShift}
                           >
-                            {t('syncShiftAction')}
-                          </AlertDialogAction>
-                        </AlertDialogFooter>
-                      </AlertDialogContent>
-                    </AlertDialog>
+                            {tCommon('cancel')}
+                          </Button>
+                          <div className="flex flex-col-reverse gap-2 sm:flex-row">
+                            <Button
+                              variant="outline"
+                              onClick={handleApplyToEnd}
+                              disabled={isApplyingToEnd || selectedSyncOrderIds.length === 0}
+                            >
+                              {isApplyingToEnd ? (
+                                <RefreshCw className="animate-spin h-4 w-4" />
+                              ) : null}
+                              {t('syncShiftApplyToEndAction', { count: selectedSyncOrderIds.length })}
+                            </Button>
+                            <Button
+                              variant="primary"
+                              onClick={handleSyncShift}
+                              disabled={isSyncingShift || isApplyingToEnd}
+                            >
+                              {isSyncingShift ? (
+                                <RefreshCw className="animate-spin h-4 w-4" />
+                              ) : (
+                                <FileSpreadsheet className="h-4 w-4" />
+                              )}
+                              {t('syncShiftAction')}
+                            </Button>
+                          </div>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
                   </>
                 )}
               </div>
@@ -801,8 +948,34 @@ export default function AdminDashboard() {
                     </div>
 
                     {/* Segmented Toggle HUD */}
-                    <div className="flex items-center rounded-md p-0.5 backdrop-blur-md shrink-0"
+                    <div className="flex items-center rounded-md p-0.5 backdrop-blur-md shrink-0 gap-0.5"
                       style={{ background: 'var(--dd-bg-surface)', border: '1px solid var(--dd-border)' }}>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setDispatchMode('auto')}
+                        className={cn(
+                          "h-5 px-2 text-[10px] font-bold uppercase border border-transparent",
+                          dispatchMode === 'auto'
+                            ? "bg-blue-600 text-white hover:bg-blue-700 hover:text-white"
+                            : "text-slate-500 hover:text-slate-700 hover:bg-slate-100",
+                        )}
+                      >
+                        AUTO
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setDispatchMode('manual')}
+                        className={cn(
+                          "h-5 px-2 text-[10px] font-bold uppercase border border-transparent",
+                          dispatchMode === 'manual'
+                            ? "bg-blue-600 text-white hover:bg-blue-700 hover:text-white"
+                            : "text-slate-500 hover:text-slate-700 hover:bg-slate-100",
+                        )}
+                      >
+                        MANUAL
+                      </Button>
                       <Button
                         variant="ghost"
                         size="sm"

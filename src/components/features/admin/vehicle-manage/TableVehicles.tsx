@@ -696,9 +696,9 @@ export default function TableVehicles() {
                 <SelectContent>
                   <SelectItem value="all">{t("all")}</SelectItem>
                   <SelectItem value="available">{t("active")}</SelectItem>
-                  <SelectItem value="running">{t("running") || "Đang chạy"}</SelectItem>
+                  {/* <SelectItem value="running">{t("running") || "Đang chạy"}</SelectItem>
                   <SelectItem value="transporting">{t("transporting") || "Đang giao"}</SelectItem>
-                  <SelectItem value="collecting">{t("collecting") || "Đang nhận"}</SelectItem>
+                  <SelectItem value="collecting">{t("collecting") || "Đang nhận"}</SelectItem> */}
                   <SelectItem value="maintenance">{t("maintenance")}</SelectItem>
                   <SelectItem value="incident">{t("incident") || "Sự cố"}</SelectItem>
                   <SelectItem value="other">{t("otherOption") || "Việc khác"}</SelectItem>
