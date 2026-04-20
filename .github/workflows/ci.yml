@@ -5,10 +5,12 @@ on:
     branches: 
       - main
       - 'dev/**'
+      - htho
   pull_request:
     branches: 
       - main
       - 'dev/**'
+      - htho
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -22,19 +24,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v3
-        with:
-          version: 10.x
-
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 24.x
-          cache: 'pnpm'
+          node-version: 22.x
+          cache: 'npm'
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: npm install
 
       # Cache Next.js build
       - name: Cache Next.js
@@ -42,11 +39,11 @@ jobs:
         with:
           path: |
             .next/cache
-          key: ${{ runner.os }}-next-${{ hashFiles('**/pnpm-lock.yaml') }}
+          key: ${{ runner.os }}-next-${{ hashFiles('**/package-lock.json') }}
           restore-keys: |
             ${{ runner.os }}-next-
 
       - name: Build application
-        run: pnpm run build
+        run: npm run build
         env:
           NEXT_TELEMETRY_DISABLED: 1
