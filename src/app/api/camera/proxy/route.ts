@@ -1,6 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 
+const getContentType = (value: unknown): string => {
+  if (typeof value === 'string' && value.trim()) return value;
+  if (Array.isArray(value)) {
+    const first = value.find((v) => typeof v === 'string' && v.trim());
+    if (typeof first === 'string') return first;
+  }
+  return 'image/jpeg';
+};
+
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const ip = searchParams.get('ip');
@@ -45,7 +54,7 @@ export async function GET(req: NextRequest) {
     if (initRes.status === 200) {
         return new NextResponse(initRes.data, {
             headers: {
-              'Content-Type': initRes.headers['content-type'] || 'image/jpeg',
+              'Content-Type': getContentType(initRes.headers['content-type']),
               'Cache-Control': 'no-store, max-age=0',
             }
         });
@@ -80,7 +89,7 @@ export async function GET(req: NextRequest) {
           if (authRes.status === 200) {
             return new NextResponse(authRes.data, {
               headers: {
-                'Content-Type': authRes.headers['content-type'] || 'image/jpeg',
+                'Content-Type': getContentType(authRes.headers['content-type']),
                 'Cache-Control': 'no-store, max-age=0',
               }
             });
@@ -96,7 +105,7 @@ export async function GET(req: NextRequest) {
       if (basicRes.status === 200) {
         return new NextResponse(basicRes.data, {
           headers: {
-            'Content-Type': basicRes.headers['content-type'] || 'image/jpeg',
+            'Content-Type': getContentType(basicRes.headers['content-type']),
             'Cache-Control': 'no-store, max-age=0',
           }
         });
@@ -152,7 +161,7 @@ export async function GET(req: NextRequest) {
                 if (authRes.status === 200) {
                   return new NextResponse(authRes.data, {
                     headers: {
-                      'Content-Type': authRes.headers['content-type'] || 'image/jpeg',
+                      'Content-Type': getContentType(authRes.headers['content-type']),
                       'Cache-Control': 'no-store, max-age=0',
                     }
                   });
