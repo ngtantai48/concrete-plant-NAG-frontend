@@ -17,9 +17,7 @@ const serializeParams = (params: Record<string, unknown>): string => {
     const searchParams = new URLSearchParams();
 
     Object.entries(params).forEach(([key, value]) => {
-        if (value === undefined || value === null) {
-            return;
-        }
+        if (value === undefined || value === null) return;
 
         if (Array.isArray(value)) {
             value.forEach((item) => {
@@ -35,6 +33,7 @@ const serializeParams = (params: Record<string, unknown>): string => {
 
     return searchParams.toString();
 };
+
 const http = axios.create({
     baseURL: process.env.NEXT_PUBLIC_API_URL,
     headers: { "Content-Type": "application/json" },
@@ -55,10 +54,12 @@ const isTokenExpired = (token: string): boolean => {
 let refreshTokenPromise: Promise<any> | null = null;
 
 http.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
+    const isAuthRequest = config.url?.includes("/auth/login") || config.url?.includes("/auth/refresh");
+
     const state: RootState | undefined = storeInstance?.getState();
     let token = state?.auth?.token;
 
-    if (token) {
+    if (!isAuthRequest && token) {
         if (isTokenExpired(token)) {
             if (!refreshTokenPromise) {
                 refreshTokenPromise = authApi.refreshToken()
@@ -88,7 +89,7 @@ http.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
             try {
                 token = await refreshTokenPromise;
             } catch (err) {
-                return config;
+                return Promise.reject(err);
             }
         }
 

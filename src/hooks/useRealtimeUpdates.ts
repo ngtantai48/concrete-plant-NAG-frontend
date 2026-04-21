@@ -2,7 +2,8 @@ import { useAppSelector } from "@/hooks/use-app-selector";
 import { SocketManager } from "@/lib/socket";
 import { validateUpdateSignal } from "@/lib/socket/schema";
 import type { UpdateSignal } from "@/lib/socket/types";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useSocket } from "@/context/socket-context";
 
 const REFRESH_COOLDOWN_MS = 800;
 
@@ -15,11 +16,13 @@ export function useRealtimeUpdates(onUpdate: (signal?: UpdateSignal) => void) {
   const lastSignalTimeRef = useRef<Date | null>(null);
   onUpdateRef.current = onUpdate;
 
-  const [isConnected, setIsConnected] = useState(false);
+  const { statusMap, lastBackgroundTick, appVisibility } = useSocket();
+  const isConnected = statusMap['updates']?.isConnected ?? false;
   const [lastSignal, setLastSignal] = useState<UpdateSignal | null>(null);
   const [lastSignalTime, setLastSignalTime] = useState<Date | null>(null);
 
   const tokenState = useAppSelector((state: any) => state.auth.token);
+  // const hookId = useMemo(() => Math.random().toString(36).substr(2, 4), []);
 
   // Initialize socket manager (singleton)
   useEffect(() => {
@@ -35,16 +38,6 @@ export function useRealtimeUpdates(onUpdate: (signal?: UpdateSignal) => void) {
 
     managerRef.current = manager;
 
-    // Connection state listener
-    const unsubscribeConnection = manager.onConnectionChange((connected) => {
-      setIsConnected(connected);
-      if (connected) {
-        console.log("[RealtimeUpdates] Da ket noi toi /updates");
-      } else {
-        console.warn("[RealtimeUpdates] Bi ngat ket noi");
-      }
-    });
-
     // Token đổi (refresh) thì force reconnect để handshake với token mới.
     // Lần đầu chỉ connect bình thường.
     const prevToken = prevTokenRef.current;
@@ -56,9 +49,6 @@ export function useRealtimeUpdates(onUpdate: (signal?: UpdateSignal) => void) {
       manager.connect();
     }
 
-    return () => {
-      unsubscribeConnection();
-    };
   }, [tokenState]);
 
   // Setup event listeners
@@ -101,7 +91,7 @@ export function useRealtimeUpdates(onUpdate: (signal?: UpdateSignal) => void) {
         const signal = validateUpdateSignal('update', payload);
         if (!signal) return;
 
-        console.log("[RealtimeUpdates] Received update event:", signal);
+        // console.log(`[RealtimeUpdates][${hookId}] Received update event:`, signal);
         triggerRefresh(signal);
       })
     );
@@ -112,7 +102,7 @@ export function useRealtimeUpdates(onUpdate: (signal?: UpdateSignal) => void) {
         const signal = validateUpdateSignal('ping', payload);
         if (!signal) return;
 
-        console.log("[RealtimeUpdates] Received ping event:", signal);
+        // console.log(`[RealtimeUpdates][${hookId}] Received ping event:`, signal);
         triggerRefresh(signal);
       })
     );
@@ -120,20 +110,14 @@ export function useRealtimeUpdates(onUpdate: (signal?: UpdateSignal) => void) {
     // Catch-all for other events (excluding update/ping)
     unsubscribes.push(
       manager.onAny((eventName, payload) => {
-        // DIAGNOSTIC: log raw event name for every event on /updates
-        console.log('[updates raw]', eventName, payload);
-
         if (eventName === 'update' || eventName === 'ping') {
           return; // Already handled above
         }
 
         const signal = validateUpdateSignal(eventName, payload);
-        if (!signal) {
-          console.warn(`[RealtimeUpdates] Event "${eventName}" filtered by validateUpdateSignal`);
-          return;
-        }
+        if (!signal) return;
 
-        console.log(`[RealtimeUpdates] Received event ${eventName}:`, payload);
+        // console.log(`[RealtimeUpdates][${hookId}] Received event ${eventName}:`, payload);
         triggerRefresh(signal);
       })
     );
@@ -148,72 +132,24 @@ export function useRealtimeUpdates(onUpdate: (signal?: UpdateSignal) => void) {
     };
   }, [isConnected]);
 
-  // ============================================================
-  // Tab visibility & focus: force data refresh khi tab trở lại
-  // Reconnection được xử lý bởi SocketManager.setupVisibilityHandler()
-  // Ở đây chỉ cần đảm bảo data được cập nhật ngay khi user quay lại
-  // ============================================================
+  // Centralized Visibility Wake
   useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        onUpdateRef.current({ update_type: 'visibility_wake' });
-      }
-    };
+    if (appVisibility === 'visible') {
+      // console.log("[RealtimeUpdates] Visibility wake trigger");
+      onUpdateRef.current({ update_type: 'visibility_wake' });
+    }
+  }, [appVisibility]);
 
-    const handleFocus = () => {
-      onUpdateRef.current({ update_type: 'window_focus' });
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('focus', handleFocus);
-
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('focus', handleFocus);
-    };
-  }, []); // Không cần deps — dùng onUpdateRef (stable ref)
-
-  // ============================================================
-  // Background keep-alive via Web Worker
-  // Browser throttle setTimeout/setInterval ở background tabs,
-  // nhưng Web Workers thì KHÔNG bị throttle.
-  // Worker tick mỗi 15s, nếu socket im lặng >30s → trigger data refresh.
-  // Reconnection do SocketManager tự xử lý (visibilitychange + auto reconnect).
-  // ============================================================
+  // Centralized Background Polling (Tick every 15s from provider)
   useEffect(() => {
-    if (typeof Worker === 'undefined') return; // SSR guard
-
-    const workerCode = `
-      let intervalId = null;
-      self.onmessage = function(e) {
-        if (e.data === 'start') {
-          intervalId = setInterval(() => { self.postMessage('tick'); }, 15000);
-        } else if (e.data === 'stop') {
-          clearInterval(intervalId);
-        }
-      };
-    `;
-    const blob = new Blob([workerCode], { type: 'application/javascript' });
-    const workerUrl = URL.createObjectURL(blob);
-    const worker = new Worker(workerUrl);
-
-    worker.onmessage = () => {
-      const now = Date.now();
-      const last = lastSignalTimeRef.current?.getTime() ?? 0;
-      // Nếu socket im lặng >30s → force data refresh để bắt kịp dữ liệu
-      if (now - last > 30_000) {
-        onUpdateRef.current({ update_type: 'background_polling' });
-      }
-    };
-
-    worker.postMessage('start');
-
-    return () => {
-      worker.postMessage('stop');
-      worker.terminate();
-      URL.revokeObjectURL(workerUrl);
-    };
-  }, []); // ← Stable: Worker tạo 1 lần duy nhất, dùng refs cho mọi state check
+    const now = Date.now();
+    const last = lastSignalTimeRef.current ? lastSignalTimeRef.current.getTime() : 0;
+    // Nếu socket im lặng > 30s → trigger data refresh
+    if (now - last > 30_000) {
+      // console.log("[RealtimeUpdates] Background polling trigger (silent > 30s)");
+      onUpdateRef.current({ update_type: 'background_polling' });
+    }
+  }, [lastBackgroundTick]);
 
   return { isConnected, lastSignal, lastSignalTime };
 }
