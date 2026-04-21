@@ -1,49 +1,37 @@
 "use client";
 
-import stationApi from "@/services/station.service";
-import type { Station } from "@/types/station";
-import vehicleApi from "@/services/vehicle.service";
-import type { Vehicle } from "@/types/vehicle";
-import orderApi from "@/services/order.service";
-import type { Order } from "@/types/order";
-import { RefreshCw, Map as MapIcon, Maximize2, Minimize2, Truck, Radio, CheckCircle2, Clock, Route, MapPin, Search, Calendar as CalendarIcon, Timer, ArrowRight, Ellipsis, X, ShieldCheck, FileSpreadsheet, ZoomOut, ZoomIn } from "lucide-react";
-import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Separator } from "@/components/ui/separator";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
-import { format } from "date-fns";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import orderApi from "@/services/order.service";
+import vehicleApi from "@/services/vehicle.service";
+import stationApi from "@/services/station.service";
+import type { Order } from "@/types/order";
+import type { Station } from "@/types/station";
+import type { Vehicle } from "@/types/vehicle";
+import { format } from "date-fns";
+import { ArrowRight, Calendar as CalendarIcon, CheckCircle2, Clock, Ellipsis, FileSpreadsheet, Map as MapIcon, MapPin, Radio, RefreshCw, Route, Search, Timer, Truck, X } from "lucide-react";
+import { toast } from "sonner";
 
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle as DlgTitle } from "@/components/ui/dialog";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { useLocale, useTranslations } from "next-intl";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useNearbyVehicles } from "@/hooks/useNearbyVehicles";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle as DlgTitle } from "@/components/ui/dialog";
 import { useDeviceHeartbeat } from "@/hooks/useDeviceHeartbeat";
+import { useNearbyVehicles } from "@/hooks/useNearbyVehicles";
 import { useRealtimeUpdates } from "@/hooks/useRealtimeUpdates";
+import { useLocale, useTranslations } from "next-intl";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
-
-
-
-import StationStatusPanel from "./StationStatusPanel";
 import ActivityFlow, { type DispatchMode } from "./ActivityFlow";
+import ClockDisplay from "./ClockDisplay";
+import StationStatusPanel from "./StationStatusPanel";
+import { computeTripStats, formatDuration } from "./trip-stats";
 import VehicleStatusChange from "./VehicleStatusChange";
 
 const StationMap = dynamic(
@@ -79,37 +67,10 @@ export default function AdminDashboard() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [pendingOrders, setPendingOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
   const [zoomLevel, setZoomLevel] = useState<number>(1);
   const [selectedDate, setSelectedDate] = useState(getTodayDate());
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
-  const operationDate = selectedDate;
   const isPastDate = selectedDate < getTodayDate();
-  const [clock, setClock] = useState("");
-  const clockRef = useRef<ReturnType<typeof setInterval>>(null);
-
-
-
-  useEffect(() => {
-    const tick = () => {
-      setClock(
-        new Date().toLocaleString(locale === 'vi' ? 'vi-VN' : 'en-US', {
-          weekday: "long",
-          day: "2-digit",
-          month: "2-digit",
-          year: "numeric",
-          hour: "2-digit",
-          minute: "2-digit",
-          second: "2-digit",
-        }),
-      );
-    };
-    tick();
-    clockRef.current = setInterval(tick, 1000);
-    return () => {
-      if (clockRef.current) clearInterval(clockRef.current);
-    };
-  }, [locale]);
 
 
 
@@ -149,7 +110,7 @@ export default function AdminDashboard() {
         const pRes = results[3].value;
         const list = pRes.data?.data || pRes.data || [];
         setPendingOrders(list);
-        console.log('[fetchAll] pending count:', Array.isArray(list) ? list.length : 'n/a');
+        // console.log('[fetchAll] pending count:', Array.isArray(list) ? list.length : 'n/a');
       } else {
         console.warn('[fetchAll] pending failed:', results[3]?.reason);
       }
@@ -169,14 +130,21 @@ export default function AdminDashboard() {
     [stations],
   );
 
-  const { vehicles: vtrackingVehicles, inRangeCount, loading: nearbyLoading, lastUpdated, error: nearbyError, refetch: refetchVehicles } = useNearbyVehicles(
+  const { 
+    vehicles: vtrackingVehicles, 
+    // inRangeCount, 
+    // loading: nearbyLoading, 
+    // lastUpdated, 
+    // error: nearbyError, 
+    // refetch: refetchVehicles 
+  } = useNearbyVehicles(
     geofenceStation?.station_gps_longitude ?? null,
     geofenceStation?.station_gps_latitude ?? null,
     geofenceStation?.station_gps_geofencing || 500,
     45000,
   );
 
-  const { isConnected: socketConnected, lastSignal, lastSignalTime } = useRealtimeUpdates(fetchAll);
+  const { isConnected: socketConnected, /* lastSignal, */ lastSignalTime } = useRealtimeUpdates(fetchAll);
   const { stationStatusMap, isLedConnected } = useDeviceHeartbeat();
 
   const inYardVehicles = useMemo(() => vtrackingVehicles.filter(v => v.inRange && v.vehicle_name?.toUpperCase().startsWith('X')), [vtrackingVehicles]);
@@ -197,20 +165,8 @@ export default function AdminDashboard() {
       }
     });
 
-    // orders.filter(o => o.order_status === "canceled").forEach(o => {
-    //   const plate = o.vehicles?.vehicle_license_plate || `#${o.order_id}`;
-    //   if (!list.some(item => item.label === plate)) {
-    //     list.push({
-    //       id: `ord-${o.order_id}`,
-    //       label: plate,
-    //       statusLabel: t('canceled'),
-    //       chipClass: 'dd-chip-amber'
-    //     });
-    //   }
-    // });
-
     return list;
-  }, [vehicles, orders, t, tVehiclePage]);
+  }, [vehicles, t, tVehiclePage]);
 
   const activeFlowOrders = useMemo(() => {
     return pendingOrders.filter(o => {
@@ -237,11 +193,11 @@ export default function AdminDashboard() {
     );
   }, [orders]);
 
-  const ordersTodayPanel = useMemo(() => {
-    return [...ordersActive, ...ordersCompleted].sort(
-      (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
-    );
-  }, [ordersActive, ordersCompleted]);
+  // const ordersTodayPanel = useMemo(() => {
+  //   return [...ordersActive, ...ordersCompleted].sort(
+  //     (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
+  //   );
+  // }, [ordersActive, ordersCompleted]);
 
   const hasUnclosedShift = useMemo(() => {
     return pendingOrders.some((o) => o.shift_closing?.shift_status === 0);
@@ -426,58 +382,50 @@ export default function AdminDashboard() {
     return v ? { latitude: v.latitude, longitude: v.longitude } : null;
   }, [focusVehicleId, vtrackingVehicles]);
 
-  // if (loading) {
-  //   return (
-  //     <div className="dashboard-dark">
-  //       <div className="m-10 max-w-[800px] lg:mx-auto space-y-6">
-  //         <Skeleton active paragraph={{ rows: 1 }} />
-  //         <div className="grid grid-cols-3 gap-4">
-  //           {[1, 2, 3].map((i) => (
-  //             <div key={i} className="dd-card p-5">
-  //               <Skeleton active paragraph={{ rows: 2 }} title={false} />
-  //             </div>
-  //           ))}
-  //         </div>
-  //         <div className="dd-card p-6">
-  //           <Skeleton active paragraph={{ rows: 10 }} />
-  //         </div>
-  //       </div>
-  //     </div>
-  //   );
-  // }
+  // Pre-compute trip stats for all vehicles (Fix #2: avoid recomputing inside render)
+  const vehicleStatsMap = useMemo(() => {
+    const map = new Map<number, ReturnType<typeof computeTripStats>>();
+    sortedVehiclesWithTrips.forEach(v => {
+      const trips = vehicleTripMap.get(v.vehicle_id) || [];
+      if (trips.length > 0) {
+        map.set(v.vehicle_id, computeTripStats(trips));
+      }
+    });
+    return map;
+  }, [sortedVehiclesWithTrips, vehicleTripMap]);
 
-  const statCards = [
-    {
-      label: t('completed'),
-      value: ordersCompleted.length.toString().padStart(3, '0'),
-      accentColor: '#06b6d4',
-      glowColor: 'rgba(6, 182, 212, 0.12)',
-    },
-    {
-      label: t('pending'),
-      value: ordersPending.length.toString().padStart(2, '0'),
-      accentColor: '#f59e0b',
-      glowColor: 'rgba(245, 158, 11, 0.12)',
-    },
-    {
-      label: t('collecting'),
-      value: ordersAtStation.length.toString().padStart(2, '0'),
-      accentColor: '#22c55e',
-      glowColor: 'rgba(34, 197, 94, 0.12)',
-    },
-    {
-      label: t('inTransit'),
-      value: ordersInTransit.length.toString().padStart(2, '0'),
-      accentColor: '#38bdf8',
-      glowColor: 'rgba(56, 189, 248, 0.12)',
-    },
-    {
-      label: t('activeStationsShort'),
-      value: `${activeStations.length}/${stations.filter(s => s.station_types?.station_type_id === 1).length}`,
-      accentColor: '#10b981',
-      glowColor: 'rgba(16, 185, 129, 0.12)',
-    },
-  ];
+  // const statCards = useMemo(() => [
+  //   {
+  //     label: t('completed'),
+  //     value: ordersCompleted.length.toString().padStart(3, '0'),
+  //     accentColor: '#06b6d4',
+  //     glowColor: 'rgba(6, 182, 212, 0.12)',
+  //   },
+  //   {
+  //     label: t('pending'),
+  //     value: ordersPending.length.toString().padStart(2, '0'),
+  //     accentColor: '#f59e0b',
+  //     glowColor: 'rgba(245, 158, 11, 0.12)',
+  //   },
+  //   {
+  //     label: t('collecting'),
+  //     value: ordersAtStation.length.toString().padStart(2, '0'),
+  //     accentColor: '#22c55e',
+  //     glowColor: 'rgba(34, 197, 94, 0.12)',
+  //   },
+  //   {
+  //     label: t('inTransit'),
+  //     value: ordersInTransit.length.toString().padStart(2, '0'),
+  //     accentColor: '#38bdf8',
+  //     glowColor: 'rgba(56, 189, 248, 0.12)',
+  //   },
+  //   {
+  //     label: t('activeStationsShort'),
+  //     value: `${activeStations.length}/${stations.filter(s => s.station_types?.station_type_id === 1).length}`,
+  //     accentColor: '#10b981',
+  //     glowColor: 'rgba(16, 185, 129, 0.12)',
+  //   },
+  // ], [t, ordersCompleted.length, ordersPending.length, ordersAtStation.length, ordersInTransit.length, activeStations.length, stations]);
 
   return (
     <div className={`dashboard-light bg-cover bg-center ${isFullScreen ? 'fixed inset-0 z-[100] bg-slate-50 h-screen' : 'h-[calc(100vh-64px)]'} overflow-hidden flex flex-col`}>
@@ -493,7 +441,7 @@ export default function AdminDashboard() {
               </h1>
               <span className="text-xs font-bold uppercase whitespace-nowrap"
                 style={{ color: 'var(--dd-text-muted)' }}>
-                {t('systemTime')}: {clock}
+                {t('systemTime')}: <ClockDisplay locale={locale} />
               </span>
             </div>
 
@@ -518,11 +466,10 @@ export default function AdminDashboard() {
                         return nextZoom;
                       });
                     }}
-                    className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 border text-sm font-bold uppercase cursor-pointer transition-all ${
-                      zoomLevel === 1
-                        ? 'border-emerald-200 text-emerald-700 hover:bg-emerald-50'
-                        : 'border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100'
-                    }`}
+                    className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 border text-sm font-bold uppercase cursor-pointer transition-all ${zoomLevel === 1
+                      ? 'border-emerald-200 text-emerald-700 hover:bg-emerald-50'
+                      : 'border-sky-200 bg-sky-50 text-sky-700 hover:bg-sky-100'
+                      }`}
                   >
                     {zoomLevel === 1
                       ? <Radio className="h-2.5 w-2.5 text-emerald-500 animate-pulse" />
@@ -790,49 +737,9 @@ export default function AdminDashboard() {
                   </>
                 )}
               </div>
-
-              {/* Sync Button */}
-              {/* <Button
-                variant="outline"
-                size="sm"
-                onClick={handleRefresh}
-                disabled={isRefreshing}
-                className="h-7 px-2.5 text-xs font-bold uppercase gap-1"
-              >
-                <RefreshCw className={`w-3 h-3 ${isRefreshing ? "animate-spin" : ""}`} />
-                {t('sync')}
-              </Button> */}
             </div>
           </div>
-
-          {/* ═══ STAT CARDS ═══ */}
-          {/* {!isPastDate && (
-            <div className="mt-1 grid grid-cols-2 gap-1.5 md:grid-cols-5 shrink-0">
-              {statCards.map((card, i) => (
-                <Card
-                  key={i}
-                  className="dd-stat-card py-0 animate-fade-up hover:scale-[1.02] active:scale-[0.98] transition-all cursor-default"
-                  style={{
-                    '--accent-color': card.accentColor,
-                    animationDelay: `${i * 0.1}s`
-                  } as React.CSSProperties}
-                >
-                  <CardContent className="p-1.5 lg:px-2.5 lg:py-1 flex items-center justify-between gap-2 h-full">
-                    <span className="text-sm font-extrabold uppercase truncate"
-                      style={{ color: 'var(--dd-text-muted)' }}>
-                      {card.label}
-                    </span>
-                    <div className="text-xl lg:text-2xl font-black leading-none shrink-0"
-                      style={{ color: card.accentColor }}>
-                      {card.value}
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )} */}
         </div>
-
 
         {!isPastDate && !loading && !hasUnclosedShift && (
           <div
@@ -1055,46 +962,9 @@ export default function AdminDashboard() {
                         const accentColor = hasActive ? '#0ea5e9' : (hasTrips ? '#10b981' : '#94a3b8');
                         const hoverBorder = hasActive ? 'rgba(14, 165, 233, 0.4)' : (hasTrips ? 'rgba(16, 185, 129, 0.4)' : 'rgba(148, 163, 184, 0.3)');
                         const chipClass = hasActive ? 'dd-chip-sky' : 'dd-chip-emerald';
-
-                        const totalDistanceKm = trips.reduce((sum, o) => {
-                          if (o.order_multi) return sum + (o.order_multi.distance_end - o.order_multi.distance_start);
-                          return sum;
-                        }, 0);
-                        const totalStops = trips.reduce((sum, o) => {
-                          if (o.order_multi) return sum + (o.order_multi.nStop_end - o.order_multi.nStop_start);
-                          return sum;
-                        }, 0);
-                        const totalStopSecs = trips.reduce((sum, o) => {
-                          if (o.order_multi && o.order_multi.stop_duration_seconds) return sum + o.order_multi.stop_duration_seconds;
-                          return sum;
-                        }, 0);
-                        const totalTimeMs = trips.reduce((sum, o) => {
-                          if (o.order_start_datetime && o.order_end_datetime) {
-                            return sum + (new Date(o.order_end_datetime).getTime() - new Date(o.order_start_datetime).getTime());
-                          }
-                          return sum;
-                        }, 0);
-                        const totalMixMs = trips.reduce((sum, o) => {
-                          const mixInVal = o.order_multi?.checkin_time_station || o.checkin_time_station;
-                          const mixOutVal = o.order_multi?.checkout_time_station || o.checkout_time_station;
-                          if (mixInVal && mixOutVal) {
-                            const diff = new Date(mixOutVal).getTime() - new Date(mixInVal).getTime();
-                            if (diff > 0) return sum + diff;
-                          }
-                          return sum;
-                        }, 0);
-                        const totalMins = Math.floor(totalTimeMs / 60000);
-                        const hours = Math.floor(totalMins / 60);
-                        const mins = totalMins % 60;
-                        const totalStopMins = Math.floor(totalStopSecs / 60);
-                        const stopHours = Math.floor(totalStopMins / 60);
-                        const stopMinsRemain = totalStopMins % 60;
-                        const stopDurationStr = stopHours > 0 ? `${stopHours} ${tCommon('hour')} ${stopMinsRemain} ${tCommon('minute')}` : `${totalStopMins} ${tCommon('minute')}`;
-
-                        const totalMixMins = Math.floor(totalMixMs / 60000);
-                        const mixTotalHours = Math.floor(totalMixMins / 60);
-                        const mixTotalMinsRemain = totalMixMins % 60;
-                        const mixTotalDurationStr = mixTotalHours > 0 ? `${mixTotalHours} ${tCommon('hour')} ${mixTotalMinsRemain} ${tCommon('minute')}` : `${totalMixMins} ${tCommon('minute')}`;
+                        const stats = vehicleStatsMap.get(v.vehicle_id);
+                        const stopDurationStr = stats ? formatDuration(stats.totalStopMins, stats.stopHours, stats.stopMinsRemain, tCommon('hour'), tCommon('minute')) : '';
+                        const mixTotalDurationStr = stats ? formatDuration(stats.totalMixMins, stats.mixTotalHours, stats.mixTotalMinsRemain, tCommon('hour'), tCommon('minute')) : '';
                         return (
                           <li key={v.vehicle_id}
                             className="dd-surface px-2 py-1.5 transition-all relative overflow-hidden cursor-pointer"
@@ -1120,32 +990,32 @@ export default function AdminDashboard() {
                                 </span>
                               )}
                             </div>
-                            {hasTrips && (
+                            {hasTrips && stats && (
                               <div className="mt-1 pl-2 flex flex-wrap items-center gap-x-3 gap-y-1">
-                                {totalDistanceKm > 0 && (
+                                {stats.totalDistanceKm > 0 && (
                                   <div className="flex items-center gap-1 text-[10px] font-semibold" style={{ color: '#0ea5e9' }}>
                                     <Route className="w-3 h-3" />
-                                    <span>{totalDistanceKm.toFixed(1)} km</span>
+                                    <span>{stats.totalDistanceKm.toFixed(1)} km</span>
                                   </div>
                                 )}
                                 <div className="flex items-center gap-1 text-[10px] font-semibold" style={{ color: '#ec4899' }}>
                                   <MapPin className="w-3 h-3" />
-                                  {Number.isNaN(totalStops) ? (
+                                  {Number.isNaN(stats.totalStops) ? (
                                     <>
                                       <RefreshCw className="w-2.5 h-2.5 animate-spin" />
                                       <span>Loading...</span>
                                     </>
                                   ) : (
-                                    <span>{totalStops} {t('stops')}{totalStopSecs > 0 ? ` ( ${stopDurationStr} )` : ''}</span>
+                                    <span>{stats.totalStops} {t('stops')}{stats.totalStopSecs > 0 ? ` ( ${stopDurationStr} )` : ''}</span>
                                   )}
                                 </div>
-                                {totalMins > 0 && (
+                                {stats.totalMins > 0 && (
                                   <div className="flex items-center gap-1 text-[10px] font-semibold" style={{ color: '#f59e0b' }}>
                                     <Clock className="w-3 h-3" />
-                                    <span>{hours > 0 ? `${hours} ${tCommon('hour')} ${mins} ${tCommon('minute')}` : `${mins} ${tCommon('minute')}`}</span>
+                                    <span>{stats.hours > 0 ? `${stats.hours} ${tCommon('hour')} ${stats.mins} ${tCommon('minute')}` : `${stats.mins} ${tCommon('minute')}`}</span>
                                   </div>
                                 )}
-                                {totalMixMs > 0 && (
+                                {stats.totalMixMs > 0 && (
                                   <div className="flex items-center gap-1 text-[10px] font-semibold whitespace-nowrap" style={{ color: '#8b5cf6' }}>
                                     <Timer className="w-3 h-3" />
                                     <span>{t("mixing")}: {mixTotalDurationStr}</span>
@@ -1203,45 +1073,9 @@ export default function AdminDashboard() {
                         const hasTrips = trips.length > 0;
                         const accentColor = hasTrips ? '#10b981' : '#94a3b8';
                         const hoverBorder = hasTrips ? 'rgba(16, 185, 129, 0.4)' : 'rgba(148, 163, 184, 0.3)';
-                        const totalDistanceKm = trips.reduce((sum, o) => {
-                          if (o.order_multi) return sum + (o.order_multi.distance_end - o.order_multi.distance_start);
-                          return sum;
-                        }, 0);
-                        const totalStops = trips.reduce((sum, o) => {
-                          if (o.order_multi) return sum + (o.order_multi.nStop_end - o.order_multi.nStop_start);
-                          return sum;
-                        }, 0);
-                        const totalStopSecs = trips.reduce((sum, o) => {
-                          if (o.order_multi && o.order_multi.stop_duration_seconds) return sum + o.order_multi.stop_duration_seconds;
-                          return sum;
-                        }, 0);
-                        const totalTimeMs = trips.reduce((sum, o) => {
-                          if (o.order_start_datetime && o.order_end_datetime) {
-                            return sum + (new Date(o.order_end_datetime).getTime() - new Date(o.order_start_datetime).getTime());
-                          }
-                          return sum;
-                        }, 0);
-                        const totalMixMs = trips.reduce((sum, o) => {
-                          const mixInVal = o.order_multi?.checkin_time_station || o.checkin_time_station;
-                          const mixOutVal = o.order_multi?.checkout_time_station || o.checkout_time_station;
-                          if (mixInVal && mixOutVal) {
-                            const diff = new Date(mixOutVal).getTime() - new Date(mixInVal).getTime();
-                            if (diff > 0) return sum + diff;
-                          }
-                          return sum;
-                        }, 0);
-                        const totalMins = Math.floor(totalTimeMs / 60000);
-                        const hours = Math.floor(totalMins / 60);
-                        const mins = totalMins % 60;
-                        const totalStopMins = Math.floor(totalStopSecs / 60);
-                        const stopHours = Math.floor(totalStopMins / 60);
-                        const stopMinsRemain = totalStopMins % 60;
-                        const stopDurationStr = stopHours > 0 ? `${stopHours} giờ ${stopMinsRemain} phút` : `${totalStopMins} phút`;
-
-                        const totalMixMins = Math.floor(totalMixMs / 60000);
-                        const mixTotalHours = Math.floor(totalMixMins / 60);
-                        const mixTotalMinsRemain = totalMixMins % 60;
-                        const mixTotalDurationStr = mixTotalHours > 0 ? `${mixTotalHours} giờ ${mixTotalMinsRemain} phút` : `${totalMixMins} phút`;
+                        const stats = vehicleStatsMap.get(v.vehicle_id);
+                        const stopDurationStr = stats ? formatDuration(stats.totalStopMins, stats.stopHours, stats.stopMinsRemain, tCommon('hour'), tCommon('minute')) : '';
+                        const mixTotalDurationStr = stats ? formatDuration(stats.totalMixMins, stats.mixTotalHours, stats.mixTotalMinsRemain, tCommon('hour'), tCommon('minute')) : '';
                         return (
                           <li key={v.vehicle_id}
                             className="dd-surface px-2 py-1.5 transition-all relative overflow-hidden cursor-pointer"
@@ -1267,35 +1101,35 @@ export default function AdminDashboard() {
                                 </span>
                               )}
                             </div>
-                            {hasTrips && (
+                            {hasTrips && stats && (
                               <div className="mt-1.5 pl-2 flex flex-wrap items-center gap-x-3 gap-y-1">
-                                {totalDistanceKm > 0 && (
+                                {stats.totalDistanceKm > 0 && (
                                   <div className="flex items-center gap-1 text-[10px] font-semibold whitespace-nowrap" style={{ color: '#0ea5e9' }}>
                                     <Route className="w-3 h-3" />
-                                    <span>{totalDistanceKm.toFixed(1)} km</span>
+                                    <span>{stats.totalDistanceKm.toFixed(1)} km</span>
                                   </div>
                                 )}
                                 <div className="flex items-center gap-1 text-[10px] font-semibold whitespace-nowrap" style={{ color: '#ec4899' }}>
                                   <MapPin className="w-3 h-3" />
-                                  {Number.isNaN(totalStops) ? (
+                                  {Number.isNaN(stats.totalStops) ? (
                                     <>
                                       <RefreshCw className="w-2.5 h-2.5 animate-spin" />
                                       <span>Loading...</span>
                                     </>
                                   ) : (
-                                    <span>{totalStops} {t('stops')}{totalStopSecs > 0 ? ` ( ${stopDurationStr} )` : ''}</span>
+                                    <span>{stats.totalStops} {t('stops')}{stats.totalStopSecs > 0 ? ` ( ${stopDurationStr} )` : ''}</span>
                                   )}
                                 </div>
-                                {totalMins > 0 && (
+                                {stats.totalMins > 0 && (
                                   <div className="flex items-center gap-1 text-[10px] font-semibold whitespace-nowrap" style={{ color: '#f59e0b' }}>
                                     <Clock className="w-3 h-3" />
-                                    <span>{hours > 0 ? `${hours} giờ ${mins} phút` : `${mins} phút`}</span>
+                                    <span>{stats.hours > 0 ? `${stats.hours} ${tCommon('hour')} ${stats.mins} ${tCommon('minute')}` : `${stats.mins} ${tCommon('minute')}`}</span>
                                   </div>
                                 )}
-                                {totalMixMs > 0 && (
+                                {stats.totalMixMs > 0 && (
                                   <div className="flex items-center gap-1 text-[10px] font-semibold whitespace-nowrap" style={{ color: '#8b5cf6' }}>
                                     <Timer className="w-3 h-3" />
-                                    <span>Trộn: {mixTotalDurationStr}</span>
+                                    <span>{t("mixing")}: {mixTotalDurationStr}</span>
                                   </div>
                                 )}
                               </div>
@@ -1333,44 +1167,10 @@ export default function AdminDashboard() {
         <DialogContent className="sm:max-w-4xl max-h-[80vh] p-0 gap-0 overflow-hidden flex flex-col" showCloseButton={false}>
           {selectedVehicleTrips && (() => {
             const { vehicle, orders: tripOrders } = selectedVehicleTrips;
-            const totalDistanceKm = tripOrders.reduce((sum, o) => {
-              if (o.order_multi) return sum + (o.order_multi.distance_end - o.order_multi.distance_start);
-              return sum;
-            }, 0);
-            const totalStops = tripOrders.reduce((sum, o) => {
-              if (o.order_multi) return sum + (o.order_multi.nStop_end - o.order_multi.nStop_start);
-              return sum;
-            }, 0);
-            const totalStopSecs = tripOrders.reduce((sum, o) => {
-              if (o.order_multi && o.order_multi.stop_duration_seconds) return sum + o.order_multi.stop_duration_seconds;
-              return sum;
-            }, 0);
-            const totalTimeMs = tripOrders.reduce((sum, o) => {
-              if (o.order_start_datetime && o.order_end_datetime) {
-                return sum + (new Date(o.order_end_datetime).getTime() - new Date(o.order_start_datetime).getTime());
-              }
-              return sum;
-            }, 0);
-            const totalMixMs = tripOrders.reduce((sum, o) => {
-              const mixInVal = o.order_multi?.checkin_time_station || o.checkin_time_station;
-              const mixOutVal = o.order_multi?.checkout_time_station || o.checkout_time_station;
-              if (mixInVal && mixOutVal) {
-                const diff = new Date(mixOutVal).getTime() - new Date(mixInVal).getTime();
-                if (diff > 0) return sum + diff;
-              }
-              return sum;
-            }, 0);
-            const totalMins = Math.floor(totalTimeMs / 60000);
-            const totalHours = Math.floor(totalMins / 60);
-            const totalRemainMins = totalMins % 60;
-            const totalStopMins = Math.floor(totalStopSecs / 60);
-            const stopHours = Math.floor(totalStopMins / 60);
-            const stopMinsRemain = totalStopMins % 60;
-            const stopDurationStr = stopHours > 0 ? `${stopHours} ${tCommon('hour')} ${stopMinsRemain} ${tCommon('minute')}` : `${totalStopMins} ${tCommon('minute')}`;
-            const totalMixMins = Math.floor(totalMixMs / 60000);
-            const mixTotalHours = Math.floor(totalMixMins / 60);
-            const mixTotalMinsRemain = totalMixMins % 60;
-            const mixTotalDurationStr = mixTotalHours > 0 ? `${mixTotalHours} ${tCommon('hour')} ${mixTotalMinsRemain} ${tCommon('minute')}` : `${totalMixMins} ${tCommon('minute')}`;
+            const stats = computeTripStats(tripOrders);
+            const stopDurationStr = formatDuration(stats.totalStopMins, stats.stopHours, stats.stopMinsRemain, tCommon('hour'), tCommon('minute'));
+            const mixTotalDurationStr = formatDuration(stats.totalMixMins, stats.mixTotalHours, stats.mixTotalMinsRemain, tCommon('hour'), tCommon('minute'));
+
             return (
               <div className="flex flex-col flex-1 min-h-0">
                 {/* Header */}
@@ -1419,7 +1219,7 @@ export default function AdminDashboard() {
                         const stopMins = Math.floor(stopSecs / 60);
                         const stopH = Math.floor(stopMins / 60);
                         const stopM = stopMins % 60;
-                        const stopDurationStr = stopH > 0 ? `${stopH} ${tCommon('hour')} ${stopM} ${tCommon('minute')}` : `${stopMins} ${tCommon('minute')}`;
+                        const orderStopDurationStr = formatDuration(stopMins, stopH, stopM, tCommon('hour'), tCommon('minute'));
 
                         const mixInVal = o.order_multi?.checkin_time_station || o.checkin_time_station;
                         const mixOutVal = o.order_multi?.checkout_time_station || o.checkout_time_station;
@@ -1429,7 +1229,7 @@ export default function AdminDashboard() {
                         const mixMinsTotal = Math.floor(mixMs / 60000);
                         const mixH = Math.floor(mixMinsTotal / 60);
                         const mixM = mixMinsTotal % 60;
-                        const mixDurationStr = mixH > 0 ? `${mixH} ${tCommon('hour')} ${mixM} ${tCommon('minute')}` : `${mixMinsTotal} ${tCommon('minute')}`;
+                        const orderMixDurationStr = formatDuration(mixMinsTotal, mixH, mixM, tCommon('hour'), tCommon('minute'));
                         const isTripActive = o.order_status === 'running' || o.order_status === 'transporting';
 
                         return (
@@ -1497,13 +1297,13 @@ export default function AdminDashboard() {
                                         <span>Loading...</span>
                                       </>
                                     ) : (
-                                      <span>{stops} {t('stops')}{stopSecs > 0 ? ` (${stopDurationStr})` : ''}</span>
+                                      <span>{stops} {t('stops')}{stopSecs > 0 ? ` (${orderStopDurationStr})` : ''}</span>
                                     )}
                                   </div>
                                   {mixMs > 0 && (
                                     <div className="flex items-center gap-1.5 text-sm font-semibold whitespace-nowrap text-violet-500">
                                       <Timer size={14} />
-                                      <span>{t('mixing')}: {mixDurationStr}</span>
+                                      <span>{t('mixing')}: {orderMixDurationStr}</span>
                                     </div>
                                   )}
                                 </div>
@@ -1523,43 +1323,37 @@ export default function AdminDashboard() {
                       {t('tripSummary')}
                     </span>
                     <div className="flex flex-wrap items-center justify-start sm:justify-end gap-x-4 gap-y-2">
-                      {/* {tripOrders.filter(o => o.order_status === 'running' || o.order_status === 'transporting').length > 0 && (
-                        <div className="flex items-center gap-1.5 text-sm font-bold whitespace-nowrap" style={{ color: '#0ea5e9' }}>
-                          <Truck size={16} />
-                          <span>{tripOrders.filter(o => o.order_status === 'running' || o.order_status === 'transporting').length} Đang di chuyển</span>
-                        </div>
-                      )} */}
                       <div className="flex items-center gap-1.5 text-sm font-bold whitespace-nowrap" style={{ color: '#10b981' }}>
                         <CheckCircle2 size={16} />
                         <span>{tripOrders.filter(o => o.order_status === 'completed').length} {t('completed')}</span>
                       </div>
-                      {totalDistanceKm > 0 && (
+                      {stats.totalDistanceKm > 0 && (
                         <div className="flex items-center gap-1.5 text-sm font-bold whitespace-nowrap" style={{ color: '#0ea5e9' }}>
                           <Route size={16} />
-                          <span>{totalDistanceKm.toFixed(1)} km</span>
+                          <span>{stats.totalDistanceKm.toFixed(1)} km</span>
                         </div>
                       )}
-                      {totalMins > 0 && (
+                      {stats.totalMins > 0 && (
                         <div className="flex items-center gap-1.5 text-sm font-bold whitespace-nowrap" style={{ color: '#f59e0b' }}>
                           <Clock size={16} />
-                          <span>{totalHours > 0 ? `${totalHours} giờ ${totalRemainMins} phút` : `${totalRemainMins} phút`}</span>
+                          <span>{stats.hours > 0 ? `${stats.hours} ${tCommon('hour')} ${stats.mins} ${tCommon('minute')}` : `${stats.mins} ${tCommon('minute')}`}</span>
                         </div>
                       )}
                       <div className="flex items-center gap-1.5 text-sm font-bold whitespace-nowrap" style={{ color: '#ec4899' }}>
                         <MapPin size={16} />
-                        {Number.isNaN(totalStops) ? (
+                        {Number.isNaN(stats.totalStops) ? (
                           <>
                             <RefreshCw size={16} className="animate-spin" />
                             <span>Loading...</span>
                           </>
                         ) : (
-                          <span>{totalStops} {t('stops')}{totalStopSecs > 0 ? ` (${stopDurationStr})` : ''}</span>
+                          <span>{stats.totalStops} {t('stops')}{stats.totalStopSecs > 0 ? ` (${stopDurationStr})` : ''}</span>
                         )}
                       </div>
-                      {totalMixMs > 0 && (
+                      {stats.totalMixMs > 0 && (
                         <div className="flex items-center gap-1.5 text-sm font-bold whitespace-nowrap" style={{ color: '#8b5cf6' }}>
                           <Timer size={16} />
-                          <span>Trộn: {mixTotalDurationStr}</span>
+                          <span>{t('mixing')}: {mixTotalDurationStr}</span>
                         </div>
                       )}
                     </div>

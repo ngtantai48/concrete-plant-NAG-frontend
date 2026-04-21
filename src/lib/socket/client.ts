@@ -230,7 +230,7 @@ export class SocketManager {
     if (!this.socket) return;
 
     this.socket.on('connect', () => {
-      console.log(`[SocketManager] Connected to ${this.connectionUrl}`);
+      // console.log(`[SocketManager] Connected to ${this.connectionUrl}`);
       this.isConnectedState = true;
       this.reconnectAttempts = 0;
       this.notifyConnectionListeners(true);
@@ -266,7 +266,7 @@ export class SocketManager {
       if (document.visibilityState === 'visible') {
         // Tab vừa trở lại foreground
         if (this.socket && !this.socket.connected) {
-          console.log(`[SocketManager] Tab visible — socket disconnected, reconnecting ${this.connectionUrl}`);
+          // console.log(`[SocketManager] Tab visible — socket disconnected, reconnecting ${this.connectionUrl}`);
           this.socket.connect();
         }
       }

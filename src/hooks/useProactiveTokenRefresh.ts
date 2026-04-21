@@ -22,7 +22,7 @@ function getTokenData(token: string): { exp: number; iat?: number } | null {
   try {
     const decoded: any = jwtDecode(token);
     if (typeof decoded.exp !== "number") return null;
-    console.log("[ProactiveTokenRefresh] Token data exp:", decoded.exp);
+    // console.log("[ProactiveTokenRefresh] Token data exp:", decoded.exp);
     return { exp: decoded.exp, iat: decoded.iat };
   } catch {
     return null;
@@ -63,9 +63,9 @@ export function useProactiveTokenRefresh() {
 
     const refreshInMs = Math.max(timeUntilExpiry - refreshBufferS, 0) * 1000;
 
-    console.log(
-      `[ProactiveTokenRefresh] Token lifetime: ${Math.round(totalLifetime / 60)}m, Expiring in: ${Math.round(timeUntilExpiry / 60)}m. Will refresh in: ${Math.round(refreshInMs / 1000 / 60)}m (Buffer: ${refreshBufferS}s)`
-    );
+    // console.log(
+    //   `[ProactiveTokenRefresh] Token lifetime: ${Math.round(totalLifetime / 60)}m, Expiring in: ${Math.round(timeUntilExpiry / 60)}m. Will refresh in: ${Math.round(refreshInMs / 1000 / 60)}m (Buffer: ${refreshBufferS}s)`
+    // );
 
     timerRef.current = setTimeout(() => {
       doRefresh();
@@ -83,7 +83,7 @@ export function useProactiveTokenRefresh() {
     if (isRefreshingRef.current) return;
     isRefreshingRef.current = true;
 
-    console.log("[ProactiveTokenRefresh] Đang tự động refresh token...");
+    // console.log("[ProactiveTokenRefresh] Đang tự động refresh token...");
 
     authApi
       .refreshToken()
@@ -100,10 +100,10 @@ export function useProactiveTokenRefresh() {
             user_full_name: res.data.user_full_name,
           },
         });
-        console.log("[ProactiveTokenRefresh] ✅ Token đã được refresh thành công");
+        // console.log("[ProactiveTokenRefresh] ✅ Token đã được refresh thành công");
       })
       .catch((err) => {
-        console.error("[ProactiveTokenRefresh] ❌ Refresh thất bại:", err);
+        // console.error("[ProactiveTokenRefresh] ❌ Refresh thất bại:", err);
         const store = getStore();
         store?.dispatch(logoutSuccess());
       })

@@ -22,7 +22,7 @@ export function useRealtimeUpdates(onUpdate: (signal?: UpdateSignal) => void) {
   const [lastSignalTime, setLastSignalTime] = useState<Date | null>(null);
 
   const tokenState = useAppSelector((state: any) => state.auth.token);
-  const hookId = useMemo(() => Math.random().toString(36).substr(2, 4), []);
+  // const hookId = useMemo(() => Math.random().toString(36).substr(2, 4), []);
 
   // Initialize socket manager (singleton)
   useEffect(() => {
@@ -91,7 +91,7 @@ export function useRealtimeUpdates(onUpdate: (signal?: UpdateSignal) => void) {
         const signal = validateUpdateSignal('update', payload);
         if (!signal) return;
 
-        console.log(`[RealtimeUpdates][${hookId}] Received update event:`, signal);
+        // console.log(`[RealtimeUpdates][${hookId}] Received update event:`, signal);
         triggerRefresh(signal);
       })
     );
@@ -102,7 +102,7 @@ export function useRealtimeUpdates(onUpdate: (signal?: UpdateSignal) => void) {
         const signal = validateUpdateSignal('ping', payload);
         if (!signal) return;
 
-        console.log(`[RealtimeUpdates][${hookId}] Received ping event:`, signal);
+        // console.log(`[RealtimeUpdates][${hookId}] Received ping event:`, signal);
         triggerRefresh(signal);
       })
     );
@@ -117,7 +117,7 @@ export function useRealtimeUpdates(onUpdate: (signal?: UpdateSignal) => void) {
         const signal = validateUpdateSignal(eventName, payload);
         if (!signal) return;
 
-        console.log(`[RealtimeUpdates][${hookId}] Received event ${eventName}:`, payload);
+        // console.log(`[RealtimeUpdates][${hookId}] Received event ${eventName}:`, payload);
         triggerRefresh(signal);
       })
     );
@@ -135,7 +135,7 @@ export function useRealtimeUpdates(onUpdate: (signal?: UpdateSignal) => void) {
   // Centralized Visibility Wake
   useEffect(() => {
     if (appVisibility === 'visible') {
-      console.log("[RealtimeUpdates] Visibility wake trigger");
+      // console.log("[RealtimeUpdates] Visibility wake trigger");
       onUpdateRef.current({ update_type: 'visibility_wake' });
     }
   }, [appVisibility]);
@@ -146,7 +146,7 @@ export function useRealtimeUpdates(onUpdate: (signal?: UpdateSignal) => void) {
     const last = lastSignalTimeRef.current ? lastSignalTimeRef.current.getTime() : 0;
     // Nếu socket im lặng > 30s → trigger data refresh
     if (now - last > 30_000) {
-      console.log("[RealtimeUpdates] Background polling trigger (silent > 30s)");
+      // console.log("[RealtimeUpdates] Background polling trigger (silent > 30s)");
       onUpdateRef.current({ update_type: 'background_polling' });
     }
   }, [lastBackgroundTick]);
