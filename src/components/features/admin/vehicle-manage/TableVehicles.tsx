@@ -13,7 +13,7 @@ import {
 import { SelectContent, SelectItem, SelectTrigger, SelectValue, Select as ShadcnSelect, } from "@/components/ui/select";
 import { useAppDispatch, useAppSelector } from "@/hooks/use-app-selector";
 import { useNavigationStore } from "@/hooks/use-navigation-store";
-import { useRfidScanner } from "@/hooks/use-rfid-scanner";
+// import { useRfidScanner } from "@/hooks/use-rfid-scanner";
 import driverApi from "@/services/driver.service";
 import mediaApi from "@/services/media.service";
 import vehicleTypeApi from "@/services/vehicle-type.service";
@@ -97,25 +97,25 @@ export default function TableVehicles() {
   const [uploadingMediaId, setUploadingMediaId] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const { connect, disconnect, isScanning, lastTag, setLastTag } = useRfidScanner();
+  // const { connect, disconnect, isScanning, lastTag, setLastTag } = useRfidScanner();
 
-  useEffect(() => {
-    if (!isModalVisible) {
-      disconnect();
-    }
-  }, [isModalVisible, disconnect]);
+  // useEffect(() => {
+  //   if (!isModalVisible) {
+  //     disconnect();
+  //   }
+  // }, [isModalVisible, disconnect]);
 
-  useEffect(() => {
-    if (lastTag) {
-      form.setFieldsValue({ vehicle_rfid: lastTag });
-      toast.success(t("rfidScanSuccess") || "Đã quét thẻ RFID!", {
-        description: `Mã thẻ: ${lastTag}`,
-        position: "top-center",
-      });
-      setLastTag(null);
-      disconnect();
-    }
-  }, [lastTag, form, disconnect, setLastTag, t]);
+  // useEffect(() => {
+  //   if (lastTag) {
+  //     form.setFieldsValue({ vehicle_rfid: lastTag });
+  //     toast.success(t("rfidScanSuccess") || "Đã quét thẻ RFID!", {
+  //       description: `Mã thẻ: ${lastTag}`,
+  //       position: "top-center",
+  //     });
+  //     setLastTag(null);
+  //     disconnect();
+  //   }
+  // }, [lastTag, form, disconnect, setLastTag, t]);
 
   const handleSearchCommit = useCallback(() => {
     if (searchCategory === "plate") {

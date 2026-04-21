@@ -1,16 +1,13 @@
 "use client";
 
-import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
-import {
-  getNotificationText,
-  getNotificationTimestampValue,
-  shouldSpeakNotification,
-} from "@/lib/notification";
+import { useAppSelector } from "@/hooks/use-app-selector";
+import { useProactiveTokenRefresh } from "@/hooks/useProactiveTokenRefresh";
+import { getNotificationText, getNotificationTimestampValue, shouldSpeakNotification } from "@/lib/notification";
 import { SocketManager } from "@/lib/socket";
 import { validateNotificationPayload } from "@/lib/socket/schema";
 import type { NotificationPayload } from "@/lib/socket/types";
-import { useAppSelector } from "@/hooks/use-app-selector";
 import { Notification } from "@/types/notification";
+import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from "react";
 
 type SocketEventHandler = (eventName: string, ...args: unknown[]) => void;
 
@@ -41,8 +38,15 @@ function pickVietnameseFemaleVoice(voices: SpeechSynthesisVoice[]): SpeechSynthe
     ?? null;
 }
 
-interface SocketContextType {
+interface SocketStatusInfo {
   isConnected: boolean;
+  lastError?: string;
+  reconnectAttempts: number;
+}
+
+interface SocketContextType {
+  isConnected: boolean; // Main connection (notifications)
+  statusMap: Record<string, SocketStatusInfo>;
   notifications: Notification[];
   unreadCount: number;
   markAsRead: (id: string | number) => void;
@@ -57,6 +61,14 @@ interface SocketContextType {
    * Subscribe to all socket events. Returns an unsubscribe function.
    */
   onSocketEvent: (handler: SocketEventHandler) => () => void;
+  /**
+   * Background tick from the centralized Web Worker (every 15s)
+   */
+  lastBackgroundTick: number;
+  /**
+   * Global app visibility state
+   */
+  appVisibility: Document["visibilityState"];
 }
 
 const SocketContext = createContext<SocketContextType | undefined>(undefined);
@@ -93,14 +105,26 @@ function createThrottle(ms: number) {
 }
 
 export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  // Tự động refresh access token trước khi hết hạn
+  // Đảm bảo server luôn gửi "update" events qua socket
+  useProactiveTokenRefresh();
+
   const managerRef = useRef<SocketManager | null>(null);
   const prevTokenRef = useRef<string | undefined>(undefined);
   const [isConnected, setIsConnected] = useState(false);
+  const [statusMap, setStatusMap] = useState<Record<string, SocketStatusInfo>>({
+    notifications: { isConnected: false, reconnectAttempts: 0 },
+  });
+
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const notificationsRef = useRef<Notification[]>([]);
   const spokenNotificationIdsRef = useRef<Set<string | number>>(new Set());
   const [isMuted, setIsMuted] = useState(false);
   const isMutedRef = useRef(false);
+
+  // Centralized background polling & visibility
+  const [lastBackgroundTick, setLastBackgroundTick] = useState<number>(Date.now());
+  const [appVisibility, setAppVisibility] = useState<Document["visibilityState"]>('visible');
 
   const listenersRef = useRef<Set<SocketEventHandler>>(new Set());
 
@@ -109,6 +133,51 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   useEffect(() => {
     notificationsRef.current = notifications;
   }, [notifications]);
+
+  // ============================================================
+  // Centralized Web Worker (Single instance for the entire app)
+  // ============================================================
+  useEffect(() => {
+    if (typeof Worker === 'undefined') return;
+
+    const workerCode = `
+      let intervalId = null;
+      self.onmessage = function(e) {
+        if (e.data === 'start') {
+          intervalId = setInterval(() => { self.postMessage('tick'); }, 15000);
+        } else if (e.data === 'stop') {
+          clearInterval(intervalId);
+        }
+      };
+    `;
+    const blob = new Blob([workerCode], { type: 'application/javascript' });
+    const workerUrl = URL.createObjectURL(blob);
+    const worker = new Worker(workerUrl);
+
+    worker.onmessage = () => {
+      setLastBackgroundTick(Date.now());
+    };
+
+    worker.postMessage('start');
+
+    return () => {
+      worker.postMessage('stop');
+      worker.terminate();
+      URL.revokeObjectURL(workerUrl);
+    };
+  }, []);
+
+  // ============================================================
+  // Centralized Visibility Handler
+  // ============================================================
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      setAppVisibility(document.visibilityState);
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, []);
 
   const speakNotification = useCallback((notification: NotificationPayload | Notification) => {
     // Skip speech if user has muted voice notifications
@@ -141,39 +210,62 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     window.speechSynthesis.speak(utterance);
   }, []);
 
-  // Initialize socket manager (singleton)
+  // Initialize socket managers (singleton)
   useEffect(() => {
     if (!process.env.NEXT_PUBLIC_SOCKET_URL || !tokenState) return;
 
-    const manager = SocketManager.getInstance('notifications', {
+    // 1. Notifications namespace
+    const managerNoti = SocketManager.getInstance('notifications', {
       path: '/gateways',
       reconnectionDelay: 1000,
       reconnectionDelayMax: 5000,
     });
+    managerNoti.setAuthProvider(() => tokenState);
+    managerRef.current = managerNoti;
 
-    // Set auth provider cho token refresh
-    manager.setAuthProvider(() => tokenState);
+    const unsubscribeNoti = managerNoti.onConnectionChange((connected) => {
+      setIsConnected(connected);
+      setStatusMap(prev => ({
+        ...prev,
+        notifications: { ...prev.notifications, isConnected: connected }
+      }));
+    });
 
-    managerRef.current = manager;
+    // 2. Updates namespace (Centralized tracking for Dashboard/IoT)
+    const managerUpdates = SocketManager.getInstance('updates', {
+      reconnectionDelay: 2000,
+      reconnectionDelayMax: 5000,
+    });
+    managerUpdates.setAuthProvider(() => tokenState);
 
-    // Connection state listener
-    const unsubscribeConnection = manager.onConnectionChange(setIsConnected);
+    // Đảm bảo statusMap có entry cho updates
+    setStatusMap(prev => ({
+      ...prev,
+      updates: { isConnected: managerUpdates.isConnected, reconnectAttempts: 0 }
+    }));
 
-    // Nếu token đã đổi (refresh), force reconnect để handshake lại với token mới.
-    // Lần đầu (prev === undefined) chỉ connect bình thường.
+    const unsubscribeUpdates = managerUpdates.onConnectionChange((connected) => {
+      setStatusMap(prev => ({
+        ...prev,
+        updates: { ...prev.updates, isConnected: connected }
+      }));
+    });
+
+    // Lần đầu hoặc token đổi (refresh) -> reconnect/connect
     const prevToken = prevTokenRef.current;
     prevTokenRef.current = tokenState;
 
     if (prevToken && prevToken !== tokenState) {
-      manager.reconnect();
+      managerNoti.reconnect();
+      managerUpdates.reconnect();
     } else {
-      manager.connect();
+      managerNoti.connect();
+      managerUpdates.connect();
     }
 
     return () => {
-      unsubscribeConnection();
-      // Không disconnect ở đây để giữ connection cho toàn app
-      // Chỉ disconnect khi app unmount hoàn toàn
+      unsubscribeNoti();
+      unsubscribeUpdates();
     };
   }, [tokenState]);
 
@@ -414,6 +506,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     <SocketContext.Provider
       value={{
         isConnected,
+        statusMap,
         notifications,
         unreadCount: notifications.filter((item) => !item.read).length,
         markAsRead,
@@ -433,6 +526,8 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
           });
         },
         onSocketEvent,
+        lastBackgroundTick,
+        appVisibility,
       }}
     >
       {children}
