@@ -151,10 +151,7 @@ function SortableVehicleItemBase({
               }}
               disabled={isBusy}
             >
-              <SelectTrigger
-                size="sm"
-                className="h-8 w-[64px] shrink-0 text-sm font-extrabold"
-              >
+              <SelectTrigger size="sm" className="shrink-0 text-sm font-extrabold">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent className="max-h-[280px]">
