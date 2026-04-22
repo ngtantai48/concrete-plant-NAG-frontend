@@ -119,7 +119,7 @@ export default function Sidebar() {
           { key: ADMIN.ATTENDANCE, label: t("attendance"), icon: <CalendarCheck /> },
         ],
       },
-      { key: ADMIN.SYSTEM_SETTINGS, label: t("systemSettings"), icon: <Settings />, roles: ["admin"] },
+      //{ key: ADMIN.SYSTEM_SETTINGS, label: t("systemSettings"), icon: <Settings />, roles: ["admin"] },
       { key: USER.DASHBOARD, label: t("dashboard"), icon: <Gauge />, roles: ["user"] },
       { key: CUSTOMER.DASHBOARD, label: t("dashboard"), icon: <Gauge />, roles: ["customer"] },
       // { key: ADMIN.DRIVER_DISPLAY, label: t("driverDisplay"), icon: <Monitor />, roles: ["admin"] },
