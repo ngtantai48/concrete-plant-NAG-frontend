@@ -15,7 +15,7 @@ import type { Order } from "@/types/order";
 import type { Station } from "@/types/station";
 import type { Vehicle } from "@/types/vehicle";
 import { format } from "date-fns";
-import { ArrowRight, Calendar as CalendarIcon, CheckCircle2, Clock, Ellipsis, FileSpreadsheet, Map as MapIcon, MapPin, Radio, RefreshCw, Route, Search, Timer, Truck, X } from "lucide-react";
+import { ArrowRight, Calendar as CalendarIcon, CheckCircle2, Clock, Ellipsis, FileSpreadsheet, Map as MapIcon, MapPin, Radio, RefreshCw, Route, Save, Search, Timer, Truck, X } from "lucide-react";
 import { toast } from "sonner";
 
 import { Checkbox } from "@/components/ui/checkbox";
@@ -33,6 +33,7 @@ import ClockDisplay from "./ClockDisplay";
 import StationStatusPanel from "./StationStatusPanel";
 import { computeTripStats, formatDuration } from "./trip-stats";
 import VehicleStatusChange from "./VehicleStatusChange";
+import EndOfDayModal from "../end-of-day/EndOfDayModal";
 
 const StationMap = dynamic(
   () => import("@/components/features/admin/dashboard/StationMap"),
@@ -70,6 +71,7 @@ export default function AdminDashboard() {
   const [zoomLevel, setZoomLevel] = useState<number>(1);
   const [selectedDate, setSelectedDate] = useState(getTodayDate());
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
+  const [isEndOfDayModalOpen, setIsEndOfDayModalOpen] = useState(false);
   const isPastDate = selectedDate < getTodayDate();
 
 
@@ -130,8 +132,8 @@ export default function AdminDashboard() {
     [stations],
   );
 
-  const { 
-    vehicles: vtrackingVehicles, 
+  const {
+    vehicles: vtrackingVehicles,
     // inRangeCount, 
     // loading: nearbyLoading, 
     // lastUpdated, 
@@ -554,6 +556,23 @@ export default function AdminDashboard() {
 
               {/* Sync Shift Button (replaces hidden Chốt ca button) */}
               <div className="border-l border-slate-200 pl-2 flex items-center gap-1.5">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => setIsEndOfDayModalOpen(true)}
+                      className="uppercase border-sky-200 text-sky-700 hover:bg-sky-50"
+                    >
+                      <Save className="h-4 w-4 mr-1.5" />
+                      Check log
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Check log {format(new Date(selectedDate), "dd/MM/yyyy")}</p>
+                  </TooltipContent>
+                </Tooltip>
+
                 {!isPastDate && hasUnclosedShift && (
                   <>
                     {/* Chốt ca button hidden — keeping handleShiftClose for potential re-enable */}
@@ -1489,6 +1508,13 @@ export default function AdminDashboard() {
           </div>
         </DialogContent>
       </Dialog>
+      <EndOfDayModal
+        open={isEndOfDayModalOpen}
+        onCancel={() => setIsEndOfDayModalOpen(false)}
+        onAccept={() => {
+          toast.success("Đã chốt ngày thành công");
+        }}
+      />
     </div>
   );
 };
