@@ -10,6 +10,7 @@ import { Save, Shuffle } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
+import EndOfDayModal from "./EndOfDayModal";
 
 const FLOW_STATION_TYPE_ID = 1;
 const getTodayDate = () => {
@@ -29,6 +30,7 @@ export default function EndOfDayVehicleManager() {
   const operationDate = getTodayDate();
   const [clock, setClock] = useState("");
   const clockRef = useRef<ReturnType<typeof setInterval>>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   useEffect(() => {
     const tick = () => {
@@ -154,8 +156,9 @@ export default function EndOfDayVehicleManager() {
                     {tPage("rebalanceAction")}
                   </button>
 
-                  {/* <button
+                  <button
                     type="button"
+                    onClick={() => setIsModalOpen(true)}
                     className="dd-btn flex items-center gap-2"
                     style={{
                       background: "linear-gradient(135deg, rgba(14, 165, 233, 0.16), rgba(59, 130, 246, 0.12))",
@@ -164,8 +167,8 @@ export default function EndOfDayVehicleManager() {
                     }}
                   >
                     <Save className="h-4 w-4" />
-                    {tPage("saveAction")}
-                  </button> */}
+                    Chốt ngày
+                  </button>
 
                 </div>
               </div>
@@ -210,6 +213,13 @@ export default function EndOfDayVehicleManager() {
         </div>
 
       </div>
+      <EndOfDayModal
+        open={isModalOpen}
+        onCancel={() => setIsModalOpen(false)}
+        onAccept={() => {
+          toast.success("Check log thành công");
+        }}
+      />
     </div>
   );
 }
