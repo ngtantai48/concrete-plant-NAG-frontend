@@ -85,32 +85,60 @@ export default function EndOfDayModal({ open, onCancel, onAccept }: EndOfDayModa
       title: "Nhật ký vận hành",
       key: "notes",
       render: (_: any, record: EndOfDayVehicle) => {
-        const { operation_notes, operation_note } = record;
-        
-        let parts: string[] = [];
-        if (operation_notes && operation_notes.length > 0) {
-          parts = operation_notes;
-        } else if (operation_note) {
-          parts = operation_note.split(" | ");
+        const { operation_items, operation_notes, operation_note, abnormal_notes } = record;
+
+        const rows: Array<{ key: string; message: string; isWarning: boolean }> = [];
+        const normalize = (value: string) => value.trim().toLowerCase();
+
+        if (operation_items && operation_items.length > 0) {
+          operation_items.forEach((item, idx) => {
+            const message = typeof item?.message === "string" ? item.message.trim() : "";
+            if (!message) return;
+            rows.push({
+              key: `item-${idx}`,
+              message,
+              isWarning: String(item?.level || "").toLowerCase() === "warning",
+            });
+          });
+        } else {
+          let parts: string[] = [];
+          if (operation_notes && operation_notes.length > 0) {
+            parts = operation_notes;
+          } else if (operation_note) {
+            parts = operation_note.split(" | ");
+          }
+
+          const abnormalSet = new Set((abnormal_notes || []).map((note) => normalize(note)));
+          parts.forEach((part, idx) => {
+            const message = part.trim();
+            if (!message) return;
+            const normalizedPart = normalize(message);
+            const isLegacyAbnormalText =
+              normalizedPart.includes("bat thuong") || normalizedPart.includes("bất thường");
+            rows.push({
+              key: `part-${idx}`,
+              message,
+              isWarning: abnormalSet.has(normalizedPart) || isLegacyAbnormalText,
+            });
+          });
         }
 
-        if (parts.length === 0) return <Text type="secondary">-</Text>;
+        if (rows.length === 0) return <Text type="secondary">-</Text>;
 
         return (
           <div className="flex flex-col gap-1.5">
-            {parts.map((part, idx) => {
-              const isPartAbnormal = part.toLowerCase().includes("bat thuong") || part.toLowerCase().includes("bất thường");
+            {rows.map((row) => {
               return (
-                <div 
-                  key={idx} 
-                  className={`flex items-start gap-2 text-[14.5px] leading-snug ${isPartAbnormal ? 'text-red-600 font-semibold' : 'text-gray-700 font-medium'}`}
+                <div
+                  key={row.key}
+                  className={`flex items-start gap-2 text-[14.5px] leading-snug ${row.isWarning ? "text-red-600 font-semibold" : "text-gray-700 font-medium"}`}
                 >
-                  {isPartAbnormal ? (
+                  {row.isWarning ? (
                     <AlertCircle className="w-4.5 h-4.5 mt-[2px] shrink-0" />
                   ) : (
                     <CheckCircle2 className="w-4.5 h-4.5 mt-[2px] shrink-0 text-emerald-500" />
                   )}
-                  <span>{part}</span>
+                  <span>{row.message}</span>
                 </div>
               );
             })}
@@ -132,9 +160,9 @@ export default function EndOfDayModal({ open, onCancel, onAccept }: EndOfDayModa
             {data && (
               <p className="text-sm text-gray-500 m-0 mt-0.5 font-medium">
                 {dayjs(data.date).format("DD/MM/YYYY")} • Tổng: {data.total} xe
-                {data.abnormal_total > 0 && (
+                {/* {data.abnormal_total > 0 && (
                   <span className="text-red-500 ml-2">({data.abnormal_total} bất thường)</span>
-                )}
+                )} */}
               </p>
             )}
           </div>
@@ -146,7 +174,7 @@ export default function EndOfDayModal({ open, onCancel, onAccept }: EndOfDayModa
       style={{ top: 20 }}
       footer={
         <div className="flex justify-end pt-4 border-t mt-4">
-          <Button 
+          <Button
             type="primary"
             className="h-10 px-8 font-medium rounded-lg bg-blue-600 hover:bg-blue-700"
             onClick={onCancel}
