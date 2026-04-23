@@ -1,31 +1,6 @@
-/**
- * Hook an toàn để đăng ký socket event listeners trong components
- * Tự động cleanup và xử lý lifecycle
- */
-
 import { useEffect, useRef } from 'react';
 import { SocketManager } from '@/lib/socket';
 
-/**
- * Hook để đăng ký listener cho socket events
- * Tự động cleanup khi unmount
- * 
- * @example
- * // Lắng nghe event cụ thể
- * useSocketEventListener('notification:new', (payload) => {
- *   console.log('New notification:', payload);
- * }, 'notifications');
- * 
- * @example
- * // Lắng nghe tất cả events
- * useSocketEventListener(
- *   'any', 
- *   (eventName, ...args) => {
- *     console.log(eventName, args);
- *   },
- *   'updates'
- * );
- */
 export function useSocketEventListener<EventName extends string>(
   eventName: EventName | 'any',
   handler: EventName extends 'any'
@@ -41,7 +16,7 @@ export function useSocketEventListener<EventName extends string>(
     if (!enabled) return;
 
     let manager: SocketManager;
-    
+
     try {
       manager = SocketManager.getInstance(namespace);
     } catch (error) {
@@ -73,10 +48,6 @@ export function useSocketEventListener<EventName extends string>(
   }, [namespace, eventName, enabled]);
 }
 
-/**
- * Hook để emit socket events an toàn
- * Kiểm tra kết nối trước khi emit
- */
 export function useSocketEmit(namespace: string = 'notifications') {
   const managerRef = useRef<SocketManager | null>(null);
 
