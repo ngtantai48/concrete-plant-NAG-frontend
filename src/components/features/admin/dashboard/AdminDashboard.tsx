@@ -4,30 +4,34 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Card, CardContent } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter,
+  DialogHeader, DialogTitle as DlgTitle
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { useDeviceHeartbeat } from "@/hooks/useDeviceHeartbeat";
+import { useNearbyVehicles } from "@/hooks/useNearbyVehicles";
+import { useRealtimeUpdates } from "@/hooks/useRealtimeUpdates";
 import { cn } from "@/lib/utils";
 import orderApi from "@/services/order.service";
-import vehicleApi from "@/services/vehicle.service";
 import stationApi from "@/services/station.service";
+import vehicleApi from "@/services/vehicle.service";
 import type { Order } from "@/types/order";
 import type { Station } from "@/types/station";
 import type { Vehicle } from "@/types/vehicle";
 import { format } from "date-fns";
-import { ArrowRight, Calendar as CalendarIcon, CheckCircle2, Clock, Ellipsis, FileSpreadsheet, Map as MapIcon, MapPin, Radio, RefreshCw, Route, Save, Search, Timer, Truck, X } from "lucide-react";
-import { toast } from "sonner";
-
-import { Checkbox } from "@/components/ui/checkbox";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle as DlgTitle } from "@/components/ui/dialog";
-import { useDeviceHeartbeat } from "@/hooks/useDeviceHeartbeat";
-import { useNearbyVehicles } from "@/hooks/useNearbyVehicles";
-import { useRealtimeUpdates } from "@/hooks/useRealtimeUpdates";
+import {
+  ArrowRight, Calendar as CalendarIcon, CheckCircle2, Clock, Ellipsis, FileSpreadsheet,
+  Map as MapIcon, MapPin, Radio, RefreshCw, Route, Search, Timer, Truck, X, Save
+} from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
-
+import { toast } from "sonner";
 import ActivityFlow, { type DispatchMode } from "./ActivityFlow";
 import ClockDisplay from "./ClockDisplay";
 import StationStatusPanel from "./StationStatusPanel";
@@ -53,7 +57,6 @@ const getTodayDate = () => {
   return new Date(now.getTime() - timezoneOffset).toISOString().slice(0, 10);
 };
 
-
 export default function AdminDashboard() {
   const t = useTranslations("DashboardPage");
   const tVehiclePage = useTranslations("VehiclePage");
@@ -73,9 +76,6 @@ export default function AdminDashboard() {
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const [isEndOfDayModalOpen, setIsEndOfDayModalOpen] = useState(false);
   const isPastDate = selectedDate < getTodayDate();
-
-
-
 
   const fetchAll = useCallback(async () => {
     try {
@@ -127,10 +127,10 @@ export default function AdminDashboard() {
     fetchAll();
   }, [fetchAll]);
 
-  const activeStations = useMemo(
-    () => stations.filter((s) => s.station_types?.station_type_id === 1 && s.station_status === "operating"),
-    [stations],
-  );
+  // const activeStations = useMemo(
+  //   () => stations.filter((s) => s.station_types?.station_type_id === 1 && s.station_status === "operating"),
+  //   [stations],
+  // );
 
   const {
     vehicles: vtrackingVehicles,
@@ -178,22 +178,20 @@ export default function AdminDashboard() {
     });
   }, [pendingOrders]);
 
-  const ordersAtStation = useMemo(() => orders.filter(o => o.order_status === "collecting"), [orders]);
-  const ordersPending = useMemo(() => {
-    return pendingOrders.filter(o => o.vehicles?.vehicle_status === "available");
-  }, [pendingOrders]);
-  const ordersInTransit = useMemo(() => orders.filter(o => o.order_status === "transporting" || o.order_status === "running"), [orders]);
+  // const ordersAtStation = useMemo(() => orders.filter(o => o.order_status === "collecting"), [orders]);
+  // const ordersPending = useMemo(() => {
+  //   return pendingOrders.filter(o => o.vehicles?.vehicle_status === "available");
+  // }, [pendingOrders]);
+  // const ordersInTransit = useMemo(() => orders.filter(o => o.order_status === "transporting" || o.order_status === "running"), [orders]);
   const ordersCompleted = useMemo(() => {
     return orders.filter(o => o.order_status === "completed");
   }, [orders]);
 
-
-
-  const ordersActive = useMemo(() => {
-    return orders.filter(o =>
-      o.order_status === "collecting" || o.order_status === "transporting" || o.order_status === "running"
-    );
-  }, [orders]);
+  // const ordersActive = useMemo(() => {
+  //   return orders.filter(o =>
+  //     o.order_status === "collecting" || o.order_status === "transporting" || o.order_status === "running"
+  //   );
+  // }, [orders]);
 
   // const ordersTodayPanel = useMemo(() => {
   //   return [...ordersActive, ...ordersCompleted].sort(
@@ -205,22 +203,22 @@ export default function AdminDashboard() {
     return pendingOrders.some((o) => o.shift_closing?.shift_status === 0);
   }, [pendingOrders]);
 
-  const [isShiftClosing, setIsShiftClosing] = useState(false);
-  const [isShiftCloseDialogOpen, setIsShiftCloseDialogOpen] = useState(false);
+  // const [isShiftClosing, setIsShiftClosing] = useState(false);
+  // const [isShiftCloseDialogOpen, setIsShiftCloseDialogOpen] = useState(false);
 
-  const handleShiftClose = useCallback(async () => {
-    setIsShiftCloseDialogOpen(false);
-    setIsShiftClosing(true);
-    try {
-      await orderApi.shiftClose({ operation_date: selectedDate });
-      toast.success(t('shiftCloseSuccess', { date: selectedDate }));
-      fetchAll();
-    } catch {
-      toast.error(t('shiftCloseFailed'));
-    } finally {
-      setIsShiftClosing(false);
-    }
-  }, [selectedDate, t, fetchAll]);
+  // const handleShiftClose = useCallback(async () => {
+  //   setIsShiftCloseDialogOpen(false);
+  //   setIsShiftClosing(true);
+  //   try {
+  //     await orderApi.shiftClose({ operation_date: selectedDate });
+  //     toast.success(t('shiftCloseSuccess', { date: selectedDate }));
+  //     fetchAll();
+  //   } catch {
+  //     toast.error(t('shiftCloseFailed'));
+  //   } finally {
+  //     setIsShiftClosing(false);
+  //   }
+  // }, [selectedDate, t, fetchAll]);
 
   const [isSyncingShift, setIsSyncingShift] = useState(false);
   const [isSyncShiftDialogOpen, setIsSyncShiftDialogOpen] = useState(false);
