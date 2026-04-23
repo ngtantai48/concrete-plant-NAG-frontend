@@ -18,11 +18,22 @@ export interface EndOfDayVehicle {
   finished_at: string | null;
   operation_note: string;
   operation_notes?: string[];
+  operation_items?: EndOfDayOperationItem[];
   abnormal_notes?: string[];
+  abnormal_event_items?: EndOfDayOperationItem[];
   order_id: number;
   order_number: number;
   order_status: string;
   station_name: string;
+}
+
+export interface EndOfDayOperationItem {
+  event: string;
+  message: string;
+  level: "warning" | "info" | "status" | string;
+  occurred_at?: string | null;
+  order_id?: number | null;
+  station_name?: string | null;
 }
 
 export interface EndOfDayStatusResponse {
@@ -33,7 +44,7 @@ export interface EndOfDayStatusResponse {
 }
 
 const vehicleApi = {
-  getAll: (params?: { page?: number; limit?: number; vehicle_license_plate?: string; vehicle_status?: string; user_id?: number }) => 
+  getAll: (params?: { page?: number; limit?: number; vehicle_license_plate?: string; vehicle_status?: string; user_id?: number }) =>
     http.get<ListVehicles>("/vehicles", { params }),
   getById: (id: number) => http.get(`/vehicles/${id}`),
   create: (data: Partial<Vehicle>) => http.post("/vehicles", data),
