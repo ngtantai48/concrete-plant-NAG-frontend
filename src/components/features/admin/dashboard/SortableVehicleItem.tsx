@@ -116,7 +116,7 @@ function SortableVehicleItemBase({
       style={dndStyle}
       className={`sortable-vehicle-item relative overflow-hidden rounded-lg px-4 py-3 group shadow-sm ${isSelected ? 'ring-2 ring-sky-500/20' : ''} ${isDragging ? 'cursor-grabbing shadow-lg is-dragging' : 'cursor-default'}`}
     >
-      <div className="absolute left-0 top-0 bottom-0 w-[3px]"
+      <div className="absolute left-0 top-0 bottom-0 w-0.75"
         style={{ background: style.dot, opacity: 0.8 }} />
 
       <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -154,7 +154,7 @@ function SortableVehicleItemBase({
               <SelectTrigger size="sm" className="shrink-0 text-sm font-extrabold">
                 <SelectValue />
               </SelectTrigger>
-              <SelectContent className="max-h-[280px]">
+              <SelectContent className="max-h-70">
                 {Array.from({ length: totalPositions }, (_, i) => i + 1).map((pos) => (
                   <SelectItem key={pos} value={String(pos)}>
                     {pos}
@@ -207,7 +207,7 @@ function SortableVehicleItemBase({
                 <Select key={manualStationValue ?? 'manual-empty'} value={manualStationValue} onValueChange={onManualStationChange}>
                   <SelectTrigger
                     size="sm"
-                    className="w-[120px] h-8 bg-white text-[11px] font-bold uppercase"
+                    className="w-30 h-8 bg-white text-[11px] font-bold uppercase"
                     onClick={(event) => event.stopPropagation()}
                   >
                     <SelectValue placeholder={t('manualChooseStation')} />

@@ -207,7 +207,7 @@ const StationMap = ({ stationLongitude, stationLatitude, radius, vehicles, focus
   return (
     <div className="w-full h-full relative z-0 rounded-lg overflow-hidden" style={{ border: '1px solid rgba(56, 189, 248, 0.1)' }}>
       {/* Legend overlay */}
-      <div className="absolute top-2 left-2 z-[1000] flex flex-col gap-1">
+      <div className="absolute top-2 left-2 z-1000 flex flex-col gap-1">
         <div className="bg-white/95 backdrop-blur-sm rounded-md shadow-md px-2.5 py-1.5 flex items-center gap-3 border border-slate-200">
           <div className="flex items-center gap-1">
             <span className="w-2.5 h-2.5 rounded-full" style={{ background: '#3b82f6' }}></span>
@@ -267,18 +267,17 @@ const StationMap = ({ stationLongitude, stationLatitude, radius, vehicles, focus
             <Marker key={v.device_id} position={[v.latitude, v.longitude]} icon={icon}
               ref={(ref) => setMarkerRef(v.device_id, ref as unknown as L.Marker | null)}>
               <Popup>
-                <div className="font-sans min-w-[220px] p-0.5">
+                <div className="font-sans min-w-55 p-0.5">
                   {/* Header */}
                   <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
                     <div className="flex flex-col">
                       <strong className="text-base font-bold text-slate-800 uppercase">{v.license_plate}</strong>
-                      <span className="text-xs text-slate-500 truncate max-w-[200px]">{v.vehicle_name}</span>
+                      <span className="text-xs text-slate-500 truncate max-w-50">{v.vehicle_name}</span>
                     </div>
-                    <span className={`ml-auto shrink-0 font-semibold px-2 py-0.5 rounded-full text-[11px] ${
-                      normalizeStatus(v.status, v.timestamp) === "run" ? "bg-emerald-50 text-emerald-700 border border-emerald-100" :
+                    <span className={`ml-auto shrink-0 font-semibold px-2 py-0.5 rounded-full text-[11px] ${normalizeStatus(v.status, v.timestamp) === "run" ? "bg-emerald-50 text-emerald-700 border border-emerald-100" :
                       normalizeStatus(v.status, v.timestamp) === "park" ? "bg-amber-50 text-amber-700 border border-amber-100" :
-                      "bg-slate-50 text-slate-500 border border-slate-100"
-                    }`}>
+                        "bg-slate-50 text-slate-500 border border-slate-100"
+                      }`}>
                       {normalizeStatus(v.status, v.timestamp) === "run" ? "Đang chạy" : normalizeStatus(v.status, v.timestamp) === "park" ? "Đang dừng" : "Mất kết nối"}
                     </span>
                   </div>

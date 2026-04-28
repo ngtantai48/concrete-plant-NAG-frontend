@@ -208,7 +208,7 @@ function StationDropTargetCard({
   return (
     <div
       ref={setNodeRef}
-      className="min-w-[220px] rounded-lg border px-4 py-3"
+      className="min-w-55 rounded-lg border px-4 py-3"
       style={{
         background: isActiveDropTarget
           ? 'linear-gradient(135deg, rgba(14, 165, 233, 0.08), rgba(125, 211, 252, 0.04))'
