@@ -314,6 +314,8 @@
     "stationLabelWord": "Station",
     "readyVehiclesPanel": "Vehicles in Yard",
     "noReadyVehicles": "No vehicles in yard",
+    "showYardEntryTime": "Show the last time the vehicle entered the yard",
+    "hideYardEntryTime": "Hide the last time the vehicle entered the yard",
     "stoppedMaintenance": "Problem / Maintenance / Other",
     "empty": "Empty",
     "stopped": "Stopped",
