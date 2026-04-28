@@ -336,6 +336,8 @@
     "stationLabelWord": "Trạm",
     "readyVehiclesPanel": "Xe trong bãi",
     "noReadyVehicles": "Không có xe trong bãi",
+    "showYardEntryTime": "Hiển thị thời gian cuối cùng xe vào bãi",
+    "hideYardEntryTime": "Ẩn thời gian cuối cùng xe vào bãi",
     "stoppedMaintenance": "Sự cố / Bảo trì / Việc khác",
     "empty": "Trống",
     "stopped": "Tạm dừng",

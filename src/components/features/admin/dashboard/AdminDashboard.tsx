@@ -25,12 +25,12 @@ import type { Vehicle } from "@/types/vehicle";
 import { format } from "date-fns";
 import {
   ArrowRight, Calendar as CalendarIcon, CheckCircle2, Clock, Ellipsis, FileSpreadsheet,
-  Map as MapIcon, MapPin, Radio, RefreshCw, Route, Search, Timer, Truck, X, Save
+  Eye, EyeOff, Map as MapIcon, MapPin, Radio, RefreshCw, Route, Search, Timer, Truck, X, Save
 } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import { toast } from "sonner";
 import ActivityFlow, { type DispatchMode } from "./ActivityFlow";
 import ClockDisplay from "./ClockDisplay";
@@ -57,6 +57,46 @@ const getTodayDate = () => {
   return new Date(now.getTime() - timezoneOffset).toISOString().slice(0, 10);
 };
 
+const YARD_ENTRY_TIME_VISIBILITY_STORAGE_KEY = 'admin-dashboard-yard-entry-time-visible';
+const YARD_ENTRY_TIME_VISIBILITY_STORAGE_EVENT = 'admin-dashboard-yard-entry-time-visible-change';
+
+const getYardEntryTimeVisibilitySnapshot = () => (
+  typeof window === 'undefined' ||
+  window.localStorage.getItem(YARD_ENTRY_TIME_VISIBILITY_STORAGE_KEY) !== 'false'
+);
+
+const subscribeYardEntryTimeVisibility = (onStoreChange: () => void) => {
+  window.addEventListener('storage', onStoreChange);
+  window.addEventListener(YARD_ENTRY_TIME_VISIBILITY_STORAGE_EVENT, onStoreChange);
+
+  return () => {
+    window.removeEventListener('storage', onStoreChange);
+    window.removeEventListener(YARD_ENTRY_TIME_VISIBILITY_STORAGE_EVENT, onStoreChange);
+  };
+};
+
+const normalizeVehicleKey = (value?: string | null) => value?.trim().toUpperCase() || '';
+
+const getVehicleOrderInitTime = (
+  orderInitTimeByVehicleKey: Map<string, number>,
+  licensePlate?: string | null,
+  vehicleName?: string | null,
+) => (
+  orderInitTimeByVehicleKey.get(normalizeVehicleKey(licensePlate)) ??
+  orderInitTimeByVehicleKey.get(normalizeVehicleKey(vehicleName)) ??
+  null
+);
+
+const getVtrackingDisplayStatus = (status: string, timestamp?: number) => {
+  const isStale = timestamp ? Date.now() - timestamp > 10 * 60 * 1000 : false;
+  if (isStale) return 'offline';
+
+  const normalizedStatus = (status || '').toLowerCase();
+  if (['run', 'running'].includes(normalizedStatus)) return 'run';
+  if (['stop', 'park', 'idle', 'parking', 'stopped'].includes(normalizedStatus)) return 'park';
+  return 'offline';
+};
+
 export default function AdminDashboard() {
   const t = useTranslations("DashboardPage");
   const tVehiclePage = useTranslations("VehiclePage");
@@ -70,12 +110,23 @@ export default function AdminDashboard() {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [pendingOrders, setPendingOrders] = useState<Order[]>([]);
+  const [yardOrders, setYardOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [zoomLevel, setZoomLevel] = useState<number>(1);
-  const [selectedDate, setSelectedDate] = useState(getTodayDate());
+  const [selectedDate, setSelectedDate] = useState(() => getTodayDate());
+  const showYardEntryTime = useSyncExternalStore(
+    subscribeYardEntryTimeVisibility,
+    getYardEntryTimeVisibilitySnapshot,
+    () => true,
+  );
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const [isEndOfDayModalOpen, setIsEndOfDayModalOpen] = useState(false);
   const isPastDate = selectedDate < getTodayDate();
+
+  const handleToggleYardEntryTime = useCallback(() => {
+    window.localStorage.setItem(YARD_ENTRY_TIME_VISIBILITY_STORAGE_KEY, String(!showYardEntryTime));
+    window.dispatchEvent(new Event(YARD_ENTRY_TIME_VISIBILITY_STORAGE_EVENT));
+  }, [showYardEntryTime]);
 
   const fetchAll = useCallback(async () => {
     try {
@@ -84,6 +135,8 @@ export default function AdminDashboard() {
         vehicleApi.getAll({ limit: 100 }),
         orderApi.getByInitDate(selectedDate),
         orderApi.getByStatus('pending'),
+        orderApi.getByStatus('collecting'),
+        orderApi.getByStatus('transporting'),
       ] as any[];
 
       const results = await Promise.allSettled(apiCalls);
@@ -108,14 +161,25 @@ export default function AdminDashboard() {
       } else {
         console.warn('[fetchAll] ordersByDate failed:', results[2].reason);
       }
-      if (results[3]?.status === 'fulfilled') {
-        const pRes = results[3].value;
-        const list = pRes.data?.data || pRes.data || [];
-        setPendingOrders(list);
-        // console.log('[fetchAll] pending count:', Array.isArray(list) ? list.length : 'n/a');
-      } else {
-        console.warn('[fetchAll] pending failed:', results[3]?.reason);
-      }
+      const pendingList = results[3]?.status === 'fulfilled'
+        ? results[3].value.data?.data || results[3].value.data || []
+        : [];
+      setPendingOrders(Array.isArray(pendingList) ? pendingList : []);
+
+      const yardOrderResults = results.slice(3, 6);
+      const fulfilledYardOrders = yardOrderResults.flatMap((result) => {
+        if (result.status !== 'fulfilled') return [];
+        const list = result.value.data?.data || result.value.data || [];
+        return Array.isArray(list) ? list : [];
+      });
+      setYardOrders(fulfilledYardOrders);
+
+      yardOrderResults.forEach((result, index) => {
+        if (result.status === 'rejected') {
+          const status = ['pending', 'collecting', 'transporting'][index];
+          console.warn(`[fetchAll] ${status} orders failed:`, result.reason);
+        }
+      });
     } catch (err) {
       console.error('[fetchAll] unexpected:', err);
     } finally {
@@ -149,7 +213,68 @@ export default function AdminDashboard() {
   const { isConnected: socketConnected, /* lastSignal, */ lastSignalTime } = useRealtimeUpdates(fetchAll);
   const { stationStatusMap, isLedConnected } = useDeviceHeartbeat();
 
-  const inYardVehicles = useMemo(() => vtrackingVehicles.filter(v => v.inRange && v.vehicle_name?.toUpperCase().startsWith('X')), [vtrackingVehicles]);
+  const vehicleTimeFormatter = useMemo(
+    () => new Intl.DateTimeFormat(locale === 'vi' ? 'vi-VN' : 'en-US', {
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: false,
+    }),
+    [locale],
+  );
+
+  const vehicleDateFormatter = useMemo(
+    () => new Intl.DateTimeFormat(locale === 'vi' ? 'vi-VN' : 'en-US', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    }),
+    [locale],
+  );
+
+  const yardOrderInitTimeByVehicleKey = useMemo(() => {
+    const map = new Map<string, number>();
+
+    yardOrders.forEach((order) => {
+      const initTime = new Date(order.order_init_datetime).getTime();
+      if (!Number.isFinite(initTime)) return;
+
+      [
+        normalizeVehicleKey(order.vehicles?.vehicle_license_plate),
+        normalizeVehicleKey(order.vehicles?.vehicle_name),
+      ].forEach((key) => {
+        if (!key) return;
+        const current = map.get(key);
+        if (current == null || initTime < current) {
+          map.set(key, initTime);
+        }
+      });
+    });
+
+    return map;
+  }, [yardOrders]);
+
+  const inYardVehicles = useMemo(
+    () => vtrackingVehicles
+      .filter(v => v.inRange && v.vehicle_name?.toUpperCase().startsWith('X'))
+      .sort((a, b) => {
+        const aOrderInitTime = getVehicleOrderInitTime(
+          yardOrderInitTimeByVehicleKey,
+          a.license_plate,
+          a.vehicle_name,
+        ) ?? Number.POSITIVE_INFINITY;
+        const bOrderInitTime = getVehicleOrderInitTime(
+          yardOrderInitTimeByVehicleKey,
+          b.license_plate,
+          b.vehicle_name,
+        ) ?? Number.POSITIVE_INFINITY;
+
+        const orderInitDiff = aOrderInitTime - bOrderInitTime;
+        if (orderInitDiff !== 0) return orderInitDiff;
+        return (a.license_plate || '').localeCompare(b.license_plate || '');
+      }),
+    [yardOrderInitTimeByVehicleKey, vtrackingVehicles],
+  );
 
   const stoppedMaintenanceList = useMemo(() => {
     const list: { id: string; label: string; statusLabel: string; chipClass: string }[] = [];
@@ -381,6 +506,18 @@ export default function AdminDashboard() {
     const v = vtrackingVehicles.find(v => v.device_id === focusVehicleId);
     return v ? { latitude: v.latitude, longitude: v.longitude } : null;
   }, [focusVehicleId, vtrackingVehicles]);
+
+  const mapVehicles = useMemo(() => {
+    const q = mapSearch.trim().toLowerCase();
+
+    return vtrackingVehicles
+      .filter((v) => {
+        if (mapStatusFilter !== 'all' && v.status !== mapStatusFilter) return false;
+        if (!q) return true;
+        return v.license_plate?.toLowerCase().includes(q) || v.vehicle_name?.toLowerCase().includes(q);
+      })
+      .sort((a, b) => a.distance - b.distance);
+  }, [mapSearch, mapStatusFilter, vtrackingVehicles]);
 
   // Pre-compute trip stats for all vehicles (Fix #2: avoid recomputing inside render)
   const vehicleStatsMap = useMemo(() => {
@@ -792,13 +929,29 @@ export default function AdminDashboard() {
               <div className="flex gap-2 flex-1 min-h-0">
 
                 {/* Vehicles Column: Xe trong bãi + Dừng/Bảo trì stacked vertically */}
-                <div className="flex flex-col gap-1.5 shrink-0 min-h-0" style={{ width: '320px' }}>
+                <div className="flex flex-col gap-1.5 shrink-0 min-h-0" style={{ width: '350px' }}>
                   {/* Ready Vehicles */}
-                  <div className="flex flex-col overflow-hidden dd-card min-h-0" style={{ flex: '7 1 0%' }}>
+                  <div className="flex flex-col overflow-hidden dd-card min-h-0" style={{ flex: '6 1 0%' }}>
                     <div className="flex items-center justify-between px-3 py-1.5 text-sm font-extrabold uppercase"
                       style={{ borderBottom: '1px solid var(--dd-border)' }}>
                       <span>{t('readyVehiclesPanel')}</span>
-                      <span className="text-sm font-extrabold">{inYardVehicles.length} {t('vehicleCount')}</span>
+                      <div className="flex items-center gap-2">
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button type="button" variant="ghost" size="icon"
+                              onClick={handleToggleYardEntryTime}
+                              className="h-6 w-6 text-slate-500 hover:text-slate-700"
+                              aria-label={showYardEntryTime ? t('hideYardEntryTime') : t('showYardEntryTime')}
+                            >
+                              {showYardEntryTime ? <EyeOff /> : <Eye />}
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <span>{showYardEntryTime ? t('hideYardEntryTime') : t('showYardEntryTime')}</span>
+                          </TooltipContent>
+                        </Tooltip>
+                        <span className="text-sm font-extrabold">{inYardVehicles.length} {t('vehicleCount')}</span>
+                      </div>
                     </div>
                     <div className="overflow-y-auto p-0 flex-1">
                       {inYardVehicles.length === 0 ? (
@@ -807,24 +960,33 @@ export default function AdminDashboard() {
                         </div>
                       ) : (
                         <ul className="flex flex-col gap-1 px-2 py-2">
-                          {inYardVehicles.map((v) => (
-                            <li key={v.device_id} className="justify-between flex items-center gap-2 px-3 py-2 transition-colors rounded-md border shadow-sm cursor-default hover:shadow-md"
-                              style={{ background: 'var(--dd-bg-surface)', borderColor: 'var(--dd-border)' }}
-                              onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--dd-emerald)'}
-                              onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--dd-border)'}>
-                              <div className="flex items-center gap-2 min-w-0">
-                                <div className="h-5 w-5 rounded-full flex items-center justify-center shrink-0 border" style={{ background: 'rgba(16, 185, 129, 0.1)', borderColor: 'rgba(16, 185, 129, 0.3)' }}>
-                                  <Truck className="h-2.5 w-2.5 animate-drive-idle" style={{ color: 'var(--dd-emerald)' }} />
+                          {inYardVehicles.map((v) => {
+                            const orderInitTime = getVehicleOrderInitTime(
+                              yardOrderInitTimeByVehicleKey,
+                              v.license_plate,
+                              v.vehicle_name,
+                            );
+
+                            return (
+                              <li key={v.device_id} className="justify-between flex items-center gap-2 px-3 py-2 transition-colors rounded-md border shadow-sm cursor-default hover:shadow-md"
+                                style={{ background: 'var(--dd-bg-surface)', borderColor: 'var(--dd-border)' }}
+                                onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--dd-emerald)'}
+                                onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--dd-border)'}>
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <span className="font-black text-sm truncate">{v.license_plate}{v.vehicle_name ? ` | ${v.vehicle_name}` : ''}</span>
                                 </div>
-                                <span className="font-bold text-sm truncate" style={{ color: 'var(--dd-text-primary)' }}>{v.license_plate}{v.vehicle_name ? ` | ${v.vehicle_name}` : ''}</span>
-                              </div>
-                              <div className="text-sm me-2 shrink-0">
-                                <span className="font-semibold" style={{ color: 'var(--dd-text-muted)' }}>
-                                  {v.distance >= 1000 ? `${(v.distance / 1000).toFixed(1)} km` : `${v.distance} m`}
-                                </span>
-                              </div>
-                            </li>
-                          ))}
+                                <div className="text-xs font-semibold flex flex-col items-end">
+                                  <span style={{ color: 'var(--dd-text-muted)' }}>{v.distance >= 1000 ? `${(v.distance / 1000).toFixed(1)} km` : `${v.distance} m`}</span>
+                                  {showYardEntryTime && (
+                                    <div className="flex flex-row items-end gap-3">
+                                      <span>{orderInitTime ? vehicleTimeFormatter.format(new Date(orderInitTime)) : '--:--:--'}</span>
+                                      <span>{orderInitTime ? vehicleDateFormatter.format(new Date(orderInitTime)) : '--/--/----'}</span>
+                                    </div>
+                                  )}
+                                </div>
+                              </li>
+                            );
+                          })}
                         </ul>
                       )}
                     </div>
@@ -1191,7 +1353,7 @@ export default function AdminDashboard() {
             return (
               <div className="flex flex-col flex-1 min-h-0">
                 {/* Header */}
-                <div className="bg-slate-300 px-4 py-3 shrink-0 border-b-1">
+                <div className="bg-slate-300 px-4 py-3 shrink-0 border-b">
                   <div className="flex items-center justify-between">
                     <DlgTitle className="flex items-center gap-2 text-base font-bold uppercase">
                       {t('tripDetail')} — {vehicle.vehicle_license_plate}{vehicle.vehicle_name ? ` | ${vehicle.vehicle_name}` : ''}
@@ -1335,7 +1497,7 @@ export default function AdminDashboard() {
 
                 {/* Summary Footer */}
                 {tripOrders.length > 0 && (
-                  <div className="shrink-0 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-t-1">
+                  <div className="shrink-0 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-t">
                     <span className="text-base font-bold uppercase">
                       {t('tripSummary')}
                     </span>
@@ -1387,7 +1549,7 @@ export default function AdminDashboard() {
         <DialogContent className="max-w-7xl sm:max-w-7xl w-[95vw] h-[85vh] p-0 gap-0 overflow-hidden" showCloseButton={false}>
           <div className="flex h-full overflow-hidden">
             {/* Left: Vehicle Search */}
-            <div className="w-[300px] shrink-0 flex flex-col border-r" style={{ borderColor: 'var(--dd-border)' }}>
+            <div className="w-75 shrink-0 flex flex-col border-r" style={{ borderColor: 'var(--dd-border)' }}>
               <DialogHeader className="p-4 shrink-0" style={{ borderBottom: '1px solid var(--dd-border)' }}>
                 <DlgTitle className="text-base font-bold uppercase flex items-center gap-2">
                   <MapIcon className="w-4 h-4 text-sky-500" />
@@ -1431,15 +1593,21 @@ export default function AdminDashboard() {
                 ))}
               </div>
               <div className="flex-1 overflow-y-auto overscroll-contain p-2">
-                {vtrackingVehicles
-                  .filter(v => {
-                    if (mapStatusFilter !== 'all' && v.status !== mapStatusFilter) return false;
-                    if (!mapSearch) return true;
-                    const q = mapSearch.toLowerCase();
-                    return v.license_plate?.toLowerCase().includes(q) || v.vehicle_name?.toLowerCase().includes(q);
-                  })
+                {mapVehicles
                   .map((v) => {
                     const isActive = focusVehicleId === v.device_id;
+                    const displayStatus = getVtrackingDisplayStatus(v.status, v.timestamp);
+                    const statusColor = displayStatus === 'run'
+                      ? '#10b981'
+                      : displayStatus === 'park'
+                        ? '#f59e0b'
+                        : '#94a3b8';
+                    const statusLabel = displayStatus === 'run'
+                      ? t('running')
+                      : displayStatus === 'park'
+                        ? t('stopped')
+                        : t('disconnected');
+
                     return (
                       <Button
                         key={v.device_id}
@@ -1453,14 +1621,7 @@ export default function AdminDashboard() {
                         <div className="flex items-center gap-2.5">
                           <div className="h-3 w-3 rounded-full shrink-0 border-2 border-white shadow-sm"
                             style={{
-                              background: (() => {
-                                const isStale = v.timestamp && (Date.now() - v.timestamp > 10 * 60 * 1000);
-                                if (isStale) return '#94a3b8';
-                                const s = (v.status || '').toLowerCase();
-                                if (['run', 'running'].includes(s)) return '#10b981';
-                                if (['stop', 'park', 'idle', 'parking', 'stopped'].includes(s)) return '#f59e0b';
-                                return '#94a3b8';
-                              })()
+                              background: statusColor,
                             }}
                           />
                           <span className="text-sm font-bold" style={{ color: 'var(--dd-text-primary)' }}>
@@ -1468,14 +1629,7 @@ export default function AdminDashboard() {
                           </span>
                         </div>
                         <div className="mt-1.5 pl-5 flex items-center justify-between text-xs" style={{ color: 'var(--dd-text-muted)' }}>
-                          <span>{(() => {
-                            const isStale = v.timestamp && (Date.now() - v.timestamp > 10 * 60 * 1000);
-                            if (isStale) return t('disconnected');
-                            const s = (v.status || '').toLowerCase();
-                            if (['run', 'running'].includes(s)) return t('running');
-                            if (['stop', 'park', 'idle', 'parking', 'stopped'].includes(s)) return t('stopped');
-                            return t('disconnected');
-                          })()}</span>
+                          <span>{statusLabel}</span>
                           <span className="font-semibold tabular-nums">{v.speed} km/h</span>
                         </div>
                         <div className="mt-0.5 pl-5 text-xs text-left" style={{ color: 'var(--dd-text-muted)' }}>

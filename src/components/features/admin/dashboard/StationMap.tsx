@@ -1,5 +1,5 @@
 import "leaflet/dist/leaflet.css";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from "react-leaflet";
 import L from "leaflet";
 import type { NearbyVehicle } from "@/hooks/useNearbyVehicles";
@@ -188,6 +188,19 @@ const StationMap = ({ stationLongitude, stationLatitude, radius, vehicles, focus
     return () => setMounted(false);
   }, []);
 
+  // Vehicle status counts (using normalized status with speed + timestamp)
+  const { run: runCount, park: parkCount, offline: offlineCount } = useMemo(
+    () => vehicles.reduce(
+      (counts, vehicle) => {
+        const status = normalizeStatus(vehicle.status, vehicle.timestamp);
+        counts[status] += 1;
+        return counts;
+      },
+      { run: 0, park: 0, offline: 0 },
+    ),
+    [vehicles],
+  );
+
   if (!mounted || stationLongitude == null || stationLatitude == null) {
     return (
       <div className="w-full h-full flex items-center justify-center rounded-lg" style={{ background: 'rgba(10, 14, 30, 0.8)', border: '1px solid rgba(56, 189, 248, 0.08)' }}>
@@ -198,11 +211,6 @@ const StationMap = ({ stationLongitude, stationLatitude, radius, vehicles, focus
 
   const stationLng = stationLongitude;
   const stationLat = stationLatitude;
-
-  // Vehicle status counts (using normalized status with speed + timestamp)
-  const runCount = vehicles.filter(v => normalizeStatus(v.status, v.timestamp) === 'run').length;
-  const parkCount = vehicles.filter(v => normalizeStatus(v.status, v.timestamp) === 'park').length;
-  const offlineCount = vehicles.filter(v => normalizeStatus(v.status, v.timestamp) === 'offline').length;
 
   return (
     <div className="w-full h-full relative z-0 rounded-lg overflow-hidden" style={{ border: '1px solid rgba(56, 189, 248, 0.1)' }}>
@@ -262,6 +270,10 @@ const StationMap = ({ stationLongitude, stationLatitude, radius, vehicles, focus
         {vehicles.map((v) => {
           const nStatus = normalizeStatus(v.status, v.timestamp);
           const icon = createVehicleIcon(nStatus, v.direction, v.speed, zoom, v.vehicle_name, v.license_plate);
+          const statusClass = nStatus === "run" ? "bg-emerald-50 text-emerald-700 border border-emerald-100" :
+            nStatus === "park" ? "bg-amber-50 text-amber-700 border border-amber-100" :
+              "bg-slate-50 text-slate-500 border border-slate-100";
+          const statusLabel = nStatus === "run" ? "Đang chạy" : nStatus === "park" ? "Đang dừng" : "Mất kết nối";
 
           return (
             <Marker key={v.device_id} position={[v.latitude, v.longitude]} icon={icon}
@@ -274,11 +286,8 @@ const StationMap = ({ stationLongitude, stationLatitude, radius, vehicles, focus
                       <strong className="text-base font-bold text-slate-800 uppercase">{v.license_plate}</strong>
                       <span className="text-xs text-slate-500 truncate max-w-50">{v.vehicle_name}</span>
                     </div>
-                    <span className={`ml-auto shrink-0 font-semibold px-2 py-0.5 rounded-full text-[11px] ${normalizeStatus(v.status, v.timestamp) === "run" ? "bg-emerald-50 text-emerald-700 border border-emerald-100" :
-                      normalizeStatus(v.status, v.timestamp) === "park" ? "bg-amber-50 text-amber-700 border border-amber-100" :
-                        "bg-slate-50 text-slate-500 border border-slate-100"
-                      }`}>
-                      {normalizeStatus(v.status, v.timestamp) === "run" ? "Đang chạy" : normalizeStatus(v.status, v.timestamp) === "park" ? "Đang dừng" : "Mất kết nối"}
+                    <span className={`ml-auto shrink-0 font-semibold px-2 py-0.5 rounded-full text-[11px] ${statusClass}`}>
+                      {statusLabel}
                     </span>
                   </div>
 

@@ -9,6 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { ArrowRight, ChevronUp, ChevronDown, GripVertical, X, Clock } from 'lucide-react';
@@ -49,6 +50,8 @@ interface SortableVehicleItemProps {
   t: (key: string) => string;
 }
 
+const EMPTY_STATIONS: Station[] = [];
+
 function SortableVehicleItemBase({
   order,
   stationId,
@@ -63,7 +66,7 @@ function SortableVehicleItemBase({
   isManualMode = false,
   isSelected = false,
   onToggleSelect,
-  manualStationOptions = [],
+  manualStationOptions = EMPTY_STATIONS,
   manualStationValue,
   manualTargetStationName,
   onManualStationChange,
@@ -81,6 +84,9 @@ function SortableVehicleItemBase({
   const displayedStationName = isManualMode && isSelected
     ? (manualTargetStationName || stationName)
     : stationName;
+  const vehicleLabel = order.vehicles?.vehicle_license_plate
+    ? `${order.vehicles.vehicle_license_plate}${order.vehicles.vehicle_name ? ` | ${order.vehicles.vehicle_name}` : ''}`
+    : `ĐƠN: ${order.order_id}`;
 
   const {
     attributes,
@@ -170,13 +176,20 @@ function SortableVehicleItemBase({
             </div>
           )}
 
-          <div className="min-w-0 flex-1 flex items-center gap-6">
-            <div className="truncate text-base font-black" style={{ color: 'var(--dd-text-primary)' }}>
-              {order.vehicles?.vehicle_license_plate ? `${order.vehicles.vehicle_license_plate}${order.vehicles.vehicle_name ? ` | ${order.vehicles.vehicle_name}` : ''}` : `ĐƠN: ${order.order_id}`}
-            </div>
+          <div className="min-w-0 flex-1 flex items-center gap-10">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="truncate text-base font-black" style={{ color: 'var(--dd-text-primary)' }}>
+                  {order.vehicles?.vehicle_license_plate ? `${order.vehicles.vehicle_license_plate}${order.vehicles.vehicle_name ? ` | ${order.vehicles.vehicle_name}` : ''}` : `ĐƠN: ${order.order_id}`}
+                </div>
+              </TooltipTrigger>
+              <TooltipContent>
+                <span>{vehicleLabel}</span>
+              </TooltipContent>
+            </Tooltip>
             {order.order_init_datetime && (
-              <div className="flex items-center gap-1 text-sm font-extrabold mx-4" style={{ color: 'var(--dd-text-muted)' }}>
-                <Clock size={14} />
+              <div className="flex items-center gap-1 text-sm font-bold mx-5" style={{ color: 'var(--dd-text-muted)' }}>
+                {/* <Clock size={14} /> */}
                 <span>
                   <span className="opacity-85">{t('lastUpdatedAt')}</span>
                   <span style={{ color: 'var(--dd-text-primary)' }}>
