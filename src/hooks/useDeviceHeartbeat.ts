@@ -13,6 +13,18 @@ interface DeviceHeartbeatState {
 
 let globalStationStatusMap: Record<string, DeviceStationStatusType> = {};
 
+type DeviceConnectionStatus = "connected" | "disconnected";
+
+const CONNECTED_VALUES = new Set(["connected", "online", "up", "true", "1"]);
+const DISCONNECTED_VALUES = new Set(["disconnected", "offline", "down", "false", "0"]);
+
+function normalizeConnectionStatus(value: unknown): DeviceConnectionStatus | null {
+  const status = String(value ?? "").trim().toLowerCase();
+  if (CONNECTED_VALUES.has(status)) return "connected";
+  if (DISCONNECTED_VALUES.has(status)) return "disconnected";
+  return null;
+}
+
 export function useDeviceHeartbeat(): DeviceHeartbeatState {
   const managerRef = useRef<SocketManager | null>(null);
   const [isSocketConnected, setIsSocketConnected] = useState(false);
@@ -36,17 +48,6 @@ export function useDeviceHeartbeat(): DeviceHeartbeatState {
       setIsSocketConnected(connected);
     });
 
-    manager.connect();
-
-    return () => {
-      unsubscribeConnection();
-    };
-  }, []);
-
-  useEffect(() => {
-    const manager = managerRef.current;
-    if (!manager || !isSocketConnected) return;
-
     const unsubscribes: Array<() => void> = [];
 
     const scheduleUpdate = () => {
@@ -63,8 +64,7 @@ export function useDeviceHeartbeat(): DeviceHeartbeatState {
               const existing = nextMap[stationId] || {
                 stationId,
                 deviceStatus: "disconnected",
-                cameraStatus: "disconnected",
-                ledStatus: "disconnected",
+                lastPayload: null,
               };
 
               nextMap[stationId] = { ...existing, ...flushed[stationId] };
@@ -87,12 +87,26 @@ export function useDeviceHeartbeat(): DeviceHeartbeatState {
       }
 
       const stationId = String(payload!.station_id);
-      const deviceStatus = payload!.device_status === "connected" ? "connected" : "disconnected";
+      const deviceStatus = normalizeConnectionStatus(payload!.device_status);
+      if (!deviceStatus) return;
+
+      const updateType = payload!.update_type;
+      const nextStatus: Partial<DeviceStationStatusType> = {
+        deviceStatus,
+        lastPayload: payload!,
+      };
+
+      if (updateType === "camera_checks") {
+        nextStatus.cameraStatus = deviceStatus;
+      }
+
+      if (updateType === "led_checks" || updateType === "led" || updateType === "led_status") {
+        nextStatus.ledStatus = deviceStatus;
+      }
 
       bufferRef.current[stationId] = {
         ...(bufferRef.current[stationId] || {}),
-        deviceStatus: deviceStatus,
-        lastPayload: payload!,
+        ...nextStatus,
       };
 
       scheduleUpdate();
@@ -132,8 +146,8 @@ export function useDeviceHeartbeat(): DeviceHeartbeatState {
           const stationId = String(item.station_id || item.id || "");
           if (!stationId) return;
 
-          const statusStr = String(item.status || item.device_status || "").trim().toLowerCase();
-          const status = statusStr === "connected" ? "connected" : "disconnected";
+          const status = normalizeConnectionStatus(item.status ?? item.device_status);
+          if (!status) return;
 
           bufferRef.current[stationId] = {
             ...(bufferRef.current[stationId] || {}),
@@ -166,17 +180,20 @@ export function useDeviceHeartbeat(): DeviceHeartbeatState {
       })
     );
 
+    manager.connect();
+
     return () => {
+      unsubscribeConnection();
       unsubscribes.forEach((unsub) => unsub());
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
         timeoutRef.current = null;
       }
     };
-  }, [isSocketConnected]);
+  }, []);
 
   const isLedConnected = useMemo(() => {
-    return stationStatusMap["4"]?.deviceStatus === "connected";
+    return stationStatusMap["4"]?.ledStatus === "connected";
   }, [stationStatusMap]);
 
   return useMemo(

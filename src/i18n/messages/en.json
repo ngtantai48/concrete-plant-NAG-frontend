@@ -476,6 +476,7 @@
     "undoScheduleFailed": "Unable to undo schedule",
     "cameraConnected": "Camera connected",
     "cameraDisconnected": "Camera disconnected",
+    "cameraChecking": "Checking camera",
     "confirmStopStationTitle": "Confirm station pause",
     "confirmStopStationDescription": "Are you sure you want to pause <strong>{stationName}</strong>? This action will temporarily stop the station from receiving concrete trucks.",
     "forgotShiftSlotsBannerTitle": "Forgot to confirm shift slots?",

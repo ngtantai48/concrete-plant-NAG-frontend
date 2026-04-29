@@ -210,8 +210,8 @@ export default function AdminDashboard() {
     45000,
   );
 
-  const { isConnected: socketConnected, /* lastSignal, */ lastSignalTime } = useRealtimeUpdates(fetchAll);
   const { stationStatusMap, isLedConnected } = useDeviceHeartbeat();
+  const { isConnected: socketConnected, /* lastSignal, */ lastSignalTime } = useRealtimeUpdates(fetchAll);
 
   const vehicleTimeFormatter = useMemo(
     () => new Intl.DateTimeFormat(locale === 'vi' ? 'vi-VN' : 'en-US', {
