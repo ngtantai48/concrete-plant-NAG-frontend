@@ -23,7 +23,7 @@ interface SocketConfig {
 
 const DEFAULT_CONFIG: SocketConfig = {
   transports: ['websocket'],
-  autoConnect: true,
+  autoConnect: false,
   reconnection: true,
   reconnectionDelay: 1000,
   reconnectionDelayMax: 5000,
@@ -94,23 +94,16 @@ export class SocketManager {
    * Kết nối tới server (lazy connect)
    */
   connect(): Socket {
-    if (this.socket?.connected) {
-      return this.socket;
+    const socket = this.ensureSocket();
+
+    if (socket.connected) {
+      return socket;
     }
 
-    this.socket = io(this.connectionUrl, {
-      ...this.config,
-      auth: (cb: (data: Record<string, string>) => void) => {
-        const token = this.authProvider?.();
-        cb(token ? { token: `Bearer ${token}` } : {});
-      },
-    });
-
-    this.setupConnectionEvents();
     this.setupVisibilityHandler();
-    this.socket.connect();
+    socket.connect();
 
-    return this.socket;
+    return socket;
   }
 
   /**
@@ -135,10 +128,7 @@ export class SocketManager {
     eventName: EventName,
     handler: Function
   ): () => void {
-    if (!this.socket) {
-      console.warn(`[SocketManager] Cannot register listener "${String(eventName)}" - socket not connected`);
-      return () => { };
-    }
+    const socket = this.ensureSocket();
 
     const key = String(eventName);
     if (!this.eventListeners.has(key)) {
@@ -154,12 +144,12 @@ export class SocketManager {
       }
     };
 
-    this.socket.on(key, eventHandler);
+    socket.on(key, eventHandler);
 
     // Return unsubscribe function
     return () => {
       this.eventListeners.get(key)?.delete(handler);
-      this.socket?.off(key, eventHandler);
+      socket.off(key, eventHandler);
     };
   }
 
@@ -168,15 +158,12 @@ export class SocketManager {
    * Trả về unsubscribe function
    */
   onAny(handler: (eventName: string, ...args: unknown[]) => void): () => void {
-    if (!this.socket) {
-      console.warn('[SocketManager] Cannot register onAny listener - socket not connected');
-      return () => { };
-    }
+    const socket = this.ensureSocket();
 
-    this.socket.onAny(handler);
+    socket.onAny(handler);
 
     return () => {
-      this.socket?.offAny(handler);
+      socket.offAny(handler);
     };
   }
 
@@ -217,7 +204,14 @@ export class SocketManager {
    * Force reconnect (chỉ dùng khi cần thiết, ví dụ: token mới)
    */
   reconnect(): void {
-    this.disconnect();
+    if (!this.socket) {
+      this.connect();
+      return;
+    }
+
+    this.socket.disconnect();
+    this.isConnectedState = false;
+    this.notifyConnectionListeners(false);
     // Delay nhỏ để đảm bảo cleanup hoàn tất
     setTimeout(() => this.connect(), 100);
   }
@@ -225,6 +219,26 @@ export class SocketManager {
   // ============================================================
   // Private Methods
   // ============================================================
+
+  private ensureSocket(): Socket {
+    if (this.socket) {
+      return this.socket;
+    }
+
+    this.socket = io(this.connectionUrl, {
+      ...this.config,
+      autoConnect: false,
+      auth: (cb: (data: Record<string, string>) => void) => {
+        const token = this.authProvider?.();
+        cb(token ? { token: `Bearer ${token}` } : {});
+      },
+    });
+
+    this.setupConnectionEvents();
+    this.setupVisibilityHandler();
+
+    return this.socket;
+  }
 
   private setupConnectionEvents(): void {
     if (!this.socket) return;

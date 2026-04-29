@@ -1,13 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import type { DeviceStationStatus } from "@/hooks/useDeviceHeartbeat";
 import stationApi from "@/services/station.service";
@@ -25,10 +18,12 @@ interface StationStatusPanelProps {
   onStationUpdated?: () => void;
 }
 
+const EMPTY_DEVICE_STATION_STATUS_MAP: Record<string, DeviceStationStatus> = {};
+
 const StationStatusPanel = ({
   stations,
   orders,
-  deviceStationStatusMap = {},
+  deviceStationStatusMap = EMPTY_DEVICE_STATION_STATUS_MAP,
   onStationUpdated,
 }: StationStatusPanelProps) => {
   const t = useTranslations("DashboardPage");
@@ -50,7 +45,7 @@ const StationStatusPanel = ({
   const [submitting, setSubmitting] = useState(false);
   const [stationToPause, setStationToPause] = useState<Station | null>(null);
   const [viewingCameraStation, setViewingCameraStation] = useState<Station | null>(null);
-  const [cameraKey, setCameraKey] = useState(Date.now());
+  const [cameraKey, setCameraKey] = useState(() => Date.now());
 
   const vehiclesByStation = useMemo(() => {
     const map: Record<number, { license_plate: string; status: string; order_number: number }[]> = {};
@@ -67,9 +62,8 @@ const StationStatusPanel = ({
 
         map[order.stations.station_id].push({
           license_plate: order.vehicles?.vehicle_license_plate
-            ? `${order.vehicles.vehicle_license_plate}${
-                order.vehicles.vehicle_name ? ` | ${order.vehicles.vehicle_name}` : ""
-              }`
+            ? `${order.vehicles.vehicle_license_plate}${order.vehicles.vehicle_name ? ` | ${order.vehicles.vehicle_name}` : ""
+            }`
             : `#${order.order_id}`,
           status: order.order_status,
           order_number: order.order_number,
@@ -95,13 +89,8 @@ const StationStatusPanel = ({
         await stationApi.reportOperating(station.station_id);
       }
 
-      toast.success(
-        `${station.station_name}: ${
-          nextStatus === "operating" ? t("stationRestored") : t("stationPaused")
-        }`,
-        {
-          position: "top-right",
-        },
+      toast.success(`${station.station_name}: ${nextStatus === "operating" ? t("stationRestored") : t("stationPaused")}`,
+        { position: "top-right" },
       );
       onStationUpdated?.();
     } catch {
@@ -121,9 +110,7 @@ const StationStatusPanel = ({
         station_incident_description: incidentDesc.trim(),
       });
 
-      toast.success(`${incidentStation.station_name}: ${t("incidentReportSuccess")}`, {
-        position: "top-right",
-      });
+      toast.success(`${incidentStation.station_name}: ${t("incidentReportSuccess")}`, { position: "top-right" });
       setIncidentStation(null);
       setIncidentDesc("");
       onStationUpdated?.();
@@ -203,6 +190,18 @@ const StationStatusPanel = ({
           const activeVehicle = stationVehicles[0] || null;
           const remainingVehicles = Math.max(stationVehicles.length - 1, 0);
           const deviceStatus = deviceStationStatusMap[String(station.station_id)]?.cameraStatus;
+          const cameraStatusClass =
+            deviceStatus === "connected"
+              ? "border-emerald-200 bg-emerald-50/50 text-emerald-600"
+              : deviceStatus === "disconnected"
+                ? "animate-pulse border-red-200 bg-red-50/50 text-red-600"
+                : "border-slate-200 bg-slate-50/80 text-slate-500";
+          const cameraStatusLabel =
+            deviceStatus === "connected"
+              ? t("cameraConnected")
+              : deviceStatus === "disconnected"
+                ? t("cameraDisconnected")
+                : t("cameraChecking");
 
           return (
             <div
@@ -219,29 +218,24 @@ const StationStatusPanel = ({
                   <Badge
                     variant="outline"
                     onClick={() => handleOpenCamera(station)}
-                    className={`h-7 shrink-0 cursor-pointer gap-1.5 px-2 py-0 text-sm font-normal shadow-none transition-all hover:bg-slate-100 ${
-                      deviceStatus === "connected"
-                        ? "border-emerald-200 bg-emerald-50/50 text-emerald-600"
-                        : "animate-pulse border-red-200 bg-red-50/50 text-red-600"
-                    }`}
+                    className={`h-7 shrink-0 cursor-pointer gap-1.5 px-2 py-0 text-sm font-normal shadow-none transition-all hover:bg-slate-100 ${cameraStatusClass}`}
                   >
                     <Video className="h-3.5 w-3.5" />
-                    {deviceStatus === "connected" ? t("cameraConnected") : t("cameraDisconnected")}
+                    {cameraStatusLabel}
                   </Badge>
 
                   <Badge
                     variant="secondary"
-                    className={`ml-auto h-7 shrink-0 gap-1.5 px-2.5 py-0 text-sm font-normal shadow-none ${
-                      station.station_status === "operating"
-                        ? "border-transparent bg-emerald-100 text-emerald-700"
-                        : station.station_status === "stopped"
-                          ? "border-transparent bg-amber-100 text-amber-700"
-                          : station.station_status === "incident"
-                            ? "border-transparent bg-red-100 text-red-700"
-                            : station.station_status === "collecting"
-                              ? "border-transparent bg-sky-100 text-sky-700"
-                              : "border-transparent bg-slate-100 text-slate-700"
-                    }`}
+                    className={`ml-auto h-7 shrink-0 gap-1.5 px-2.5 py-0 text-sm font-normal shadow-none ${station.station_status === "operating"
+                      ? "border-transparent bg-emerald-100 text-emerald-700"
+                      : station.station_status === "stopped"
+                        ? "border-transparent bg-amber-100 text-amber-700"
+                        : station.station_status === "incident"
+                          ? "border-transparent bg-red-100 text-red-700"
+                          : station.station_status === "collecting"
+                            ? "border-transparent bg-sky-100 text-sky-700"
+                            : "border-transparent bg-slate-100 text-slate-700"
+                      }`}
                   >
                     <span className="h-1.5 w-1.5 rounded-full" style={{ background: theme.dot }} />
                     {theme.label}
@@ -253,7 +247,7 @@ const StationStatusPanel = ({
                     className="rounded-md px-3 py-1 shadow-sm"
                     style={{ border: "1px solid var(--dd-border)" }}
                   >
-                    <div className="flex min-h-[28px] items-center justify-between">
+                    <div className="flex min-h-7 items-center justify-between">
                       <span className="text-xs font-bold uppercase">{t("vehicleUnloading")}</span>
                       {activeVehicle ? (
                         <div className="flex items-center">
@@ -386,15 +380,14 @@ const StationStatusPanel = ({
           <div className="relative flex aspect-video w-full items-center justify-center overflow-hidden rounded-md border border-slate-200 bg-black shadow-inner">
             {viewingCameraStation?.station_ip_address ? (
               <img
-                src={`/api/camera/proxy?ip=${viewingCameraStation.station_ip_address}&port=${
-                  viewingCameraStation.station_id === 1
-                    ? "81"
-                    : viewingCameraStation.station_id === 2
-                      ? "82"
-                      : viewingCameraStation.station_id === 3
-                        ? "80"
-                        : "80"
-                }&t=${cameraKey}`}
+                src={`/api/camera/proxy?ip=${viewingCameraStation.station_ip_address}&port=${viewingCameraStation.station_id === 1
+                  ? "81"
+                  : viewingCameraStation.station_id === 2
+                    ? "82"
+                    : viewingCameraStation.station_id === 3
+                      ? "80"
+                      : "80"
+                  }&t=${cameraKey}`}
                 className="h-full w-full bg-black object-contain"
                 alt={`Camera ${viewingCameraStation.station_name}`}
               />

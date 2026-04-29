@@ -498,6 +498,7 @@
     "undoScheduleFailed": "Không thể hủy chốt lịch",
     "cameraConnected": "Camera kết nối",
     "cameraDisconnected": "Camera mất kết nối",
+    "cameraChecking": "Đang kiểm tra",
     "confirmStopStationTitle": "Xác nhận dừng trạm",
     "confirmStopStationDescription": "Bạn có chắc chắn muốn báo <strong>{stationName}</strong> dừng hoạt động không? Hành động này sẽ khiến trạm tạm thời không nhận thêm xe đổ bê tông.",
     "forgotShiftSlotsBannerTitle": "Có thể bạn đã quên chốt lốt",

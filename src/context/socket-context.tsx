@@ -257,10 +257,11 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     if (prevToken && prevToken !== tokenState) {
       managerNoti.reconnect();
-      managerUpdates.reconnect();
+      if (managerUpdates.getSocket()) {
+        managerUpdates.reconnect();
+      }
     } else {
       managerNoti.connect();
-      managerUpdates.connect();
     }
 
     return () => {
