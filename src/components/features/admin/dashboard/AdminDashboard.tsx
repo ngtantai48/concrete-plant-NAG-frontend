@@ -1137,10 +1137,9 @@ export default function AdminDashboard() {
                         const hasTrips = trips.length > 0;
                         const hasRunning = trips.some(o => o.order_status === 'running');
                         const hasTransporting = trips.some(o => o.order_status === 'transporting');
-                        const hasActive = hasRunning || hasTransporting;
-                        const accentColor = hasActive ? '#0ea5e9' : (hasTrips ? '#10b981' : '#94a3b8');
-                        const hoverBorder = hasActive ? 'rgba(14, 165, 233, 0.4)' : (hasTrips ? 'rgba(16, 185, 129, 0.4)' : 'rgba(148, 163, 184, 0.3)');
-                        const chipClass = hasActive ? 'dd-chip-sky' : 'dd-chip-emerald';
+                        const accentColor = hasRunning ? '#0ea5e9' : hasTransporting ? '#f59e0b' : (hasTrips ? '#10b981' : '#94a3b8');
+                        const hoverBorder = hasRunning ? 'rgba(14, 165, 233, 0.4)' : hasTransporting ? 'rgba(245, 158, 11, 0.4)' : (hasTrips ? 'rgba(16, 185, 129, 0.4)' : 'rgba(148, 163, 184, 0.3)');
+                        const chipClass = hasRunning ? 'dd-chip-sky' : hasTransporting ? 'dd-chip-amber' : 'dd-chip-emerald';
                         const stats = vehicleStatsMap.get(v.vehicle_id);
                         const stopDurationStr = stats ? formatDuration(stats.totalStopMins, stats.stopHours, stats.stopMinsRemain, tCommon('hour'), tCommon('minute')) : '';
                         const mixTotalDurationStr = stats ? formatDuration(stats.totalMixMins, stats.mixTotalHours, stats.mixTotalMinsRemain, tCommon('hour'), tCommon('minute')) : '';
