@@ -61,6 +61,10 @@
     "attendance": "Chấm công",
     "shiftSlots": "Quản lý lốt ca",
     "systemSettings": "Cấu hình hệ thống",
+    "reports": "Báo cáo phân tích",
+    "reportProduction": "Sản lượng",
+    "reportFuel": "Tiêu hao nhiên liệu",
+    "reportMaintenance": "Dự báo bảo trì",
     "role": {
       "admin": "Quản trị viên",
       "manager": "Quản lý",

@@ -135,6 +135,11 @@ export const navigationConfig: NavItem[] = [
         icon: <Gauge size={18} />,
       },
       {
+        key: SIDEBAR.REPORT_MAINTENANCE,
+        label: "reportMaintenance",
+        icon: <Wrench size={18} />,
+      },
+      {
         key: SIDEBAR.REPORT_FUEL,
         label: "reportFuel",
         icon: <ArrowRightLeft size={18} />,
