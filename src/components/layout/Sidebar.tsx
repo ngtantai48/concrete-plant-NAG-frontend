@@ -105,7 +105,7 @@ export default function Sidebar() {
   const baseMenuItems = useMemo(
     () => [
       { key: ADMIN.DASHBOARD, label: t("dashboard"), icon: <Gauge />, roles: ["admin"] },
-      { key: ADMIN.USER_MANAGE, label: t("userManagement"), icon: <UsersRound />, roles: ["admin"] },
+      // { key: ADMIN.USER_MANAGE, label: t("userManagement"), icon: <UsersRound />, roles: ["admin"] },
       // { key: ADMIN.DRIVERS, label: t("drivers"), icon: <Truck />, roles: ["admin"] },
       // { key: ADMIN.SHIFT_SLOTS, label: t("shiftSlots"), icon: <ClipboardList />, roles: ["admin"] },
       { key: ADMIN.VEHICLES, label: t("vehicles"), icon: <Car />, roles: ["admin"] },
