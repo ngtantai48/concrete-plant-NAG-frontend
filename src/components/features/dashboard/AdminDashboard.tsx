@@ -1030,7 +1030,7 @@ export default function AdminDashboard() {
                               ) : null}
                               {t('syncShiftApplyToEndAction', { count: selectedSyncOrderIds.length })}
                             </Button>
-                            {hasActionAccess(SIDEBAR.DASHBOARD, PERMISSIONS.DASHBOARD.SYNC_SLOTS) && (
+                             {hasActionAccess(SIDEBAR.DASHBOARD, PERMISSIONS.DASHBOARD.SYNC_SLOTS) && (
                               <Button
                                 variant="primary"
                                 onClick={handleSyncShift}

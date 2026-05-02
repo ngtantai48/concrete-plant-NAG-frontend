@@ -60,6 +60,10 @@
     "attendance": "Attendance",
     "shiftSlots": "Shift Slots",
     "systemSettings": "System Settings",
+    "reports": "Reports & Analytics",
+    "reportProduction": "Production Report",
+    "reportFuel": "Fuel Consumption",
+    "reportMaintenance": "Maintenance Forecast",
     "role": {
       "admin": "Administrator",
       "manager": "Manager",
