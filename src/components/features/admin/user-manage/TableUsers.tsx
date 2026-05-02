@@ -144,7 +144,6 @@ export default function TableUsers() {
       dispatcher: tRoles("dispatcher"),
       driver: tRoles("driver"),
       user: tRoles("user"),
-      customer: tRoles("customer"),
     };
     return roleLabels[role] || role || "-";
   };

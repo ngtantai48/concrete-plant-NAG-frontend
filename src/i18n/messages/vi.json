@@ -40,7 +40,6 @@
     "uploadImage": "Nhập liệu hình ảnh",
     "userManagement": "Quản lý người dùng",
     "staffManagement": "Quản lý nhân viên",
-    "customerManagement": "Quản lý khách hàng",
     "tools": "Công cụ",
     "AdvancedManagement": "Nâng cao",
     "settings": "Cài đặt",
@@ -65,8 +64,7 @@
       "manager": "Quản lý",
       "dispatcher": "Điều phối xe",
       "driver": "Tài xế",
-      "user": "Người dùng",
-      "customer": "Khách hàng"
+      "user": "Người dùng"
     }
   },
   "Header": {
