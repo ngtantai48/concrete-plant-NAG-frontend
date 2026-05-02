@@ -40,7 +40,6 @@
     "uploadImage": "Image management",
     "userManagement": "User management",
     "staffManagement": "Staff management",
-    "customerManagement": "Customer management",
     "tools": "Tools",
     "AdvancedManagement": "Advanced management",
     "settings": "Settings",
@@ -64,8 +63,7 @@
       "manager": "Manager",
       "dispatcher": "Dispatcher",
       "driver": "Driver",
-      "user": "User",
-      "customer": "Customer"
+      "user": "User"
     }
   },
   "Header": {

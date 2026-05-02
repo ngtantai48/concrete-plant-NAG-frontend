@@ -35,7 +35,6 @@ const UserProfile = ({ collapsed, userName, userRole, isLoading }: {
     dispatcher: t("role.dispatcher"),
     driver: t("role.driver"),
     user: t("role.user"),
-    customer: t("role.customer"),
   };
 
   return (

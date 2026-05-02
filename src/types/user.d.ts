@@ -1,4 +1,4 @@
-export type UserRole = "admin" | "manager" | "dispatcher" | "driver" | "user" | "customer";
+export type UserRole = "admin" | "manager" | "dispatcher" | "driver" | "user";
 
 export interface BaseUser {
     user_full_name: string;
