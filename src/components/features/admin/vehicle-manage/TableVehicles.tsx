@@ -13,6 +13,7 @@ import {
 import { SelectContent, SelectItem, SelectTrigger, SelectValue, Select as ShadcnSelect, } from "@/components/ui/select";
 import { useAppDispatch, useAppSelector } from "@/hooks/use-app-selector";
 import { useNavigationStore } from "@/hooks/use-navigation-store";
+import { usePermissions } from "@/hooks/use-permissions";
 // import { useRfidScanner } from "@/hooks/use-rfid-scanner";
 import driverApi from "@/services/driver.service";
 import mediaApi from "@/services/media.service";
@@ -69,6 +70,7 @@ export default function TableVehicles() {
   const tCommon = useTranslations("Common");
   const { setDirty } = useNavigationStore();
 
+  const { hasActionAccess } = usePermissions();
   const [form] = Form.useForm();
 
   const dispatch = useAppDispatch();
@@ -569,30 +571,34 @@ export default function TableVehicles() {
       fixed: "right" as const,
       render: (_: unknown, record: Vehicle) => (
         <Space size="middle">
-          <Tooltip title={t("editTooltip")}>
-            <Button variant="outline" size="iconSquare" onClick={() => openEditModal(record)}>
-              <PenSquare className="text-blue-600" />
-            </Button>
-          </Tooltip>
-          <Popconfirm
-            title={t("confirmTitle")}
-            description={
-              <span>
-                {t("confirmDelete")} <b>{record.vehicle_license_plate}{record.vehicle_name ? ` | ${record.vehicle_name}` : ''}</b>?
-              </span>
-            }
-            okText={t("okText")}
-            cancelText={t("cancelText")}
-            placement="leftBottom"
-            okButtonProps={{ danger: true }}
-            onConfirm={() => handleDelete(record)}
-          >
-            <Tooltip title={t("deleteTooltip")}>
-              <Button variant="outline" size="iconSquare">
-                <Trash2 className="text-red-500" />
+          {hasActionAccess('/admin/vehicles', 'edit') && (
+            <Tooltip title={t("editTooltip")}>
+              <Button variant="outline" size="iconSquare" onClick={() => openEditModal(record)}>
+                <PenSquare className="text-blue-600" />
               </Button>
             </Tooltip>
-          </Popconfirm>
+          )}
+          {hasActionAccess('/admin/vehicles', 'delete') && (
+            <Popconfirm
+              title={t("confirmTitle")}
+              description={
+                <span>
+                  {t("confirmDelete")} <b>{record.vehicle_license_plate}{record.vehicle_name ? ` | ${record.vehicle_name}` : ''}</b>?
+                </span>
+              }
+              okText={t("okText")}
+              cancelText={t("cancelText")}
+              placement="leftBottom"
+              okButtonProps={{ danger: true }}
+              onConfirm={() => handleDelete(record)}
+            >
+              <Tooltip title={t("deleteTooltip")}>
+                <Button variant="outline" size="iconSquare">
+                  <Trash2 className="text-red-500" />
+                </Button>
+              </Tooltip>
+            </Popconfirm>
+          )}
         </Space>
       ),
     },
@@ -610,12 +616,14 @@ export default function TableVehicles() {
           </div>
 
           <div className="flex gap-3 mt-2 sm:mt-0 flex-wrap">
-            <Tooltip title={t("addTooltip")}>
-              <Button variant="primary" onClick={openAddModal}>
-                <Plus />
-                {t("addVehicle")}
-              </Button>
-            </Tooltip>
+            {hasActionAccess('/admin/vehicles', 'add') && (
+              <Tooltip title={t("addTooltip")}>
+                <Button variant="primary" onClick={openAddModal}>
+                  <Plus />
+                  {t("addVehicle")}
+                </Button>
+              </Tooltip>
+            )}
 
             <Tooltip title={tCommon("refreshData")}>
               <Button

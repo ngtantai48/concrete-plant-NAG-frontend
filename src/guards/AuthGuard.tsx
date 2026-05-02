@@ -1,6 +1,7 @@
 "use client";
 
 import { useAppSelector } from "@/hooks/use-app-selector";
+import { usePermissions } from "@/hooks/use-permissions";
 import { forbidden, usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef } from "react";
 
@@ -14,6 +15,8 @@ export default function AuthGuard({ children, roles }: {
     const attemptedRef = useRef(false);
     const hasToken = useAppSelector((state: any) => state.auth.token);
 
+    const { hasPageAccess } = usePermissions();
+
     useEffect(() => {
         if (loading) return;
         if (!isAuthenticated) {
@@ -24,10 +27,21 @@ export default function AuthGuard({ children, roles }: {
             return;
         }
 
+        // If specific roles are passed (legacy), check them
         if (roles && !roles.includes(user?.role)) {
             forbidden();
+            return;
         }
-    }, [loading, isAuthenticated, roles, user, router, pathname]);
+
+        // Check page permission based on pathname
+        // We only check if the pathname starts with /admin and it's not the root /admin
+        if (pathname.startsWith("/admin") && pathname !== "/admin") {
+            if (!hasPageAccess(pathname)) {
+                forbidden();
+            }
+        }
+
+    }, [loading, isAuthenticated, roles, user, router, pathname, hasPageAccess]);
 
     if (loading) {
         return null

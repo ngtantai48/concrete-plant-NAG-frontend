@@ -13,6 +13,7 @@ import {
   Pagination as ShadcnPagination,
 } from "@/components/ui/pagination";
 import { useAppDispatch, useAppSelector } from "@/hooks/use-app-selector";
+import { usePermissions } from "@/hooks/use-permissions";
 import { userApi } from "@/services/user.service";
 import { clearUsers, deleteUser, fetchUsers, setPagination } from "@/store/slices/userSlice";
 import type { User } from "@/types/user";
@@ -33,6 +34,7 @@ export default function TableUsers() {
   const t = useTranslations("UserManage");
   const tCommon = useTranslations("Common");
   const tRoles = useTranslations("Sidebar.role");
+  const { hasActionAccess } = usePermissions();
   const dispatch = useAppDispatch();
   const searchParams = useSearchParams();
 
@@ -228,30 +230,34 @@ export default function TableUsers() {
       fixed: "right",
       render: (_value, record) => (
         <Space size="middle">
-          <Tooltip title={tCommon("edit")}>
-            <Button variant="outline" size="iconSquare" onClick={() => setEditingUser(record)}>
-              <PencilLine className="text-blue-600" />
-            </Button>
-          </Tooltip>
-          <Popconfirm
-            title={tCommon("confirm")}
-            description={
-              <span>
-                {t("confirmDelete")} <b>{record.user_full_name}</b>?
-              </span>
-            }
-            okText={tCommon("delete")}
-            cancelText={tCommon("cancel")}
-            placement="leftBottom"
-            okButtonProps={{ danger: true }}
-            onConfirm={() => handleDeleteUser(record)}
-          >
-            <Tooltip title={tCommon("delete")}>
-              <Button variant="outline" size="iconSquare">
-                <Trash className="text-red-600" />
+          {hasActionAccess('/admin/user-manage', 'edit') && (
+            <Tooltip title={tCommon("edit")}>
+              <Button variant="outline" size="iconSquare" onClick={() => setEditingUser(record)}>
+                <PencilLine className="text-blue-600" />
               </Button>
             </Tooltip>
-          </Popconfirm>
+          )}
+          {hasActionAccess('/admin/user-manage', 'delete') && (
+            <Popconfirm
+              title={tCommon("confirm")}
+              description={
+                <span>
+                  {t("confirmDelete")} <b>{record.user_full_name}</b>?
+                </span>
+              }
+              okText={tCommon("delete")}
+              cancelText={tCommon("cancel")}
+              placement="leftBottom"
+              okButtonProps={{ danger: true }}
+              onConfirm={() => handleDeleteUser(record)}
+            >
+              <Tooltip title={tCommon("delete")}>
+                <Button variant="outline" size="iconSquare">
+                  <Trash className="text-red-600" />
+                </Button>
+              </Tooltip>
+            </Popconfirm>
+          )}
         </Space>
       ),
     },
@@ -269,12 +275,14 @@ export default function TableUsers() {
           </div>
 
           <div className="flex gap-3 mt-2 sm:mt-0 flex-wrap">
-            <Tooltip title={t("add_new")}>
-              <Button variant="primary" onClick={() => setOpenCreate(true)}>
-                <UserPlus className="w-4 h-4" />
-                {t("add")}
-              </Button>
-            </Tooltip>
+            {hasActionAccess('/admin/user-manage', 'add') && (
+              <Tooltip title={t("add_new")}>
+                <Button variant="primary" onClick={() => setOpenCreate(true)}>
+                  <UserPlus className="w-4 h-4" />
+                  {t("add")}
+                </Button>
+              </Tooltip>
+            )}
 
             <Tooltip title={tCommon("refreshData")}>
               <Button variant="outline" disabled={refreshDisabled > 0}

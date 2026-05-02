@@ -19,6 +19,7 @@ import { cn } from "@/lib/utils";
 import orderApi from "@/services/order.service";
 import stationApi from "@/services/station.service";
 import vehicleApi from "@/services/vehicle.service";
+import { usePermissions } from "@/hooks/use-permissions";
 import type { Order } from "@/types/order";
 import type { Station } from "@/types/station";
 import type { Vehicle } from "@/types/vehicle";
@@ -106,6 +107,8 @@ export default function AdminDashboard() {
 
   const [geofenceStation, setGeofenceStation] = useState<Station | null>(null);
   const [isFullScreen, setIsFullScreen] = useState(false);
+  const { hasActionAccess } = usePermissions();
+
   const [stations, setStations] = useState<Station[]>([]);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
@@ -837,16 +840,18 @@ export default function AdminDashboard() {
 
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <Button
-                          size="sm"
-                          variant="primary"
-                          onClick={() => setIsSyncShiftDialogOpen(true)}
-                          disabled={isSyncingShift}
-                          className="uppercase"
-                        >
-                          {isSyncingShift ? <RefreshCw className="animate-spin" /> : <FileSpreadsheet />}
-                          {t('syncShiftAction')}
-                        </Button>
+                        {hasActionAccess('/admin/dashboard', 'sync_slots') && (
+                          <Button
+                            size="sm"
+                            variant="primary"
+                            onClick={() => setIsSyncShiftDialogOpen(true)}
+                            disabled={isSyncingShift}
+                            className="uppercase"
+                          >
+                            {isSyncingShift ? <RefreshCw className="animate-spin" /> : <FileSpreadsheet />}
+                            {t('syncShiftAction')}
+                          </Button>
+                        )}
                       </TooltipTrigger>
                       <TooltipContent>
                         <p>{t('syncShiftAction')} {format(new Date(selectedDate), "dd/MM/yyyy")}</p>
@@ -959,18 +964,20 @@ export default function AdminDashboard() {
                               ) : null}
                               {t('syncShiftApplyToEndAction', { count: selectedSyncOrderIds.length })}
                             </Button>
-                            <Button
-                              variant="primary"
-                              onClick={handleSyncShift}
-                              disabled={isSyncingShift || isApplyingToEnd}
-                            >
-                              {isSyncingShift ? (
-                                <RefreshCw className="animate-spin h-4 w-4" />
-                              ) : (
-                                <FileSpreadsheet className="h-4 w-4" />
-                              )}
-                              {t('syncShiftAction')}
-                            </Button>
+                            {hasActionAccess('/admin/dashboard', 'sync_slots') && (
+                              <Button
+                                variant="primary"
+                                onClick={handleSyncShift}
+                                disabled={isSyncingShift || isApplyingToEnd}
+                              >
+                                {isSyncingShift ? (
+                                  <RefreshCw className="animate-spin h-4 w-4" />
+                                ) : (
+                                  <FileSpreadsheet className="h-4 w-4" />
+                                )}
+                                {t('syncShiftAction')}
+                              </Button>
+                            )}
                           </div>
                         </DialogFooter>
                       </DialogContent>
@@ -1154,19 +1161,21 @@ export default function AdminDashboard() {
                       >
                         AUTO
                       </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setDispatchMode('manual')}
-                        className={cn(
-                          "h-5 px-2 text-[10px] font-bold uppercase border border-transparent",
-                          dispatchMode === 'manual'
-                            ? "bg-blue-600 text-white hover:bg-blue-700 hover:text-white"
-                            : "text-slate-500 hover:text-slate-700 hover:bg-slate-100",
-                        )}
-                      >
-                        MANUAL
-                      </Button>
+                      {hasActionAccess('/admin/dashboard', 'manual_sort') && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setDispatchMode('manual')}
+                          className={cn(
+                            "h-5 px-2 text-[10px] font-bold uppercase border border-transparent",
+                            dispatchMode === 'manual'
+                              ? "bg-blue-600 text-white hover:bg-blue-700 hover:text-white"
+                              : "text-slate-500 hover:text-slate-700 hover:bg-slate-100",
+                          )}
+                        >
+                          MANUAL
+                        </Button>
+                      )}
                       <Button
                         variant="ghost"
                         size="sm"

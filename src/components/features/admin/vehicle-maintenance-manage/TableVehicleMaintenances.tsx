@@ -9,6 +9,7 @@ import { DatePicker, Form, Input, InputNumber, Modal, Pagination, Popconfirm, Se
 import dayjs from "dayjs";
 import { Calendar, ClipboardList, PenSquare, Plus, RefreshCw, Trash2, Wrench } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { usePermissions } from "@/hooks/use-permissions";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
@@ -18,6 +19,7 @@ const { TextArea } = Input;
 export default function TableVehicleMaintenances() {
   const t = useTranslations("VehicleMaintenancePage");
   const tCommon = useTranslations("Common");
+  const { hasActionAccess } = usePermissions();
   const { setDirty } = useNavigationStore();
 
   const [form] = Form.useForm();
@@ -279,26 +281,30 @@ export default function TableVehicleMaintenances() {
       fixed: "right" as const,
       render: (_: unknown, record: VehicleMaintenance) => (
         <Space size="middle">
-          <Tooltip title={t("editTooltip")}>
-            <Button variant="outline" size="iconSquare" onClick={() => openEditModal(record)}>
-              <PenSquare className="w-4 h-4 text-blue-600" />
-            </Button>
-          </Tooltip>
-          <Popconfirm
-            title={t("confirmTitle")}
-            description={t("confirmDelete")}
-            okText={t("okText")}
-            cancelText={t("cancelText")}
-            placement="leftBottom"
-            okButtonProps={{ danger: true }}
-            onConfirm={() => handleDelete(record)}
-          >
-            <Tooltip title={t("deleteTooltip")}>
-              <Button variant="outline" size="iconSquare">
-                <Trash2 className="w-4 h-4 text-red-500" />
+          {hasActionAccess('/admin/vehicle-maintenances', 'edit') && (
+            <Tooltip title={t("editTooltip")}>
+              <Button variant="outline" size="iconSquare" onClick={() => openEditModal(record)}>
+                <PenSquare className="w-4 h-4 text-blue-600" />
               </Button>
             </Tooltip>
-          </Popconfirm>
+          )}
+          {hasActionAccess('/admin/vehicle-maintenances', 'delete') && (
+            <Popconfirm
+              title={t("confirmTitle")}
+              description={t("confirmDelete")}
+              okText={t("okText")}
+              cancelText={t("cancelText")}
+              placement="leftBottom"
+              okButtonProps={{ danger: true }}
+              onConfirm={() => handleDelete(record)}
+            >
+              <Tooltip title={t("deleteTooltip")}>
+                <Button variant="outline" size="iconSquare">
+                  <Trash2 className="w-4 h-4 text-red-500" />
+                </Button>
+              </Tooltip>
+            </Popconfirm>
+          )}
         </Space>
       ),
     },
@@ -316,12 +322,14 @@ export default function TableVehicleMaintenances() {
           </div>
 
           <div className="flex gap-3 mt-2 sm:mt-0 flex-wrap">
-            <Tooltip title={t("addTooltip")}>
-              <Button variant="primary" onClick={openAddModal}>
-                <Plus className="w-4 h-4" />
-                {t("addMaintenance")}
-              </Button>
-            </Tooltip>
+            {hasActionAccess('/admin/vehicle-maintenances', 'add') && (
+              <Tooltip title={t("addTooltip")}>
+                <Button variant="primary" onClick={openAddModal}>
+                  <Plus className="w-4 h-4" />
+                  {t("addMaintenance")}
+                </Button>
+              </Tooltip>
+            )}
 
             <Tooltip title={tCommon("refreshData")}>
               <Button

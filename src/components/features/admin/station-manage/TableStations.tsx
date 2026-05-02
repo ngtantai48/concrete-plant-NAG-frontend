@@ -8,12 +8,14 @@ import type { StationType } from "@/types/station";
 import { Modal, Pagination, Popconfirm, Space, Table, Tag, Tooltip, Form, Input, InputNumber, Select } from "antd";
 import { Building2, MapPin, PencilLine, Plus, Radar, Save, Trash, X, RefreshCw, Wifi } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { usePermissions } from "@/hooks/use-permissions";
 import { useState, useMemo, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 
 const TableStations: React.FC = () => {
   const t = useTranslations("StationPage");
   const tCommon = useTranslations("Common");
+  const { hasActionAccess } = usePermissions();
   const [stations, setStations] = useState<Station[]>([]);
   const [stationTypes, setStationTypes] = useState<StationType[]>([]);
   const [loading, setLoading] = useState(true);
@@ -260,26 +262,30 @@ const TableStations: React.FC = () => {
       fixed: "right" as const,
       render: (_: unknown, record: Station) => (
         <Space size="middle">
-          <Tooltip title="Chỉnh sửa">
-            <Button variant="outline" size="iconSquare" onClick={() => openEditModal(record)}>
-              <PencilLine color="#1677ff" />
-            </Button>
-          </Tooltip>
-          <Popconfirm
-            title="Xác nhận"
-            description={<span> {t("confirmDelete")} <b>{record.station_name}</b>?</span>}
-            okText="Xoá"
-            cancelText="Huỷ"
-            placement="leftBottom"
-            okButtonProps={{ danger: true }}
-            onConfirm={() => handleDelete(record)}
-          >
-            <Tooltip title="Xoá">
-              <Button variant="outline" size="iconSquare">
-                <Trash color="red" />
+          {hasActionAccess('/admin/stations', 'edit') && (
+            <Tooltip title="Chỉnh sửa">
+              <Button variant="outline" size="iconSquare" onClick={() => openEditModal(record)}>
+                <PencilLine color="#1677ff" />
               </Button>
             </Tooltip>
-          </Popconfirm>
+          )}
+          {hasActionAccess('/admin/stations', 'delete') && (
+            <Popconfirm
+              title="Xác nhận"
+              description={<span> {t("confirmDelete")} <b>{record.station_name}</b>?</span>}
+              okText="Xoá"
+              cancelText="Huỷ"
+              placement="leftBottom"
+              okButtonProps={{ danger: true }}
+              onConfirm={() => handleDelete(record)}
+            >
+              <Tooltip title="Xoá">
+                <Button variant="outline" size="iconSquare">
+                  <Trash color="red" />
+                </Button>
+              </Tooltip>
+            </Popconfirm>
+          )}
         </Space>
       ),
     },
@@ -297,12 +303,14 @@ const TableStations: React.FC = () => {
           </div>
 
           <div className="flex gap-3 mt-2 sm:mt-0 flex-wrap">
-            <Tooltip title="Thêm trạm mới">
-              <Button variant="primary" onClick={openAddModal}>
-                <Plus className="w-4 h-4" />
-                {t("addStation")}
-              </Button>
-            </Tooltip>
+            {hasActionAccess('/admin/stations', 'add') && (
+              <Tooltip title="Thêm trạm mới">
+                <Button variant="primary" onClick={openAddModal}>
+                  <Plus className="w-4 h-4" />
+                  {t("addStation")}
+                </Button>
+              </Tooltip>
+            )}
 
             <Tooltip title={tCommon("refreshData")}>
               <Button
