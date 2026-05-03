@@ -1,13 +1,14 @@
 "use client";
 
-import { ROLE_DASHBOARD_MAP } from "@/constants/role";
 import { useAppSelector } from "@/hooks/use-app-selector";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
+import { usePermissions } from "@/hooks/use-permissions";
 
 export default function RoleRedirect() {
     const router = useRouter();
-    const { isAuthenticated, user, loading } = useAppSelector((state) => state.auth);
+    const { isAuthenticated, loading } = useAppSelector((state) => state.auth);
+    const { getDefaultRoute } = usePermissions();
 
     useEffect(() => {
         if (loading) return;
@@ -17,13 +18,9 @@ export default function RoleRedirect() {
             return;
         }
 
-        const role = user?.role;
-        if (role && ROLE_DASHBOARD_MAP[role]) {
-            router.replace(ROLE_DASHBOARD_MAP[role]);
-        } else {
-            router.replace("/login");
-        }
-    }, [isAuthenticated, user, loading, router]);
+        const defaultRoute = getDefaultRoute();
+        router.replace(defaultRoute);
+    }, [isAuthenticated, loading, router, getDefaultRoute]);
 
     if (loading) {
         return (

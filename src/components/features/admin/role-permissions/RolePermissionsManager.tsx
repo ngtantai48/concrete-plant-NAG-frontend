@@ -126,19 +126,16 @@ export default function RolePermissionsManager() {
           <CardDescription>Chọn một vai trò để chỉnh sửa quyền truy cập của họ.</CardDescription>
         </CardHeader>
         <CardContent className="flex-1 flex">
-          <Tabs type="card"
-            activeKey={activeTab}
-            onChange={setActiveTab}
+          <Tabs type="card" activeKey={activeTab} onChange={setActiveTab}
             items={roles.map(role => ({
-              key: role.key,
-              label: role.label,
+              key: role.key, label: role.label,
               children: (
                 <div
                   className="p-4 border border-gray-200 dark:border-gray-800 rounded-md 
-                  bg-white dark:bg-gray-950 max-h-[380px] 
-                  overflow-y-auto">
-                  <Tree
-                    checkable
+                  bg-white dark:bg-gray-950 h-[350px] 
+                  overflow-y-auto"
+                >
+                  <Tree checkable
                     treeData={treeData}
                     checkedKeys={localPerms[role.key] || []}
                     onCheck={handleCheck}

@@ -1,23 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useTranslations } from "next-intl";
-import { toast } from "sonner";
-import { 
-  Save, 
-  RefreshCw, 
-  Clock, 
-  AlertCircle, 
-  RotateCcw, 
-  Settings2,
-  Info
-} from "lucide-react";
-import { useForm } from "react-hook-form";
+import { usePermissions } from "@/hooks/use-permissions";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { AlertCircle, Clock, Info, RefreshCw, RotateCcw, Save, Settings2 } from "lucide-react";
+import { useTranslations } from "next-intl";
+import { useEffect, useState } from "react";
+import { useForm } from "react-hook-form";
+import { toast } from "sonner";
 import * as z from "zod";
-
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { COMMON } from "@/constants/route";
 import systemApi from "@/services/system.service";
 
 const systemSettingsSchema = z.object({
@@ -41,6 +34,7 @@ export default function SystemSettingsForm() {
   const t = useTranslations("SystemSettingsPage");
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
+  const { hasActionAccess } = usePermissions();
 
   const {
     register,
@@ -118,7 +112,7 @@ export default function SystemSettingsForm() {
 
         <form onSubmit={handleSubmit(onSubmit)} className="p-8 md:p-10">
           <div className="space-y-8">
-            
+
             {/* Setting Item 1 */}
             <div className="flex flex-col lg:flex-row lg:items-center gap-6 group">
               <div className="flex-1">
@@ -136,9 +130,8 @@ export default function SystemSettingsForm() {
                 <Input
                   type="number"
                   step="0.1"
-                  className={`h-12 bg-slate-50/30 border-2 text-lg font-bold pr-16 rounded-2xl focus-visible:ring-blue-100 focus-visible:border-blue-500 transition-all ${
-                    errors.cmr_station_min_stay_minutes ? "border-red-200" : "border-slate-100"
-                  }`}
+                  className={`h-12 bg-slate-50/30 border-2 text-lg font-bold pr-16 rounded-2xl focus-visible:ring-blue-100 focus-visible:border-blue-500 transition-all ${errors.cmr_station_min_stay_minutes ? "border-red-200" : "border-slate-100"
+                    }`}
                   {...register("cmr_station_min_stay_minutes", { valueAsNumber: true })}
                 />
                 <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400">phút</span>
@@ -167,9 +160,8 @@ export default function SystemSettingsForm() {
                 <Input
                   type="number"
                   step="0.1"
-                  className={`h-12 bg-slate-50/30 border-2 text-lg font-bold pr-16 rounded-2xl focus-visible:ring-amber-100 focus-visible:border-amber-500 transition-all ${
-                    errors.station_checkout_vehicle_checkin_warning_minutes ? "border-red-200" : "border-slate-100"
-                  }`}
+                  className={`h-12 bg-slate-50/30 border-2 text-lg font-bold pr-16 rounded-2xl focus-visible:ring-amber-100 focus-visible:border-amber-500 transition-all ${errors.station_checkout_vehicle_checkin_warning_minutes ? "border-red-200" : "border-slate-100"
+                    }`}
                   {...register("station_checkout_vehicle_checkin_warning_minutes", { valueAsNumber: true })}
                 />
                 <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400">phút</span>
@@ -198,9 +190,8 @@ export default function SystemSettingsForm() {
                 <Input
                   type="number"
                   step="0.1"
-                  className={`h-12 bg-slate-50/30 border-2 text-lg font-bold pr-16 rounded-2xl focus-visible:ring-purple-100 focus-visible:border-purple-500 transition-all ${
-                    errors.station_checkout_vehicle_checkin_timeout_minutes ? "border-red-200" : "border-slate-100"
-                  }`}
+                  className={`h-12 bg-slate-50/30 border-2 text-lg font-bold pr-16 rounded-2xl focus-visible:ring-purple-100 focus-visible:border-purple-500 transition-all ${errors.station_checkout_vehicle_checkin_timeout_minutes ? "border-red-200" : "border-slate-100"
+                    }`}
                   {...register("station_checkout_vehicle_checkin_timeout_minutes", { valueAsNumber: true })}
                 />
                 <span className="absolute right-4 top-1/2 -translate-y-1/2 text-sm font-bold text-slate-400">phút</span>
@@ -218,7 +209,7 @@ export default function SystemSettingsForm() {
               <Info className="h-5 w-5" />
               <p className="text-[11px] font-semibold italic">Thay đổi sẽ có hiệu lực ngay lập tức sau khi lưu.</p>
             </div>
-            
+
             <div className="flex items-center gap-4 w-full sm:w-auto">
               <Button
                 type="button"
@@ -227,21 +218,19 @@ export default function SystemSettingsForm() {
                 disabled={loading}
                 className="flex-1 sm:flex-none h-11 px-6 rounded-xl font-bold text-slate-500 hover:bg-white"
               >
-                <RefreshCw className={`h-4 w-4 mr-2 ${fetching ? "animate-spin" : ""}`} />
+                <RefreshCw className={`h-4 w-4 ${fetching ? "animate-spin" : ""}`} />
                 Làm mới
               </Button>
-              <Button
-                type="submit"
-                disabled={loading}
-                className="flex-1 sm:flex-none h-11 px-10 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold shadow-lg shadow-amber-200"
-              >
-                {loading ? (
-                  <RefreshCw className="h-4 w-4 animate-spin mr-2" />
-                ) : (
-                  <Save className="h-4 w-4 mr-2" />
-                )}
-                Lưu cấu hình
-              </Button>
+              {hasActionAccess(COMMON.SYSTEM_SETTINGS, 'edit') && (
+                <Button
+                  type="submit"
+                  disabled={loading}
+                  className="flex-1 sm:flex-none h-11 px-10 rounded-xl bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold shadow-lg shadow-amber-200"
+                >
+                  {loading ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
+                  Lưu cấu hình
+                </Button>
+              )}
             </div>
           </div>
         </form>
