@@ -59,4 +59,11 @@ export const PERMISSIONS = {
         UPDATE: 'update',
     },
 
+    REPORTS: {
+        VIEW: 'view',
+    },
+
+    END_OF_DAY: {
+        VIEW: 'view',
+    },
 };

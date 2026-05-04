@@ -18,6 +18,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import reportApi from "@/services/report.service";
+import { SIDEBAR } from "@/constants/route";
 
 const UserProfile = ({ collapsed, userName, userRole, isLoading }: {
   collapsed: boolean;
@@ -82,6 +84,19 @@ export default function Sidebar() {
   const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
   const [pendingUrl, setPendingUrl] = useState<string>("");
   const { hasPageAccess } = usePermissions();
+  const [maintenanceAlertCount, setMaintenanceAlertCount] = useState(0);
+  const [hasCritical, setHasCritical] = useState(false);
+
+  // Fetch maintenance alert count on mount
+  useEffect(() => {
+    reportApi.getMaintenanceForecast().then((res) => {
+      const items = (res.data as any)?.vehicles ?? (res.data as any)?.items ?? [];
+      const critical = items.filter((i: any) => i.risk_level === "critical").length;
+      const warning = items.filter((i: any) => i.risk_level === "warning").length;
+      setMaintenanceAlertCount(critical + warning);
+      setHasCritical(critical > 0);
+    }).catch(() => {});
+  }, []);
 
   const { isDirty, setDirty } = useNavigationStore();
 
@@ -103,14 +118,33 @@ export default function Sidebar() {
 
   const baseMenuItems = useMemo(() => {
     const translateItems = (items: NavItem[]): any[] => {
-      return items.map((item) => ({
-        ...item,
-        label: t(item.label),
-        children: item.children ? translateItems(item.children) : undefined,
-      }));
+      return items.map((item) => {
+        let label: React.ReactNode = t(item.label);
+
+        // Special handling for maintenance alert badge
+        if (item.key === SIDEBAR.REPORT_MAINTENANCE && maintenanceAlertCount > 0) {
+          label = (
+            <span className="flex items-center justify-between w-full">
+              <span>{t(item.label)}</span>
+              <span
+                className={`ml-2 inline-flex items-center justify-center rounded-full text-white font-bold text-[10px] px-1.5 min-w-[18px] h-[18px] shrink-0 ${hasCritical ? "animate-pulse" : ""}`}
+                style={{ background: hasCritical ? "#ef4444" : "#f59e0b" }}
+              >
+                {maintenanceAlertCount}
+              </span>
+            </span>
+          );
+        }
+
+        return {
+          ...item,
+          label,
+          children: item.children ? translateItems(item.children) : undefined,
+        };
+      });
     };
     return translateItems(navigationConfig);
-  }, [t]);
+  }, [t, maintenanceAlertCount, hasCritical]);
 
   const menuItems = useMemo(() => {
     const filterItems = (items: any[]): any[] => {

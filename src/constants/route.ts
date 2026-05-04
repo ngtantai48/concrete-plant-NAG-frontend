@@ -17,6 +17,10 @@ export const SIDEBAR = {
   SYSTEM_SETTINGS: "/system-settings",
   USER_MANAGE: "/user-manage",
   ROLE_PERMISSIONS: "/role-permissions",
+  END_OF_DAY: "/end-of-day",
+  REPORT_MAINTENANCE: "/reports/maintenance",
+  REPORT_PRODUCTION: "/reports/production",
+  REPORT_FUEL: "/reports/fuel",
 };
 
 export const SHARE = {
