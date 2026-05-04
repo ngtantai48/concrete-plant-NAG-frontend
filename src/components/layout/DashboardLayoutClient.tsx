@@ -1,9 +1,10 @@
 "use client";
 
+import { useAppDispatch } from "@/hooks/use-app-selector";
 import authApi from "@/services/auth.service";
 import { logoutSuccess } from "@/store/slices/authSlice";
-import { useAppDispatch, useAppSelector } from "@/hooks/use-app-selector";
 import { Layout } from "antd";
+import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
 import AppHeader from "./Header";
 import Sidebar from "./Sidebar";
@@ -13,6 +14,7 @@ const { Content } = Layout;
 export default function DashboardLayoutClient({ children }: { children: React.ReactNode }) {
     const router = useRouter();
     const dispatch = useAppDispatch();
+    const t = useTranslations("Header");
 
     const handleLogout = async () => {
         try {
