@@ -50,7 +50,8 @@ const vehicleApi = {
   create: (data: Partial<Vehicle>) => http.post("/vehicles", data),
   update: (id: number, data: Partial<Vehicle>) => http.put(`/vehicles/${id}`, data),
   delete: (id: number) => http.delete(`/vehicles/${id}`),
-  getEndOfDayStatus: () => http.get<EndOfDayStatusResponse>("/vehicles/end-of-day-status"),
+  getEndOfDayStatus: (date?: string) =>
+    http.get<EndOfDayStatusResponse>("/vehicles/end-of-day-status", { params: date ? { date } : undefined }),
 };
 
 export default vehicleApi;

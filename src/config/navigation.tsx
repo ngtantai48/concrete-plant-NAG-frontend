@@ -3,7 +3,7 @@ import { ROLES } from "@/constants/roles";
 import { SIDEBAR } from "@/constants/route";
 import {
   CalendarCheck, Car, Gauge, Layers, MapPin, Package, UsersRound,
-  Wrench, Settings, ShieldCheck, UserCog, UtensilsCrossed
+  Wrench, Settings, ShieldCheck, UserCog, UtensilsCrossed, ClipboardList, ArrowRightLeft
 } from "lucide-react";
 import React from "react";
 
@@ -40,7 +40,7 @@ export const navigationConfig: NavItem[] = [
     roles: [ROLES.ADMIN],
     children: [
       {
-        key: SIDEBAR.USER_MANAGE,   // đang sai ở key này, xem xét đổi cấu trúc route lại
+        key: SIDEBAR.USER_MANAGE,
         label: "allUsers",
         icon: <UserCog size={18} />,
         actions: [
@@ -115,19 +115,37 @@ export const navigationConfig: NavItem[] = [
         key: SIDEBAR.MEAL_CHECK,
         label: "mealCheck",
         icon: <UtensilsCrossed size={18} />,
-        // actions: [
-        //   { key: PERMISSIONS.MEAL_CHECK.VIEW, label: "Xem" },
-        // ],
       },
       {
         key: SIDEBAR.ATTENDANCE,
         label: "attendance",
         icon: <CalendarCheck size={18} />,
-        // actions: [
-        //   { key: PERMISSIONS.ATTENDANCE.VIEW, label: "Xem" },
-        // ],
       },
     ],
+  },
+  {
+    key: "reports-group",
+    label: "reports",
+    icon: <ClipboardList />,
+    actions: [{ key: PERMISSIONS.REPORTS.VIEW, label: "Xem" }],
+    children: [
+      {
+        key: SIDEBAR.REPORT_PRODUCTION,
+        label: "reportProduction",
+        icon: <Gauge size={18} />,
+      },
+      {
+        key: SIDEBAR.REPORT_FUEL,
+        label: "reportFuel",
+        icon: <ArrowRightLeft size={18} />,
+      },
+    ],
+  },
+  {
+    key: SIDEBAR.END_OF_DAY,
+    label: "endOfDay",
+    icon: <CalendarCheck />,
+    actions: [{ key: PERMISSIONS.END_OF_DAY.VIEW, label: "Xem" }],
   },
   {
     key: SIDEBAR.SYSTEM_SETTINGS,
