@@ -25,7 +25,7 @@ import type { Vehicle } from "@/types/vehicle";
 import { format } from "date-fns";
 import {
   ArrowRight, Calendar as CalendarIcon, CheckCircle2, Clock, Ellipsis, FileSpreadsheet,
-  Eye, EyeOff, Map as MapIcon, MapPin, Radio, RefreshCw, Route, Search, Timer, Truck, X, Save
+  Eye, EyeOff, LayoutGrid, Map as MapIcon, MapPin, Radio, RefreshCw, Route, Search, Timer, Truck, X, Save
 } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import dynamic from "next/dynamic";
@@ -276,6 +276,13 @@ export default function AdminDashboard() {
     [yardOrderInitTimeByVehicleKey, vtrackingVehicles],
   );
 
+  const otherVehiclesInYard = useMemo(
+    () => vtrackingVehicles
+      .filter(v => v.inRange && !v.vehicle_name?.toUpperCase().startsWith('X'))
+      .sort((a, b) => (a.license_plate || '').localeCompare(b.license_plate || '')),
+    [vtrackingVehicles],
+  );
+
   const stoppedMaintenanceList = useMemo(() => {
     const list: { id: string; label: string; statusLabel: string; chipClass: string }[] = [];
 
@@ -457,6 +464,7 @@ export default function AdminDashboard() {
   const [focusVehicleId, setFocusVehicleId] = useState<string | null>(null);
   const [mapStatusFilter, setMapStatusFilter] = useState<'all' | 'run' | 'park' | 'offline'>('all');
   const [selectedVehicleTrips, setSelectedVehicleTrips] = useState<{ vehicle: Vehicle; orders: Order[] } | null>(null);
+  const [isOtherVehiclesInYardDialogOpen, setIsOtherVehiclesInYardDialogOpen] = useState(false);
 
   const vehicleTripMap = useMemo(() => {
     const map = new Map<number, Order[]>();
@@ -500,6 +508,14 @@ export default function AdminDashboard() {
       return a.vehicle_license_plate.localeCompare(b.vehicle_license_plate);
     });
   }, [vehicles, vehicleTripMap]);
+
+  const mixerVehicles = useMemo(() => {
+    return sortedVehiclesWithTrips.filter(v => v.vehicle_name?.toUpperCase().startsWith('X'));
+  }, [sortedVehiclesWithTrips]);
+
+  const otherVehicleTypes = useMemo(() => {
+    return sortedVehiclesWithTrips.filter(v => !v.vehicle_name?.toUpperCase().startsWith('X'));
+  }, [sortedVehiclesWithTrips]);
 
   const focusVehicle = useMemo(() => {
     if (!focusVehicleId) return null;
@@ -563,6 +579,79 @@ export default function AdminDashboard() {
   //     glowColor: 'rgba(16, 185, 129, 0.12)',
   //   },
   // ], [t, ordersCompleted.length, ordersPending.length, ordersAtStation.length, ordersInTransit.length, activeStations.length, stations]);
+
+  const renderVehicleTripListItem = (v: Vehicle) => {
+    const trips = vehicleTripMap.get(v.vehicle_id) || [];
+    const hasTrips = trips.length > 0;
+    const hasRunning = trips.some(o => o.order_status === 'running');
+    const hasTransporting = trips.some(o => o.order_status === 'transporting');
+    const accentColor = hasRunning ? '#0ea5e9' : hasTransporting ? '#f59e0b' : (hasTrips ? '#10b981' : '#94a3b8');
+    const hoverBorder = hasRunning ? 'rgba(14, 165, 233, 0.4)' : hasTransporting ? 'rgba(245, 158, 11, 0.4)' : (hasTrips ? 'rgba(16, 185, 129, 0.4)' : 'rgba(148, 163, 184, 0.3)');
+    const chipClass = hasRunning ? 'dd-chip-sky' : hasTransporting ? 'dd-chip-amber' : 'dd-chip-emerald';
+    const stats = vehicleStatsMap.get(v.vehicle_id);
+    const stopDurationStr = stats ? formatDuration(stats.totalStopMins, stats.stopHours, stats.stopMinsRemain, tCommon('hour'), tCommon('minute')) : '';
+    const mixTotalDurationStr = stats ? formatDuration(stats.totalMixMins, stats.mixTotalHours, stats.mixTotalMinsRemain, tCommon('hour'), tCommon('minute')) : '';
+
+    return (
+      <li key={v.vehicle_id}
+        className="dd-surface px-2 py-1.5 transition-all relative overflow-hidden cursor-pointer"
+        style={{ borderRadius: '6px', border: '1px solid var(--dd-border)' }}
+        onMouseEnter={e => e.currentTarget.style.borderColor = hoverBorder}
+        onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--dd-border)'}
+        onClick={() => setSelectedVehicleTrips({ vehicle: v, orders: trips })}>
+        <div className="absolute left-0 top-0 bottom-0 w-1" style={{ background: accentColor }} />
+        <div className="flex justify-between items-center pl-2">
+          <div className="flex items-center gap-1.5">
+            <span className="text-sm font-bold" style={{ color: 'var(--dd-text-primary)' }}>
+              {v.vehicle_license_plate}{v.vehicle_name ? ` | ${v.vehicle_name}` : ''}
+            </span>
+          </div>
+          {hasTrips ? (
+            <span className={`dd-chip ${chipClass} text-[10px] px-1.5 py-0.5`}>
+              {hasRunning ? t('moving') : hasTransporting ? t('collected') : t('tripCount', { count: trips.length })}
+            </span>
+          ) : (
+            <span className="dd-chip dd-chip-slate text-[10px] px-1.5 py-0.5">
+              {t('noTrips')}
+            </span>
+          )}
+        </div>
+        {hasTrips && stats && (
+          <div className="mt-1 pl-2 flex flex-wrap items-center gap-x-3 gap-y-1">
+            {stats.totalDistanceKm > 0 && (
+              <div className="flex items-center gap-1 text-[10px] font-semibold" style={{ color: '#0ea5e9' }}>
+                <Route className="w-3 h-3" />
+                <span>{stats.totalDistanceKm.toFixed(1)} km</span>
+              </div>
+            )}
+            <div className="flex items-center gap-1 text-[10px] font-semibold" style={{ color: '#ec4899' }}>
+              <MapPin className="w-3 h-3" />
+              {Number.isNaN(stats.totalStops) ? (
+                <>
+                  <RefreshCw className="w-2.5 h-2.5 animate-spin" />
+                  <span>Loading...</span>
+                </>
+              ) : (
+                <span>{stats.totalStops} {t('stops')}{stats.totalStopSecs > 0 ? ` ( ${stopDurationStr} )` : ''}</span>
+              )}
+            </div>
+            {stats.totalMins > 0 && (
+              <div className="flex items-center gap-1 text-[10px] font-semibold" style={{ color: '#f59e0b' }}>
+                <Clock className="w-3 h-3" />
+                <span>{stats.hours > 0 ? `${stats.hours} ${tCommon('hour')} ${stats.mins} ${tCommon('minute')}` : `${stats.mins} ${tCommon('minute')}`}</span>
+              </div>
+            )}
+            {stats.totalMixMs > 0 && (
+              <div className="flex items-center gap-1 text-[10px] font-semibold whitespace-nowrap" style={{ color: '#8b5cf6' }}>
+                <Timer className="w-3 h-3" />
+                <span>{t("mixing")}: {mixTotalDurationStr}</span>
+              </div>
+            )}
+          </div>
+        )}
+      </li>
+    );
+  };
 
   return (
     <div className={`dashboard-light bg-cover bg-center ${isFullScreen ? 'fixed inset-0 z-[100] bg-slate-50 h-screen' : 'h-[calc(100vh-64px)]'} overflow-hidden flex flex-col`}>
@@ -930,9 +1019,27 @@ export default function AdminDashboard() {
                 <div className="flex flex-col gap-1.5 shrink-0 min-h-0" style={{ width: '350px' }}>
                   {/* Ready Vehicles */}
                   <div className="flex flex-col overflow-hidden dd-card min-h-0" style={{ flex: '6 1 0%' }}>
-                    <div className="flex items-center justify-between px-3 py-1.5 text-sm font-extrabold uppercase"
+                    <div className="flex items-center justify-between px-3 py-2 text-sm font-extrabold uppercase"
                       style={{ borderBottom: '1px solid var(--dd-border)' }}>
-                      <span>{t('readyVehiclesPanel')}</span>
+                      <div className="flex items-center gap-2">
+                        <span>{t('mixerVehiclesInYard')}</span>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => setIsOtherVehiclesInYardDialogOpen(true)}
+                              className="h-6 w-6 text-sky-500 hover:text-sky-700 hover:bg-sky-50"
+                            >
+                              <LayoutGrid />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <span>{t('otherVehiclesInYardTitle')} ({otherVehiclesInYard.length})</span>
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
                       <div className="flex items-center gap-2">
                         <Tooltip>
                           <TooltipTrigger asChild>
@@ -992,7 +1099,7 @@ export default function AdminDashboard() {
 
                   {/* Canceled / Stopped */}
                   <div className="flex flex-col overflow-hidden dd-card min-h-0" style={{ flex: '3 1 0%', borderColor: 'rgba(245, 158, 11, 0.2)' }}>
-                    <div className="flex items-center justify-between px-3 py-1.5 text-sm font-extrabold uppercase"
+                    <div className="flex items-center justify-between px-3 py-2 text-sm font-extrabold uppercase"
                       style={{ background: 'var(--dd-bg-header)', color: 'var(--dd-text-primary)', borderBottom: '1px solid var(--dd-border)' }}>
                       <span>{t('stoppedMaintenance')}</span>
                       <span className="text-sm font-extrabold">{stoppedMaintenanceList.length} {t('vehicleCount')}</span>
@@ -1032,7 +1139,7 @@ export default function AdminDashboard() {
                     </div>
 
                     {/* Segmented Toggle HUD */}
-                    <div className="flex items-center rounded-md p-0.5 backdrop-blur-md shrink-0 gap-0.5"
+                    <div className="flex items-center rounded-md backdrop-blur-md shrink-0 gap-1"
                       style={{ background: 'var(--dd-bg-surface)', border: '1px solid var(--dd-border)' }}>
                       <Button
                         variant="ghost"
@@ -1098,110 +1205,61 @@ export default function AdminDashboard() {
 
           {/* Right: Today's Trips by Vehicle (30%) */}
           {!isPastDate && (
-            <div className="flex flex-col h-full min-h-0 animate-fade-up" style={{ flex: '3 1 0%', animationDelay: '0.6s' }}>
-              <div className="flex h-full flex-col overflow-hidden dd-card" style={{ borderColor: 'rgba(16, 185, 129, 0.2)' }}>
+            <div className="flex flex-col gap-1.5 h-full min-h-0 animate-fade-up" style={{ flex: '3 1 0%', animationDelay: '0.6s' }}>
+
+              {/* Section 1: Mixer Vehicles (Xe bồn) */}
+              <div className="flex flex-col overflow-hidden dd-card min-h-0" style={{ flex: '6 1 0%', borderColor: 'rgba(16, 185, 129, 0.2)' }}>
                 <div className="flex items-center justify-between px-3 py-2 text-sm font-extrabold uppercase"
                   style={{ borderBottom: '1px solid var(--dd-border)' }}>
                   <div className="flex items-center gap-1.5">
-                    <span>{t('completedToday')}</span>
+                    <span>{t('mixerVehicles')}</span>
+                    <span className="text-sm font-extrabold">({mixerVehicles.length} {t('vehicleCount')})</span>
                   </div>
                   <div className="flex items-center gap-1.5">
-                    {ordersCompleted.length > 0 && (
+                    {ordersCompleted.filter(o => o.vehicles?.vehicle_name?.toUpperCase().startsWith('X')).length > 0 && (
                       <span className="dd-chip dd-chip-emerald text-[10px] px-1.5 py-0.5">
-                        {ordersCompleted.length} {t('completed')}
+                        {ordersCompleted.filter(o => o.vehicles?.vehicle_name?.toUpperCase().startsWith('X')).length} {t('completed')}
                       </span>
                     )}
-                    <span className="text-sm font-extrabold">{vehicles.length} {t('vehicleCount')}</span>
                   </div>
                 </div>
-                <div className="flex-1 overflow-y-auto">
-                  {sortedVehiclesWithTrips.length === 0 ? (
-                    <div className="flex items-center justify-center h-full">
-                      <div className="flex flex-col items-center justify-center">
-                        <div className="h-14 w-14 rounded-full flex items-center justify-center backdrop-blur-md"
-                          style={{ background: 'var(--dd-bg-surface)', border: '2px dashed var(--dd-border)' }}>
-                          <Truck className="h-6 w-6 text-emerald-400 opacity-50" />
-                        </div>
-                        <span className="mt-3 text-xs font-bold uppercase"
-                          style={{ color: 'var(--dd-text-muted)' }}>
-                          {t('noCompletedToday')}
-                        </span>
-                      </div>
+                <div className="flex-1 overflow-y-auto p-0">
+                  {mixerVehicles.length === 0 ? (
+                    <div className="flex h-full items-center justify-center p-3">
+                      <span className="text-xs font-bold uppercase" style={{ color: 'var(--dd-text-muted)' }}>{t('noTrips')}</span>
                     </div>
                   ) : (
                     <ul className="flex flex-col gap-1.5 p-2">
-                      {sortedVehiclesWithTrips.map((v) => {
-                        const trips = vehicleTripMap.get(v.vehicle_id) || [];
-                        const hasTrips = trips.length > 0;
-                        const hasRunning = trips.some(o => o.order_status === 'running');
-                        const hasTransporting = trips.some(o => o.order_status === 'transporting');
-                        const accentColor = hasRunning ? '#0ea5e9' : hasTransporting ? '#f59e0b' : (hasTrips ? '#10b981' : '#94a3b8');
-                        const hoverBorder = hasRunning ? 'rgba(14, 165, 233, 0.4)' : hasTransporting ? 'rgba(245, 158, 11, 0.4)' : (hasTrips ? 'rgba(16, 185, 129, 0.4)' : 'rgba(148, 163, 184, 0.3)');
-                        const chipClass = hasRunning ? 'dd-chip-sky' : hasTransporting ? 'dd-chip-amber' : 'dd-chip-emerald';
-                        const stats = vehicleStatsMap.get(v.vehicle_id);
-                        const stopDurationStr = stats ? formatDuration(stats.totalStopMins, stats.stopHours, stats.stopMinsRemain, tCommon('hour'), tCommon('minute')) : '';
-                        const mixTotalDurationStr = stats ? formatDuration(stats.totalMixMins, stats.mixTotalHours, stats.mixTotalMinsRemain, tCommon('hour'), tCommon('minute')) : '';
-                        return (
-                          <li key={v.vehicle_id}
-                            className="dd-surface px-2 py-1.5 transition-all relative overflow-hidden cursor-pointer"
-                            style={{ borderRadius: '6px', border: '1px solid var(--dd-border)' }}
-                            onMouseEnter={e => e.currentTarget.style.borderColor = hoverBorder}
-                            onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--dd-border)'}
-                            onClick={() => setSelectedVehicleTrips({ vehicle: v, orders: trips })}>
-                            <div className="absolute left-0 top-0 bottom-0 w-1" style={{ background: accentColor }} />
-                            <div className="flex justify-between items-center pl-2">
-                              <div className="flex items-center gap-1.5">
-                                {/* <Truck className="w-3.5 h-3.5" style={{ color: accentColor }} /> */}
-                                <span className="text-sm font-bold" style={{ color: 'var(--dd-text-primary)' }}>
-                                  {v.vehicle_license_plate}{v.vehicle_name ? ` | ${v.vehicle_name}` : ''}
-                                </span>
-                              </div>
-                              {hasTrips ? (
-                                <span className={`dd-chip ${chipClass} text-[10px] px-1.5 py-0.5`}>
-                                  {hasRunning ? t('moving') : hasTransporting ? t('collected') : t('tripCount', { count: trips.length })}
-                                </span>
-                              ) : (
-                                <span className="dd-chip dd-chip-slate text-[10px] px-1.5 py-0.5">
-                                  {t('noTrips')}
-                                </span>
-                              )}
-                            </div>
-                            {hasTrips && stats && (
-                              <div className="mt-1 pl-2 flex flex-wrap items-center gap-x-3 gap-y-1">
-                                {stats.totalDistanceKm > 0 && (
-                                  <div className="flex items-center gap-1 text-[10px] font-semibold" style={{ color: '#0ea5e9' }}>
-                                    <Route className="w-3 h-3" />
-                                    <span>{stats.totalDistanceKm.toFixed(1)} km</span>
-                                  </div>
-                                )}
-                                <div className="flex items-center gap-1 text-[10px] font-semibold" style={{ color: '#ec4899' }}>
-                                  <MapPin className="w-3 h-3" />
-                                  {Number.isNaN(stats.totalStops) ? (
-                                    <>
-                                      <RefreshCw className="w-2.5 h-2.5 animate-spin" />
-                                      <span>Loading...</span>
-                                    </>
-                                  ) : (
-                                    <span>{stats.totalStops} {t('stops')}{stats.totalStopSecs > 0 ? ` ( ${stopDurationStr} )` : ''}</span>
-                                  )}
-                                </div>
-                                {stats.totalMins > 0 && (
-                                  <div className="flex items-center gap-1 text-[10px] font-semibold" style={{ color: '#f59e0b' }}>
-                                    <Clock className="w-3 h-3" />
-                                    <span>{stats.hours > 0 ? `${stats.hours} ${tCommon('hour')} ${stats.mins} ${tCommon('minute')}` : `${stats.mins} ${tCommon('minute')}`}</span>
-                                  </div>
-                                )}
-                                {stats.totalMixMs > 0 && (
-                                  <div className="flex items-center gap-1 text-[10px] font-semibold whitespace-nowrap" style={{ color: '#8b5cf6' }}>
-                                    <Timer className="w-3 h-3" />
-                                    <span>{t("mixing")}: {mixTotalDurationStr}</span>
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                          </li>
-                        );
-                      })}
+                      {mixerVehicles.map(v => renderVehicleTripListItem(v))}
+                    </ul>
+                  )}
+                </div>
+              </div>
+
+              {/* Section 2: Other Vehicles (Xe khác) */}
+              <div className="flex flex-col overflow-hidden dd-card min-h-0" style={{ flex: '3 1 0%', borderColor: 'rgba(148, 163, 184, 0.2)' }}>
+                <div className="flex items-center justify-between px-3 py-2 text-sm font-extrabold uppercase"
+                  style={{ background: 'var(--dd-bg-header)', borderBottom: '1px solid var(--dd-border)' }}>
+                  <div className="flex items-center gap-1.5">
+                    <span>{t('otherVehicleTypes')}</span>
+                    <span className="text-sm font-extrabold">({otherVehicleTypes.length} {t('vehicleCount')})</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    {ordersCompleted.filter(o => !o.vehicles?.vehicle_name?.toUpperCase().startsWith('X')).length > 0 && (
+                      <span className="dd-chip dd-chip-emerald text-[10px] px-1.5 py-0.5">
+                        {ordersCompleted.filter(o => !o.vehicles?.vehicle_name?.toUpperCase().startsWith('X')).length} {t('completed')}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className="flex-1 overflow-y-auto p-0">
+                  {otherVehicleTypes.length === 0 ? (
+                    <div className="flex h-full items-center justify-center p-3">
+                      <span className="text-xs font-bold uppercase" style={{ color: 'var(--dd-text-muted)' }}>{t('empty')}</span>
+                    </div>
+                  ) : (
+                    <ul className="flex flex-col gap-1.5 p-2">
+                      {otherVehicleTypes.map(v => renderVehicleTripListItem(v))}
                     </ul>
                   )}
                 </div>
@@ -1538,6 +1596,61 @@ export default function AdminDashboard() {
               </div>
             );
           })()}
+        </DialogContent>
+      </Dialog>
+
+      {/* ═══ OTHER VEHICLES IN YARD DIALOG ═══ */}
+      <Dialog open={isOtherVehiclesInYardDialogOpen} onOpenChange={setIsOtherVehiclesInYardDialogOpen}>
+        <DialogContent className="sm:max-w-2xl max-h-[70vh] p-0 gap-0 overflow-hidden flex flex-col">
+          <DialogHeader className="bg-slate-50 px-4 py-3 shrink-0 border-b">
+            <DlgTitle className="text-base font-bold uppercase flex items-center gap-2">
+              <Truck className="w-5 h-5 text-sky-500" />
+              {t('otherVehiclesInYardTitle')}
+            </DlgTitle>
+            <DialogDescription>
+              {t('otherVehiclesInYardDescription')}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="flex-1 overflow-y-auto p-4 bg-slate-50/50 overscroll-contain">
+            {otherVehiclesInYard.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-10 opacity-50">
+                <Truck className="h-10 w-10 mb-2" />
+                <span className="text-sm font-bold uppercase">{t('noReadyVehicles')}</span>
+              </div>
+            ) : (
+              <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {otherVehiclesInYard.map((v) => (
+                  <li key={v.device_id} className="bg-white p-3 rounded-md border shadow-sm flex flex-col gap-1">
+                    <div className="flex items-center justify-between">
+                      <span className="font-bold text-sm">{v.license_plate}</span>
+                      <Badge variant="outline" className="text-[10px] uppercase">
+                        {v.vehicle_name}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center justify-between mt-1 text-xs font-semibold text-slate-500">
+                      <div className="flex items-center gap-1">
+                        <MapPin className="h-3 w-3" />
+                        <span>{v.distance >= 1000 ? `${(v.distance / 1000).toFixed(1)} km` : `${v.distance} m`}</span>
+                      </div>
+                      <span className={cn(
+                        "px-1.5 py-0.5 rounded text-[10px] uppercase font-bold",
+                        v.status === 'run' ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"
+                      )}>
+                        {v.status === 'run' ? t('moving') : t('stopped')}
+                      </span>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
+          <DialogFooter className="p-3 bg-slate-50 border-t">
+            <Button onClick={() => setIsOtherVehiclesInYardDialogOpen(false)} variant="primary" size="sm" className="uppercase font-bold">
+              {tCommon('back')}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
