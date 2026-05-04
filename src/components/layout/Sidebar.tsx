@@ -19,6 +19,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import reportApi from "@/services/report.service";
 
 const UserProfile = ({ collapsed, userName, userRole, isLoading }: {
   collapsed: boolean;
@@ -80,6 +81,19 @@ export default function Sidebar() {
   const [mounted, setMounted] = useState(false);
   const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
   const [pendingUrl, setPendingUrl] = useState<string>("");
+  const [maintenanceAlertCount, setMaintenanceAlertCount] = useState(0);
+  const [hasCritical, setHasCritical] = useState(false);
+
+  // Fetch maintenance alert count on mount
+  useEffect(() => {
+    reportApi.getMaintenanceForecast().then((res) => {
+      const items = (res.data as any)?.vehicles ?? (res.data as any)?.items ?? [];
+      const critical = items.filter((i: any) => i.risk_level === "critical").length;
+      const warning = items.filter((i: any) => i.risk_level === "warning").length;
+      setMaintenanceAlertCount(critical + warning);
+      setHasCritical(critical > 0);
+    }).catch(() => {});
+  }, []);
 
   const { isDirty, setDirty } = useNavigationStore();
 
@@ -119,6 +133,34 @@ export default function Sidebar() {
           { key: ADMIN.ATTENDANCE, label: t("attendance"), icon: <CalendarCheck /> },
         ],
       },
+      {
+        key: "reports-menu",
+        label: "Báo cáo phân tích",
+        icon: <ClipboardList />,
+        roles: ["admin"],
+        children: [
+          { key: ADMIN.REPORT_PRODUCTION, label: "Báo cáo Sản lượng", icon: <Gauge /> },
+          /* {
+            key: ADMIN.REPORT_MAINTENANCE,
+            label: (
+              <span className="flex items-center justify-between w-full">
+                <span>Dự báo Bảo trì</span>
+                {maintenanceAlertCount > 0 && (
+                  <span
+                    className={`ml-2 inline-flex items-center justify-center rounded-full text-white font-bold text-[10px] px-1.5 min-w-[18px] h-[18px] shrink-0 ${hasCritical ? "animate-pulse" : ""}`}
+                    style={{ background: hasCritical ? "#ef4444" : "#f59e0b" }}
+                  >
+                    {maintenanceAlertCount}
+                  </span>
+                )}
+              </span>
+            ),
+            icon: <Wrench />,
+          }, */
+          { key: ADMIN.REPORT_FUEL, label: "Tiêu hao Nhiên liệu", icon: <ArrowRightLeft /> },
+        ],
+      },
+      // { key: ADMIN.END_OF_DAY, label: "Chốt Cuối Ngày", icon: <CalendarCheck />, roles: ["admin"] },
       //{ key: ADMIN.SYSTEM_SETTINGS, label: t("systemSettings"), icon: <Settings />, roles: ["admin"] },
       { key: USER.DASHBOARD, label: t("dashboard"), icon: <Gauge />, roles: ["user"] },
       { key: CUSTOMER.DASHBOARD, label: t("dashboard"), icon: <Gauge />, roles: ["customer"] },

@@ -16,6 +16,10 @@ export const ADMIN = {
   ATTENDANCE: "/admin/attendance",
   SHIFT_SLOTS: "/admin/shift-slots",
   SYSTEM_SETTINGS: "/admin/system-settings",
+  END_OF_DAY: "/admin/end-of-day",
+  REPORT_MAINTENANCE: "/admin/reports/maintenance",
+  REPORT_PRODUCTION: "/admin/reports/production",
+  REPORT_FUEL: "/admin/reports/fuel",
 };
 
 export const SHARE = {
