@@ -18,6 +18,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import reportApi from "@/services/report.service";
 
 const UserProfile = ({ collapsed, userName, userRole, isLoading }: {
   collapsed: boolean;
@@ -82,6 +83,19 @@ export default function Sidebar() {
   const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
   const [pendingUrl, setPendingUrl] = useState<string>("");
   const { hasPageAccess } = usePermissions();
+  const [maintenanceAlertCount, setMaintenanceAlertCount] = useState(0);
+  const [hasCritical, setHasCritical] = useState(false);
+
+  // Fetch maintenance alert count on mount
+  useEffect(() => {
+    reportApi.getMaintenanceForecast().then((res) => {
+      const items = (res.data as any)?.vehicles ?? (res.data as any)?.items ?? [];
+      const critical = items.filter((i: any) => i.risk_level === "critical").length;
+      const warning = items.filter((i: any) => i.risk_level === "warning").length;
+      setMaintenanceAlertCount(critical + warning);
+      setHasCritical(critical > 0);
+    }).catch(() => {});
+  }, []);
 
   const { isDirty, setDirty } = useNavigationStore();
 

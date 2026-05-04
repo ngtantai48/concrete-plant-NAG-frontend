@@ -1,25 +1,29 @@
 "use client";
 
-import { useAppDispatch, useAppSelector } from "@/hooks/use-app-selector";
 import authApi from "@/services/auth.service";
 import { logoutSuccess } from "@/store/slices/authSlice";
+import { useAppDispatch, useAppSelector } from "@/hooks/use-app-selector";
 import { Layout } from "antd";
 import { useTranslations } from "next-intl";
 import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 import AppHeader from "./Header";
 import Sidebar from "./Sidebar";
+
+const ChatbotPanel = dynamic(() => import("@/components/features/chatbot/ChatbotPanel"), { ssr: false });
+
 
 const { Content } = Layout;
 
 export default function DashboardLayoutClient({ children }: { children: React.ReactNode }) {
     const router = useRouter();
     const dispatch = useAppDispatch();
-    const t = useTranslations('Header');
+    const t = useTranslations("Header");
 
     const handleLogout = async () => {
         try {
             await authApi.logout();
-        } catch (err) {
+        } catch {
             console.warn("Logout API failed, continuing with local logout.");
         } finally {
             dispatch(logoutSuccess());
@@ -36,6 +40,8 @@ export default function DashboardLayoutClient({ children }: { children: React.Re
                     {children}
                 </Content>
             </Layout>
+            {/* Floating AI Chatbot — visible on all admin pages */}
+            <ChatbotPanel />
         </Layout>
     );
 }

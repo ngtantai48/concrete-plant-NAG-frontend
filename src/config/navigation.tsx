@@ -3,7 +3,7 @@ import { ROLES } from "@/constants/roles";
 import { SIDEBAR } from "@/constants/route";
 import {
   CalendarCheck, Car, Gauge, Layers, MapPin, Package, UsersRound,
-  Wrench, Settings, ShieldCheck, UserCog, UtensilsCrossed
+  Wrench, Settings, ShieldCheck, UserCog, UtensilsCrossed, ClipboardList, ArrowRightLeft
 } from "lucide-react";
 import React from "react";
 
@@ -128,6 +128,30 @@ export const navigationConfig: NavItem[] = [
         // ],
       },
     ],
+  },
+  {
+    key: "reports-group",
+    label: "reports",
+    icon: <ClipboardList />,
+    roles: [ROLES.ADMIN],
+    children: [
+      {
+        key: SIDEBAR.REPORT_PRODUCTION,
+        label: "reportProduction",
+        icon: <Gauge size={18} />,
+      },
+      {
+        key: SIDEBAR.REPORT_FUEL,
+        label: "reportFuel",
+        icon: <ArrowRightLeft size={18} />,
+      },
+    ],
+  },
+  {
+    key: SIDEBAR.END_OF_DAY,
+    label: "endOfDay",
+    icon: <CalendarCheck />,
+    roles: [ROLES.ADMIN],
   },
   {
     key: SIDEBAR.SYSTEM_SETTINGS,
