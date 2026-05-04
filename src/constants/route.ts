@@ -24,6 +24,8 @@ export const SIDEBAR = {
   REPORT_MAINTENANCE: "/reports/maintenance",
   REPORT_PRODUCTION: "/reports/production",
   REPORT_FUEL: "/reports/fuel",
+  END_OF_DAY: "/end-of-day",
+  DISPATCH_CENTER: "/dispatch-center",
 };
 <<<<<<< HEAD
 

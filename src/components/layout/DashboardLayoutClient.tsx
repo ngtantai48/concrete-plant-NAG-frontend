@@ -1,8 +1,8 @@
 "use client";
 
-import { useAppDispatch } from "@/hooks/use-app-selector";
 import authApi from "@/services/auth.service";
 import { logoutSuccess } from "@/store/slices/authSlice";
+import { useAppDispatch, useAppSelector } from "@/hooks/use-app-selector";
 import { Layout } from "antd";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
