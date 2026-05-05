@@ -602,7 +602,7 @@ export default function AdminDashboard() {
         <div className="absolute left-0 top-0 bottom-0 w-1" style={{ background: accentColor }} />
         <div className="flex justify-between items-center pl-2">
           <div className="flex items-center gap-1.5">
-            <span className="text-sm font-bold" style={{ color: 'var(--dd-text-primary)' }}>
+            <span className="text-sm font-extrabold">
               {v.vehicle_license_plate}{v.vehicle_name ? ` | ${v.vehicle_name}` : ''}
             </span>
           </div>
@@ -1607,9 +1607,7 @@ export default function AdminDashboard() {
               <Truck className="w-5 h-5 text-sky-500" />
               {t('otherVehiclesInYardTitle')}
             </DlgTitle>
-            <DialogDescription>
-              {t('otherVehiclesInYardDescription')}
-            </DialogDescription>
+            <DialogDescription>{t('otherVehiclesInYardDescription')}</DialogDescription>
           </DialogHeader>
 
           <div className="flex-1 overflow-y-auto p-4 bg-slate-50/50 overscroll-contain">
@@ -1621,20 +1619,17 @@ export default function AdminDashboard() {
             ) : (
               <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 {otherVehiclesInYard.map((v) => (
-                  <li key={v.device_id} className="bg-white p-3 rounded-md border shadow-sm flex flex-col gap-1">
+                  <li key={v.device_id} className="bg-white p-3 rounded-md border border-[#cbd5e1] flex flex-col gap-1">
                     <div className="flex items-center justify-between">
-                      <span className="font-bold text-sm">{v.license_plate}</span>
-                      <Badge variant="outline" className="text-[10px] uppercase">
-                        {v.vehicle_name}
-                      </Badge>
+                      <span className="font-bold text-base">{v?.license_plate} | {v?.vehicle_name}</span>
                     </div>
-                    <div className="flex items-center justify-between mt-1 text-xs font-semibold text-slate-500">
+                    <div className="flex items-center justify-between text-xs font-bold text-slate-500">
                       <div className="flex items-center gap-1">
-                        <MapPin className="h-3 w-3" />
+                        <MapPin size={15} />
                         <span>{v.distance >= 1000 ? `${(v.distance / 1000).toFixed(1)} km` : `${v.distance} m`}</span>
                       </div>
                       <span className={cn(
-                        "px-1.5 py-0.5 rounded text-[10px] uppercase font-bold",
+                        "px-1.5 py-0.5 rounded text-xs font-bold",
                         v.status === 'run' ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"
                       )}>
                         {v.status === 'run' ? t('moving') : t('stopped')}
@@ -1646,11 +1641,11 @@ export default function AdminDashboard() {
             )}
           </div>
 
-          <DialogFooter className="p-3 bg-slate-50 border-t">
+          {/* <DialogFooter className="p-3 bg-slate-50 border-t">
             <Button onClick={() => setIsOtherVehiclesInYardDialogOpen(false)} variant="primary" size="sm" className="uppercase font-bold">
               {tCommon('back')}
             </Button>
-          </DialogFooter>
+          </DialogFooter> */}
         </DialogContent>
       </Dialog>
 
