@@ -213,7 +213,7 @@ export default function MaintenanceForecast() {
         ].map((s, i) => (
           <Col xs={12} sm={12} lg={6} key={i}>
             <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.05 }}>
-              <Card className="border-0 shadow-sm rounded-2xl hover:shadow-md transition-all" bodyStyle={{ padding: 20 }}>
+              <Card className="border-0 shadow-sm rounded-2xl hover:shadow-md transition-all" styles={{ body: { padding: 20 } }}>
                 <div className="flex items-start justify-between">
                   <div>
                     <Text type="secondary" className="text-[11px] font-bold uppercase tracking-widest block mb-1">{s.label}</Text>
@@ -232,7 +232,7 @@ export default function MaintenanceForecast() {
         {/* risk pie */}
         <Col xs={24} lg={8}>
           <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}>
-            <Card className="border-0 shadow-sm rounded-2xl h-full" bodyStyle={{ padding: 20 }}>
+            <Card className="border-0 shadow-sm rounded-2xl h-full" styles={{ body: { padding: 20 } }}>
               <Title level={5} className="m-0 mb-3 font-bold">Phân bố mức rủi ro</Title>
               <div className="w-full h-[220px]">
                 <ResponsiveContainer width="100%" height="100%">
@@ -259,7 +259,7 @@ export default function MaintenanceForecast() {
         {/* most urgent */}
         <Col xs={24} lg={16}>
           <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
-            <Card className="border-0 shadow-sm rounded-2xl h-full" bodyStyle={{ padding: 0 }}>
+            <Card className="border-0 shadow-sm rounded-2xl h-full" styles={{ body: { padding: 0 } }}>
               <div className="px-5 py-4 border-b border-gray-50 flex items-center gap-2">
                 <div style={{ background: "#fef2f2", width: 32, height: 32, borderRadius: 10, display: "flex", alignItems: "center", justifyContent: "center" }}>
                   <CalendarClock size={16} className="text-red-500" />
@@ -296,7 +296,7 @@ export default function MaintenanceForecast() {
 
       {/* ── main table ─────────────────────────────────────────────────── */}
       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}>
-        <Card className="border-0 shadow-sm rounded-2xl overflow-hidden" bodyStyle={{ padding: 0 }}>
+        <Card className="border-0 shadow-sm rounded-2xl overflow-hidden" styles={{ body: { padding: 0 } }}>
           <div className="px-6 py-4 border-b border-gray-50 flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
             <div>
               <Title level={5} className="m-0 font-bold">Danh sách xe theo tiến độ bảo trì</Title>
@@ -323,7 +323,7 @@ export default function MaintenanceForecast() {
       </motion.div>
 
       {/* ── config drawer ──────────────────────────────────────────────── */}
-      <Drawer title={<Space><Settings2 size={20} className="text-amber-500" /><span className="font-bold">Cấu hình ngưỡng bảo trì</span></Space>} placement="right" onClose={() => setConfigOpen(false)} open={configOpen} width={400}
+      <Drawer title={<Space><Settings2 size={20} className="text-amber-500" /><span className="font-bold">Cấu hình ngưỡng bảo trì</span></Space>} placement="right" onClose={() => setConfigOpen(false)} open={configOpen} size={400}
         footer={<div className="flex justify-end gap-3"><Button onClick={() => setConfigOpen(false)}>Hủy</Button><Button type="primary" onClick={applyConfig} style={{ background: "#d97706", border: 0 }}>Áp dụng</Button></div>}
       >
         <div className="space-y-6">

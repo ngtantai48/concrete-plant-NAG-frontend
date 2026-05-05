@@ -144,7 +144,7 @@ export default function FuelProfilesTab({ vehicle_id, vehicles }: { vehicle_id?:
 
       {/* ═══ DRAWER THÊM/SỬA CẤU HÌNH ═══ */}
       <Drawer title={null} open={drawerOpen} onClose={() => { setDrawerOpen(false); setEditItem(null); }}
-        width={420} closable={false} styles={{ body: { padding: 0 }, header: { display: "none" } }}>
+        size={420} closable={false} styles={{ body: { padding: 0 }, header: { display: "none" } }}>
         <div className="h-full flex flex-col">
           <div className="flex justify-between items-center px-6 py-4 border-b border-slate-100">
             <div><h3 className="font-black text-lg text-slate-800 m-0">{editItem ? "Chỉnh sửa cấu hình" : "Thêm / Chỉnh sửa cấu hình"}</h3></div>

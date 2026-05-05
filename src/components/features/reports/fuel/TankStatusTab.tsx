@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useEffect, useRef } from "react";
 import { Input, Spin, Empty, Switch, DatePicker, Button } from "antd";
 import { Search, Route, Clock, AlertTriangle, Settings, Droplets, TrendingUp, CheckCircle2, Activity, MapPin, MoreHorizontal, Download, RefreshCw, Zap } from "lucide-react";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RTooltip, ResponsiveContainer, ReferenceDot } from "recharts";
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip as RTooltip, ReferenceDot } from "recharts";
 import dayjs from "dayjs";
 import dynamic from "next/dynamic";
 import type { FuelVehicleSummary, VehicleTankStatus, VehicleFuelProfile, FuelEvent } from "@/types/report";
@@ -13,6 +13,8 @@ import DashboardTab from "./DashboardTab";
 import FuelEventsTab from "./FuelEventsTab";
 import type { Vehicle } from "@/types/vehicle";
 import fuelApi from "@/services/fuel.service";
+import { logHttpError } from "@/lib/http-error";
+import SafeResponsiveChart from "@/components/features/reports/SafeResponsiveChart";
 
 const StationMap = dynamic(
   () => import("@/components/features/admin/dashboard/StationMap"),
@@ -89,7 +91,11 @@ export default function TankStatusTab({ tanks, loading, useVTracking, setUseVTra
     return (rangeEnd.isAfter(now) ? now : rangeEnd).format("YYYY-MM-DD HH:mm:ss");
   }, [dateRange]);
   const [search, setSearch] = useState("");
-  const normalizedSelectedVehicleId = toVehicleId(selectedVehicleId);
+  const normalizedSelectedVehicleId = useMemo(() => {
+    const id = N(selectedVehicleId);
+    return id > 0 ? id : null;
+  }, [selectedVehicleId]);
+
   const [selectedId, setSelectedId] = useState<number | null>(normalizedSelectedVehicleId);
   const [activeTab, setActiveTab] = useState("Tổng quan");
   const [refreshTick, setRefreshTick] = useState(0);
@@ -112,13 +118,15 @@ export default function TankStatusTab({ tanks, loading, useVTracking, setUseVTra
   const [todaySnapshot, setTodaySnapshot] = useState<VehicleTankStatus | null>(null);
   const [loadingTodaySnapshot, setLoadingTodaySnapshot] = useState(false);
   const baseTank = useMemo(() => {
-    if (!tanks?.length) return undefined;
-    if (selectedId == null) return tanks[0];
-    return tanks.find((tank) => toVehicleId(tank.vehicle_id) === selectedId) || tanks[0];
+    const normalizedSelectedId = N(selectedId);
+    return tanks.find((tank) => N(tank.vehicle_id) === normalizedSelectedId) || tanks[0];
   }, [tanks, selectedId]);
 
+  const baseVehicleId = N(baseTank?.vehicle_id);
+
   // The "active" tank is the detailed one if available and VTracking is on, otherwise the base one
-  const activeTank = (useVTracking && detailedTank && baseTank && detailedTank.vehicle_id === baseTank.vehicle_id) ? detailedTank : baseTank;
+  const activeTank = (useVTracking && detailedTank && baseTank && N(detailedTank.vehicle_id) === baseVehicleId) ? detailedTank : baseTank;
+  const activeVehicleId = N(activeTank?.vehicle_id);
   const displayTanks = useMemo(
     () => tanks.map((tank) => (tank.vehicle_id === activeTank?.vehicle_id ? { ...tank, ...activeTank } : tank)),
     [tanks, activeTank]
@@ -130,8 +138,19 @@ export default function TankStatusTab({ tanks, loading, useVTracking, setUseVTra
     onRequestRefresh?.();
   };
 
+  const handleSelectVehicle = (vehicleId: number) => {
+    const normalizedId = N(vehicleId);
+    if (normalizedId <= 0) return;
+    if (normalizedId !== N(selectedId)) {
+      setSelectedId(normalizedId);
+    }
+    if (normalizedId !== N(selectedVehicleId)) {
+      onSelectedVehicleChange?.(normalizedId);
+    }
+  };
+
   const tanksFingerprint = useMemo(
-    () => tanks?.map((tank) => toVehicleId(tank.vehicle_id) ?? 0).sort((a, b) => a - b).join(",") || "",
+    () => tanks?.map((tank) => N(tank.vehicle_id)).sort((a, b) => a - b).join(",") || "",
     [tanks]
   );
   useEffect(() => {
@@ -142,7 +161,7 @@ export default function TankStatusTab({ tanks, loading, useVTracking, setUseVTra
 
   // Fetch Detailed Runtime for selected vehicle
   useEffect(() => {
-    if (!baseTank?.vehicle_id || !useVTracking) {
+    if (!baseVehicleId || !useVTracking) {
       setDetailedTank(null);
       return;
     }
@@ -155,7 +174,7 @@ export default function TankStatusTab({ tanks, loading, useVTracking, setUseVTra
     const realtimeTo = snapshotAt;
 
     const params: any = {
-      vehicle_id: baseTank.vehicle_id,
+      vehicle_id: baseVehicleId,
       to: realtimeTo,
       include_vtracking_runtime: 1,
       runtime_concurrency: 1
@@ -168,21 +187,21 @@ export default function TankStatusTab({ tanks, loading, useVTracking, setUseVTra
         const item = res.data?.items?.[0] || (Array.isArray(res.data) ? res.data[0] : null);
         if (item) setDetailedTank(item);
       })
-      .catch(console.error)
+      .catch((error) => logHttpError("Fuel detail runtime failed", error))
       .finally(() => {
         if (reqId === detailReqIdRef.current) setLoadingDetail(false);
       });
-  }, [baseTank?.vehicle_id, baseTank?.configured_opening_fuel_at, useVTracking, refreshTick, snapshotAt]);
+  }, [baseVehicleId, baseTank?.configured_opening_fuel_at, useVTracking, refreshTick, snapshotAt]);
 
   useEffect(() => {
-    if (!baseTank?.vehicle_id) {
+    if (!baseVehicleId) {
       setTodaySnapshot(null);
       return;
     }
     const reqId = ++todayReqIdRef.current;
     setLoadingTodaySnapshot(true);
     fuelApi.getTankStatus({
-      vehicle_id: baseTank.vehicle_id,
+      vehicle_id: baseVehicleId,
       from: dayjs().startOf("day").format("YYYY-MM-DD HH:mm:ss"),
       to: snapshotAt,
       include_vtracking_runtime: 1,
@@ -193,24 +212,24 @@ export default function TankStatusTab({ tanks, loading, useVTracking, setUseVTra
         const item = res.data?.items?.[0] || (Array.isArray(res.data) ? res.data[0] : null);
         setTodaySnapshot(item || null);
       })
-      .catch(console.error)
+      .catch((error) => logHttpError("Fuel today snapshot failed", error))
       .finally(() => {
         if (reqId === todayReqIdRef.current) setLoadingTodaySnapshot(false);
       });
-  }, [baseTank?.vehicle_id, refreshTick, snapshotAt]);
+  }, [baseVehicleId, refreshTick, snapshotAt]);
 
   // Fetch Fuel Profile for selected vehicle to compare
   useEffect(() => {
-    if (!baseTank?.vehicle_id) return;
+    if (!baseVehicleId) return;
     setLoadingProfile(true);
-    fuelApi.getProfiles({ vehicle_id: baseTank.vehicle_id, limit: 1 })
+    fuelApi.getProfiles({ vehicle_id: baseVehicleId, limit: 1 })
       .then(res => {
         const p = Array.isArray(res.data) ? res.data[0] : (res.data as any)?.data?.[0];
         setActiveProfile(p || null);
       })
-      .catch(console.error)
+      .catch((error) => logHttpError("Fuel profile failed", error))
       .finally(() => setLoadingProfile(false));
-  }, [baseTank?.vehicle_id]);
+  }, [baseVehicleId]);
 
   const filtered = useMemo(() => {
     let list = displayTanks;
@@ -222,29 +241,31 @@ export default function TankStatusTab({ tanks, loading, useVTracking, setUseVTra
   }, [displayTanks, search]);
 
   useEffect(() => {
-    if (normalizedSelectedVehicleId == null) return;
-    setSelectedId((prev) => (prev === normalizedSelectedVehicleId ? prev : normalizedSelectedVehicleId));
-  }, [normalizedSelectedVehicleId]);
+    const nextId = N(selectedVehicleId);
+    if (nextId > 0 && nextId !== N(selectedId)) {
+      setSelectedId(nextId);
+    }
+  }, [selectedVehicleId, selectedId]);
 
   useEffect(() => {
     lastSyncIdRef.current = normalizedSelectedVehicleId;
   }, [normalizedSelectedVehicleId]);
 
   useEffect(() => {
-    const currentId = toVehicleId(activeTank?.vehicle_id);
-    if (currentId && currentId !== normalizedSelectedVehicleId && currentId !== lastSyncIdRef.current) {
+    const currentId = N(activeTank?.vehicle_id);
+    if (currentId > 0 && currentId !== normalizedSelectedVehicleId && currentId !== lastSyncIdRef.current) {
       lastSyncIdRef.current = currentId;
       onSelectedVehicleChange?.(currentId);
     }
   }, [activeTank?.vehicle_id, normalizedSelectedVehicleId, onSelectedVehicleChange]);
 
   useEffect(() => {
-    if (!activeTank?.vehicle_id) return;
+    if (!activeVehicleId) return;
     const reqId = ++timeseriesReqIdRef.current;
     setLoadingTimeseries(true);
     const realtimeFrom = dayjs(snapshotAt).startOf("day").format("YYYY-MM-DD HH:mm:ss");
     const realtimeTo = snapshotAt;
-    fuelApi.getTankTimeseries({ vehicle_id: activeTank.vehicle_id, from: realtimeFrom, to: realtimeTo, step_minutes: 30 })
+    fuelApi.getTankTimeseries({ vehicle_id: activeVehicleId, from: realtimeFrom, to: realtimeTo, step_minutes: 30 })
       .then(res => {
         if (reqId !== timeseriesReqIdRef.current) return;
         const sorted = [...(res.data.timeseries || [])].sort(
@@ -260,11 +281,11 @@ export default function TankStatusTab({ tanks, loading, useVTracking, setUseVTra
           : [nowPoint];
         setTimeseries(withRealtimeTail);
       })
-      .catch(console.error)
+      .catch((error) => logHttpError("Fuel timeseries failed", error))
       .finally(() => {
         if (reqId === timeseriesReqIdRef.current) setLoadingTimeseries(false);
       });
-  }, [activeTank?.vehicle_id, activeTank?.current_fuel_liters, refreshTick, snapshotAt]);
+  }, [activeVehicleId, activeTank?.current_fuel_liters, refreshTick, snapshotAt]);
 
   // Fetch vtracking data for map with a dummy center (Da Nang) and large radius
   // Reduced interval to 60s and radius to 500km to avoid heavy processing
@@ -289,13 +310,21 @@ export default function TankStatusTab({ tanks, loading, useVTracking, setUseVTra
 
   // Fetch Events - Only refetch if vehicle_id actually changes
   React.useEffect(() => {
-    if (!activeTank?.vehicle_id) return;
+    if (!activeVehicleId) return;
     setLoadingEvents(true);
-    fuelApi.getEvents({ vehicle_id: activeTank.vehicle_id, page: 1, limit: 5 })
-      .then(res => setEvents(res.data?.data || []))
-      .catch(console.error)
+    fuelApi.getEvents({ vehicle_id: activeVehicleId, page: 1, limit: 5 })
+      .then(res => {
+        const nextEvents = res.data?.data || [];
+        setEvents((prev) => {
+          if (prev.length === nextEvents.length && prev.every((item, index) => N(item.fuel_event_id) === N(nextEvents[index]?.fuel_event_id))) {
+            return prev;
+          }
+          return nextEvents;
+        });
+      })
+      .catch((error) => logHttpError("Fuel recent events failed", error))
       .finally(() => setLoadingEvents(false));
-  }, [activeTank?.vehicle_id, refreshTick]);
+  }, [activeVehicleId, refreshTick]);
 
   if (loading) return <div className="flex justify-center items-center h-64"><Spin size="large" /></div>;
   if (!tanks.length) return <Empty description="Không có dữ liệu" className="mt-10" />;
@@ -418,7 +447,7 @@ export default function TankStatusTab({ tanks, loading, useVTracking, setUseVTra
               const isSel = t.vehicle_id === activeTank.vehicle_id;
               const tNoBase = !canComputeBaseline(t);
               return (
-                <div key={t.vehicle_id} onClick={() => setSelectedId(toVehicleId(t.vehicle_id))}
+                <div key={t.vehicle_id} onClick={() => handleSelectVehicle(N(t.vehicle_id))}
                   className={`flex items-center p-3 border-b border-slate-50 cursor-pointer transition-colors ${isSel ? 'bg-blue-600 text-white' : 'hover:bg-slate-50'}`}>
                   <div className="flex items-center gap-3">
                     <div className={`w-2.5 h-2.5 rounded-full ${isSel ? 'bg-white' : tNoBase ? 'bg-rose-400' : 'bg-emerald-400'}`} />
@@ -912,7 +941,11 @@ export default function TankStatusTab({ tanks, loading, useVTracking, setUseVTra
               ) : timeseries.length === 0 ? (
                 <Empty description="Chưa có dữ liệu biểu đồ" />
               ) : (
+<<<<<<< HEAD:src/components/features/reports/fuel/TankStatusTab.tsx
                 <ResponsiveContainer width="100%" height={200}>
+=======
+                <SafeResponsiveChart>
+>>>>>>> fe8689c (feat: implement fuel management and reporting features including tank status monitoring, consumption analytics, and maintenance forecasting.):src/components/features/admin/reports/fuel/TankStatusTab.tsx
                   <LineChart data={timeseries} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                     <XAxis
@@ -964,7 +997,7 @@ export default function TankStatusTab({ tanks, loading, useVTracking, setUseVTra
                       activeDot={{ r: 6, fill: '#6366f1', stroke: '#fff', strokeWidth: 2 }}
                     />
                   </LineChart>
-                </ResponsiveContainer>
+                </SafeResponsiveChart>
               )}
             </div>
           </div>
