@@ -440,7 +440,7 @@ const Tip = ({ active, payload, label }: any) => {
 /* Compact metric strip — single card, 4 metrics side by side */
 const MetricStrip = ({ metrics }: { metrics: { label: string; value: string | number; sub?: string; accent: string; icon: React.ReactNode; border: string }[] }) => (
   <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.35 }}>
-    <Card className="border-0 shadow-sm rounded-2xl" bodyStyle={{ padding: 0 }}>
+    <Card className="border-0 shadow-sm rounded-2xl" styles={{ body: { padding: 0 } }}>
       <div className="grid grid-cols-2 lg:grid-cols-4 divide-x divide-y lg:divide-y-0 divide-gray-100">
         {metrics.map((m, i) => (
           <div key={i} className="flex items-center gap-3 px-5 py-4">
@@ -1135,7 +1135,7 @@ export default function ProductionDashboard() {
     <div className="space-y-3">
       {/* ═══ HEADER BAR ═══ */}
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-        <Card className="border border-slate-200/70 shadow-sm rounded-2xl" bodyStyle={{ padding: "14px 20px" }}>
+        <Card className="border border-slate-200/70 shadow-sm rounded-2xl" styles={{ body: { padding: "14px 20px" } }}>
           <div className="flex items-center justify-between flex-wrap gap-3">
             <div className="flex items-center gap-3">
               <div style={{ background: "#eff6ff", width: 38, height: 38, borderRadius: 11, display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -1175,7 +1175,7 @@ export default function ProductionDashboard() {
         {/* ═══ ROW 1: 5 KPI cards ═══ */}
         <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}>
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-3">
-            <Card className="border border-slate-200/70 shadow-sm rounded-2xl" bodyStyle={{ padding: "14px 16px 10px" }}>
+            <Card className="border border-slate-200/70 shadow-sm rounded-2xl" styles={{ body: { padding: "14px 16px 10px" } }}>
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5">
                   <Text className="text-[11px] font-extrabold uppercase tracking-wide text-slate-500">Sản lượng trung bình</Text>
@@ -1250,7 +1250,7 @@ export default function ProductionDashboard() {
                 bg: "#f5f3ff",
               },
             ].map((metric) => (
-              <Card key={metric.label} className="border border-slate-200/70 shadow-sm rounded-2xl" bodyStyle={{ padding: "14px 16px" }}>
+              <Card key={metric.label} className="border border-slate-200/70 shadow-sm rounded-2xl" styles={{ body: { padding: "14px 16px" } }}>
                 <div className="flex items-center gap-2.5 mb-2">
                   <span className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: metric.bg, color: metric.color }}>
                     {metric.icon}
@@ -1283,7 +1283,7 @@ export default function ProductionDashboard() {
             <div className="flex flex-col gap-4 h-full">
               {/* Total this period */}
               <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }} className="flex-1">
-                <Card className="border-0 shadow-sm rounded-2xl h-full" bodyStyle={{ padding: "16px 18px", overflow: "visible" }}>
+                <Card className="border-0 shadow-sm rounded-2xl h-full" styles={{ body: { padding: "16px 18px", overflow: "visible" } }}>
                   <span className="text-[13px] font-extrabold text-slate-700 block">{groupedSeries.length} kỳ thống kê</span>
                   <span className="text-[12px] font-bold text-slate-500 block mb-0.5">{dayjs(data.from).format("DD/MM")} – {dayjs(data.to).format("DD/MM")}</span>
                   <div className="font-black text-[32px] mb-1" style={{ color: "#0f172a" }}>{(s?.total_orders ?? 0).toLocaleString("vi-VN")}</div>
@@ -1309,7 +1309,7 @@ export default function ProductionDashboard() {
               </motion.div>
               {/* Donut gauge */}
               <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="flex-1">
-                <Card className="border-0 shadow-sm rounded-2xl h-full" bodyStyle={{ padding: "16px 18px", display: "flex", flexDirection: "column", alignItems: "center" }}>
+                <Card className="border-0 shadow-sm rounded-2xl h-full" styles={{ body: { padding: "16px 18px", display: "flex", flexDirection: "column", alignItems: "center" } }}>
                   <span className="text-[13px] font-extrabold text-slate-700 block mb-1 self-start">Tỷ lệ hoàn thành</span>
                   <div className="w-[100px] h-[100px] relative">
                     <ResponsiveContainer width="100%" height="100%">
@@ -1333,7 +1333,7 @@ export default function ProductionDashboard() {
           {/* Center — Main chart */}
           <Col xs={24} lg={12}>
             <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }} className="h-full">
-              <Card className="border-0 shadow-sm rounded-2xl h-full" bodyStyle={{ padding: "16px 20px 8px" }}>
+              <Card className="border-0 shadow-sm rounded-2xl h-full" styles={{ body: { padding: "16px 20px 8px" } }}>
                 <div className="flex items-center justify-between mb-3">
                   <div>
                     <Title level={5} className="m-0 text-[15px]">Sản lượng theo ngày</Title>
@@ -1391,7 +1391,7 @@ export default function ProductionDashboard() {
           {/* Right — Station performance with circular rings */}
           <Col xs={24} lg={7}>
             <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }} className="h-full">
-              <Card className="border-0 shadow-sm rounded-2xl h-full" bodyStyle={{ padding: 0, display: "flex", flexDirection: "column", height: "100%" }}>
+              <Card className="border-0 shadow-sm rounded-2xl h-full" styles={{ body: { padding: 0, display: "flex", flexDirection: "column", height: "100%" } }}>
                 <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between shrink-0">
                   <div>
                     <Title level={5} className="m-0 text-[15px]">Hiệu suất Trạm</Title>
@@ -1446,7 +1446,7 @@ export default function ProductionDashboard() {
 
           {/* Recent Periods — compact list */}
           <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }} className="min-h-0">
-            <Card className="border-0 shadow-sm rounded-2xl h-full" bodyStyle={{ padding: 0, display: "flex", flexDirection: "column", height: "100%" }}>
+            <Card className="border-0 shadow-sm rounded-2xl h-full" styles={{ body: { padding: 0, display: "flex", flexDirection: "column", height: "100%" } }}>
               <div className="px-4 py-2.5 border-b border-gray-100 flex items-center justify-between shrink-0">
                 <div>
                   <Title level={5} className="m-0 text-[15px]">Sản lượng theo kỳ gần nhất</Title>
@@ -1511,7 +1511,7 @@ export default function ProductionDashboard() {
 
           {/* Pie — Status Distribution + Summary */}
           <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.4 }} className="min-h-0">
-            <Card className="border-0 shadow-sm rounded-2xl h-full" bodyStyle={{ padding: 0, display: "flex", flexDirection: "column", height: "100%" }}>
+            <Card className="border-0 shadow-sm rounded-2xl h-full" styles={{ body: { padding: 0, display: "flex", flexDirection: "column", height: "100%" } }}>
               <div className="px-4 py-2.5 border-b border-gray-100 flex items-center justify-between shrink-0">
                 <Title level={5} className="m-0 text-[15px]">Phân bổ trạng thái</Title>
                 <Tag color="blue" className="rounded-full border-0 text-[11px] font-bold">{pie.length} loại</Tag>
@@ -1567,7 +1567,7 @@ export default function ProductionDashboard() {
         okText="Xuất báo cáo"
         cancelText="Hủy"
         confirmLoading={exporting}
-        destroyOnClose
+        destroyOnHidden
       >
         {pendingExportScope === "by_vehicle" ? (
           <div className="space-y-3">
@@ -1608,7 +1608,7 @@ export default function ProductionDashboard() {
       {/* Period drill-down Drawer */}
       <Drawer
         title={null}
-        placement="right" width={980}
+        placement="right" size={980}
         open={periodDrawer} onClose={() => {
           setPeriodDrawer(false);
           setPeriodVehicleSearch("");
@@ -1751,7 +1751,7 @@ export default function ProductionDashboard() {
       <Drawer
         title={null}
         placement="right"
-        width={940}
+        size={940}
         open={stationDrawer}
         onClose={() => setStationDrawer(false)}
         styles={{ header: { display: "none" }, body: { padding: 0 } }}

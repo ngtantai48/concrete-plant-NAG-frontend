@@ -208,7 +208,7 @@ export default function FuelEventsTabNew({ from, to, vehicle_id, vehicles, onMut
 
       {/* ═══ DRAWER THÊM GIAO DỊCH ═══ */}
       <Drawer title={null} open={drawerOpen} onClose={() => { setDrawerOpen(false); setEditItem(null); }}
-        width={420} closable={false} styles={{ body: { padding: 0, background: "#fff" }, header: { display: "none" } }}>
+        size={420} closable={false} styles={{ body: { padding: 0, background: "#fff" }, header: { display: "none" } }}>
         <div className="h-full flex flex-col">
           {/* Header */}
           <div className="flex justify-between items-center px-6 py-4 border-b border-slate-100">

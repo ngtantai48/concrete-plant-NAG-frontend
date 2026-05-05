@@ -180,7 +180,7 @@ export default function VehicleRanking({ vehicles, baseQuery, maxOrders: _maxOrd
 
   return (
     <>
-      <Card className="border border-slate-200/70 shadow-sm rounded-2xl h-full" bodyStyle={{ padding: 0, display: "flex", flexDirection: "column", height: "100%" }}>
+      <Card className="border border-slate-200/70 shadow-sm rounded-2xl h-full" styles={{ body: { padding: 0, display: "flex", flexDirection: "column", height: "100%" } }}>
         <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between shrink-0 gap-3 flex-nowrap">
           <div className="min-w-0">
             <div className="flex items-center gap-2.5 min-w-0">
@@ -271,7 +271,7 @@ export default function VehicleRanking({ vehicles, baseQuery, maxOrders: _maxOrd
       <Drawer
         title={null}
         placement="right"
-        width={960}
+        size={960}
         onClose={() => setDrawerOpen(false)}
         open={drawerOpen}
         styles={{ header: { display: "none" }, body: { padding: 0 } }}
