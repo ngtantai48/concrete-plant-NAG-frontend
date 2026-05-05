@@ -22,6 +22,23 @@ export default function FuelConsumptionReport() {
     vehicleApi.getAll({ limit: 100 }).then(r => setVehicles(r.data.data)).catch(console.error);
   }, []);
 
+  useEffect(() => {
+    if (process.env.NODE_ENV !== "development") return;
+    const originalWarn = console.warn;
+
+    console.warn = (...args: unknown[]) => {
+      const message = args.map((item) => (typeof item === "string" ? item : "")).join(" ");
+      if (message.includes("The width(-1) and height(-1) of chart should be greater than 0")) {
+        return;
+      }
+      originalWarn(...args);
+    };
+
+    return () => {
+      console.warn = originalWarn;
+    };
+  }, []);
+
   const fetchTankData = useCallback((options?: { silent?: boolean }) => {
     const isSilent = options?.silent === true;
     if (!isSilent) setTankLoading(true);
