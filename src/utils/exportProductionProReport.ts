@@ -215,16 +215,16 @@ const renderSection = (section: ProProductionSection, index: number) => {
 
         <div class="summary-grid">
           ${section.summaryCards
-            .map(
-              (card) => `
+        .map(
+          (card) => `
                 <div class="summary-card">
                   <div class="summary-label">${escapeHtml(card.label)}</div>
                   <div class="summary-value">${escapeHtml(card.value)}</div>
                   ${card.hint ? `<div class="summary-hint">${escapeHtml(card.hint)}</div>` : ""}
                 </div>
               `
-            )
-            .join("")}
+        )
+        .join("")}
         </div>
 
         <div class="insight-box">
@@ -236,14 +236,14 @@ const renderSection = (section: ProProductionSection, index: number) => {
           </div>
           <div class="insight-list">
             ${renderInsightItems(
-              section.insights?.length
-                ? section.insights
-                : [
-                    { label: "Tổng chuyến", value: section.summaryCards[0]?.value || "0" },
-                    { label: "Hoàn thành", value: section.summaryCards[1]?.value || "0" },
-                    { label: "Tổng KM", value: section.summaryCards[3]?.value || "0" },
-                  ]
-            )}
+          section.insights?.length
+            ? section.insights
+            : [
+              { label: "Tổng chuyến", value: section.summaryCards[0]?.value || "0" },
+              { label: "Hoàn thành", value: section.summaryCards[1]?.value || "0" },
+              { label: "Tổng KM", value: section.summaryCards[3]?.value || "0" },
+            ]
+        )}
           </div>
         </div>
 

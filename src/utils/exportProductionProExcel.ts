@@ -578,11 +578,11 @@ const renderSummaryCards = (
         },
         ...(card.hint
           ? [
-              {
-                text: card.hint,
-                font: { name: "Segoe UI", size: hintSize, bold: true, color: { argb: ARGB(THEME.slate700) } },
-              },
-            ]
+            {
+              text: card.hint,
+              font: { name: "Segoe UI", size: hintSize, bold: true, color: { argb: ARGB(THEME.slate700) } },
+            },
+          ]
           : []),
       ],
     };
@@ -609,21 +609,21 @@ const renderPanel = (
   worksheet.mergeCells(range);
   root.value = options.title
     ? {
-        richText: [
-          {
-            text: `${options.title}\n`,
-            font: { name: "Segoe UI", size: 12, bold: true, color: { argb: ARGB(THEME.slate900) } },
-          },
-          ...(options.subtitle
-            ? [
-                {
-                  text: options.subtitle,
-                  font: { name: "Segoe UI", size: 10, color: { argb: ARGB(THEME.slate500) } },
-                },
-              ]
-            : []),
-        ],
-      }
+      richText: [
+        {
+          text: `${options.title}\n`,
+          font: { name: "Segoe UI", size: 12, bold: true, color: { argb: ARGB(THEME.slate900) } },
+        },
+        ...(options.subtitle
+          ? [
+            {
+              text: options.subtitle,
+              font: { name: "Segoe UI", size: 10, color: { argb: ARGB(THEME.slate500) } },
+            },
+          ]
+          : []),
+      ],
+    }
     : "";
   root.alignment = { vertical: "top", horizontal: "left", wrapText: true };
   root.fill = {
@@ -649,17 +649,17 @@ const renderSectionBanner = (
   worksheet.mergeCells(range);
   root.value = subtitle
     ? {
-        richText: [
-          {
-            text: `${title}\n`,
-            font: { name: "Segoe UI", size: 13, bold: true, color: { argb: ARGB(THEME.slate900) } },
-          },
-          {
-            text: subtitle,
-            font: { name: "Segoe UI", size: 10, color: { argb: ARGB(THEME.slate500) } },
-          },
-        ],
-      }
+      richText: [
+        {
+          text: `${title}\n`,
+          font: { name: "Segoe UI", size: 13, bold: true, color: { argb: ARGB(THEME.slate900) } },
+        },
+        {
+          text: subtitle,
+          font: { name: "Segoe UI", size: 10, color: { argb: ARGB(THEME.slate500) } },
+        },
+      ],
+    }
     : title;
   root.alignment = { vertical: "middle", horizontal: "left", wrapText: true };
   root.fill = { type: "pattern", pattern: "solid", fgColor: { argb: ARGB("F8FAFC") } };

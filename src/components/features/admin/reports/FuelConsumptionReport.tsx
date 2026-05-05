@@ -1,6 +1,6 @@
 "use client";
-import React, { useState, useEffect, useCallback } from "react";
-import { Typography, DatePicker } from "antd";
+import React, { useState, useEffect, useCallback, useMemo } from "react";
+import { Typography } from "antd";
 import { Activity } from "lucide-react";
 import dayjs from "dayjs";
 import fuelApi from "@/services/fuel.service";
@@ -10,11 +10,10 @@ import type { Vehicle } from "@/types/vehicle";
 import TankStatusTab from "./fuel/TankStatusTab";
 
 const { Title } = Typography;
-const { RangePicker } = DatePicker;
 
 export default function FuelConsumptionReport() {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
-  const [selectedVehicle, setSelectedVehicle] = useState<number | undefined>();
+  const [focusedVehicleId, setFocusedVehicleId] = useState<number | undefined>();
   const [useVTracking, setUseVTracking] = useState(true);
   const [tankData, setTankData] = useState<VehicleTankStatus[]>([]);
   const [tankLoading, setTankLoading] = useState(false);
@@ -27,20 +26,25 @@ export default function FuelConsumptionReport() {
     const isSilent = options?.silent === true;
     if (!isSilent) setTankLoading(true);
     return fuelApi.getTankStatus({
-      vehicle_id: selectedVehicle,
       to: dayjs().format("YYYY-MM-DD HH:mm:ss"),
       include_vtracking_runtime: 1,
       runtime_concurrency: 1,
     })
       .then(r => {
         const d = r?.data;
-        setTankData(d?.items || (Array.isArray(d) ? d : []));
+        const items = d?.items || (Array.isArray(d) ? d : []);
+        setTankData(items);
+        setFocusedVehicleId((prev) => {
+          if (!items.length) return undefined;
+          if (prev && items.some((item: VehicleTankStatus) => item.vehicle_id === prev)) return prev;
+          return items[0].vehicle_id;
+        });
       })
       .catch(console.error)
       .finally(() => {
         if (!isSilent) setTankLoading(false);
       });
-  }, [selectedVehicle]);
+  }, []);
 
   useEffect(() => {
     fetchTankData();
@@ -53,6 +57,13 @@ export default function FuelConsumptionReport() {
     return () => clearInterval(timer);
   }, [fetchTankData]);
 
+  const focusedVehicleLabel = useMemo(() => {
+    const focus = tankData.find((item) => item.vehicle_id === focusedVehicleId);
+    if (focus) return `${focus.vehicle_name} — ${focus.vehicle_license_plate}`;
+    const veh = vehicles.find((item) => item.vehicle_id === focusedVehicleId);
+    return veh ? `${veh.vehicle_name} — ${veh.vehicle_license_plate}` : "";
+  }, [tankData, vehicles, focusedVehicleId]);
+
   return (
     <div className="flex flex-col min-h-screen bg-slate-50">
       <div className="bg-white border-b border-slate-200 px-6 py-4 flex-shrink-0">
@@ -62,7 +73,14 @@ export default function FuelConsumptionReport() {
               <Activity size={24} />
             </div>
             <div>
-              <Title level={4} className="m-0 font-black text-slate-800">Quản lý Nhiên liệu</Title>
+              <div className="flex items-center gap-2 flex-wrap">
+                <Title level={4} className="m-0 font-black text-slate-800">Quản lý Nhiên liệu</Title>
+                {focusedVehicleLabel && (
+                  <span className="inline-flex items-center rounded-lg border border-blue-100 bg-blue-50 px-2.5 py-1 text-xs font-black text-blue-700">
+                    {focusedVehicleLabel}
+                  </span>
+                )}
+              </div>
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -81,8 +99,9 @@ export default function FuelConsumptionReport() {
           useVTracking={useVTracking}
           setUseVTracking={setUseVTracking}
           vehicles={vehicles}
-          selectedVehicleId={selectedVehicle}
+          selectedVehicleId={focusedVehicleId}
           onRequestRefresh={() => fetchTankData({ silent: true })}
+          onSelectedVehicleChange={setFocusedVehicleId}
         />
       </div>
 
