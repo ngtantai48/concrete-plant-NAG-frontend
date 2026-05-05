@@ -10,6 +10,10 @@ import type { Vehicle } from "@/types/vehicle";
 import TankStatusTab from "./fuel/TankStatusTab";
 
 const { Title } = Typography;
+const toVehicleId = (value: any): number | undefined => {
+  const id = Number(value);
+  return Number.isFinite(id) && id > 0 ? id : undefined;
+};
 
 export default function FuelConsumptionReport() {
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
@@ -36,8 +40,11 @@ export default function FuelConsumptionReport() {
         setTankData(items);
         setFocusedVehicleId((prev) => {
           if (!items.length) return undefined;
-          if (prev && items.some((item: VehicleTankStatus) => item.vehicle_id === prev)) return prev;
-          return items[0].vehicle_id;
+          const normalizedPrev = toVehicleId(prev);
+          if (normalizedPrev && items.some((item: VehicleTankStatus) => toVehicleId(item.vehicle_id) === normalizedPrev)) {
+            return normalizedPrev;
+          }
+          return toVehicleId(items[0].vehicle_id);
         });
       })
       .catch(console.error)
