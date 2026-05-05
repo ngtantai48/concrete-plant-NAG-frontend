@@ -1,5 +1,4 @@
 import SystemSettingsForm from "@/components/features/admin/system-settings/SystemSettingsForm";
-import { useTranslations } from "next-intl";
 import { getTranslations } from "next-intl/server";
 
 export async function generateMetadata({ params: { locale } }: { params: { locale: string } }) {

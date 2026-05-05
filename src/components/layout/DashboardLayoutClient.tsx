@@ -1,6 +1,5 @@
 "use client";
 
-import AuthGuard from "@/guards/AuthGuard";
 import { useAppDispatch, useAppSelector } from "@/hooks/use-app-selector";
 import authApi from "@/services/auth.service";
 import { logoutSuccess } from "@/store/slices/authSlice";

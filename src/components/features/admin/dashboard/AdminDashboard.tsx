@@ -664,11 +664,11 @@ export default function AdminDashboard() {
                   <Button
                     variant="outline"
                     className={cn(
-                      "h-8 w-[150px] px-2 text-sm font-bold justify-start text-left border-slate-200 bg-white/80 transition-all shadow-none hover:bg-white hover:border-sky-400 focus-visible:ring-1 focus-visible:ring-sky-500",
+                      "h-8 w-37.5 px-2 text-sm font-bold justify-start text-left border-slate-200 bg-white/80 transition-all shadow-none hover:bg-white hover:border-sky-400 focus-visible:ring-1 focus-visible:ring-sky-500",
                       !selectedDate && "text-muted-foreground"
                     )}
                   >
-                    <CalendarIcon className="mr-2 text-sky-500" />
+                    <CalendarIcon className="text-sky-500" />
                     {selectedDate ? format(new Date(selectedDate), "dd/MM/yyyy") : <span>Chọn ngày</span>}
                   </Button>
                 </PopoverTrigger>
@@ -690,16 +690,14 @@ export default function AdminDashboard() {
               </Popover>
 
               {/* Sync Shift Button (replaces hidden Chốt ca button) */}
-              <div className="border-l border-slate-200 pl-2 flex items-center gap-1.5">
+              <div className="border-l border-slate-200 pl-2 flex items-center gap-2">
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Button
-                      size="sm"
-                      variant="outline"
+                    <Button size="sm" variant="outline"
                       onClick={() => setIsEndOfDayModalOpen(true)}
                       className="uppercase border-sky-200 text-sky-700 hover:bg-sky-50"
                     >
-                      <Save className="h-4 w-4 mr-1.5" />
+                      <Save />
                       Check log
                     </Button>
                   </TooltipTrigger>
@@ -895,7 +893,7 @@ export default function AdminDashboard() {
           </div>
         </div>
 
-        {!isPastDate && !loading && !hasUnclosedShift && (
+        {/* {!isPastDate && !loading && !hasUnclosedShift && (
           <div
             className="mb-1 shrink-0 rounded-lg border px-3 py-1 cursor-pointer hover:bg-slate-50 transition-colors"
             style={{
@@ -911,7 +909,7 @@ export default function AdminDashboard() {
               </span>
             </div>
           </div>
-        )}
+        )} */}
 
         {/* ═══ COMMAND CORE GRID ═══ */}
         <div className={`flex ${isPastDate ? '' : 'gap-4'} flex-1 min-h-0 overflow-hidden`}>
