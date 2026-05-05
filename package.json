@@ -48,6 +48,7 @@
     "framer-motion": "^12.38.0",
     "googleapis": "^171.4.0",
     "html-to-image": "^1.11.13",
+    "jszip": "^3.10.1",
     "jwt-decode": "^4.0.0",
     "leaflet": "^1.9.4",
     "lucide-react": "^1.8.0",
