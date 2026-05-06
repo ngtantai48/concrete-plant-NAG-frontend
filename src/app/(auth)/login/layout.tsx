@@ -1,9 +1,7 @@
-import { ReactNode } from "react";
+import GuestGuard from "@/guards/GuestGuard";
 
-interface LoginLayoutProps {
-    children: ReactNode;
-}
-
-export default function LoginLayout({ children }: LoginLayoutProps) {
-    return <>{children}</>
+export default function LoginLayout({ children }: { children: React.ReactNode }) {
+    return (
+        <GuestGuard>{children}</GuestGuard>
+    );
 }

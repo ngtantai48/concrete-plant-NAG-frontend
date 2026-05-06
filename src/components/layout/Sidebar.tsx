@@ -5,14 +5,15 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { ADMIN, CUSTOMER, USER } from "@/constants/route";
+import { ADMIN, USER } from "@/constants/route";
 import { useAppSelector } from "@/hooks/use-app-selector";
 import { useNavigationStore } from "@/hooks/use-navigation-store";
 import { DoubleLeftOutlined, DoubleRightOutlined } from "@ant-design/icons";
 import { createSelector } from "@reduxjs/toolkit";
 import { Avatar, Button, Layout, Menu, MenuProps } from "antd";
 import {
-  ArrowRightLeft, CalendarCheck, Car, Gauge, Layers, MapPin, Package, Settings, Truck, User, UtensilsCrossed, Wrench, ClipboardList,
+  CalendarCheck, Car, Gauge, Layers, MapPin, Package,
+  User, UsersRound, UtensilsCrossed, Wrench
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import Image from "next/image";
@@ -31,12 +32,14 @@ const UserProfile = ({ collapsed, userName, userRole, isLoading }: {
 
   const roleMap: Record<string, string> = {
     admin: t("role.admin"),
+    manager: t("role.manager"),
+    dispatcher: t("role.dispatcher"),
+    driver: t("role.driver"),
     user: t("role.user"),
-    customer: t("role.customer"),
   };
 
   return (
-    <div className="flex items-center border-t border-gray-700 p-3 bg-gray-900 min-h-[70px]">
+    <div className="flex items-center border-t border-gray-700 p-3 bg-gray-900 min-h-17.5">
       <div className="flex items-center gap-4 w-full px-3">
         {isLoading ? (
           <>
@@ -116,7 +119,7 @@ export default function Sidebar() {
   const baseMenuItems = useMemo(
     () => [
       { key: ADMIN.DASHBOARD, label: t("dashboard"), icon: <Gauge />, roles: ["admin"] },
-
+      // { key: ADMIN.USER_MANAGE, label: t("userManagement"), icon: <UsersRound />, roles: ["admin"] },
       // { key: ADMIN.DRIVERS, label: t("drivers"), icon: <Truck />, roles: ["admin"] },
       // { key: ADMIN.SHIFT_SLOTS, label: t("shiftSlots"), icon: <ClipboardList />, roles: ["admin"] },
       { key: ADMIN.VEHICLES, label: t("vehicles"), icon: <Car />, roles: ["admin"] },
@@ -124,10 +127,7 @@ export default function Sidebar() {
       { key: ADMIN.VEHICLE_TYPES, label: t("vehicleTypes"), icon: <Layers />, roles: ["admin"] },
       { key: ADMIN.STATIONS, label: t("stations"), icon: <MapPin />, roles: ["admin"] },
       {
-        key: "tools-menu",
-        label: t("tools"),
-        icon: <Package />,
-        roles: ["admin"],
+        key: "tools-menu", label: t("tools"), icon: <Package />, roles: ["admin"],
         children: [
           { key: ADMIN.MEAL_CHECK, label: t("mealCheck"), icon: <UtensilsCrossed /> },
           { key: ADMIN.ATTENDANCE, label: t("attendance"), icon: <CalendarCheck /> },
@@ -162,9 +162,9 @@ export default function Sidebar() {
       },
       // { key: ADMIN.END_OF_DAY, label: "Chốt Cuối Ngày", icon: <CalendarCheck />, roles: ["admin"] },
       //{ key: ADMIN.SYSTEM_SETTINGS, label: t("systemSettings"), icon: <Settings />, roles: ["admin"] },
-      { key: USER.DASHBOARD, label: t("dashboard"), icon: <Gauge />, roles: ["user"] },
-      { key: CUSTOMER.DASHBOARD, label: t("dashboard"), icon: <Gauge />, roles: ["customer"] },
       // { key: ADMIN.DRIVER_DISPLAY, label: t("driverDisplay"), icon: <Monitor />, roles: ["admin"] },
+
+      { key: USER.DASHBOARD, label: t("dashboard"), icon: <Gauge />, roles: ["user"] },
     ],
     [t]
   );
@@ -258,29 +258,16 @@ export default function Sidebar() {
 
   return (
     <>
-      <Layout.Sider
-        width={270}
-        collapsedWidth={80}
-        collapsed={collapsed}
+      <Layout.Sider width={270} collapsedWidth={80} collapsed={collapsed}
         className="bg-gray-900! text-white! p-0!"
-        style={{
-          position: "fixed",
-          left: 0,
-          top: 0,
-          bottom: 0,
-          zIndex: 100,
-          overflow: "hidden",
-        }}
+        style={{ position: "fixed", left: 0, top: 0, bottom: 0, zIndex: 100, overflow: "hidden" }}
         trigger={null}
       >
         <div className="flex flex-col h-full">
           <div className="shrink-0">
             <div className="flex items-center justify-between p-4 border-b border-gray-700 bg-gray-900">
               {!collapsed && (
-                <div
-                  className="flex items-center justify-center m-3"
-                  style={{ width: 140, height: 40 }}
-                >
+                <div className="flex items-center justify-center m-3" style={{ width: 140, height: 40 }}>
                   <Image className="object-contain" src={Logo} alt="SAVINA Logo" priority />
                 </div>
               )}

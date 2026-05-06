@@ -1,5 +1,6 @@
 "use client";
 
+import { useAppDispatch, useAppSelector } from "@/hooks/use-app-selector";
 import authApi from "@/services/auth.service";
 import { logoutSuccess } from "@/store/slices/authSlice";
 import { useAppDispatch } from "@/hooks/use-app-selector";

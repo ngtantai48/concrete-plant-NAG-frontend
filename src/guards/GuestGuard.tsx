@@ -6,8 +6,10 @@ import { useEffect } from "react";
 
 const roleRedirectMap: Record<string, string> = {
     admin: "/admin/dashboard",
+    manager: "/manager/dashboard",
+    dispatcher: "/dispatcher/dashboard",
+    driver: "/driver/dashboard",
     user: "/user/dashboard",
-    customer: "/customer/dashboard",
 };
 
 export default function GuestGuard({ children }: { children: React.ReactNode }) {

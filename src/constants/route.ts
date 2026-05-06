@@ -4,6 +4,7 @@ export const ROUTES = {
 
 export const ADMIN = {
   DASHBOARD: "/admin/dashboard",
+  USER_MANAGE: "/admin/user-manage",
   END_OF_DAY_VEHICLES: "/admin/end-of-day-vehicles",
   DRIVERS: "/admin/drivers",
   VEHICLES: "/admin/vehicles",
@@ -22,14 +23,22 @@ export const ADMIN = {
   REPORT_FUEL: "/admin/reports/fuel",
 };
 
-export const SHARE = {
-  PROFILE: "/profile",
+export const MANAGER = {
+  DASHBOARD: "/manager/dashboard",
 };
 
-export const CUSTOMER = {
-  DASHBOARD: "/customer/dashboard",
+export const DISPATCHER = {
+  DASHBOARD: "/dispatcher/dashboard",
+};
+
+export const DRIVER = {
+  DASHBOARD: "/driver/dashboard",
 };
 
 export const USER = {
   DASHBOARD: "/user/dashboard",
+};
+
+export const SHARE = {
+  PROFILE: "/profile",
 };
