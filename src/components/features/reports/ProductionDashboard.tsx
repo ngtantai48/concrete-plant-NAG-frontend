@@ -421,6 +421,25 @@ const getStationLoadingMinutes = (order: Order) => {
   return end.diff(start, "minute");
 };
 
+const getTripMovingSeconds = (order: Order): number | null => {
+  const startRaw = order.order_start_datetime ?? order.order_init_datetime;
+  const endRaw = order.order_end_datetime;
+  if (!startRaw || !endRaw) return null;
+  const start = dayjs(startRaw);
+  const end = dayjs(endRaw);
+  if (!start.isValid() || !end.isValid() || end.isBefore(start)) return null;
+  return end.diff(start, "second");
+};
+
+const formatDurationFromSeconds = (seconds: number | null) => {
+  if (seconds === null) return "—";
+  const totalMinutes = Math.max(0, Math.round(seconds / 60));
+  if (totalMinutes < 60) return `${totalMinutes} phút`;
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return `${hours}h${minutes > 0 ? ` ${minutes}m` : ""}`;
+};
+
 /* ── Dark-tech tooltip ── */
 const Tip = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null;
@@ -433,6 +452,58 @@ const Tip = ({ active, payload, label }: any) => {
           <span className="font-black text-gray-900">{typeof p.value === "number" ? p.value.toLocaleString("vi-VN") : p.value}</span>
         </div>
       ))}
+    </div>
+  );
+};
+
+const TrendTooltip = ({
+  active,
+  payload,
+  label,
+  groupBy,
+  topStationName,
+  averageValue,
+}: {
+  active?: boolean;
+  payload?: any[];
+  label?: string;
+  groupBy: GroupByMode;
+  topStationName?: string;
+  averageValue: number;
+}) => {
+  if (!active || !payload?.length) return null;
+  const point = payload[0]?.payload || {};
+  const completed = N(point["Hoàn thành"]);
+  const processing = N(point["Đang xử lý"]);
+  const totalOrders = N(point.total_orders || completed + processing);
+  const processingRate = totalOrders > 0 ? Math.round((processing / totalOrders) * 100) : 0;
+  const avgLabel = groupBy === "day" ? "chuyến/ngày" : groupBy === "week" ? "chuyến/tuần" : "chuyến/tháng";
+
+  return (
+    <div style={{ background: "rgba(255,255,255,.98)", backdropFilter: "blur(12px)", borderRadius: 14, padding: "12px 14px", boxShadow: "0 8px 28px rgba(15,23,42,.16)", border: "1px solid #e2e8f0", minWidth: 220 }}>
+      <div style={{ fontWeight: 800, color: "#0f172a", fontSize: 14, marginBottom: 8 }}>{label}</div>
+      <div className="space-y-1.5 text-[13px]">
+        <div className="flex items-center justify-between">
+          <span className="font-semibold text-slate-500">Hoàn thành</span>
+          <span className="font-black text-emerald-600">{completed.toLocaleString("vi-VN")}</span>
+        </div>
+        <div className="flex items-center justify-between">
+          <span className="font-semibold text-slate-500">Đang xử lý</span>
+          <span className="font-black text-amber-600">{processing.toLocaleString("vi-VN")}</span>
+        </div>
+        <div className="flex items-center justify-between">
+          <span className="font-semibold text-slate-500">Trạm nổi bật</span>
+          <span className="font-black text-slate-700">{topStationName || "—"}</span>
+        </div>
+        <div className="flex items-center justify-between">
+          <span className="font-semibold text-slate-500">Trung bình</span>
+          <span className="font-black text-slate-700">{averageValue.toLocaleString("vi-VN")}</span>
+        </div>
+        <div className="flex items-center justify-between">
+          <span className="font-semibold text-slate-500">Đang xử lý / {avgLabel}</span>
+          <span className="font-black text-amber-600">{processingRate}%</span>
+        </div>
+      </div>
     </div>
   );
 };
@@ -749,6 +820,7 @@ export default function ProductionDashboard() {
       groupedSeries.map((item: ProductionSeriesItem) => ({
         period: formatPeriodLabel(item.period, groupByMode),
         rawPeriod: item.period,
+        total_orders: N(item.total_orders),
         "Hoàn thành": N(item.completed),
         "Đang xử lý": N(item.running) + N(item.collecting) + N(item.transporting),
         "Chờ": N(item.pending),
@@ -837,6 +909,7 @@ export default function ProductionDashboard() {
           distanceKmText: `${Math.round(getOrderDistanceKm(order)).toLocaleString("vi-VN")} km`,
           tripVolumeText: formatTripVolumeText(order),
           stopText: formatStopText(order),
+          movementTimeText: formatDurationFromSeconds(getTripMovingSeconds(order)),
           startText: toDisplayDate(order.order_start_datetime ?? order.order_init_datetime, true),
           endText: toDisplayDate(order.order_end_datetime, true),
           statusLabel: ORDER_STATUS_LABELS[status] || status,
@@ -1360,7 +1433,15 @@ export default function ProductionDashboard() {
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
                       <XAxis dataKey="period" axisLine={false} tickLine={false} tick={{ fill: "#475569", fontSize: 11, fontWeight: 600 }} dy={6} />
                       <YAxis axisLine={false} tickLine={false} tick={{ fill: "#64748b", fontSize: 11 }} />
-                      <RTooltip content={<Tip />} />
+                      <RTooltip
+                        content={
+                          <TrendTooltip
+                            groupBy={groupByMode}
+                            topStationName={data.top_stations?.[0]?.station_name}
+                            averageValue={avg}
+                          />
+                        }
+                      />
                       <Bar dataKey="Hoàn thành" fill="#059669" radius={[4, 4, 0, 0]} />
                       <Bar dataKey="Đang xử lý" fill="#d97706" radius={[4, 4, 0, 0]} />
                     </BarChart>
@@ -1711,6 +1792,17 @@ export default function ProductionDashboard() {
                     const km = Math.round(getOrderDistanceKm(r));
                     return <span className="font-mono text-[15px] font-black" style={{ color: km > 0 ? "#2563eb" : "#94a3b8" }}>{km > 0 ? km.toLocaleString("vi-VN") : "0"}</span>;
                   }
+                },
+                {
+                  title: "TG di chuyển",
+                  key: "moving",
+                  width: 104,
+                  align: "center" as const,
+                  render: (_: any, r: Order) => (
+                    <span className="text-[14px] font-bold text-blue-700">
+                      {formatDurationFromSeconds(getTripMovingSeconds(r))}
+                    </span>
+                  ),
                 },
                 {
                   title: "Dừng/Đỗ", key: "stops", width: 74, align: "center" as const, render: (_: any, r: Order) => {
