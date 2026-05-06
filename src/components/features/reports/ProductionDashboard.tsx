@@ -848,6 +848,18 @@ export default function ProductionDashboard() {
     return Math.round((currentTotalOrders / periodCount) * 10) / 10;
   }, [periodCount, s?.total_orders]);
   const completionRate = s && s.total_orders > 0 ? Math.round(s.completed / s.total_orders * 100) : 0;
+  const processingCount = N(s?.running) + N(s?.collecting) + N(s?.transporting);
+  const pendingCount = N(s?.pending);
+  const canceledCount = N(s?.canceled);
+  const statusRows = useMemo(() => {
+    const totalOrders = Math.max(1, N(s?.total_orders));
+    return pie
+      .map((item) => ({
+        ...item,
+        pct: Math.round((item.v / totalOrders) * 1000) / 10,
+      }))
+      .sort((left, right) => right.v - left.v);
+  }, [pie, s?.total_orders]);
   const deltaPercent = useCallback((current: number, previous: number) => {
     const cur = N(current);
     const prev = N(previous);
@@ -1597,24 +1609,55 @@ export default function ProductionDashboard() {
                 <Title level={5} className="m-0 text-[15px]">Phân bổ trạng thái</Title>
                 <Tag color="blue" className="rounded-full border-0 text-[11px] font-bold">{pie.length} loại</Tag>
               </div>
-              <div className="flex-1 px-4 pt-2">
-                <div className="w-full h-[170px]">
-                  <ResponsiveContainer>
-                    <PieChart>
-                      <Pie data={pie} cx="50%" cy="50%" innerRadius={48} outerRadius={76} paddingAngle={3} dataKey="v" nameKey="n">
-                        {pie.map((e, i) => <Cell key={i} fill={e.c} />)}
-                      </Pie>
-                      <RTooltip content={<Tip />} />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-                <div className="grid grid-cols-2 gap-1 mt-1">
-                  {pie.map(p => (
-                    <div key={p.n} className="flex items-center gap-2 text-[13px]">
-                      <div style={{ width: 10, height: 10, borderRadius: 3, background: p.c, flexShrink: 0 }} />
-                      <span className="text-slate-600 truncate">{p.n}: <span className="font-bold" style={{ color: "#0f172a" }}>{p.v}</span></span>
+              <div className="flex-1 px-4 pt-3 pb-3 flex flex-col gap-3">
+                <div className="grid grid-cols-[170px_1fr] gap-3 items-center">
+                  <div className="relative w-full h-[180px]">
+                    <ResponsiveContainer>
+                      <PieChart>
+                        <Pie data={pie} cx="50%" cy="50%" innerRadius={52} outerRadius={78} paddingAngle={3} dataKey="v" nameKey="n">
+                          {pie.map((e, i) => <Cell key={i} fill={e.c} />)}
+                        </Pie>
+                        <RTooltip content={<Tip />} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                      <span className="text-[24px] font-black text-slate-900">{N(s?.total_orders).toLocaleString("vi-VN")}</span>
+                      <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wide">Tổng chuyến</span>
                     </div>
-                  ))}
+                  </div>
+
+                  <div className="space-y-2">
+                    {statusRows.map((item) => (
+                      <div key={item.n} className="rounded-lg border border-slate-100 bg-slate-50/60 px-2.5 py-2">
+                        <div className="flex items-center justify-between text-[12px] mb-1">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="inline-block w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: item.c }} />
+                            <span className="font-bold text-slate-700 truncate">{item.n}</span>
+                          </div>
+                          <span className="font-black text-slate-900">{item.v.toLocaleString("vi-VN")}</span>
+                        </div>
+                        <div className="h-1.5 rounded-full bg-slate-200 overflow-hidden">
+                          <div className="h-full rounded-full" style={{ width: `${item.pct}%`, background: item.c }} />
+                        </div>
+                        <div className="mt-1 text-right text-[11px] font-bold text-slate-500">{item.pct}%</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="rounded-lg border border-amber-100 bg-amber-50/70 px-2.5 py-2">
+                    <div className="text-[10px] font-bold uppercase tracking-wide text-amber-600">Đang xử lý</div>
+                    <div className="text-[16px] font-black text-amber-700 leading-tight">{processingCount.toLocaleString("vi-VN")}</div>
+                  </div>
+                  <div className="rounded-lg border border-slate-200 bg-slate-50/80 px-2.5 py-2">
+                    <div className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Chờ xử lý</div>
+                    <div className="text-[16px] font-black text-slate-700 leading-tight">{pendingCount.toLocaleString("vi-VN")}</div>
+                  </div>
+                  <div className="rounded-lg border border-rose-100 bg-rose-50/70 px-2.5 py-2">
+                    <div className="text-[10px] font-bold uppercase tracking-wide text-rose-500">Đã hủy</div>
+                    <div className="text-[16px] font-black text-rose-600 leading-tight">{canceledCount.toLocaleString("vi-VN")}</div>
+                  </div>
                 </div>
               </div>
               {/* Summary footer */}
@@ -1629,7 +1672,7 @@ export default function ProductionDashboard() {
                 </div>
                 <div className="py-2.5 text-center">
                   <span className="text-[11px] font-semibold text-slate-500 block">Đang xử lý</span>
-                  <div className="font-black text-[16px] text-amber-600">{((s?.running ?? 0) + (s?.collecting ?? 0) + (s?.transporting ?? 0)).toLocaleString("vi-VN")}</div>
+                  <div className="font-black text-[16px] text-amber-600">{processingCount.toLocaleString("vi-VN")}</div>
                 </div>
               </div>
             </Card>

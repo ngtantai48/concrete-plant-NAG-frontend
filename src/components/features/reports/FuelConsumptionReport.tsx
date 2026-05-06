@@ -10,6 +10,9 @@ import type { Vehicle } from "@/types/vehicle";
 import TankStatusTab from "./fuel/TankStatusTab";
 
 const { Title } = Typography;
+const TANK_CACHE_TTL_MS = 45_000;
+let cachedTankItems: VehicleTankStatus[] | null = null;
+let cachedTankFetchedAt = 0;
 const toVehicleId = (value: any): number | undefined => {
   const id = Number(value);
   return Number.isFinite(id) && id > 0 ? id : undefined;
@@ -21,6 +24,7 @@ export default function FuelConsumptionReport() {
   const [useVTracking, setUseVTracking] = useState(true);
   const [tankData, setTankData] = useState<VehicleTankStatus[]>([]);
   const [tankLoading, setTankLoading] = useState(false);
+  const hasHydratedCacheRef = React.useRef(false);
 
   useEffect(() => {
     vehicleApi.getAll({ limit: 100 }).then(r => setVehicles(r.data.data)).catch(console.error);
@@ -45,15 +49,15 @@ export default function FuelConsumptionReport() {
 
   const fetchTankData = useCallback((options?: { silent?: boolean }) => {
     const isSilent = options?.silent === true;
-    if (!isSilent) setTankLoading(true);
+    if (!isSilent && !cachedTankItems?.length) setTankLoading(true);
     return fuelApi.getTankStatus({
       to: dayjs().format("YYYY-MM-DD HH:mm:ss"),
-      include_vtracking_runtime: 1,
-      runtime_concurrency: 1,
     })
       .then(r => {
         const d = r?.data;
         const items = d?.items || (Array.isArray(d) ? d : []);
+        cachedTankItems = items;
+        cachedTankFetchedAt = Date.now();
         setTankData(items);
         setFocusedVehicleId((prev) => {
           if (!items.length) return undefined;
@@ -71,6 +75,19 @@ export default function FuelConsumptionReport() {
   }, []);
 
   useEffect(() => {
+    if (!hasHydratedCacheRef.current && cachedTankItems?.length && Date.now() - cachedTankFetchedAt <= TANK_CACHE_TTL_MS) {
+      hasHydratedCacheRef.current = true;
+      setTankData(cachedTankItems);
+      setFocusedVehicleId((prev) => {
+        const normalizedPrev = toVehicleId(prev);
+        if (normalizedPrev && cachedTankItems!.some((item) => toVehicleId(item.vehicle_id) === normalizedPrev)) {
+          return normalizedPrev;
+        }
+        return toVehicleId(cachedTankItems![0]?.vehicle_id);
+      });
+      fetchTankData({ silent: true });
+      return;
+    }
     fetchTankData();
   }, [fetchTankData]);
 
