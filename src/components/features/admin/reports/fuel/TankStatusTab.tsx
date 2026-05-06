@@ -57,6 +57,47 @@ const openingBaselineLiters = (tank: VehicleTankStatus) =>
   tank.configured_opening_balance_liters ??
   tank.configured_opening_fuel_liters ??
   0;
+const VTRACKING_OVERVIEW_CACHE_TTL_MS = 45_000;
+const VTRACKING_OVERVIEW_PERSIST_KEY = "fuel_vtracking_overview_cache_v1";
+const VTRACKING_OVERVIEW_MAX_CACHE_ITEMS = 80;
+
+type VtrackingOverviewCacheEntry = {
+  data: VehicleTankStatus;
+  fetchedAt: number;
+  openingAt?: string | null;
+};
+
+const loadVtrackingOverviewCache = (): Map<number, VtrackingOverviewCacheEntry> => {
+  if (typeof window === "undefined") return new Map();
+  try {
+    const raw = window.localStorage.getItem(VTRACKING_OVERVIEW_PERSIST_KEY);
+    if (!raw) return new Map();
+    const parsed = JSON.parse(raw) as Record<string, VtrackingOverviewCacheEntry>;
+    const map = new Map<number, VtrackingOverviewCacheEntry>();
+    Object.entries(parsed || {}).forEach(([key, value]) => {
+      const id = Number(key);
+      if (!Number.isFinite(id) || id <= 0) return;
+      if (!value || typeof value.fetchedAt !== "number" || !value.data) return;
+      map.set(id, value);
+    });
+    return map;
+  } catch {
+    return new Map();
+  }
+};
+
+const persistVtrackingOverviewCache = (cache: Map<number, VtrackingOverviewCacheEntry>) => {
+  if (typeof window === "undefined") return;
+  try {
+    const entries = [...cache.entries()]
+      .sort((a, b) => b[1].fetchedAt - a[1].fetchedAt)
+      .slice(0, VTRACKING_OVERVIEW_MAX_CACHE_ITEMS);
+    const payload = Object.fromEntries(entries.map(([id, value]) => [String(id), value]));
+    window.localStorage.setItem(VTRACKING_OVERVIEW_PERSIST_KEY, JSON.stringify(payload));
+  } catch {
+    // ignore storage quota / serialization issues
+  }
+};
 
 function GaugeCircle({ percent, size = 160, strokeWidth = 14 }: { percent: number; size?: number; strokeWidth?: number }) {
   const r = (size - strokeWidth) / 2;
@@ -113,14 +154,18 @@ export default function TankStatusTab({ tanks, loading, useVTracking, setUseVTra
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [todaySnapshot, setTodaySnapshot] = useState<VehicleTankStatus | null>(null);
   const [loadingTodaySnapshot, setLoadingTodaySnapshot] = useState(false);
+  const detailCacheRef = useRef<Map<number, VtrackingOverviewCacheEntry>>(loadVtrackingOverviewCache());
+  const prefetchingRef = useRef<Set<number>>(new Set());
   const baseTank = useMemo(() => {
     if (!tanks?.length) return undefined;
     if (selectedId == null) return tanks[0];
     return tanks.find((tank) => toVehicleId(tank.vehicle_id) === selectedId) || tanks[0];
   }, [tanks, selectedId]);
 
-  // The "active" tank is the detailed one if available and VTracking is on, otherwise the base one
-  const activeTank = (useVTracking && detailedTank && baseTank && detailedTank.vehicle_id === baseTank.vehicle_id) ? detailedTank : baseTank;
+  // Overview must always use VTracking data when enabled.
+  const overviewTank = (useVTracking && detailedTank && baseTank && detailedTank.vehicle_id === baseTank.vehicle_id) ? detailedTank : (useVTracking ? null : baseTank);
+  const isOverviewReady = !useVTracking || Boolean(overviewTank);
+  const activeTank = overviewTank ?? baseTank;
   const displayTanks = useMemo(
     () => tanks.map((tank) => (tank.vehicle_id === activeTank?.vehicle_id ? { ...tank, ...activeTank } : tank)),
     [tanks, activeTank]
@@ -149,6 +194,23 @@ export default function TankStatusTab({ tanks, loading, useVTracking, setUseVTra
       return;
     }
     const reqId = ++detailReqIdRef.current;
+    const vehicleId = toVehicleId(baseTank.vehicle_id);
+    if (!vehicleId) {
+      setDetailedTank(null);
+      return;
+    }
+    const cached = detailCacheRef.current.get(vehicleId);
+    const cachedIsValid =
+      Boolean(cached) &&
+      cached?.openingAt === (baseTank.configured_opening_fuel_at ?? null) &&
+      (Date.now() - (cached?.fetchedAt || 0)) <= VTRACKING_OVERVIEW_CACHE_TTL_MS;
+    if (cached?.data && cached.openingAt === (baseTank.configured_opening_fuel_at ?? null)) {
+      setDetailedTank(cached.data);
+    }
+    if (cachedIsValid) {
+      setLoadingDetail(false);
+      return;
+    }
     setLoadingDetail(true);
     // Realtime overview must always anchor to configured opening date, not UI date filter.
     const baselineFrom = baseTank.configured_opening_fuel_at
@@ -160,7 +222,7 @@ export default function TankStatusTab({ tanks, loading, useVTracking, setUseVTra
       vehicle_id: baseVehicleId,
       to: realtimeTo,
       include_vtracking_runtime: 1,
-      runtime_concurrency: 1
+      runtime_concurrency: 2
     };
     if (baselineFrom) params.from = baselineFrom;
 
@@ -168,7 +230,15 @@ export default function TankStatusTab({ tanks, loading, useVTracking, setUseVTra
       .then(res => {
         if (reqId !== detailReqIdRef.current) return;
         const item = res.data?.items?.[0] || (Array.isArray(res.data) ? res.data[0] : null);
-        if (item) setDetailedTank(item);
+        if (item) {
+          setDetailedTank(item);
+          detailCacheRef.current.set(vehicleId, {
+            data: item,
+            fetchedAt: Date.now(),
+            openingAt: baseTank.configured_opening_fuel_at ?? null,
+          });
+          persistVtrackingOverviewCache(detailCacheRef.current);
+        }
       })
       .catch((error) => logHttpError("Fuel detail runtime failed", error))
       .finally(() => {
@@ -181,6 +251,7 @@ export default function TankStatusTab({ tanks, loading, useVTracking, setUseVTra
       setTodaySnapshot(null);
       return;
     }
+    if (useVTracking && !isOverviewReady) return;
     const reqId = ++todayReqIdRef.current;
     setLoadingTodaySnapshot(true);
     fuelApi.getTankStatus({
@@ -188,7 +259,7 @@ export default function TankStatusTab({ tanks, loading, useVTracking, setUseVTra
       from: dayjs().startOf("day").format("YYYY-MM-DD HH:mm:ss"),
       to: snapshotAt,
       include_vtracking_runtime: 1,
-      runtime_concurrency: 1,
+      runtime_concurrency: 2,
     })
       .then((res) => {
         if (reqId !== todayReqIdRef.current) return;
@@ -242,6 +313,7 @@ export default function TankStatusTab({ tanks, loading, useVTracking, setUseVTra
 
   useEffect(() => {
     if (!activeTank?.vehicle_id) return;
+    if (useVTracking && !isOverviewReady) return;
     const reqId = ++timeseriesReqIdRef.current;
     setLoadingTimeseries(true);
     const realtimeFrom = dayjs(snapshotAt).startOf("day").format("YYYY-MM-DD HH:mm:ss");
@@ -353,10 +425,10 @@ export default function TankStatusTab({ tanks, loading, useVTracking, setUseVTra
               <div className="text-[11px] font-black text-slate-500 uppercase">Mức dầu realtime</div>
             </div>
             <div className="text-xl font-black text-slate-900">
-              {noBaseline ? "N/A" : `${dec(activeTank.current_fuel_liters)} L`}
+              {!isOverviewReady ? "Đang đồng bộ..." : (noBaseline ? "N/A" : `${dec(activeTank.current_fuel_liters)} L`)}
             </div>
             <div className="text-[10px] font-bold text-slate-400 mt-1">
-              {noBaseline ? "Thiếu mốc chốt để tính tồn" : `${pct.toFixed(0)}% bình · cập nhật ${dayjs(snapshotAt).format("HH:mm:ss")}`}
+              {!isOverviewReady ? "Đang tải từ VTracking" : (noBaseline ? "Thiếu mốc chốt để tính tồn" : `${pct.toFixed(0)}% bình · cập nhật ${dayjs(snapshotAt).format("HH:mm:ss")}`)}
             </div>
           </div>
 
@@ -365,8 +437,8 @@ export default function TankStatusTab({ tanks, loading, useVTracking, setUseVTra
               <div className="w-8 h-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center"><Route size={16} /></div>
               <div className="text-[11px] font-black text-slate-500 uppercase">Hoạt động hôm nay</div>
             </div>
-            <div className="text-xl font-black text-slate-900">{dec(todayDistanceKm)} km</div>
-            <div className="text-[10px] font-bold text-slate-400 mt-1">{todayIdleHours}h nổ máy chờ</div>
+            <div className="text-xl font-black text-slate-900">{isOverviewReady ? `${dec(todayDistanceKm)} km` : "Đang tải..."}</div>
+            <div className="text-[10px] font-bold text-slate-400 mt-1">{isOverviewReady ? `${todayIdleHours}h nổ máy chờ` : "VTracking runtime"}</div>
           </div>
 
           <div className="bg-white rounded-xl p-3 border border-slate-200">
@@ -374,8 +446,8 @@ export default function TankStatusTab({ tanks, loading, useVTracking, setUseVTra
               <div className="w-8 h-8 rounded-full bg-violet-50 text-violet-600 flex items-center justify-center"><TrendingUp size={16} /></div>
               <div className="text-[11px] font-black text-slate-500 uppercase">Ước tính hôm nay</div>
             </div>
-            <div className="text-xl font-black text-violet-700">{dec(todayEstimatedLiters)} L</div>
-            <div className="text-[10px] font-bold text-slate-400 mt-1">{dec(todayDriveEstimatedLiters)} chạy + {dec(todayIdleEstimatedLiters)} chờ</div>
+            <div className="text-xl font-black text-violet-700">{isOverviewReady ? `${dec(todayEstimatedLiters)} L` : "Đang tải..."}</div>
+            <div className="text-[10px] font-bold text-slate-400 mt-1">{isOverviewReady ? `${dec(todayDriveEstimatedLiters)} chạy + ${dec(todayIdleEstimatedLiters)} chờ` : "Đợi dữ liệu thực tế"}</div>
           </div>
 
           <div className="bg-white rounded-xl p-3 border border-slate-200">
@@ -383,9 +455,9 @@ export default function TankStatusTab({ tanks, loading, useVTracking, setUseVTra
               <div className="w-8 h-8 rounded-full bg-sky-50 text-sky-600 flex items-center justify-center"><Clock size={16} /></div>
               <div className="text-[11px] font-black text-slate-500 uppercase">Tồn theo mốc chốt</div>
             </div>
-            <div className="text-xl font-black text-slate-900">{noBaseline ? "N/A" : `${dec(estimatedBalanceNow)} L`}</div>
+            <div className="text-xl font-black text-slate-900">{!isOverviewReady ? "Đang tải..." : (noBaseline ? "N/A" : `${dec(estimatedBalanceNow)} L`)}</div>
             <div className="text-[10px] font-bold text-slate-400 mt-1">
-              {noBaseline ? "Cần cấu hình mốc đầu kỳ" : `${dec(openingBaselineLiters(activeTank))} + ${dec(activeTank.refuel_in_liters)} - ${dec(activeTank.estimated_used_liters)}`}
+              {!isOverviewReady ? "Đang đồng bộ theo mốc chốt" : (noBaseline ? "Cần cấu hình mốc đầu kỳ" : `${dec(openingBaselineLiters(activeTank))} + ${dec(activeTank.refuel_in_liters)} - ${dec(activeTank.estimated_used_liters)}`)}
             </div>
           </div>
 
@@ -409,7 +481,7 @@ export default function TankStatusTab({ tanks, loading, useVTracking, setUseVTra
             <span className="text-xs font-bold text-slate-600">Ưu tiên VTracking</span>
             <Switch checked={useVTracking} onChange={setUseVTracking} className={useVTracking ? "bg-emerald-500" : "bg-slate-300"} />
           </div>
-          <div className="text-[11px] font-black text-emerald-600">{fuelSourceLabel}</div>
+          <div className="text-[11px] font-black text-emerald-600">{!isOverviewReady && useVTracking ? "Đang tải VTracking" : fuelSourceLabel}</div>
           <div className="text-[10px] font-bold text-slate-400 mt-1">GPS cập nhật: {vtrackingLastSeenLabel}</div>
         </div>
       </div>
@@ -481,57 +553,63 @@ export default function TankStatusTab({ tanks, loading, useVTracking, setUseVTra
 
           <div className="flex-1 overflow-y-auto scrollbar-hide">
             {activeTab === 'Tổng quan' ? (
-              <>
-                {/* Hero Gauge */}
-                <div className="flex items-center justify-between mb-4 px-2">
-                  <div className="flex items-center gap-10">
-                    <div className="relative w-36 h-36 flex-shrink-0 flex items-center justify-center">
-                      {noBaseline ? (
-                        <div className="w-32 h-32 bg-rose-50 rounded-full flex flex-col items-center justify-center border-4 border-dashed border-rose-200">
-                          <AlertTriangle size={24} className="text-rose-400 mb-2" />
-                          <span className="text-[10px] font-black text-rose-400 uppercase tracking-widest text-center px-4">Thiếu mốc tồn kỳ</span>
-                        </div>
-                      ) : noConfig ? (
-                        <div className="w-36 h-36 bg-slate-50 rounded-full flex flex-col items-center justify-center border-4 border-dashed border-slate-200">
-                          <span className="text-xs font-black text-slate-400 uppercase tracking-widest text-center leading-tight">Chưa cấu<br />hình bình</span>
-                        </div>
-                      ) : (
-                        <>
-                          <GaugeCircle percent={pct} size={130} />
-                          <div className="absolute inset-0 flex flex-col items-center justify-center pt-2">
-                            <span className="font-black text-3xl text-slate-800 tracking-tighter">{pct.toFixed(0)}%</span>
-                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-[0.2em]">Còn lại</span>
+              !isOverviewReady ? (
+                <div className="h-full flex flex-col items-center justify-center gap-3 text-slate-500">
+                  <Spin size="large" />
+                  <div className="text-sm font-bold">Đang đồng bộ dữ liệu realtime từ VTracking...</div>
+                </div>
+              ) : (
+                <>
+                  {/* Hero Gauge */}
+                  <div className="flex items-center justify-between mb-4 px-2">
+                    <div className="flex items-center gap-10">
+                      <div className="relative w-36 h-36 flex-shrink-0 flex items-center justify-center">
+                        {noBaseline ? (
+                          <div className="w-32 h-32 bg-rose-50 rounded-full flex flex-col items-center justify-center border-4 border-dashed border-rose-200">
+                            <AlertTriangle size={24} className="text-rose-400 mb-2" />
+                            <span className="text-[10px] font-black text-rose-400 uppercase tracking-widest text-center px-4">Thiếu mốc tồn kỳ</span>
                           </div>
-                        </>
-                      )}
-                    </div>
-                    <div className="flex-1">
-                      <div className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">Mức nhiên liệu hiện tại</div>
-                      <div className="font-black text-3xl text-slate-900 flex items-baseline gap-2 mb-2">
-                        {noBaseline ? <span className="text-amber-500">N/A</span> : dec(activeTank.current_fuel_liters)}
-                        <span className="text-base font-bold text-slate-300">/ {noConfig ? '—' : `${N(activeTank.tank_capacity_liters)} Lít`}</span>
+                        ) : noConfig ? (
+                          <div className="w-36 h-36 bg-slate-50 rounded-full flex flex-col items-center justify-center border-4 border-dashed border-slate-200">
+                            <span className="text-xs font-black text-slate-400 uppercase tracking-widest text-center leading-tight">Chưa cấu<br />hình bình</span>
+                          </div>
+                        ) : (
+                          <>
+                            <GaugeCircle percent={pct} size={130} />
+                            <div className="absolute inset-0 flex flex-col items-center justify-center pt-2">
+                              <span className="font-black text-3xl text-slate-800 tracking-tighter">{pct.toFixed(0)}%</span>
+                              <span className="text-[9px] font-bold text-slate-400 uppercase tracking-[0.2em]">Còn lại</span>
+                            </div>
+                          </>
+                        )}
                       </div>
-                      {noBaseline ? (
-                        <div className="text-xs font-bold text-amber-600 mb-4 bg-amber-50 px-3 py-1.5 rounded-lg border border-amber-100 max-w-fit">⚠ Cần cập nhật mốc tồn kỳ để tính toán</div>
-                      ) : (
-                        <div className="text-xs font-bold text-slate-400 mb-4 flex items-center gap-2">
-                          <div className="w-1 h-1 rounded-full bg-slate-300" />
-                          Số lít thực tế trong bình / Dung tích tối đa
+                      <div className="flex-1">
+                        <div className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] mb-1">Mức nhiên liệu hiện tại</div>
+                        <div className="font-black text-3xl text-slate-900 flex items-baseline gap-2 mb-2">
+                          {noBaseline ? <span className="text-amber-500">N/A</span> : dec(activeTank.current_fuel_liters)}
+                          <span className="text-base font-bold text-slate-300">/ {noConfig ? '—' : `${N(activeTank.tank_capacity_liters)} Lít`}</span>
                         </div>
-                      )}
-                      <div className="flex items-center gap-3 flex-wrap">
-                        <div className="bg-slate-900 text-white px-4 py-1.5 rounded-xl text-xs font-bold flex items-center gap-2 shadow-sm"><Route size={14} className="text-blue-400" /> {dec(displayDistanceKm)} km</div>
-                        <div className="bg-amber-100 text-amber-800 px-4 py-1.5 rounded-xl text-xs font-bold flex items-center gap-2 shadow-sm border border-amber-200/50"><Clock size={14} className="text-amber-500" /> {idleH}h chờ</div>
+                        {noBaseline ? (
+                          <div className="text-xs font-bold text-amber-600 mb-4 bg-amber-50 px-3 py-1.5 rounded-lg border border-amber-100 max-w-fit">⚠ Cần cập nhật mốc tồn kỳ để tính toán</div>
+                        ) : (
+                          <div className="text-xs font-bold text-slate-400 mb-4 flex items-center gap-2">
+                            <div className="w-1 h-1 rounded-full bg-slate-300" />
+                            Số lít thực tế trong bình / Dung tích tối đa
+                          </div>
+                        )}
+                        <div className="flex items-center gap-3 flex-wrap">
+                          <div className="bg-slate-900 text-white px-4 py-1.5 rounded-xl text-xs font-bold flex items-center gap-2 shadow-sm"><Route size={14} className="text-blue-400" /> {dec(displayDistanceKm)} km</div>
+                          <div className="bg-amber-100 text-amber-800 px-4 py-1.5 rounded-xl text-xs font-bold flex items-center gap-2 shadow-sm border border-amber-200/50"><Clock size={14} className="text-amber-500" /> {idleH}h chờ</div>
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  {/* Visual Tank (Matched to Image) */}
-                  {!noBaseline && !noConfig && (
-                    <div className="flex items-center h-28 gap-3">
-                      {/* The Tank */}
-                      <div className="relative w-16 h-full rounded-[1.25rem] border-[3px] border-slate-200 overflow-hidden bg-white shadow-sm flex-shrink-0">
-                        <style>{`
+                    {/* Visual Tank (Matched to Image) */}
+                    {!noBaseline && !noConfig && (
+                      <div className="flex items-center h-28 gap-3">
+                        {/* The Tank */}
+                        <div className="relative w-16 h-full rounded-[1.25rem] border-[3px] border-slate-200 overflow-hidden bg-white shadow-sm flex-shrink-0">
+                          <style>{`
                     @keyframes flow-x { 0% { background-position-x: 0px; } 100% { background-position-x: 100px; } }
                     @keyframes bubble-rise {
                       0% { transform: translateY(10px) scale(0.5); opacity: 0; }
@@ -541,195 +619,196 @@ export default function TankStatusTab({ tanks, loading, useVTracking, setUseVTra
                     }
                   `}</style>
 
-                        {/* Liquid Master Container */}
-                        <div
-                          className="absolute bottom-0 left-0 right-0 transition-all duration-1000 ease-out"
-                          style={{ height: `${pct}%` }}
-                        >
-                          {/* Solid body + Internal waves + Bubbles (Clipped) */}
-                          <div className="absolute inset-0 bg-emerald-500 overflow-hidden">
-                            {/* Internal flowing lines */}
+                          {/* Liquid Master Container */}
+                          <div
+                            className="absolute bottom-0 left-0 right-0 transition-all duration-1000 ease-out"
+                            style={{ height: `${pct}%` }}
+                          >
+                            {/* Solid body + Internal waves + Bubbles (Clipped) */}
+                            <div className="absolute inset-0 bg-emerald-500 overflow-hidden">
+                              {/* Internal flowing lines */}
+                              <div
+                                className="absolute inset-0 opacity-40 mix-blend-multiply"
+                                style={{
+                                  backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 100 30' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 15 Q 25 30, 50 15 T 100 15' fill='none' stroke='%23047857' stroke-width='2' stroke-opacity='0.5'/%3E%3C/svg%3E")`,
+                                  backgroundSize: '100px 30px',
+                                  animation: 'flow-x 3s linear infinite'
+                                }}
+                              />
+                              {/* Bubbles */}
+                              {[
+                                { left: '20%', size: '5px', dur: '3s', delay: '0s' },
+                                { left: '45%', size: '3px', dur: '4s', delay: '1.2s' },
+                                { left: '70%', size: '4px', dur: '3.5s', delay: '0.5s' },
+                                { left: '85%', size: '3px', dur: '2.5s', delay: '2s' },
+                                { left: '35%', size: '4px', dur: '4.5s', delay: '0.8s' },
+                              ].map((b, i) => (
+                                <div
+                                  key={i}
+                                  className="absolute -bottom-2 bg-white/60 rounded-full"
+                                  style={{ left: b.left, width: b.size, height: b.size, animation: `bubble-rise ${b.dur} ease-in infinite ${b.delay}` }}
+                                />
+                              ))}
+                            </div>
+
+                            {/* Top Surface Wave (Not clipped) */}
                             <div
-                              className="absolute inset-0 opacity-40 mix-blend-multiply"
+                              className="absolute left-0 w-[200px] h-3"
                               style={{
-                                backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 100 30' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 15 Q 25 30, 50 15 T 100 15' fill='none' stroke='%23047857' stroke-width='2' stroke-opacity='0.5'/%3E%3C/svg%3E")`,
-                                backgroundSize: '100px 30px',
-                                animation: 'flow-x 3s linear infinite'
+                                top: '-11px',
+                                backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 100 20' preserveAspectRatio='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 20 L0 10 Q 25 20, 50 10 T 100 10 L100 20 Z' fill='%2310b981'/%3E%3C/svg%3E")`,
+                                backgroundSize: '100px 100%',
+                                animation: 'flow-x 2s linear infinite'
                               }}
                             />
-                            {/* Bubbles */}
-                            {[
-                              { left: '20%', size: '5px', dur: '3s', delay: '0s' },
-                              { left: '45%', size: '3px', dur: '4s', delay: '1.2s' },
-                              { left: '70%', size: '4px', dur: '3.5s', delay: '0.5s' },
-                              { left: '85%', size: '3px', dur: '2.5s', delay: '2s' },
-                              { left: '35%', size: '4px', dur: '4.5s', delay: '0.8s' },
-                            ].map((b, i) => (
-                              <div
-                                key={i}
-                                className="absolute -bottom-2 bg-white/60 rounded-full"
-                                style={{ left: b.left, width: b.size, height: b.size, animation: `bubble-rise ${b.dur} ease-in infinite ${b.delay}` }}
-                              />
-                            ))}
+                          </div>
+                        </div>
+
+                        {/* Scale and Ticks outside */}
+                        <div className="relative h-[90%] flex flex-col justify-between w-8 flex-shrink-0">
+                          {/* Vertical Line */}
+                          <div className="w-[2px] h-full bg-slate-200 absolute left-0 top-0 rounded-full" />
+
+                          {/* Current Level Pointer */}
+                          <div
+                            className="absolute flex items-center transition-all duration-1000 ease-out z-10"
+                            style={{ bottom: `${pct}%`, transform: 'translateY(50%)', left: '-6px' }}
+                          >
+                            {/* Triangle pointing left */}
+                            <div className="w-0 h-0 border-t-[4px] border-t-transparent border-b-[4px] border-b-transparent border-r-[6px] border-r-slate-300" />
+                            {/* Line crossing the vertical axis */}
+                            <div className="w-3 h-[2px] bg-slate-300" />
                           </div>
 
-                          {/* Top Surface Wave (Not clipped) */}
-                          <div
-                            className="absolute left-0 w-[200px] h-3"
-                            style={{
-                              top: '-11px',
-                              backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 100 20' preserveAspectRatio='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M0 20 L0 10 Q 25 20, 50 10 T 100 10 L100 20 Z' fill='%2310b981'/%3E%3C/svg%3E")`,
-                              backgroundSize: '100px 100%',
-                              animation: 'flow-x 2s linear infinite'
-                            }}
-                          />
+                          {/* Ticks & Labels */}
+                          {[100, 75, 50, 25, 0].map(v => (
+                            <div key={v} className="flex items-center gap-1.5 z-0 -ml-[1px]">
+                              <span className="w-2.5 h-[2px] bg-slate-200 rounded-full" />
+                              <span className="text-[10px] font-black text-slate-400 leading-none">{v === 100 ? 'F' : v === 0 ? 'E' : ''}</span>
+                            </div>
+                          ))}
                         </div>
                       </div>
+                    )}
+                  </div>
 
-                      {/* Scale and Ticks outside */}
-                      <div className="relative h-[90%] flex flex-col justify-between w-8 flex-shrink-0">
-                        {/* Vertical Line */}
-                        <div className="w-[2px] h-full bg-slate-200 absolute left-0 top-0 rounded-full" />
-
-                        {/* Current Level Pointer */}
-                        <div
-                          className="absolute flex items-center transition-all duration-1000 ease-out z-10"
-                          style={{ bottom: `${pct}%`, transform: 'translateY(50%)', left: '-6px' }}
-                        >
-                          {/* Triangle pointing left */}
-                          <div className="w-0 h-0 border-t-[4px] border-t-transparent border-b-[4px] border-b-transparent border-r-[6px] border-r-slate-300" />
-                          {/* Line crossing the vertical axis */}
-                          <div className="w-3 h-[2px] bg-slate-300" />
+                  {/* 4 Column Stats Info */}
+                  <div className="bg-slate-50/50 rounded-2xl p-4 mb-4 border border-slate-100">
+                    <div className="grid grid-cols-4 gap-4">
+                      <div>
+                        <div className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">Tồn đầu kỳ</div>
+                        <div className="font-black text-blue-600 text-2xl">{noBaseline ? '—' : dec(openingBaselineLiters(activeTank))} <span className="text-xs font-bold opacity-60">Lít</span></div>
+                        {activeTank.configured_opening_fuel_at && (
+                          <div className="text-[10px] text-slate-400 font-bold mt-1">Chốt ngày: {dayjs(activeTank.configured_opening_fuel_at).format("DD/MM")}</div>
+                        )}
+                      </div>
+                      <div>
+                        <div className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">Đổ vào trong kỳ</div>
+                        <div className="font-black text-emerald-600 text-2xl">+{dec(activeTank.refuel_in_liters)} <span className="text-xs font-bold opacity-60">Lít</span></div>
+                        <div className="text-[10px] text-slate-400 font-bold mt-1">Tổng cộng các lần đổ</div>
+                      </div>
+                      <div>
+                        <div className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">Ước tính tiêu hao</div>
+                        <div className="font-black text-violet-600 text-2xl">{dec(activeTank.estimated_used_liters)} <span className="text-xs font-bold opacity-60">Lít</span></div>
+                        <div className="text-[10px] text-slate-400 font-bold mt-1 flex items-center gap-1.5">
+                          Theo {activeTank.fuel_estimation_source === 'vtracking_engine_runtime' ? 'Cảm biến' : activeTank.fuel_estimation_source === 'vtracking_motion_runtime' ? 'Di chuyển' : 'Thủ công'}
                         </div>
+                      </div>
+                      <div>
+                        <div className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">Nổ máy chờ</div>
+                        <div className="font-black text-slate-800 text-2xl">{idleH} <span className="text-xs font-bold opacity-60">giờ</span></div>
+                        <div className="text-[10px] text-slate-400 font-bold mt-1">
+                          {activeTank.idle_fallback_applied ? 'Chế độ: Dự phòng' : 'Thời gian nổ máy chờ'}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
 
-                        {/* Ticks & Labels */}
-                        {[100, 75, 50, 25, 0].map(v => (
-                          <div key={v} className="flex items-center gap-1.5 z-0 -ml-[1px]">
-                            <span className="w-2.5 h-[2px] bg-slate-200 rounded-full" />
-                            <span className="text-[10px] font-black text-slate-400 leading-none">{v === 100 ? 'F' : v === 0 ? 'E' : ''}</span>
+                  {/* NEW SECTION: Today's VTracking Snapshot */}
+                  <div className="bg-blue-50/40 rounded-2xl p-4 mb-4 border border-blue-100">
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="text-[10px] font-black text-blue-500 uppercase tracking-widest">
+                        Hôm nay ({dayjs().format("DD/MM/YYYY")})
+                      </div>
+                      {loadingTodaySnapshot && <Spin size="small" />}
+                    </div>
+                    <div className="grid grid-cols-3 gap-4">
+                      <div className="bg-white rounded-xl border border-blue-100 p-3">
+                        <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Quãng đường hôm nay</div>
+                        <div className="font-black text-blue-600 text-xl">{dec(todayDistanceKm)} <span className="text-xs font-bold opacity-60">km</span></div>
+                        <div className="text-[10px] font-bold text-blue-400 mt-1">~ {dec(todayDriveEstimatedLiters)} Lít chạy</div>
+                      </div>
+                      <div className="bg-white rounded-xl border border-blue-100 p-3">
+                        <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Nổ máy chờ hôm nay</div>
+                        <div className="font-black text-amber-600 text-xl">{todayIdleHours} <span className="text-xs font-bold opacity-60">giờ</span></div>
+                        <div className="text-[10px] font-bold text-amber-500 mt-1">~ {dec(todayIdleEstimatedLiters)} Lít chờ</div>
+                      </div>
+                      <div className="bg-white rounded-xl border border-blue-100 p-3">
+                        <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Ước tính dùng hôm nay</div>
+                        <div className="font-black text-violet-600 text-xl">{dec(todayEstimatedLiters)} <span className="text-xs font-bold opacity-60">Lít</span></div>
+                        <div className="text-[10px] font-bold text-violet-400 mt-1">{dec(todayDriveEstimatedLiters)} + {dec(todayIdleEstimatedLiters)} Lít</div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* NEW SECTION: Detailed Estimation Breakdown */}
+                  <div className="bg-slate-50/50 rounded-2xl p-4 border border-slate-100">
+                    <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Chi tiết ước tính đã dùng (tính từ thời điểm chốt mốc) - {dayjs(activeTank.configured_opening_fuel_at).format("DD/MM/YYYY")}</div>
+                    <div className="grid grid-cols-2 gap-6">
+                      {/* Drive Component */}
+                      <div className="flex items-start gap-5">
+                        <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center shadow-sm">
+                          <Route size={24} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex justify-between items-baseline mb-1">
+                            <span className="font-black text-slate-800">Chạy đường</span>
+                            <span className="font-black text-blue-600 text-lg">{dec(activeTank.distance_component_liters)} Lít</span>
                           </div>
-                        ))}
+                          <div className="text-[11px] font-bold text-slate-400 mb-4 tracking-tight">
+                            {dec(displayDistanceKm)} km × {activeProfile?.default_l_per_100km || '—'} Lít/100km
+                          </div>
+                          <div className="h-2 bg-slate-200 rounded-full overflow-hidden flex">
+                            <div
+                              className="h-full bg-blue-500 rounded-full transition-all duration-1000 ease-out"
+                              style={{ width: `${activeTank.estimated_used_liters > 0 ? (activeTank.distance_component_liters / activeTank.estimated_used_liters * 100) : 0}%` }}
+                            />
+                          </div>
+                          <div className="text-right mt-1.5 text-[10px] font-black text-slate-400">
+                            {(activeTank.estimated_used_liters > 0 ? (activeTank.distance_component_liters / activeTank.estimated_used_liters * 100) : 0).toFixed(1)}%
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                  )}
-                </div>
 
-                {/* 4 Column Stats Info */}
-                <div className="bg-slate-50/50 rounded-2xl p-4 mb-4 border border-slate-100">
-                  <div className="grid grid-cols-4 gap-4">
-                    <div>
-                      <div className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">Tồn đầu kỳ</div>
-                      <div className="font-black text-blue-600 text-2xl">{noBaseline ? '—' : dec(openingBaselineLiters(activeTank))} <span className="text-xs font-bold opacity-60">Lít</span></div>
-                      {activeTank.configured_opening_fuel_at && (
-                        <div className="text-[10px] text-slate-400 font-bold mt-1">Chốt ngày: {dayjs(activeTank.configured_opening_fuel_at).format("DD/MM")}</div>
-                      )}
-                    </div>
-                    <div>
-                      <div className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">Đổ vào trong kỳ</div>
-                      <div className="font-black text-emerald-600 text-2xl">+{dec(activeTank.refuel_in_liters)} <span className="text-xs font-bold opacity-60">Lít</span></div>
-                      <div className="text-[10px] text-slate-400 font-bold mt-1">Tổng cộng các lần đổ</div>
-                    </div>
-                    <div>
-                      <div className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">Ước tính tiêu hao</div>
-                      <div className="font-black text-violet-600 text-2xl">{dec(activeTank.estimated_used_liters)} <span className="text-xs font-bold opacity-60">Lít</span></div>
-                      <div className="text-[10px] text-slate-400 font-bold mt-1 flex items-center gap-1.5">
-                        Theo {activeTank.fuel_estimation_source === 'vtracking_engine_runtime' ? 'Cảm biến' : activeTank.fuel_estimation_source === 'vtracking_motion_runtime' ? 'Di chuyển' : 'Thủ công'}
-                      </div>
-                    </div>
-                    <div>
-                      <div className="text-[11px] font-black text-slate-400 uppercase tracking-widest mb-2">Nổ máy chờ</div>
-                      <div className="font-black text-slate-800 text-2xl">{idleH} <span className="text-xs font-bold opacity-60">giờ</span></div>
-                      <div className="text-[10px] text-slate-400 font-bold mt-1">
-                        {activeTank.idle_fallback_applied ? 'Chế độ: Dự phòng' : 'Thời gian nổ máy chờ'}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* NEW SECTION: Today's VTracking Snapshot */}
-                <div className="bg-blue-50/40 rounded-2xl p-4 mb-4 border border-blue-100">
-                  <div className="flex items-center justify-between mb-3">
-                    <div className="text-[10px] font-black text-blue-500 uppercase tracking-widest">
-                      Hôm nay ({dayjs().format("DD/MM/YYYY")})
-                    </div>
-                    {loadingTodaySnapshot && <Spin size="small" />}
-                  </div>
-                  <div className="grid grid-cols-3 gap-4">
-                    <div className="bg-white rounded-xl border border-blue-100 p-3">
-                      <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Quãng đường hôm nay</div>
-                      <div className="font-black text-blue-600 text-xl">{dec(todayDistanceKm)} <span className="text-xs font-bold opacity-60">km</span></div>
-                      <div className="text-[10px] font-bold text-blue-400 mt-1">~ {dec(todayDriveEstimatedLiters)} Lít chạy</div>
-                    </div>
-                    <div className="bg-white rounded-xl border border-blue-100 p-3">
-                      <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Nổ máy chờ hôm nay</div>
-                      <div className="font-black text-amber-600 text-xl">{todayIdleHours} <span className="text-xs font-bold opacity-60">giờ</span></div>
-                      <div className="text-[10px] font-bold text-amber-500 mt-1">~ {dec(todayIdleEstimatedLiters)} Lít chờ</div>
-                    </div>
-                    <div className="bg-white rounded-xl border border-blue-100 p-3">
-                      <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Ước tính dùng hôm nay</div>
-                      <div className="font-black text-violet-600 text-xl">{dec(todayEstimatedLiters)} <span className="text-xs font-bold opacity-60">Lít</span></div>
-                      <div className="text-[10px] font-bold text-violet-400 mt-1">{dec(todayDriveEstimatedLiters)} + {dec(todayIdleEstimatedLiters)} Lít</div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* NEW SECTION: Detailed Estimation Breakdown */}
-                <div className="bg-slate-50/50 rounded-2xl p-4 border border-slate-100">
-                  <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Chi tiết ước tính đã dùng (tính từ thời điểm chốt mốc) - {dayjs(activeTank.configured_opening_fuel_at).format("DD/MM/YYYY")}</div>
-                  <div className="grid grid-cols-2 gap-6">
-                    {/* Drive Component */}
-                    <div className="flex items-start gap-5">
-                      <div className="w-12 h-12 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center shadow-sm">
-                        <Route size={24} />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex justify-between items-baseline mb-1">
-                          <span className="font-black text-slate-800">Chạy đường</span>
-                          <span className="font-black text-blue-600 text-lg">{dec(activeTank.distance_component_liters)} Lít</span>
+                      {/* Idle Component */}
+                      <div className="flex items-start gap-5">
+                        <div className="w-12 h-12 bg-amber-50 text-amber-600 rounded-2xl flex items-center justify-center shadow-sm">
+                          <Clock size={24} />
                         </div>
-                        <div className="text-[11px] font-bold text-slate-400 mb-4 tracking-tight">
-                          {dec(displayDistanceKm)} km × {activeProfile?.default_l_per_100km || '—'} Lít/100km
-                        </div>
-                        <div className="h-2 bg-slate-200 rounded-full overflow-hidden flex">
-                          <div
-                            className="h-full bg-blue-500 rounded-full transition-all duration-1000 ease-out"
-                            style={{ width: `${activeTank.estimated_used_liters > 0 ? (activeTank.distance_component_liters / activeTank.estimated_used_liters * 100) : 0}%` }}
-                          />
-                        </div>
-                        <div className="text-right mt-1.5 text-[10px] font-black text-slate-400">
-                          {(activeTank.estimated_used_liters > 0 ? (activeTank.distance_component_liters / activeTank.estimated_used_liters * 100) : 0).toFixed(1)}%
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Idle Component */}
-                    <div className="flex items-start gap-5">
-                      <div className="w-12 h-12 bg-amber-50 text-amber-600 rounded-2xl flex items-center justify-center shadow-sm">
-                        <Clock size={24} />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex justify-between items-baseline mb-1">
-                          <span className="font-black text-slate-800">Chờ / nổ máy</span>
-                          <span className="font-black text-slate-900 text-lg">{dec(activeTank.idle_component_liters)} Lít</span>
-                        </div>
-                        <div className="text-[11px] font-bold text-slate-400 mb-4 tracking-tight">
-                          {dec(displayEngineHours)}h × {activeProfile?.idle_l_per_hour || '—'} Lít/h
-                        </div>
-                        <div className="h-2 bg-slate-200 rounded-full overflow-hidden flex">
-                          <div
-                            className="h-full bg-amber-500 rounded-full transition-all duration-1000 ease-out"
-                            style={{ width: `${activeTank.estimated_used_liters > 0 ? (activeTank.idle_component_liters / activeTank.estimated_used_liters * 100) : 0}%` }}
-                          />
-                        </div>
-                        <div className="text-right mt-1.5 text-[10px] font-black text-slate-400">
-                          {(activeTank.estimated_used_liters > 0 ? (activeTank.idle_component_liters / activeTank.estimated_used_liters * 100) : 0).toFixed(1)}%
+                        <div className="flex-1 min-w-0">
+                          <div className="flex justify-between items-baseline mb-1">
+                            <span className="font-black text-slate-800">Chờ / nổ máy</span>
+                            <span className="font-black text-slate-900 text-lg">{dec(activeTank.idle_component_liters)} Lít</span>
+                          </div>
+                          <div className="text-[11px] font-bold text-slate-400 mb-4 tracking-tight">
+                            {dec(displayEngineHours)}h × {activeProfile?.idle_l_per_hour || '—'} Lít/h
+                          </div>
+                          <div className="h-2 bg-slate-200 rounded-full overflow-hidden flex">
+                            <div
+                              className="h-full bg-amber-500 rounded-full transition-all duration-1000 ease-out"
+                              style={{ width: `${activeTank.estimated_used_liters > 0 ? (activeTank.idle_component_liters / activeTank.estimated_used_liters * 100) : 0}%` }}
+                            />
+                          </div>
+                          <div className="text-right mt-1.5 text-[10px] font-black text-slate-400">
+                            {(activeTank.estimated_used_liters > 0 ? (activeTank.idle_component_liters / activeTank.estimated_used_liters * 100) : 0).toFixed(1)}%
+                          </div>
                         </div>
                       </div>
                     </div>
                   </div>
-                </div>
 
-              </>
+                </>
+              )
             ) : activeTab === 'Báo cáo' ? (
               <div className="flex-1 -mx-6 -mb-6 bg-slate-50/30">
                 <DashboardTab from={fromDateTime} to={toDateTime} vehicleId={activeTank.vehicle_id} todaySnapshot={todaySnapshot} />
