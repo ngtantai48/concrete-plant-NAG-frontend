@@ -47,6 +47,7 @@ export interface ProReportTripRow {
   distanceKmText: string;
   tripVolumeText: string;
   stopText: string;
+  movementTimeText: string;
   startText: string;
   endText: string;
   statusLabel: string;
@@ -165,6 +166,7 @@ const renderTripRows = (trips: ProReportTripRow[]) =>
           <td>${escapeHtml(trip.distanceKmText)}</td>
           <td>${escapeHtml(trip.tripVolumeText)}</td>
           <td>${escapeHtml(trip.stopText)}</td>
+          <td>${escapeHtml(trip.movementTimeText)}</td>
           <td>${escapeHtml(trip.startText)}</td>
           <td>${escapeHtml(trip.endText)}</td>
           <td><span class="status ${renderStatusClass(trip.statusTone)}">${escapeHtml(trip.statusLabel)}</span></td>
@@ -200,7 +202,7 @@ const renderSection = (section: ProProductionSection, index: number) => {
   const chartPayload = createChartPayload(section, index);
   const tripsContent = section.trips.length
     ? renderTripRows(section.trips)
-    : `<tr><td colspan="10" class="empty-cell">Không có dữ liệu chuyến trong kỳ.</td></tr>`;
+    : `<tr><td colspan="11" class="empty-cell">Không có dữ liệu chuyến trong kỳ.</td></tr>`;
 
   return {
     chartPayload,
@@ -319,6 +321,7 @@ const renderSection = (section: ProProductionSection, index: number) => {
                 <th>KM</th>
                 <th>Sản lượng</th>
                 <th>Dừng/đỗ</th>
+                <th>TG di chuyển</th>
                 <th>Bắt đầu</th>
                 <th>Kết thúc</th>
                 <th>Trạng thái</th>
