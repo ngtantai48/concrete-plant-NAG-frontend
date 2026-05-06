@@ -57,6 +57,47 @@ const openingBaselineLiters = (tank: VehicleTankStatus) =>
   tank.configured_opening_balance_liters ??
   tank.configured_opening_fuel_liters ??
   0;
+const VTRACKING_OVERVIEW_CACHE_TTL_MS = 45_000;
+const VTRACKING_OVERVIEW_PERSIST_KEY = "fuel_vtracking_overview_cache_v1";
+const VTRACKING_OVERVIEW_MAX_CACHE_ITEMS = 80;
+
+type VtrackingOverviewCacheEntry = {
+  data: VehicleTankStatus;
+  fetchedAt: number;
+  openingAt?: string | null;
+};
+
+const loadVtrackingOverviewCache = (): Map<number, VtrackingOverviewCacheEntry> => {
+  if (typeof window === "undefined") return new Map();
+  try {
+    const raw = window.localStorage.getItem(VTRACKING_OVERVIEW_PERSIST_KEY);
+    if (!raw) return new Map();
+    const parsed = JSON.parse(raw) as Record<string, VtrackingOverviewCacheEntry>;
+    const map = new Map<number, VtrackingOverviewCacheEntry>();
+    Object.entries(parsed || {}).forEach(([key, value]) => {
+      const id = Number(key);
+      if (!Number.isFinite(id) || id <= 0) return;
+      if (!value || typeof value.fetchedAt !== "number" || !value.data) return;
+      map.set(id, value);
+    });
+    return map;
+  } catch {
+    return new Map();
+  }
+};
+
+const persistVtrackingOverviewCache = (cache: Map<number, VtrackingOverviewCacheEntry>) => {
+  if (typeof window === "undefined") return;
+  try {
+    const entries = [...cache.entries()]
+      .sort((a, b) => b[1].fetchedAt - a[1].fetchedAt)
+      .slice(0, VTRACKING_OVERVIEW_MAX_CACHE_ITEMS);
+    const payload = Object.fromEntries(entries.map(([id, value]) => [String(id), value]));
+    window.localStorage.setItem(VTRACKING_OVERVIEW_PERSIST_KEY, JSON.stringify(payload));
+  } catch {
+    // ignore storage quota / serialization issues
+  }
+};
 
 function GaugeCircle({ percent, size = 160, strokeWidth = 14 }: { percent: number; size?: number; strokeWidth?: number }) {
   const r = (size - strokeWidth) / 2;
@@ -117,6 +158,8 @@ export default function TankStatusTab({ tanks, loading, useVTracking, setUseVTra
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [todaySnapshot, setTodaySnapshot] = useState<VehicleTankStatus | null>(null);
   const [loadingTodaySnapshot, setLoadingTodaySnapshot] = useState(false);
+  const detailCacheRef = useRef<Map<number, VtrackingOverviewCacheEntry>>(loadVtrackingOverviewCache());
+  const prefetchingRef = useRef<Set<number>>(new Set());
   const baseTank = useMemo(() => {
     const normalizedSelectedId = N(selectedId);
     return tanks.find((tank) => N(tank.vehicle_id) === normalizedSelectedId) || tanks[0];
@@ -124,8 +167,10 @@ export default function TankStatusTab({ tanks, loading, useVTracking, setUseVTra
 
   const baseVehicleId = N(baseTank?.vehicle_id);
 
-  // The "active" tank is the detailed one if available and VTracking is on, otherwise the base one
-  const activeTank = (useVTracking && detailedTank && baseTank && N(detailedTank.vehicle_id) === baseVehicleId) ? detailedTank : baseTank;
+  // Overview must always use VTracking data when enabled.
+  const overviewTank = (useVTracking && detailedTank && baseTank && N(detailedTank.vehicle_id) === baseVehicleId) ? detailedTank : (useVTracking ? null : baseTank);
+  const isOverviewReady = !useVTracking || Boolean(overviewTank);
+  const activeTank = overviewTank ?? baseTank;
   const activeVehicleId = N(activeTank?.vehicle_id);
   const displayTanks = useMemo(
     () => tanks.map((tank) => (tank.vehicle_id === activeTank?.vehicle_id ? { ...tank, ...activeTank } : tank)),
@@ -166,6 +211,23 @@ export default function TankStatusTab({ tanks, loading, useVTracking, setUseVTra
       return;
     }
     const reqId = ++detailReqIdRef.current;
+    const vehicleId = toVehicleId(baseTank.vehicle_id);
+    if (!vehicleId) {
+      setDetailedTank(null);
+      return;
+    }
+    const cached = detailCacheRef.current.get(vehicleId);
+    const cachedIsValid =
+      Boolean(cached) &&
+      cached?.openingAt === (baseTank.configured_opening_fuel_at ?? null) &&
+      (Date.now() - (cached?.fetchedAt || 0)) <= VTRACKING_OVERVIEW_CACHE_TTL_MS;
+    if (cached?.data && cached.openingAt === (baseTank.configured_opening_fuel_at ?? null)) {
+      setDetailedTank(cached.data);
+    }
+    if (cachedIsValid) {
+      setLoadingDetail(false);
+      return;
+    }
     setLoadingDetail(true);
     // Realtime overview must always anchor to configured opening date, not UI date filter.
     const baselineFrom = baseTank.configured_opening_fuel_at
@@ -177,7 +239,7 @@ export default function TankStatusTab({ tanks, loading, useVTracking, setUseVTra
       vehicle_id: baseVehicleId,
       to: realtimeTo,
       include_vtracking_runtime: 1,
-      runtime_concurrency: 1
+      runtime_concurrency: 2
     };
     if (baselineFrom) params.from = baselineFrom;
 
@@ -185,7 +247,15 @@ export default function TankStatusTab({ tanks, loading, useVTracking, setUseVTra
       .then(res => {
         if (reqId !== detailReqIdRef.current) return;
         const item = res.data?.items?.[0] || (Array.isArray(res.data) ? res.data[0] : null);
-        if (item) setDetailedTank(item);
+        if (item) {
+          setDetailedTank(item);
+          detailCacheRef.current.set(vehicleId, {
+            data: item,
+            fetchedAt: Date.now(),
+            openingAt: baseTank.configured_opening_fuel_at ?? null,
+          });
+          persistVtrackingOverviewCache(detailCacheRef.current);
+        }
       })
       .catch((error) => logHttpError("Fuel detail runtime failed", error))
       .finally(() => {
@@ -198,6 +268,11 @@ export default function TankStatusTab({ tanks, loading, useVTracking, setUseVTra
       setTodaySnapshot(null);
       return;
     }
+    if (useVTracking && !isOverviewReady) return;
+      setTodaySnapshot(null);
+      return;
+    }
+    if (useVTracking && !isOverviewReady) return;
     const reqId = ++todayReqIdRef.current;
     setLoadingTodaySnapshot(true);
     fuelApi.getTankStatus({
@@ -205,7 +280,7 @@ export default function TankStatusTab({ tanks, loading, useVTracking, setUseVTra
       from: dayjs().startOf("day").format("YYYY-MM-DD HH:mm:ss"),
       to: snapshotAt,
       include_vtracking_runtime: 1,
-      runtime_concurrency: 1,
+      runtime_concurrency: 2,
     })
       .then((res) => {
         if (reqId !== todayReqIdRef.current) return;
@@ -216,7 +291,7 @@ export default function TankStatusTab({ tanks, loading, useVTracking, setUseVTra
       .finally(() => {
         if (reqId === todayReqIdRef.current) setLoadingTodaySnapshot(false);
       });
-  }, [baseVehicleId, refreshTick, snapshotAt]);
+  }, [baseVehicleId, refreshTick, snapshotAt, useVTracking, isOverviewReady]);
 
   // Fetch Fuel Profile for selected vehicle to compare
   useEffect(() => {
@@ -261,6 +336,7 @@ export default function TankStatusTab({ tanks, loading, useVTracking, setUseVTra
 
   useEffect(() => {
     if (!activeVehicleId) return;
+    if (useVTracking && !isOverviewReady) return;
     const reqId = ++timeseriesReqIdRef.current;
     setLoadingTimeseries(true);
     const realtimeFrom = dayjs(snapshotAt).startOf("day").format("YYYY-MM-DD HH:mm:ss");
@@ -285,7 +361,7 @@ export default function TankStatusTab({ tanks, loading, useVTracking, setUseVTra
       .finally(() => {
         if (reqId === timeseriesReqIdRef.current) setLoadingTimeseries(false);
       });
-  }, [activeVehicleId, activeTank?.current_fuel_liters, refreshTick, snapshotAt]);
+  }, [activeVehicleId, activeTank?.current_fuel_liters, refreshTick, snapshotAt, useVTracking, isOverviewReady]);
 
   // Fetch vtracking data for map with a dummy center (Da Nang) and large radius
   // Reduced interval to 60s and radius to 500km to avoid heavy processing
@@ -311,6 +387,7 @@ export default function TankStatusTab({ tanks, loading, useVTracking, setUseVTra
   // Fetch Events - Only refetch if vehicle_id actually changes
   React.useEffect(() => {
     if (!activeVehicleId) return;
+    if (useVTracking && !isOverviewReady) return;
     setLoadingEvents(true);
     fuelApi.getEvents({ vehicle_id: activeVehicleId, page: 1, limit: 5 })
       .then(res => {
@@ -324,7 +401,7 @@ export default function TankStatusTab({ tanks, loading, useVTracking, setUseVTra
       })
       .catch((error) => logHttpError("Fuel recent events failed", error))
       .finally(() => setLoadingEvents(false));
-  }, [activeVehicleId, refreshTick]);
+  }, [activeVehicleId, refreshTick, useVTracking, isOverviewReady]);
 
   if (loading) return <div className="flex justify-center items-center h-64"><Spin size="large" /></div>;
   if (!tanks.length) return <Empty description="Không có dữ liệu" className="mt-10" />;
@@ -372,10 +449,10 @@ export default function TankStatusTab({ tanks, loading, useVTracking, setUseVTra
               <div className="text-[11px] font-black text-slate-500 uppercase">Mức dầu realtime</div>
             </div>
             <div className="text-xl font-black text-slate-900">
-              {noBaseline ? "N/A" : `${dec(activeTank.current_fuel_liters)} L`}
+              {!isOverviewReady ? "Đang đồng bộ..." : (noBaseline ? "N/A" : `${dec(activeTank.current_fuel_liters)} L`)}
             </div>
             <div className="text-[10px] font-bold text-slate-400 mt-1">
-              {noBaseline ? "Thiếu mốc chốt để tính tồn" : `${pct.toFixed(0)}% bình · cập nhật ${dayjs(snapshotAt).format("HH:mm:ss")}`}
+              {!isOverviewReady ? "Đang tải từ VTracking" : (noBaseline ? "Thiếu mốc chốt để tính tồn" : `${pct.toFixed(0)}% bình · cập nhật ${dayjs(snapshotAt).format("HH:mm:ss")}`)}
             </div>
           </div>
 
@@ -384,8 +461,8 @@ export default function TankStatusTab({ tanks, loading, useVTracking, setUseVTra
               <div className="w-8 h-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center"><Route size={16} /></div>
               <div className="text-[11px] font-black text-slate-500 uppercase">Hoạt động hôm nay</div>
             </div>
-            <div className="text-xl font-black text-slate-900">{dec(todayDistanceKm)} km</div>
-            <div className="text-[10px] font-bold text-slate-400 mt-1">{todayIdleHours}h nổ máy chờ</div>
+            <div className="text-xl font-black text-slate-900">{isOverviewReady ? `${dec(todayDistanceKm)} km` : "Đang tải..."}</div>
+            <div className="text-[10px] font-bold text-slate-400 mt-1">{isOverviewReady ? `${todayIdleHours}h nổ máy chờ` : "VTracking runtime"}</div>
           </div>
 
           <div className="bg-white rounded-xl p-3 border border-slate-200">
@@ -393,8 +470,8 @@ export default function TankStatusTab({ tanks, loading, useVTracking, setUseVTra
               <div className="w-8 h-8 rounded-full bg-violet-50 text-violet-600 flex items-center justify-center"><TrendingUp size={16} /></div>
               <div className="text-[11px] font-black text-slate-500 uppercase">Ước tính hôm nay</div>
             </div>
-            <div className="text-xl font-black text-violet-700">{dec(todayEstimatedLiters)} L</div>
-            <div className="text-[10px] font-bold text-slate-400 mt-1">{dec(todayDriveEstimatedLiters)} chạy + {dec(todayIdleEstimatedLiters)} chờ</div>
+            <div className="text-xl font-black text-violet-700">{isOverviewReady ? `${dec(todayEstimatedLiters)} L` : "Đang tải..."}</div>
+            <div className="text-[10px] font-bold text-slate-400 mt-1">{isOverviewReady ? `${dec(todayDriveEstimatedLiters)} chạy + ${dec(todayIdleEstimatedLiters)} chờ` : "Đợi dữ liệu thực tế"}</div>
           </div>
 
           <div className="bg-white rounded-xl p-3 border border-slate-200">
@@ -402,9 +479,9 @@ export default function TankStatusTab({ tanks, loading, useVTracking, setUseVTra
               <div className="w-8 h-8 rounded-full bg-sky-50 text-sky-600 flex items-center justify-center"><Clock size={16} /></div>
               <div className="text-[11px] font-black text-slate-500 uppercase">Tồn theo mốc chốt</div>
             </div>
-            <div className="text-xl font-black text-slate-900">{noBaseline ? "N/A" : `${dec(estimatedBalanceNow)} L`}</div>
+            <div className="text-xl font-black text-slate-900">{!isOverviewReady ? "Đang tải..." : (noBaseline ? "N/A" : `${dec(estimatedBalanceNow)} L`)}</div>
             <div className="text-[10px] font-bold text-slate-400 mt-1">
-              {noBaseline ? "Cần cấu hình mốc đầu kỳ" : `${dec(openingBaselineLiters(activeTank))} + ${dec(activeTank.refuel_in_liters)} - ${dec(activeTank.estimated_used_liters)}`}
+              {!isOverviewReady ? "Đang đồng bộ theo mốc chốt" : (noBaseline ? "Cần cấu hình mốc đầu kỳ" : `${dec(openingBaselineLiters(activeTank))} + ${dec(activeTank.refuel_in_liters)} - ${dec(activeTank.estimated_used_liters)}`)}
             </div>
           </div>
 
@@ -428,7 +505,7 @@ export default function TankStatusTab({ tanks, loading, useVTracking, setUseVTra
             <span className="text-xs font-bold text-slate-600">Ưu tiên VTracking</span>
             <Switch checked={useVTracking} onChange={setUseVTracking} className={useVTracking ? "bg-emerald-500" : "bg-slate-300"} />
           </div>
-          <div className="text-[11px] font-black text-emerald-600">{fuelSourceLabel}</div>
+          <div className="text-[11px] font-black text-emerald-600">{!isOverviewReady && useVTracking ? "Đang tải VTracking" : fuelSourceLabel}</div>
           <div className="text-[10px] font-bold text-slate-400 mt-1">GPS cập nhật: {vtrackingLastSeenLabel}</div>
         </div>
       </div>
@@ -500,6 +577,12 @@ export default function TankStatusTab({ tanks, loading, useVTracking, setUseVTra
 
           <div className="flex-1 overflow-y-auto scrollbar-hide">
             {activeTab === 'Tổng quan' ? (
+              !isOverviewReady ? (
+                <div className="h-full flex flex-col items-center justify-center gap-3 text-slate-500">
+                  <Spin size="large" />
+                  <div className="text-sm font-bold">Đang đồng bộ dữ liệu realtime từ VTracking...</div>
+                </div>
+              ) : (
               <>
                 {/* Hero Gauge */}
                 <div className="flex items-center justify-between mb-4 px-2">
@@ -749,6 +832,7 @@ export default function TankStatusTab({ tanks, loading, useVTracking, setUseVTra
                 </div>
 
               </>
+              )
             ) : activeTab === 'Báo cáo' ? (
               <div className="flex-1 -mx-6 -mb-6 bg-slate-50/30">
                 <DashboardTab from={fromDateTime} to={toDateTime} vehicleId={activeTank.vehicle_id} todaySnapshot={todaySnapshot} />

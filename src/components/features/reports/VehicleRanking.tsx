@@ -50,7 +50,7 @@ export default function VehicleRanking({ vehicles, baseQuery, maxOrders: _maxOrd
   const [sortMode, setSortMode] = useState<"orders" | "km">("orders");
   const [page, setPage] = useState(1);
   const DETAIL_PAGE_SIZE = 15;
-  const PAGE_SIZE = 5;
+  const PAGE_SIZE = 7;
 
   const sortedVehicles = useMemo(() => {
     const clone = [...vehicles];
@@ -246,7 +246,13 @@ export default function VehicleRanking({ vehicles, baseQuery, maxOrders: _maxOrd
 
             {shownVehicles.map((vehicle, index) => {
               const rank = (page - 1) * PAGE_SIZE + index + 1;
-              const isTopThree = rank <= 3;
+              const medalTone = rank === 1
+                ? { row: "bg-amber-50/40", badge: "bg-amber-100 text-amber-700", name: "text-amber-700" }
+                : rank === 2
+                  ? { row: "bg-slate-100/70", badge: "bg-slate-200 text-slate-700", name: "text-slate-700" }
+                  : rank === 3
+                    ? { row: "bg-orange-50/45", badge: "bg-orange-100 text-orange-700", name: "text-orange-700" }
+                    : null;
               return (
                 <motion.div
                   key={vehicle.vehicle_id}
@@ -254,14 +260,14 @@ export default function VehicleRanking({ vehicles, baseQuery, maxOrders: _maxOrd
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: index * 0.02 }}
                   onClick={() => openDetail(vehicle)}
-                  className={`group grid grid-cols-[44px_82px_126px_96px_100px_18px] gap-2 items-center px-3 py-2.5 border-b border-slate-50 hover:bg-blue-50/40 cursor-pointer transition-all ${isTopThree ? "bg-blue-50/35" : ""}`}
+                  className={`group grid grid-cols-[44px_82px_126px_96px_100px_18px] gap-2 items-center px-3 py-2.5 border-b border-slate-50 hover:bg-blue-50/40 cursor-pointer transition-all ${medalTone ? medalTone.row : ""}`}
                 >
                   <div className="pr-1">
-                    <span className={`${isTopThree ? "bg-blue-100 text-blue-700" : "bg-slate-100 text-slate-600"} inline-flex h-7 min-w-7 items-center justify-center rounded-full px-2 text-xs font-black`}>
+                    <span className={`${medalTone ? medalTone.badge : "bg-slate-100 text-slate-600"} inline-flex h-7 min-w-7 items-center justify-center rounded-full px-2 text-xs font-black`}>
                       {rank}
                     </span>
                   </div>
-                  <div className={`font-black text-[16px] leading-none truncate whitespace-nowrap ${isTopThree ? "text-blue-700" : "text-slate-800"}`}>{vehicle.vehicle_name}</div>
+                  <div className={`font-black text-[16px] leading-none truncate whitespace-nowrap ${medalTone ? medalTone.name : "text-slate-800"}`}>{vehicle.vehicle_name}</div>
                   <div>
                     <span className="inline-flex items-center rounded-md border border-slate-200 px-2 py-[1px] text-[11px] font-black text-slate-500 font-mono whitespace-nowrap">
                       {vehicle.vehicle_license_plate}
