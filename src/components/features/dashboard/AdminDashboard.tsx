@@ -18,6 +18,7 @@ import { useRealtimeUpdates } from "@/hooks/useRealtimeUpdates";
 import { cn } from "@/lib/utils";
 import orderApi from "@/services/order.service";
 import stationApi from "@/services/station.service";
+import systemApi, { type TankerQueueSnapshotItem } from "@/services/system.service";
 import vehicleApi from "@/services/vehicle.service";
 import { usePermissions } from "@/hooks/use-permissions";
 import type { Order } from "@/types/order";
@@ -26,7 +27,7 @@ import type { Vehicle } from "@/types/vehicle";
 import { format } from "date-fns";
 import {
   ArrowRight, Calendar as CalendarIcon, CheckCircle2, Clock, Ellipsis, FileSpreadsheet,
-  Eye, EyeOff, LayoutGrid, Map as MapIcon, MapPin, Radio, RefreshCw, Route, Search, Timer, Truck, X, Save
+  Eye, EyeOff, LayoutGrid, History, Map as MapIcon, MapPin, Radio, RefreshCw, Route, Search, Timer, Truck, X, Save
 } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import dynamic from "next/dynamic";
@@ -58,6 +59,12 @@ const getTodayDate = () => {
   const now = new Date();
   const timezoneOffset = now.getTimezoneOffset() * 60 * 1000;
   return new Date(now.getTime() - timezoneOffset).toISOString().slice(0, 10);
+};
+
+const getYesterdayDate = () => {
+  const today = new Date(getTodayDate());
+  today.setDate(today.getDate() - 1);
+  return format(today, "yyyy-MM-dd");
 };
 
 const YARD_ENTRY_TIME_VISIBILITY_STORAGE_KEY = 'admin-dashboard-yard-entry-time-visible';
@@ -359,6 +366,14 @@ export default function AdminDashboard() {
 
   const [isSyncingShift, setIsSyncingShift] = useState(false);
   const [isSyncShiftDialogOpen, setIsSyncShiftDialogOpen] = useState(false);
+  const [isQueueHistoryDialogOpen, setIsQueueHistoryDialogOpen] = useState(false);
+  const [queueHistoryDate, setQueueHistoryDate] = useState(() => getYesterdayDate());
+  const [queueHistoryLoading, setQueueHistoryLoading] = useState(false);
+  const [queueHistoryItems, setQueueHistoryItems] = useState<TankerQueueSnapshotItem[]>([]);
+  const queueHistoryDateLabel = useMemo(() => {
+    const parsed = new Date(queueHistoryDate);
+    return Number.isNaN(parsed.getTime()) ? queueHistoryDate : format(parsed, "dd/MM/yyyy");
+  }, [queueHistoryDate]);
 
   const handleSyncShift = useCallback(async () => {
     setIsSyncShiftDialogOpen(false);
@@ -419,6 +434,41 @@ export default function AdminDashboard() {
       setIsSyncingShift(false);
     }
   }, [activeFlowOrders, t]);
+
+  const fetchQueueHistory = useCallback(async (targetDate: string) => {
+    if (!targetDate) return;
+    const parsedTargetDate = new Date(targetDate);
+    const targetDateLabel = Number.isNaN(parsedTargetDate.getTime()) ? targetDate : format(parsedTargetDate, "dd/MM/yyyy");
+    setQueueHistoryLoading(true);
+    try {
+      const response = await systemApi.getTankerQueueSnapshot(targetDate);
+      const payload = response.data?.multi_data;
+      const sortedItems = [...(payload?.items || [])].sort((a, b) => (a.position || 0) - (b.position || 0));
+      setQueueHistoryItems(sortedItems);
+      if (sortedItems.length === 0) {
+        toast(`Chưa có lịch sử lốt xe ngày ${targetDateLabel}`);
+      }
+    } catch (error) {
+      const status = (error as any)?.response?.status;
+      if (status === 404) {
+        setQueueHistoryItems([]);
+        toast(`Chưa có lịch sử lốt xe ngày ${targetDateLabel}`);
+      } else {
+        console.error("[fetchQueueHistory] error:", error);
+        toast.error("Không tải được lịch sử lốt xe");
+        setQueueHistoryItems([]);
+      }
+    } finally {
+      setQueueHistoryLoading(false);
+    }
+  }, []);
+
+  const handleOpenQueueHistory = useCallback(async () => {
+    const defaultHistoryDate = getYesterdayDate();
+    setQueueHistoryDate(defaultHistoryDate);
+    setIsQueueHistoryDialogOpen(true);
+    await fetchQueueHistory(defaultHistoryDate);
+  }, [fetchQueueHistory]);
 
   const [selectedSyncOrderIds, setSelectedSyncOrderIds] = useState<number[]>([]);
   const [isApplyingToEnd, setIsApplyingToEnd] = useState(false);
@@ -797,6 +847,23 @@ export default function AdminDashboard() {
                   </TooltipContent>
                 </Tooltip>
 
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={handleOpenQueueHistory}
+                      className="uppercase border-indigo-200 text-indigo-700 hover:bg-indigo-50"
+                    >
+                      <History className="h-4 w-4 mr-1.5" />
+                      Lịch sử lốt xe
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Xem thứ tự lốt theo ngày</p>
+                  </TooltipContent>
+                </Tooltip>
+
                 {!isPastDate && hasUnclosedShift && (
                   <>
                     {/* Chốt ca button hidden — keeping handleShiftClose for potential re-enable */}
@@ -983,6 +1050,96 @@ export default function AdminDashboard() {
                     </Dialog>
                   </>
                 )}
+
+                <Dialog open={isQueueHistoryDialogOpen} onOpenChange={setIsQueueHistoryDialogOpen}>
+                  <DialogContent className="sm:max-w-2xl max-h-[85vh] flex flex-col p-0 overflow-hidden">
+                    <DialogHeader className="px-5 pt-5 pb-2 border-b bg-white">
+                      <div className="flex items-start gap-3">
+                        <div className="h-10 w-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                          <CalendarIcon className="h-5 w-5" />
+                        </div>
+                        <div>
+                          <DlgTitle className="text-2xl font-black">Lịch sử lốt xe</DlgTitle>
+                          <DialogDescription className="mt-1">
+                            Chọn ngày để xem lịch sử thứ tự lốt xe cuối ngày.
+                          </DialogDescription>
+                        </div>
+                      </div>
+                    </DialogHeader>
+
+                    <div className="px-5 pt-4 pb-3 bg-slate-50/60 border-b">
+                      <div className="rounded-xl border bg-white p-3 space-y-2">
+                        <div className="text-xs font-bold text-slate-500">Chọn ngày</div>
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                          <Input
+                            type="date"
+                            value={queueHistoryDate}
+                            onChange={(event) => setQueueHistoryDate(event.target.value)}
+                            className="w-[180px] bg-white"
+                          />
+                          <Button
+                            variant="primary"
+                            onClick={() => fetchQueueHistory(queueHistoryDate)}
+                            disabled={queueHistoryLoading || !queueHistoryDate}
+                            className="sm:min-w-[130px]"
+                          >
+                            {queueHistoryLoading ? <RefreshCw className="animate-spin h-4 w-4" /> : <Search className="h-4 w-4" />}
+                            Xem lịch sử
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="px-5 py-3 flex-1 min-h-0 overflow-hidden bg-slate-50/40">
+                      <div className="h-[50vh] max-h-[50vh] overflow-y-scroll rounded-xl border border-slate-200 bg-white pb-2">
+                        <table className="w-full text-sm">
+                          <thead className="sticky top-0 border-b bg-slate-50">
+                            <tr>
+                              <th className="w-24 px-4 py-3 text-center text-xs font-black uppercase text-slate-500">Thứ tự</th>
+                              <th className="w-40 px-4 py-3 text-center text-xs font-black uppercase text-slate-500">Xe</th>
+                              <th className="px-4 py-3 text-center text-xs font-black uppercase text-slate-500">Biển số</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {queueHistoryItems.map((item) => (
+                              <tr key={`${item.order_id}-${item.position}`} className="border-b border-slate-100 last:border-0 hover:bg-blue-50/40 transition-colors">
+                                <td className="px-4 py-2.5 text-center">
+                                  <span className="inline-flex min-w-7 items-center justify-center rounded-full bg-indigo-50 px-2 py-1 text-sm font-black text-indigo-600 mx-auto">
+                                    {item.position}
+                                  </span>
+                                </td>
+                                <td className="px-4 py-2.5 text-center">
+                                  <span className="font-extrabold text-slate-800">{item.vehicle_name}</span>
+                                </td>
+                                <td className="px-4 py-2.5 text-center">
+                                  <span className="inline-flex items-center rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 font-mono text-xs font-semibold text-slate-700 mx-auto">
+                                    {item.vehicle_license_plate}
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                            {!queueHistoryLoading && queueHistoryItems.length === 0 && (
+                              <tr>
+                                <td colSpan={3} className="px-3 py-10 text-center text-muted-foreground">
+                                  Chưa có lịch sử lốt xe ngày {queueHistoryDateLabel}
+                                </td>
+                              </tr>
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+
+                    <DialogFooter className="border-t bg-white px-5 py-3 sm:justify-between">
+                      <div className="text-xs text-slate-500 font-semibold">Tổng số {queueHistoryItems.length} kết quả</div>
+                      <div className="flex items-center gap-2">
+                        <Button variant="outline" onClick={() => setIsQueueHistoryDialogOpen(false)}>
+                          Đóng
+                        </Button>
+                      </div>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
               </div>
             </div>
           </div>

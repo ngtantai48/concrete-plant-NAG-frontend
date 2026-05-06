@@ -905,6 +905,7 @@ const writeSectionSheet = async (
     "KM",
     "Sản lượng",
     "Dừng/đỗ",
+    "TG di chuyển",
     "Bắt đầu",
     "Kết thúc",
     "Trạng thái",
@@ -931,6 +932,7 @@ const writeSectionSheet = async (
         trip.distanceKmText,
         trip.tripVolumeText,
         trip.stopText,
+        trip.movementTimeText,
         trip.startText,
         trip.endText,
         trip.statusLabel,
@@ -938,12 +940,12 @@ const writeSectionSheet = async (
       values.forEach((value, colIndex) => {
         const cell = worksheet.getCell(rowIndex, colIndex + 1);
         cell.value = value;
-        const statusMeta = colIndex === 10 ? statusToneMeta(trip.statusTone) : null;
+        const statusMeta = colIndex === 11 ? statusToneMeta(trip.statusTone) : null;
         styleCell(cell, {
           bg: statusMeta?.color || bg,
           color: statusMeta?.font || THEME.slate700,
-          bold: colIndex === 1 || colIndex === 10,
-          align: colIndex >= 4 && colIndex <= 9 ? "center" : "left",
+          bold: colIndex === 1 || colIndex === 11,
+          align: colIndex >= 4 && colIndex <= 10 ? "center" : "left",
           fontSize: 12,
           wrap: true,
         });
@@ -955,7 +957,7 @@ const writeSectionSheet = async (
 
   worksheet.autoFilter = {
     from: { row: rowIndex - Math.max(section.trips.length, 1), column: 1 },
-    to: { row: rowIndex - 1, column: 11 },
+    to: { row: rowIndex - 1, column: 12 },
   };
 
   return {

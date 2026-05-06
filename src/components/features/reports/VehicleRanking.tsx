@@ -23,6 +23,16 @@ const getOrderDistanceKm = (order: Order) => {
   return 0;
 };
 
+const getTripMovingSeconds = (order: Order): number | null => {
+  const startRaw = order.order_start_datetime ?? order.order_init_datetime;
+  const endRaw = order.order_end_datetime;
+  if (!startRaw || !endRaw) return null;
+  const start = dayjs(startRaw);
+  const end = dayjs(endRaw);
+  if (!start.isValid() || !end.isValid() || end.isBefore(start)) return null;
+  return end.diff(start, "second");
+};
+
 interface Props {
   vehicles: ProductionTopVehicle[];
   baseQuery: ProductionQuery;
@@ -125,6 +135,14 @@ export default function VehicleRanking({ vehicles, baseQuery, maxOrders: _maxOrd
     const minute = Math.floor((sec % 3600) / 60);
     return hour > 0 ? `${hour}h ${minute}m` : `${minute} phút`;
   };
+  const fmtMoving = (sec: number | null) => {
+    if (sec === null) return "—";
+    const mins = Math.max(0, Math.round(sec / 60));
+    if (mins < 60) return `${mins} phút`;
+    const h = Math.floor(mins / 60);
+    const m = mins % 60;
+    return `${h}h${m > 0 ? ` ${m}m` : ""}`;
+  };
 
   const detailCols = [
     { title: "STT", key: "n", width: 50, align: "center" as const, render: (_: any, __: any, i: number) => <span className="text-[14px] font-bold text-slate-500">{(detailPage - 1) * DETAIL_PAGE_SIZE + i + 1}</span> },
@@ -165,6 +183,15 @@ export default function VehicleRanking({ vehicles, baseQuery, maxOrders: _maxOrd
         const m = mins % 60;
         return <span className="text-[14px] font-bold text-slate-500">{h}h{m > 0 ? ` ${m}m` : ""}</span>;
       }
+    },
+    {
+      title: "TG di chuyển",
+      key: "mv",
+      width: 104,
+      align: "right" as const,
+      render: (_: any, r: Order) => (
+        <span className="text-[14px] font-bold text-blue-700">{fmtMoving(getTripMovingSeconds(r))}</span>
+      ),
     },
     { title: "Bắt đầu", dataIndex: "order_start_datetime", key: "sd", width: 130, render: (v: string | null) => v ? (<div><div className="text-[14px] font-bold" style={{ color: "#0f172a" }}>{dayjs(v).format("HH:mm")}</div><div className="text-[12px] font-semibold text-slate-400">{dayjs(v).format("DD/MM/YYYY")}</div></div>) : <span className="text-slate-300 text-[14px]">—</span> },
     { title: "Kết thúc", dataIndex: "order_end_datetime", key: "ed", width: 130, render: (v: string | null) => v ? (<div><div className="text-[14px] font-bold" style={{ color: "#0f172a" }}>{dayjs(v).format("HH:mm")}</div><div className="text-[12px] font-semibold text-slate-400">{dayjs(v).format("DD/MM/YYYY")}</div></div>) : <span className="text-slate-300 text-[14px]">—</span> },
