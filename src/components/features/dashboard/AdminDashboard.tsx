@@ -203,18 +203,8 @@ export default function AdminDashboard() {
     fetchAll();
   }, [fetchAll]);
 
-  // const activeStations = useMemo(
-  //   () => stations.filter((s) => s.station_types?.station_type_id === 1 && s.station_status === "operating"),
-  //   [stations],
-  // );
-
   const {
     vehicles: vtrackingVehicles,
-    // inRangeCount, 
-    // loading: nearbyLoading, 
-    // lastUpdated, 
-    // error: nearbyError, 
-    // refetch: refetchVehicles 
   } = useNearbyVehicles(
     geofenceStation?.station_gps_longitude ?? null,
     geofenceStation?.station_gps_latitude ?? null,
@@ -223,7 +213,7 @@ export default function AdminDashboard() {
   );
 
   const { stationStatusMap, isLedConnected } = useDeviceHeartbeat();
-  const { isConnected: socketConnected, /* lastSignal, */ lastSignalTime } = useRealtimeUpdates(fetchAll);
+  const { isConnected: socketConnected, lastSignalTime } = useRealtimeUpdates(fetchAll);
 
   const vehicleTimeFormatter = useMemo(
     () => new Intl.DateTimeFormat(locale === 'vi' ? 'vi-VN' : 'en-US', {
@@ -322,47 +312,13 @@ export default function AdminDashboard() {
     });
   }, [pendingOrders]);
 
-  // const ordersAtStation = useMemo(() => orders.filter(o => o.order_status === "collecting"), [orders]);
-  // const ordersPending = useMemo(() => {
-  //   return pendingOrders.filter(o => o.vehicles?.vehicle_status === "available");
-  // }, [pendingOrders]);
-  // const ordersInTransit = useMemo(() => orders.filter(o => o.order_status === "transporting" || o.order_status === "running"), [orders]);
   const ordersCompleted = useMemo(() => {
     return orders.filter(o => o.order_status === "completed");
   }, [orders]);
 
-  // const ordersActive = useMemo(() => {
-  //   return orders.filter(o =>
-  //     o.order_status === "collecting" || o.order_status === "transporting" || o.order_status === "running"
-  //   );
-  // }, [orders]);
-
-  // const ordersTodayPanel = useMemo(() => {
-  //   return [...ordersActive, ...ordersCompleted].sort(
-  //     (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
-  //   );
-  // }, [ordersActive, ordersCompleted]);
-
   const hasUnclosedShift = useMemo(() => {
     return pendingOrders.some((o) => o.shift_closing?.shift_status === 0);
   }, [pendingOrders]);
-
-  // const [isShiftClosing, setIsShiftClosing] = useState(false);
-  // const [isShiftCloseDialogOpen, setIsShiftCloseDialogOpen] = useState(false);
-
-  // const handleShiftClose = useCallback(async () => {
-  //   setIsShiftCloseDialogOpen(false);
-  //   setIsShiftClosing(true);
-  //   try {
-  //     await orderApi.shiftClose({ operation_date: selectedDate });
-  //     toast.success(t('shiftCloseSuccess', { date: selectedDate }));
-  //     fetchAll();
-  //   } catch {
-  //     toast.error(t('shiftCloseFailed'));
-  //   } finally {
-  //     setIsShiftClosing(false);
-  //   }
-  // }, [selectedDate, t, fetchAll]);
 
   const [isSyncingShift, setIsSyncingShift] = useState(false);
   const [isSyncShiftDialogOpen, setIsSyncShiftDialogOpen] = useState(false);
@@ -379,7 +335,6 @@ export default function AdminDashboard() {
     setIsSyncShiftDialogOpen(false);
     setIsSyncingShift(true);
     try {
-      // Build maToStt from pending orders, sorted by order_number (matches ActivityFlow display)
       const sorted = [...activeFlowOrders].sort(
         (a, b) => (a.order_number || 0) - (b.order_number || 0),
       );
@@ -392,12 +347,9 @@ export default function AdminDashboard() {
           skipped.push({ order_number: o.order_number, reason: 'no_vehicle_name', raw });
           continue;
         }
-        // Normalize: trim + uppercase + strip whitespace + strip leading zeros after X
-        // e.g. "X02" -> "X2", "X09" -> "X9" so it matches sheet entries "X2", "X9"
         const upper = String(raw).trim().toUpperCase().replace(/\s+/g, "");
         const m = upper.match(/^X0*(\d+)$/);
         const maX = m ? `X${m[1]}` : upper;
-        // Only accept valid X-codes (X1, X2, ..., X21); skip duplicates (first occurrence wins)
         if (!/^X\d+$/.test(maX)) {
           skipped.push({ order_number: o.order_number, reason: 'invalid_format', raw });
           continue;

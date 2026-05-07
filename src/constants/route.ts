@@ -17,12 +17,18 @@ export const SIDEBAR = {
   SYSTEM_SETTINGS: "/system-settings",
   USER_MANAGE: "/user-manage",
   ROLE_PERMISSIONS: "/role-permissions",
+<<<<<<< HEAD
   END_OF_DAY: "/end-of-day",
+=======
+>>>>>>> 3b94bd9 (feat: scaffold core frontend architecture including dashboard components, permission guards, auth services, and management tables)
   REPORT_MAINTENANCE: "/reports/maintenance",
   REPORT_PRODUCTION: "/reports/production",
   REPORT_FUEL: "/reports/fuel",
 };
+<<<<<<< HEAD
 
+=======
+>>>>>>> 3b94bd9 (feat: scaffold core frontend architecture including dashboard components, permission guards, auth services, and management tables)
 export const SHARE = {
   PROFILE: "/profile",
 };

@@ -25,6 +25,7 @@ export function logHttpError(context: string, error: unknown) {
     console.error(context, error);
 }
 
+
 export function handleHttpError(error: AxiosError<ErrorResponse>) {
     const store = getStore();
     const status = error.response?.status;
