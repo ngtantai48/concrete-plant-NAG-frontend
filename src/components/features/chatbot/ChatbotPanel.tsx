@@ -1,11 +1,15 @@
 "use client";
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { MessageCircle, X, Send, Bot, User, Loader2, Minimize2, RotateCcw, ChevronRight } from "lucide-react";
-import reportApi from "@/services/report.service";
-import orderApi from "@/services/order.service";
-import vehicleApi from "@/services/vehicle.service";
+import { MessageCircle, X, ArrowUp, RotateCcw } from "lucide-react";
+import ReactMarkdown from "react-markdown";
+import remarkBreaks from "remark-breaks";
+import remarkGfm from "remark-gfm";
+import chatApi from "@/services/chat.service";
+import { clearMemory } from "@/services/chat-memory";
+import type { ChatMessage as ApiChatMessage } from "@/types/chat";
 import dayjs from "dayjs";
+import ToolProcessTree from "./ToolProcessTree";
 
 interface Message {
   id: string;
@@ -13,7 +17,12 @@ interface Message {
   text: string;
   time: string;
   loading?: boolean;
+  status?: string;
+  toolSteps?: string[];
 }
+
+const APPLE_FONT =
+  '-apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "Segoe UI", Roboto, "Helvetica Neue", sans-serif';
 
 const SUGGESTED = [
   "Hôm nay có bao nhiêu chuyến?",
@@ -23,279 +32,596 @@ const SUGGESTED = [
   "Tỷ lệ hoàn thành hôm nay?",
 ];
 
-async function queryEngine(input: string): Promise<string> {
-  const q = input.toLowerCase().trim();
-  const today = dayjs().format("YYYY-MM-DD");
+const WELCOME_TEXT =
+  "Xin chào! Tôi là trợ lý AI của hệ thống.\nTôi có thể giúp bạn tra cứu sản lượng, bảo trì, và trạng thái vận hành.";
 
-  // ─── Hôm nay / chuyến hôm nay
-  if (q.includes("hôm nay") || q.includes("today") || q.includes("ngày hôm nay")) {
-    if (q.includes("chuyến") || q.includes("lệnh") || q.includes("đơn")) {
-      try {
-        const res = await orderApi.getAll({ order_start_datetime: today });
-        const raw = res.data as any;
-        const orders: any[] = Array.isArray(raw) ? raw : (raw?.data ?? raw?.items ?? []);
-        const completed = orders.filter((o) => o.order_status === "completed").length;
-        const running = orders.filter((o) => ["running","collecting","transporting"].includes(o.order_status)).length;
-        return `📊 **Hôm nay (${dayjs().format("DD/MM/YYYY")})**\n• Tổng lệnh: **${orders.length}**\n• Hoàn thành: **${completed}**\n• Đang thực hiện: **${running}**\n• Tỷ lệ HT: **${orders.length > 0 ? Math.round(completed/orders.length*100) : 0}%**`;
-      } catch {
-        return "Không thể tải dữ liệu lệnh hôm nay. Vui lòng thử lại.";
-      }
-    }
-    if (q.includes("tỷ lệ") || q.includes("hoàn thành")) {
-      try {
-        const res = await orderApi.getAll({ order_start_datetime: today });
-        const raw = res.data as any;
-        const orders: any[] = Array.isArray(raw) ? raw : (raw?.data ?? raw?.items ?? []);
-        const completed = orders.filter((o) => o.order_status === "completed").length;
-        const pct = orders.length > 0 ? Math.round(completed/orders.length*100) : 0;
-        return `✅ Tỷ lệ hoàn thành hôm nay: **${pct}%** (${completed}/${orders.length} lệnh)${pct >= 90 ? " 🎉 Xuất sắc!" : pct >= 70 ? " 👍 Tốt" : " ⚠️ Cần cải thiện"}`;
-      } catch {
-        return "Không thể tính tỷ lệ hoàn thành. Vui lòng thử lại.";
-      }
-    }
-  }
+function MessageMarkdown({ text, isUser }: { text: string; isUser: boolean }) {
+  const linkColor = isUser ? "#FFFFFF" : "#007AFF";
+  const borderColor = isUser ? "rgba(255,255,255,0.35)" : "rgba(60,60,67,0.18)";
+  const codeBg = isUser ? "rgba(255,255,255,0.18)" : "rgba(255,255,255,0.72)";
 
-  // ─── Bảo trì
-  if (q.includes("bảo trì") || q.includes("bao tri") || q.includes("maintenance")) {
-    try {
-      const res = await reportApi.getMaintenanceForecast();
-      const raw = res.data as any;
-      const items: any[] = raw?.vehicles ?? raw?.items ?? [];
-      const critical = items.filter((i) => i.risk_level === "critical");
-      const warning = items.filter((i) => i.risk_level === "warning");
-      if (critical.length === 0 && warning.length === 0) {
-        return "✅ Tất cả xe đang trong trạng thái an toàn, chưa có xe nào cần bảo trì gấp.";
-      }
-      let resp = `🔧 **Cảnh báo bảo trì:**\n`;
-      if (critical.length > 0) {
-        resp += `\n🔴 **Khẩn cấp (${critical.length} xe):**\n`;
-        critical.slice(0, 5).forEach((i) => { resp += `• ${i.vehicle_name} (${i.vehicle_license_plate}) — ${Math.round(i.current_km ?? 0).toLocaleString("vi-VN")} km\n`; });
-      }
-      if (warning.length > 0) {
-        resp += `\n🟡 **Cảnh báo (${warning.length} xe):**\n`;
-        warning.slice(0, 3).forEach((i) => { resp += `• ${i.vehicle_name} (${i.vehicle_license_plate})\n`; });
-      }
-      return resp.trim();
-    } catch {
-      return "Không thể tải dữ liệu bảo trì. Vui lòng thử lại.";
-    }
-  }
-
-  // ─── Sản lượng tháng
-  if (q.includes("tháng") || q.includes("tháng này") || q.includes("month")) {
-    try {
-      const from = dayjs().startOf("month").format("YYYY-MM-DD");
-      const res = await reportApi.getProduction({ from, to: today, group_by: "day" });
-      const data = res.data as any;
-      const s = data?.summary;
-      if (!s) return "Không có dữ liệu sản lượng tháng này.";
-      return `📈 **Sản lượng tháng ${dayjs().format("MM/YYYY")}:**\n• Tổng lệnh: **${s.total_orders}**\n• Hoàn thành: **${s.completed}** (${s.total_orders > 0 ? Math.round(s.completed/s.total_orders*100) : 0}%)\n• Tổng KM: **${Math.round(s.total_distance_km).toLocaleString("vi-VN")} km**\n• Trung bình/ngày: **${data.series?.length ? Math.round(s.total_orders/data.series.length) : 0} lệnh**`;
-    } catch {
-      return "Không thể tải dữ liệu sản lượng tháng. Vui lòng thử lại.";
-    }
-  }
-
-  // ─── Xe nào chạy nhiều nhất / top xe
-  if (q.includes("chạy nhiều") || q.includes("top xe") || q.includes("xe nào") || q.includes("năng suất")) {
-    try {
-      const from = dayjs().startOf("month").format("YYYY-MM-DD");
-      const res = await reportApi.getProduction({ from, to: today, group_by: "day" });
-      const top = (res.data as any)?.top_vehicles ?? [];
-      if (top.length === 0) return "Không có dữ liệu xe tháng này.";
-      let resp = `🏆 **Top xe tháng ${dayjs().format("MM/YYYY")}:**\n`;
-      top.slice(0, 5).forEach((v: any, i: number) => {
-        const medal = ["🥇","🥈","🥉","4️⃣","5️⃣"][i] ?? `${i+1}.`;
-        resp += `${medal} **${v.vehicle_name}** (${v.vehicle_license_plate}) — ${v.total_orders} chuyến, ${Math.round(v.total_distance_km).toLocaleString("vi-VN")} km\n`;
-      });
-      return resp.trim();
-    } catch {
-      return "Không thể tải dữ liệu xếp hạng xe. Vui lòng thử lại.";
-    }
-  }
-
-  // ─── Trạng thái xe
-  if (q.includes("trạng thái xe") || q.includes("xe đang") || q.includes("xe hoạt động")) {
-    try {
-      const res = await vehicleApi.getAll({ limit: 100 });
-      const raw = res.data as any;
-      const vehicles: any[] = raw?.data ?? raw ?? [];
-      const available = vehicles.filter((v) => v.vehicle_status === "available").length;
-      const maintenance = vehicles.filter((v) => v.vehicle_status === "maintenance").length;
-      const incident = vehicles.filter((v) => v.vehicle_status === "incident").length;
-      return `🚛 **Trạng thái đội xe (${vehicles.length} xe):**\n• Sẵn sàng: **${available}**\n• Bảo trì: **${maintenance}**\n• Sự cố: **${incident}**\n• Khác: **${vehicles.length - available - maintenance - incident}**`;
-    } catch {
-      return "Không thể tải trạng thái xe. Vui lòng thử lại.";
-    }
-  }
-
-  // ─── Default
-  return `🤖 Tôi có thể trả lời các câu hỏi về:\n• Sản lượng hôm nay / tháng này\n• Tỷ lệ hoàn thành\n• Cảnh báo bảo trì xe\n• Xếp hạng xe năng suất\n• Trạng thái đội xe\n\nVui lòng đặt câu hỏi cụ thể hơn!`;
+  return (
+    <ReactMarkdown
+      remarkPlugins={[remarkGfm, remarkBreaks]}
+      components={{
+        p: ({ children }) => (
+          <p style={{ margin: 0, lineHeight: 1.45 }}>
+            {children}
+          </p>
+        ),
+        strong: ({ children }) => (
+          <strong style={{ fontWeight: 700 }}>
+            {children}
+          </strong>
+        ),
+        a: ({ children, href }) => (
+          <a
+            href={href}
+            target="_blank"
+            rel="noreferrer"
+            style={{ color: linkColor, textDecoration: "underline", textUnderlineOffset: 2 }}
+          >
+            {children}
+          </a>
+        ),
+        ul: ({ children }) => (
+          <ul style={{ margin: "4px 0", paddingLeft: 18, lineHeight: 1.45 }}>
+            {children}
+          </ul>
+        ),
+        ol: ({ children }) => (
+          <ol style={{ margin: "4px 0", paddingLeft: 18, lineHeight: 1.45 }}>
+            {children}
+          </ol>
+        ),
+        li: ({ children }) => <li style={{ margin: "2px 0" }}>{children}</li>,
+        table: ({ children }) => (
+          <div
+            style={{
+              overflowX: "auto",
+              margin: "6px -4px",
+              paddingBottom: 2,
+              WebkitOverflowScrolling: "touch",
+            }}
+          >
+            <table
+              style={{
+                borderCollapse: "collapse",
+                minWidth: "100%",
+                width: "max-content",
+                fontSize: 13.2,
+                lineHeight: 1.35,
+              }}
+            >
+              {children}
+            </table>
+          </div>
+        ),
+        th: ({ children }) => (
+          <th
+            style={{
+              border: `1px solid ${borderColor}`,
+              padding: "5px 8px",
+              textAlign: "left",
+              fontWeight: 700,
+              whiteSpace: "nowrap",
+              background: isUser ? "rgba(255,255,255,0.14)" : "rgba(255,255,255,0.55)",
+            }}
+          >
+            {children}
+          </th>
+        ),
+        td: ({ children }) => (
+          <td
+            style={{
+              border: `1px solid ${borderColor}`,
+              padding: "5px 8px",
+              whiteSpace: "nowrap",
+            }}
+          >
+            {children}
+          </td>
+        ),
+        code: ({ children }) => (
+          <code
+            style={{
+              background: codeBg,
+              borderRadius: 5,
+              padding: "1px 4px",
+              fontSize: "0.92em",
+            }}
+          >
+            {children}
+          </code>
+        ),
+        pre: ({ children }) => (
+          <pre
+            style={{
+              overflowX: "auto",
+              margin: "6px 0",
+              padding: "8px 10px",
+              borderRadius: 10,
+              background: codeBg,
+              lineHeight: 1.4,
+            }}
+          >
+            {children}
+          </pre>
+        ),
+      }}
+    >
+      {text}
+    </ReactMarkdown>
+  );
 }
 
-function formatText(text: string) {
-  const lines = text.split("\n");
-  return lines.map((line, i) => {
-    const parts = line.split(/\*\*(.*?)\*\*/g);
-    return (
-      <span key={i} className="block leading-relaxed">
-        {parts.map((p, j) => j % 2 === 1 ? <strong key={j}>{p}</strong> : p)}
-      </span>
-    );
-  });
+function toApiMessages(history: Message[]): ApiChatMessage[] {
+  return history
+    .filter((m) => !m.loading && m.text.trim().length > 0)
+    .map((m) => ({
+      role: m.role === "bot" ? "assistant" : "user",
+      content: m.text,
+    }));
+}
+
+function TypingDots() {
+  return (
+    <div className="flex items-center gap-1 py-1">
+      <span
+        className="rounded-full animate-bounce"
+        style={{
+          width: 6,
+          height: 6,
+          background: "rgba(60,60,67,0.55)",
+          animationDelay: "0ms",
+        }}
+      />
+      <span
+        className="rounded-full animate-bounce"
+        style={{
+          width: 6,
+          height: 6,
+          background: "rgba(60,60,67,0.55)",
+          animationDelay: "150ms",
+        }}
+      />
+      <span
+        className="rounded-full animate-bounce"
+        style={{
+          width: 6,
+          height: 6,
+          background: "rgba(60,60,67,0.55)",
+          animationDelay: "300ms",
+        }}
+      />
+    </div>
+  );
 }
 
 export default function ChatbotPanel() {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
-    { id: "0", role: "bot", text: "Xin chào! Tôi là trợ lý AI của hệ thống.\nTôi có thể giúp bạn tra cứu sản lượng, bảo trì, và trạng thái vận hành. Hỏi tôi bất cứ điều gì! 👋", time: dayjs().format("HH:mm") },
+    { id: "0", role: "bot", text: WELCOME_TEXT, time: dayjs().format("HH:mm") },
   ]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
   useEffect(() => {
-    if (open) setTimeout(() => inputRef.current?.focus(), 300);
+    if (open) setTimeout(() => inputRef.current?.focus(), 280);
   }, [open]);
 
-  const send = useCallback(async (text: string) => {
-    const trimmed = text.trim();
-    if (!trimmed || loading) return;
-    const userMsg: Message = { id: Date.now().toString(), role: "user", text: trimmed, time: dayjs().format("HH:mm") };
-    const loadingMsg: Message = { id: `l-${Date.now()}`, role: "bot", text: "", time: "", loading: true };
-    setMessages((m) => [...m, userMsg, loadingMsg]);
-    setInput("");
-    setLoading(true);
-    try {
-      const reply = await queryEngine(trimmed);
-      setMessages((m) => m.map((msg) => msg.loading ? { ...msg, text: reply, time: dayjs().format("HH:mm"), loading: false } : msg));
-    } catch {
-      setMessages((m) => m.map((msg) => msg.loading ? { ...msg, text: "Đã xảy ra lỗi. Vui lòng thử lại.", time: dayjs().format("HH:mm"), loading: false } : msg));
-    } finally {
-      setLoading(false);
-    }
-  }, [loading]);
+  useEffect(() => {
+    return () => abortRef.current?.abort();
+  }, []);
 
-  const reset = () => setMessages([{ id: "0", role: "bot", text: "Xin chào! Tôi là trợ lý AI của hệ thống.\nHỏi tôi về sản lượng, bảo trì, hoặc trạng thái vận hành! 👋", time: dayjs().format("HH:mm") }]);
+  const send = useCallback(
+    async (text: string) => {
+      const trimmed = text.trim();
+      if (!trimmed || loading) return;
+
+      const userMsg: Message = {
+        id: Date.now().toString(),
+        role: "user",
+        text: trimmed,
+        time: dayjs().format("HH:mm"),
+      };
+      const botId = `b-${Date.now()}`;
+      const botMsg: Message = { id: botId, role: "bot", text: "", time: "", loading: true };
+
+      const nextHistory = [...messages, userMsg];
+      setMessages([...nextHistory, botMsg]);
+      setInput("");
+      setLoading(true);
+
+      const controller = new AbortController();
+      abortRef.current?.abort();
+      abortRef.current = controller;
+
+      const apiMessages: ApiChatMessage[] = [
+        ...toApiMessages(nextHistory),
+        { role: "user", content: trimmed },
+      ];
+
+      let accumulated = "";
+
+      const appendStep = (status: string) =>
+        setMessages((m) =>
+          m.map((msg) => {
+            if (msg.id !== botId) return msg;
+            const last = msg.toolSteps?.[msg.toolSteps.length - 1];
+            const nextSteps =
+              last === status ? msg.toolSteps! : [...(msg.toolSteps ?? []), status];
+            return { ...msg, status, toolSteps: nextSteps, loading: !accumulated };
+          })
+        );
+
+      await chatApi.runWithTools(
+        apiMessages,
+        {
+          signal: controller.signal,
+          onStatus: appendStep,
+          onContent: (chunk) => {
+            accumulated += chunk;
+            setMessages((m) =>
+              m.map((msg) =>
+                msg.id === botId
+                  ? { ...msg, text: accumulated, status: undefined, loading: false }
+                  : msg
+              )
+            );
+          },
+          onToolStart: (name) => appendStep(`Đang gọi ${name}`),
+          onDone: () => {
+            setMessages((m) =>
+              m.map((msg) =>
+                msg.id === botId
+                  ? {
+                      ...msg,
+                      text: accumulated || "(Không có phản hồi)",
+                      time: dayjs().format("HH:mm"),
+                      loading: false,
+                      status: undefined,
+                    }
+                  : msg
+              )
+            );
+            setLoading(false);
+          },
+          onError: (err) => {
+            setMessages((m) =>
+              m.map((msg) =>
+                msg.id === botId
+                  ? {
+                      ...msg,
+                      text: `⚠️ Đã xảy ra lỗi: ${err.message}`,
+                      time: dayjs().format("HH:mm"),
+                      loading: false,
+                      status: undefined,
+                    }
+                  : msg
+              )
+            );
+            setLoading(false);
+          },
+        },
+        { maxIterations: 4 }
+      );
+    },
+    [messages, loading]
+  );
+
+  const reset = () => {
+    abortRef.current?.abort();
+    setLoading(false);
+    clearMemory();
+    setMessages([{ id: "0", role: "bot", text: WELCOME_TEXT, time: dayjs().format("HH:mm") }]);
+  };
+
+  const canSend = input.trim().length > 0 && !loading;
 
   return (
-    <div className="fixed bottom-6 right-6 z-[200] flex flex-col items-end gap-3">
-      {/* Chat panel */}
+    <div
+      className="fixed bottom-6 right-6 z-[200] flex flex-col items-end gap-3"
+      style={{ fontFamily: APPLE_FONT }}
+    >
       <AnimatePresence>
         {open && (
           <motion.div
-            initial={{ opacity: 0, y: 20, scale: 0.95 }}
+            initial={{ opacity: 0, y: 12, scale: 0.97 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 20, scale: 0.95 }}
-            transition={{ duration: 0.2 }}
-            style={{ width: 360, height: 520, borderRadius: 20, boxShadow: "0 20px 60px rgba(0,0,0,0.15)", overflow: "hidden", display: "flex", flexDirection: "column", background: "#fff" }}
+            exit={{ opacity: 0, y: 12, scale: 0.97 }}
+            transition={{ type: "spring", stiffness: 320, damping: 28 }}
+            style={{
+              width: 380,
+              height: 560,
+              borderRadius: 22,
+              boxShadow:
+                "0 30px 60px -10px rgba(0,0,0,0.18), 0 8px 16px -4px rgba(0,0,0,0.06)",
+              overflow: "hidden",
+              display: "flex",
+              flexDirection: "column",
+              background: "#FFFFFF",
+              border: "1px solid rgba(0,0,0,0.05)",
+            }}
           >
-            {/* Header */}
-            <div style={{ background: "linear-gradient(135deg, #3b82f6, #6366f1)", padding: "14px 16px", flexShrink: 0 }}>
+            <div
+              style={{
+                background: "rgba(255,255,255,0.86)",
+                backdropFilter: "saturate(180%) blur(20px)",
+                WebkitBackdropFilter: "saturate(180%) blur(20px)",
+                padding: "13px 14px",
+                borderBottom: "0.5px solid rgba(60,60,67,0.18)",
+                flexShrink: 0,
+              }}
+            >
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2.5">
-                  <div style={{ width: 34, height: 34, borderRadius: 10, background: "rgba(255,255,255,0.2)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    <Bot size={18} className="text-white" />
+                <div className="flex items-center gap-3">
+                  <div
+                    className="flex items-center justify-center"
+                    style={{
+                      width: 34,
+                      height: 34,
+                      borderRadius: 11,
+                      background: "linear-gradient(135deg, #4DA1FF 0%, #0A7BFF 100%)",
+                      boxShadow: "0 4px 10px -2px rgba(10,123,255,0.4)",
+                    }}
+                  >
+                    <MessageCircle size={17} className="text-white" strokeWidth={2.2} />
                   </div>
-                  <div>
-                    <div className="text-white font-bold text-sm leading-tight">Trợ lý AI</div>
-                    <div className="text-blue-200 text-[11px]">Hệ thống Nguyên Anh II</div>
+                  <div className="leading-tight">
+                    <div
+                      style={{
+                        fontSize: 15,
+                        fontWeight: 600,
+                        color: "#1C1C1E",
+                        letterSpacing: -0.2,
+                      }}
+                    >
+                      Trợ lý AI
+                    </div>
+                    <div style={{ fontSize: 11.5, color: "#8E8E93", marginTop: 1 }}>
+                      Nguyên Anh II
+                    </div>
                   </div>
                 </div>
                 <div className="flex items-center gap-1">
-                  <button onClick={reset} className="p-1.5 rounded-lg hover:bg-white/10 transition-colors text-white/70 hover:text-white" title="Cuộc trò chuyện mới">
-                    <RotateCcw size={14} />
+                  <button
+                    onClick={reset}
+                    className="flex items-center justify-center transition-colors"
+                    style={{ width: 30, height: 30, borderRadius: 10 }}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(0,0,0,0.05)")}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                    title="Cuộc trò chuyện mới"
+                  >
+                    <RotateCcw size={14} style={{ color: "#8E8E93" }} strokeWidth={2.2} />
                   </button>
-                  <button onClick={() => setOpen(false)} className="p-1.5 rounded-lg hover:bg-white/10 transition-colors text-white/70 hover:text-white">
-                    <Minimize2 size={14} />
+                  <button
+                    onClick={() => setOpen(false)}
+                    className="flex items-center justify-center transition-colors"
+                    style={{ width: 30, height: 30, borderRadius: 10 }}
+                    onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(0,0,0,0.05)")}
+                    onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                  >
+                    <X size={15} style={{ color: "#8E8E93" }} strokeWidth={2.2} />
                   </button>
                 </div>
               </div>
             </div>
 
-            {/* Messages */}
-            <div className="flex-1 overflow-y-auto px-3 py-3 space-y-3" style={{ background: "#f8fafc" }}>
-              {messages.map((msg) => (
-                <div key={msg.id} className={`flex gap-2 ${msg.role === "user" ? "flex-row-reverse" : "flex-row"}`}>
-                  <div className={`shrink-0 w-7 h-7 rounded-full flex items-center justify-center ${msg.role === "bot" ? "bg-blue-100" : "bg-indigo-500"}`}>
-                    {msg.role === "bot" ? <Bot size={14} className="text-blue-600" /> : <User size={13} className="text-white" />}
-                  </div>
-                  <div style={{ maxWidth: "78%" }}>
-                    {msg.loading ? (
-                      <div className="bg-white rounded-2xl rounded-tl-sm px-3.5 py-2.5 shadow-sm border border-gray-100">
-                        <Loader2 size={14} className="animate-spin text-blue-400" />
+            <div
+              className="flex-1 overflow-y-auto px-3 py-3"
+              style={{ background: "#F5F5F7" }}
+            >
+              <div className="space-y-1">
+                {messages.map((msg, idx) => {
+                  const prev = messages[idx - 1];
+                  const isFirstOfGroup = !prev || prev.role !== msg.role;
+                  const isUser = msg.role === "user";
+
+                  return (
+                    <div
+                      key={msg.id}
+                      className={`flex ${isUser ? "justify-end" : "justify-start"}`}
+                      style={{ marginTop: isFirstOfGroup ? 10 : 2 }}
+                    >
+                      <div style={{ maxWidth: isUser ? "80%" : "92%" }}>
+                        {msg.role === "bot" &&
+                        msg.toolSteps &&
+                        msg.toolSteps.length > 0 &&
+                        !msg.text ? (
+                          <div
+                            style={{
+                              background: "#E9E9EB",
+                              padding: "8px 12px",
+                              borderRadius: 18,
+                              borderTopLeftRadius: 6,
+                            }}
+                          >
+                            <ToolProcessTree steps={msg.toolSteps} isActive={msg.loading} />
+                          </div>
+                        ) : msg.loading && !msg.text ? (
+                          <div
+                            style={{
+                              background: "#E9E9EB",
+                              padding: "10px 14px",
+                              borderRadius: 18,
+                              borderTopLeftRadius: 6,
+                            }}
+                          >
+                            <TypingDots />
+                          </div>
+                        ) : (
+                          <div
+                            style={{
+                              padding: "7px 13px",
+                              borderRadius: 18,
+                              fontSize: 14.5,
+                              letterSpacing: -0.1,
+                              ...(isUser
+                                ? {
+                                    background:
+                                      "linear-gradient(180deg, #2C99FF 0%, #007AFF 100%)",
+                                    color: "#FFFFFF",
+                                    borderBottomRightRadius: 6,
+                                  }
+                                : {
+                                    background: "#E9E9EB",
+                                    color: "#000000",
+                                    borderTopLeftRadius: 6,
+                                  }),
+                            }}
+                          >
+                            {isUser ? (
+                              <span style={{ lineHeight: 1.45, whiteSpace: "pre-wrap" }}>
+                                {msg.text}
+                              </span>
+                            ) : (
+                              <MessageMarkdown text={msg.text} isUser={isUser} />
+                            )}
+                          </div>
+                        )}
                       </div>
-                    ) : (
-                      <div className={`rounded-2xl px-3.5 py-2.5 text-[13px] shadow-sm ${msg.role === "bot" ? "bg-white border border-gray-100 rounded-tl-sm text-gray-800" : "bg-indigo-500 rounded-tr-sm text-white"}`}>
-                        <div className="space-y-0.5">{formatText(msg.text)}</div>
-                        {msg.time && <div className={`text-[10px] mt-1 ${msg.role === "bot" ? "text-gray-400" : "text-indigo-200"}`}>{msg.time}</div>}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ))}
+                    </div>
+                  );
+                })}
+              </div>
               <div ref={bottomRef} />
             </div>
 
-            {/* Suggestions */}
-            <div className="px-3 py-2 border-t border-gray-100 bg-white overflow-x-auto flex gap-1.5" style={{ scrollbarWidth: "none", flexShrink: 0 }}>
+            <div
+              className="px-3 py-2 overflow-x-auto flex gap-2"
+              style={{
+                scrollbarWidth: "none",
+                background: "#FFFFFF",
+                borderTop: "0.5px solid rgba(60,60,67,0.18)",
+                flexShrink: 0,
+              }}
+            >
               {SUGGESTED.map((s) => (
-                <button key={s} onClick={() => send(s)} className="shrink-0 text-[11px] px-2.5 py-1 rounded-full border border-blue-200 text-blue-600 hover:bg-blue-50 transition-colors whitespace-nowrap font-medium">
+                <button
+                  key={s}
+                  onClick={() => send(s)}
+                  disabled={loading}
+                  className="shrink-0 transition-all disabled:opacity-50"
+                  style={{
+                    fontSize: 12.5,
+                    padding: "5px 12px",
+                    borderRadius: 999,
+                    background: "#F2F2F7",
+                    color: "#007AFF",
+                    fontWeight: 500,
+                    whiteSpace: "nowrap",
+                    letterSpacing: -0.1,
+                  }}
+                  onMouseEnter={(e) =>
+                    !loading && (e.currentTarget.style.background = "#E5E5EA")
+                  }
+                  onMouseLeave={(e) => (e.currentTarget.style.background = "#F2F2F7")}
+                >
                   {s}
                 </button>
               ))}
             </div>
 
-            {/* Input */}
-            <div className="px-3 pb-3 pt-2 bg-white border-t border-gray-100 flex items-center gap-2" style={{ flexShrink: 0 }}>
-              <input
-                ref={inputRef}
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(input); } }}
-                placeholder="Hỏi về sản lượng, bảo trì..."
-                className="flex-1 text-sm px-3 py-2 rounded-xl border border-gray-200 focus:border-blue-400 focus:outline-none bg-gray-50 focus:bg-white transition-all"
-              />
-              <button
-                onClick={() => send(input)}
-                disabled={!input.trim() || loading}
-                className="w-8 h-8 rounded-xl flex items-center justify-center transition-all disabled:opacity-40"
-                style={{ background: "linear-gradient(135deg, #3b82f6, #6366f1)" }}
+            <div
+              className="px-3 pb-3 pt-2 flex items-center"
+              style={{ background: "#FFFFFF", flexShrink: 0 }}
+            >
+              <div
+                className="flex items-center w-full"
+                style={{
+                  background: "#F2F2F7",
+                  borderRadius: 999,
+                  paddingLeft: 14,
+                  paddingRight: 4,
+                  height: 36,
+                }}
               >
-                <Send size={14} className="text-white" />
-              </button>
+                <input
+                  ref={inputRef}
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.shiftKey) {
+                      e.preventDefault();
+                      send(input);
+                    }
+                  }}
+                  placeholder="Nhập tin nhắn"
+                  className="flex-1 bg-transparent outline-none border-0"
+                  style={{
+                    fontSize: 14.5,
+                    color: "#1C1C1E",
+                    letterSpacing: -0.1,
+                  }}
+                />
+                <button
+                  onClick={() => send(input)}
+                  disabled={!canSend}
+                  className="flex items-center justify-center transition-all"
+                  style={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: 14,
+                    background: canSend
+                      ? "linear-gradient(180deg, #2C99FF 0%, #007AFF 100%)"
+                      : "#C7C7CC",
+                    flexShrink: 0,
+                    opacity: canSend ? 1 : 0.7,
+                  }}
+                >
+                  <ArrowUp size={15} className="text-white" strokeWidth={2.6} />
+                </button>
+              </div>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* FAB Button */}
       <motion.button
-        whileHover={{ scale: 1.08 }}
-        whileTap={{ scale: 0.95 }}
+        whileHover={{ scale: 1.05 }}
+        whileTap={{ scale: 0.94 }}
         onClick={() => setOpen(!open)}
         className="relative flex items-center justify-center"
-        style={{ width: 54, height: 54, borderRadius: 16, background: "linear-gradient(135deg, #3b82f6, #6366f1)", boxShadow: "0 8px 24px rgba(59,130,246,0.4)" }}
+        style={{
+          width: 56,
+          height: 56,
+          borderRadius: 18,
+          background: "linear-gradient(135deg, #4DA1FF 0%, #0A7BFF 100%)",
+          boxShadow:
+            "0 12px 28px -6px rgba(10,123,255,0.45), 0 2px 6px rgba(0,0,0,0.08)",
+        }}
       >
         <AnimatePresence mode="wait">
           {open ? (
-            <motion.div key="x" initial={{ rotate: -90, opacity: 0 }} animate={{ rotate: 0, opacity: 1 }} exit={{ rotate: 90, opacity: 0 }} transition={{ duration: 0.15 }}>
-              <X size={22} className="text-white" />
+            <motion.div
+              key="x"
+              initial={{ rotate: -90, opacity: 0 }}
+              animate={{ rotate: 0, opacity: 1 }}
+              exit={{ rotate: 90, opacity: 0 }}
+              transition={{ duration: 0.18 }}
+            >
+              <X size={22} className="text-white" strokeWidth={2.4} />
             </motion.div>
           ) : (
-            <motion.div key="chat" initial={{ rotate: 90, opacity: 0 }} animate={{ rotate: 0, opacity: 1 }} exit={{ rotate: -90, opacity: 0 }} transition={{ duration: 0.15 }}>
-              <MessageCircle size={22} className="text-white" />
+            <motion.div
+              key="chat"
+              initial={{ rotate: 90, opacity: 0 }}
+              animate={{ rotate: 0, opacity: 1 }}
+              exit={{ rotate: -90, opacity: 0 }}
+              transition={{ duration: 0.18 }}
+            >
+              <MessageCircle size={22} className="text-white" strokeWidth={2.2} />
             </motion.div>
           )}
         </AnimatePresence>
-        {/* Pulse ring */}
-        {!open && (
-          <span className="absolute inset-0 rounded-2xl animate-ping opacity-20" style={{ background: "#3b82f6" }} />
-        )}
       </motion.button>
     </div>
   );
