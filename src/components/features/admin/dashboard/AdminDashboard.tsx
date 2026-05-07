@@ -26,7 +26,7 @@ import type { Vehicle } from "@/types/vehicle";
 import { format } from "date-fns";
 import {
   ArrowRight, Calendar as CalendarIcon, CheckCircle2, Clock, Ellipsis, FileSpreadsheet,
-  Eye, EyeOff, LayoutGrid, Map as MapIcon, MapPin, Radio, RefreshCw, Route, Search, Timer, Truck, X, Save
+  Eye, EyeOff, History, LayoutGrid, Map as MapIcon, MapPin, Radio, RefreshCw, Route, Search, Timer, Truck, X, Save
 } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import dynamic from "next/dynamic";

@@ -12,7 +12,7 @@ import { DoubleLeftOutlined, DoubleRightOutlined } from "@ant-design/icons";
 import { createSelector } from "@reduxjs/toolkit";
 import { Avatar, Button, Layout, Menu, MenuProps } from "antd";
 import {
-  CalendarCheck, Car, Gauge, Layers, MapPin, Package,
+  ArrowRightLeft, CalendarCheck, Car, ClipboardList, Gauge, Layers, MapPin, Package,
   User, UsersRound, UtensilsCrossed, Wrench
 } from "lucide-react";
 import { useTranslations } from "next-intl";
