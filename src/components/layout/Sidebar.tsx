@@ -17,7 +17,6 @@ import { useTranslations } from "next-intl";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-
 import { useCallback, useEffect, useMemo, useState } from "react";
 import reportApi from "@/services/report.service";
 import { SIDEBAR } from "@/constants/route";
@@ -98,8 +97,6 @@ export default function Sidebar() {
       setHasCritical(critical > 0);
     }).catch(() => {});
   }, []);
-
-  const { hasPageAccess } = usePermissions();
 
   const { isDirty, setDirty } = useNavigationStore();
 
