@@ -4,6 +4,20 @@ import nextTypescript from "eslint-config-next/typescript";
 import prettierConfig from "eslint-config-prettier";
 
 export default defineConfig([
+  ...nextVitals,
+  ...nextTypescript,
+  prettierConfig,
+  {
+  {
+    settings: { react: { version: "detect" } },
+    rules: {
+      "@typescript-eslint/no-explicit-any": "warn",
+      "@typescript-eslint/no-unused-vars": ["warn", { argsIgnorePattern: "^_" }],
+      "react/react-in-jsx-scope": "off",
+      "react/prop-types": "off",
+      "no-console": ["warn", { allow: ["warn", "error"] }],
+    },
+  },
   {
     ignores: [
       ".next/**",
@@ -31,23 +45,9 @@ export default defineConfig([
       "package-lock.json",
       "yarn.lock",
 
-
       "public/**",
       "**/*.d.ts",
       "**/*.css",
     ],
-  },
-  ...nextVitals,
-  ...nextTypescript,
-  prettierConfig,
-  {
-    settings: { react: { version: "detect" } },
-    rules: {
-      "@typescript-eslint/no-explicit-any": "warn",
-      "@typescript-eslint/no-unused-vars": ["warn", { argsIgnorePattern: "^_" }],
-      "react/react-in-jsx-scope": "off",
-      "react/prop-types": "off",
-      "no-console": ["warn", { allow: ["warn", "error"] }],
-    },
   },
 ]);

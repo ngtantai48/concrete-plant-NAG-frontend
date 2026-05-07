@@ -13,6 +13,7 @@ function getAuth() {
 
 function normalize(s: unknown): string {
   return String(s ?? "")
+    .normalize("NFC")
     .trim()
     .replace(/\s+/g, " ");
 }
@@ -92,7 +93,7 @@ export async function GET(request: Request) {
     for (let i = 0; i < btcRows.length; i++) {
       if (!foundNghiHeader) {
         const cellI = normalize(btcRows[i]?.[8]);
-        if (cellI.includes("NHÂN SỰ NGHỈ")) {
+        if (cellI.toUpperCase().includes("NHÂN SỰ NGHỈ".toUpperCase())) {
           foundNghiHeader = true;
         }
         continue;
