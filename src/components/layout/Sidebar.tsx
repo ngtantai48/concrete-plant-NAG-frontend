@@ -5,22 +5,18 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { ADMIN, USER } from "@/constants/route";
+import { navigationConfig, NavItem } from "@/config/navigation";
 import { useAppSelector } from "@/hooks/use-app-selector";
 import { useNavigationStore } from "@/hooks/use-navigation-store";
 import { usePermissions } from "@/hooks/use-permissions";
 import { DoubleLeftOutlined, DoubleRightOutlined } from "@ant-design/icons";
 import { createSelector } from "@reduxjs/toolkit";
 import { Avatar, Button, Layout, Menu, MenuProps } from "antd";
-import {
-  CalendarCheck, Car, Gauge, Layers, MapPin, Package,
-  User, UsersRound, UtensilsCrossed, Wrench, Settings
-} from "lucide-react";
+import { User } from "lucide-react";
 import { useTranslations } from "next-intl";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
-import { navigationConfig, NavItem } from "@/config/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 const UserProfile = ({ collapsed, userName, userRole, isLoading }: {

@@ -2,7 +2,7 @@ export const ROUTES = {
   LOGIN: "/login",
 };
 
-export const COMMON = {
+export const SIDEBAR = {
   DASHBOARD: "/dashboard",
   END_OF_DAY_VEHICLES: "/end-of-day-vehicles",
   DRIVERS: "/drivers",
@@ -15,20 +15,9 @@ export const COMMON = {
   ATTENDANCE: "/attendance",
   SHIFT_SLOTS: "/shift-slots",
   SYSTEM_SETTINGS: "/system-settings",
+  USER_MANAGE: "/user-manage",
+  ROLE_PERMISSIONS: "/role-permissions",
 };
-
-export const ADMIN = {
-  USER_MANAGE: "/admin/user-manage",
-  ROLE_PERMISSIONS: "/admin/role-permissions",
-};
-
-export const MANAGER = {};
-
-export const DISPATCHER = {};
-
-export const DRIVER = {};
-
-export const USER = {};
 
 export const SHARE = {
   PROFILE: "/profile",

@@ -1,4 +1,6 @@
-import { ADMIN, COMMON } from "@/constants/route";
+import { PERMISSIONS } from "@/constants/permissions";
+import { ROLES } from "@/constants/roles";
+import { SIDEBAR } from "@/constants/route";
 import {
   CalendarCheck, Car, Gauge, Layers, MapPin, Package, UsersRound,
   Wrench, Settings, ShieldCheck, UserCog, UtensilsCrossed
@@ -21,86 +23,86 @@ export interface NavItem {
 
 export const navigationConfig: NavItem[] = [
   {
-    key: COMMON.DASHBOARD,
+    key: SIDEBAR.DASHBOARD,
     label: "dashboard",
     icon: <Gauge />,
     actions: [
-      { key: "view", label: "Xem (View)" },
-      { key: "manual_sort", label: "Sắp xếp thủ công (Manual sort)" },
-      { key: "sync_slots", label: "Đồng bộ lốt xe (Sync slots)" },
+      { key: PERMISSIONS.DASHBOARD.VIEW, label: "Xem" },
+      { key: PERMISSIONS.DASHBOARD.MANUAL_SORT, label: "Sắp xếp thủ công" },
+      { key: PERMISSIONS.DASHBOARD.SYNC_SLOTS, label: "Đồng bộ lốt xe" },
     ],
   },
   {
     key: "user-manage-group",
     label: "userManagement",
     icon: <UsersRound />,
-    roles: ["admin"],
+    roles: [ROLES.ADMIN],
     children: [
       {
-        key: ADMIN.USER_MANAGE,
+        key: SIDEBAR.USER_MANAGE,   // đang sai ở key này, xem xét đổi cấu trúc route lại
         label: "allUsers",
         icon: <UserCog size={18} />,
         actions: [
-          { key: "view", label: "Xem" },
-          { key: "add", label: "Thêm" },
-          { key: "edit", label: "Sửa" },
-          { key: "delete", label: "Xóa" },
+          { key: PERMISSIONS.USER_MANAGE.VIEW, label: "Xem" },
+          { key: PERMISSIONS.USER_MANAGE.CREATE, label: "Thêm" },
+          { key: PERMISSIONS.USER_MANAGE.UPDATE, label: "Sửa" },
+          { key: PERMISSIONS.USER_MANAGE.DELETE, label: "Xóa" },
         ],
       },
       {
-        key: ADMIN.ROLE_PERMISSIONS,
+        key: SIDEBAR.ROLE_PERMISSIONS,
         label: "rolePermissions",
         icon: <ShieldCheck size={18} />,
-        roles: ["admin"],
+        roles: [ROLES.ADMIN],
         actions: [
-          { key: "view", label: "Xem" },
-          { key: "edit", label: "Sửa" },
+          { key: PERMISSIONS.PERMISSIONS_MANAGE.VIEW, label: "Xem" },
+          { key: PERMISSIONS.PERMISSIONS_MANAGE.UPDATE, label: "Chỉnh sửa quyền" },
         ],
       },
     ],
   },
   {
-    key: COMMON.VEHICLES,
+    key: SIDEBAR.VEHICLES,
     label: "vehicles",
     icon: <Car />,
     actions: [
-      { key: "view", label: "Xem" },
-      { key: "add", label: "Thêm" },
-      { key: "edit", label: "Sửa" },
-      { key: "delete", label: "Xóa" },
+      { key: PERMISSIONS.VEHICLES.VIEW, label: "Xem" },
+      { key: PERMISSIONS.VEHICLES.CREATE, label: "Thêm" },
+      { key: PERMISSIONS.VEHICLES.UPDATE, label: "Sửa" },
+      { key: PERMISSIONS.VEHICLES.DELETE, label: "Xóa" },
     ],
   },
   {
-    key: COMMON.VEHICLE_MAINTENANCES,
+    key: SIDEBAR.VEHICLE_MAINTENANCES,
     label: "vehicleMaintenances",
     icon: <Wrench />,
     actions: [
-      { key: "view", label: "Xem" },
-      { key: "add", label: "Thêm" },
-      { key: "edit", label: "Sửa" },
-      { key: "delete", label: "Xóa" },
+      { key: PERMISSIONS.VEHICLE_MAINTENANCES.VIEW, label: "Xem" },
+      { key: PERMISSIONS.VEHICLE_MAINTENANCES.CREATE, label: "Thêm" },
+      { key: PERMISSIONS.VEHICLE_MAINTENANCES.UPDATE, label: "Sửa" },
+      { key: PERMISSIONS.VEHICLE_MAINTENANCES.DELETE, label: "Xóa" },
     ],
   },
   {
-    key: COMMON.VEHICLE_TYPES,
+    key: SIDEBAR.VEHICLE_TYPES,
     label: "vehicleTypes",
     icon: <Layers />,
     actions: [
-      { key: "view", label: "Xem" },
-      { key: "add", label: "Thêm" },
-      { key: "edit", label: "Sửa" },
-      { key: "delete", label: "Xóa" },
+      { key: PERMISSIONS.VEHICLE_TYPES.VIEW, label: "Xem" },
+      { key: PERMISSIONS.VEHICLE_TYPES.CREATE, label: "Thêm" },
+      { key: PERMISSIONS.VEHICLE_TYPES.UPDATE, label: "Sửa" },
+      { key: PERMISSIONS.VEHICLE_TYPES.DELETE, label: "Xóa" },
     ],
   },
   {
-    key: COMMON.STATIONS,
+    key: SIDEBAR.STATIONS,
     label: "stations",
     icon: <MapPin />,
     actions: [
-      { key: "view", label: "Xem" },
-      { key: "add", label: "Thêm" },
-      { key: "edit", label: "Sửa" },
-      { key: "delete", label: "Xóa" },
+      { key: PERMISSIONS.STATIONS.VIEW, label: "Xem" },
+      { key: PERMISSIONS.STATIONS.CREATE, label: "Thêm" },
+      { key: PERMISSIONS.STATIONS.UPDATE, label: "Sửa" },
+      { key: PERMISSIONS.STATIONS.DELETE, label: "Xóa" },
     ],
   },
   {
@@ -109,36 +111,30 @@ export const navigationConfig: NavItem[] = [
     icon: <Package />,
     children: [
       {
-        key: COMMON.MEAL_CHECK,
+        key: SIDEBAR.MEAL_CHECK,
         label: "mealCheck",
         icon: <UtensilsCrossed size={18} />,
-        actions: [
-          { key: "view", label: "Xem" },
-          { key: "add", label: "Thêm" },
-          { key: "edit", label: "Sửa" },
-          { key: "delete", label: "Xóa" },
-        ],
+        // actions: [
+        //   { key: PERMISSIONS.MEAL_CHECK.VIEW, label: "Xem" },
+        // ],
       },
       {
-        key: COMMON.ATTENDANCE,
+        key: SIDEBAR.ATTENDANCE,
         label: "attendance",
         icon: <CalendarCheck size={18} />,
-        actions: [
-          { key: "view", label: "Xem" },
-          { key: "add", label: "Thêm" },
-          { key: "edit", label: "Sửa" },
-          { key: "delete", label: "Xóa" },
-        ],
+        // actions: [
+        //   { key: PERMISSIONS.ATTENDANCE.VIEW, label: "Xem" },
+        // ],
       },
     ],
   },
   {
-    key: COMMON.SYSTEM_SETTINGS,
+    key: SIDEBAR.SYSTEM_SETTINGS,
     label: "systemSettings",
     icon: <Settings />,
     actions: [
-      { key: "view", label: "Xem" },
-      { key: "edit", label: "Sửa" },
+      { key: PERMISSIONS.SYSTEM_SETTINGS.VIEW, label: "Xem" },
+      { key: PERMISSIONS.SYSTEM_SETTINGS.UPDATE, label: "Sửa" },
     ],
   },
 ];
