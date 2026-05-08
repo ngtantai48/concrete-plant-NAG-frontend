@@ -10,11 +10,13 @@
 
 # testing
 /coverage
+/test-results/
 
 # next.js
 /.next/
 /out/
 /vehicle-management-main/
+/renderer-pkg/
 /.vscode/
 # production
 /build

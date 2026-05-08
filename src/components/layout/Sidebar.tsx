@@ -12,7 +12,12 @@ import { DoubleLeftOutlined, DoubleRightOutlined } from "@ant-design/icons";
 import { createSelector } from "@reduxjs/toolkit";
 import { Avatar, Button, Layout, Menu, MenuProps } from "antd";
 import {
+<<<<<<< Updated upstream
   ArrowRightLeft, CalendarCheck, Car, Gauge, Layers, MapPin, Settings, Truck, User, UtensilsCrossed, Wrench, ClipboardList,
+=======
+  ArrowRightLeft, Bot, CalendarCheck, Car, ClipboardList, Gauge, Layers, MapPin, Package,
+  User, UsersRound, UtensilsCrossed, Wrench
+>>>>>>> Stashed changes
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import Image from "next/image";
@@ -102,7 +107,12 @@ export default function Sidebar() {
   const baseMenuItems = useMemo(
     () => [
       { key: ADMIN.DASHBOARD, label: t("dashboard"), icon: <Gauge />, roles: ["admin"] },
+<<<<<<< Updated upstream
 
+=======
+      { key: ADMIN.AI_ASSISTANT, label: "Trợ lý AI", icon: <Bot />, roles: ["admin"] },
+      // { key: ADMIN.USER_MANAGE, label: t("userManagement"), icon: <UsersRound />, roles: ["admin"] },
+>>>>>>> Stashed changes
       // { key: ADMIN.DRIVERS, label: t("drivers"), icon: <Truck />, roles: ["admin"] },
       // { key: ADMIN.SHIFT_SLOTS, label: t("shiftSlots"), icon: <ClipboardList />, roles: ["admin"] },
       { key: ADMIN.VEHICLES, label: t("vehicles"), icon: <Car />, roles: ["admin"] },

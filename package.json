@@ -12,7 +12,12 @@
     "format:fix": "prettier --write ."
   },
   "dependencies": {
+<<<<<<< Updated upstream
     "@ant-design/icons": "^6.1.0",
+=======
+    "@ant-design/icons": "~6.1.1",
+    "@anthropic-ai/sdk": "^0.95.1",
+>>>>>>> Stashed changes
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
@@ -68,10 +73,18 @@
     "zustand": "^5.0.9"
   },
   "devDependencies": {
+<<<<<<< Updated upstream
     "@eslint/eslintrc": "^3.3.3",
     "@eslint/js": "^9.39.1",
     "@next/eslint-plugin-next": "^15.5.7",
     "@tailwindcss/postcss": "^4.1.17",
+=======
+    "@eslint/eslintrc": "^3.3.5",
+    "@eslint/js": "^10.0.1",
+    "@next/eslint-plugin-next": "^16.2.4",
+    "@playwright/test": "^1.59.1",
+    "@tailwindcss/postcss": "^4.2.4",
+>>>>>>> Stashed changes
     "@types/file-saver": "^2.0.7",
     "@types/leaflet": "^1.9.21",
     "@types/node": "^20.19.26",

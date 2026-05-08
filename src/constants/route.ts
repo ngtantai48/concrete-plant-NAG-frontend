@@ -4,6 +4,11 @@ export const ROUTES = {
 
 export const ADMIN = {
   DASHBOARD: "/admin/dashboard",
+<<<<<<< Updated upstream
+=======
+  AI_ASSISTANT: "/admin/ai-assistant",
+  USER_MANAGE: "/admin/user-manage",
+>>>>>>> Stashed changes
   END_OF_DAY_VEHICLES: "/admin/end-of-day-vehicles",
   DRIVERS: "/admin/drivers",
   VEHICLES: "/admin/vehicles",

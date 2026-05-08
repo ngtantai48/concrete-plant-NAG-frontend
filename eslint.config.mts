@@ -20,6 +20,7 @@ export default defineConfig([
       },
     },
   },
+<<<<<<< Updated upstream
   js.configs.recommended,
   ...tseslint.configs.recommended,
   pluginReact.configs.flat.recommended,
@@ -27,4 +28,32 @@ export default defineConfig([
   ...compat.config({
     extends: ['next', 'prettier', 'next/core-web-vitals'],
   }),
+=======
+  {
+    ignores: [
+      ".next/**",
+      ".claude/**",
+      ".ida-mcp/**",
+      ".qwen/**",
+      "renderer-pkg/**",
+      "eslint.config.*",
+      "out/**",
+      "build/**",
+      "dist/**",
+      "node_modules/**",
+      "coverage/**",
+      "*.lcov",
+      "*.tgz",
+      "**/*.css",
+      "**/*.d.ts",
+      ".vscode/**",
+      ".idea/**",
+      "*.swp",
+      "next-env.d.ts",
+      "pnpm-lock.yaml",
+      "package-lock.json",
+      "yarn.lock",
+    ],
+  },
+>>>>>>> Stashed changes
 ]);
