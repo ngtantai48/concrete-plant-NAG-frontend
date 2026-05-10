@@ -28,8 +28,9 @@ export const navigationConfig: NavItem[] = [
     icon: <Gauge />,
     actions: [
       { key: PERMISSIONS.DASHBOARD.VIEW, label: "Xem" },
-      { key: PERMISSIONS.DASHBOARD.MANUAL_SORT, label: "Sắp xếp thủ công" },
+      { key: PERMISSIONS.DASHBOARD.MANUAL_SORT, label: "Sắp xếp thứ tự lốt xe" },
       { key: PERMISSIONS.DASHBOARD.SYNC_SLOTS, label: "Đồng bộ lốt xe" },
+      { key: PERMISSIONS.DASHBOARD.MANUAL_CAMERA_FALLBACK, label: "Thao tác thủ công (camera sự cố)" },
     ],
   },
   {
@@ -43,10 +44,10 @@ export const navigationConfig: NavItem[] = [
         label: "allUsers",
         icon: <UserCog size={18} />,
         actions: [
-          { key: PERMISSIONS.USER_MANAGE.VIEW, label: "Xem" },
-          { key: PERMISSIONS.USER_MANAGE.CREATE, label: "Thêm" },
-          { key: PERMISSIONS.USER_MANAGE.UPDATE, label: "Sửa" },
-          { key: PERMISSIONS.USER_MANAGE.DELETE, label: "Xóa" },
+          { key: PERMISSIONS.USER_MANAGE.VIEW, label: "Xem danh sách người dùng" },
+          { key: PERMISSIONS.USER_MANAGE.CREATE, label: "Thêm người dùng" },
+          { key: PERMISSIONS.USER_MANAGE.UPDATE, label: "Sửa người dùng" },
+          { key: PERMISSIONS.USER_MANAGE.DELETE, label: "Xóa người dùng" },
         ],
       },
       {
@@ -55,8 +56,8 @@ export const navigationConfig: NavItem[] = [
         icon: <ShieldCheck size={18} />,
         roles: [ROLES.ADMIN],
         actions: [
-          { key: PERMISSIONS.PERMISSIONS_MANAGE.VIEW, label: "Xem" },
-          { key: PERMISSIONS.PERMISSIONS_MANAGE.UPDATE, label: "Chỉnh sửa quyền" },
+          { key: PERMISSIONS.PERMISSIONS_MANAGE.VIEW, label: "Xem quyền hạn" },
+          { key: PERMISSIONS.PERMISSIONS_MANAGE.UPDATE, label: "Chỉnh sửa quyền hạn" },
         ],
       },
     ],
@@ -66,10 +67,10 @@ export const navigationConfig: NavItem[] = [
     label: "vehicles",
     icon: <Car />,
     actions: [
-      { key: PERMISSIONS.VEHICLES.VIEW, label: "Xem" },
-      { key: PERMISSIONS.VEHICLES.CREATE, label: "Thêm" },
-      { key: PERMISSIONS.VEHICLES.UPDATE, label: "Sửa" },
-      { key: PERMISSIONS.VEHICLES.DELETE, label: "Xóa" },
+      { key: PERMISSIONS.VEHICLES.VIEW, label: "Xem danh sách phương tiện" },
+      { key: PERMISSIONS.VEHICLES.CREATE, label: "Thêm phương tiện" },
+      { key: PERMISSIONS.VEHICLES.UPDATE, label: "Sửa phương tiện" },
+      { key: PERMISSIONS.VEHICLES.DELETE, label: "Xóa phương tiện" },
     ],
   },
   {
@@ -77,10 +78,10 @@ export const navigationConfig: NavItem[] = [
     label: "vehicleMaintenances",
     icon: <Wrench />,
     actions: [
-      { key: PERMISSIONS.VEHICLE_MAINTENANCES.VIEW, label: "Xem" },
-      { key: PERMISSIONS.VEHICLE_MAINTENANCES.CREATE, label: "Thêm" },
-      { key: PERMISSIONS.VEHICLE_MAINTENANCES.UPDATE, label: "Sửa" },
-      { key: PERMISSIONS.VEHICLE_MAINTENANCES.DELETE, label: "Xóa" },
+      { key: PERMISSIONS.VEHICLE_MAINTENANCES.VIEW, label: "Xem dữ liệu bảo trì" },
+      { key: PERMISSIONS.VEHICLE_MAINTENANCES.CREATE, label: "Thêm bảo trì" },
+      { key: PERMISSIONS.VEHICLE_MAINTENANCES.UPDATE, label: "Sửa bảo trì" },
+      { key: PERMISSIONS.VEHICLE_MAINTENANCES.DELETE, label: "Xóa bảo trì" },
     ],
   },
   {
@@ -88,10 +89,10 @@ export const navigationConfig: NavItem[] = [
     label: "vehicleTypes",
     icon: <Layers />,
     actions: [
-      { key: PERMISSIONS.VEHICLE_TYPES.VIEW, label: "Xem" },
-      { key: PERMISSIONS.VEHICLE_TYPES.CREATE, label: "Thêm" },
-      { key: PERMISSIONS.VEHICLE_TYPES.UPDATE, label: "Sửa" },
-      { key: PERMISSIONS.VEHICLE_TYPES.DELETE, label: "Xóa" },
+      { key: PERMISSIONS.VEHICLE_TYPES.VIEW, label: "Xem danh sách loại phương tiện" },
+      { key: PERMISSIONS.VEHICLE_TYPES.CREATE, label: "Thêm loại phương tiện" },
+      { key: PERMISSIONS.VEHICLE_TYPES.UPDATE, label: "Sửa loại phương tiện" },
+      { key: PERMISSIONS.VEHICLE_TYPES.DELETE, label: "Xóa loại phương tiện" },
     ],
   },
   {
@@ -99,10 +100,10 @@ export const navigationConfig: NavItem[] = [
     label: "stations",
     icon: <MapPin />,
     actions: [
-      { key: PERMISSIONS.STATIONS.VIEW, label: "Xem" },
-      { key: PERMISSIONS.STATIONS.CREATE, label: "Thêm" },
-      { key: PERMISSIONS.STATIONS.UPDATE, label: "Sửa" },
-      { key: PERMISSIONS.STATIONS.DELETE, label: "Xóa" },
+      { key: PERMISSIONS.STATIONS.VIEW, label: "Xem danh sách bãi/trạm" },
+      { key: PERMISSIONS.STATIONS.CREATE, label: "Thêm bãi/trạm" },
+      { key: PERMISSIONS.STATIONS.UPDATE, label: "Sửa bãi/trạm" },
+      { key: PERMISSIONS.STATIONS.DELETE, label: "Xóa bãi/trạm" },
     ],
   },
   {

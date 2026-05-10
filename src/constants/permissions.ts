@@ -3,6 +3,7 @@ export const PERMISSIONS = {
         VIEW: 'view',
         MANUAL_SORT: 'manual_sort',
         SYNC_SLOTS: 'sync_slots',
+        MANUAL_CAMERA_FALLBACK: 'manual_camera_fallback',
     },
 
     USER_MANAGE: {

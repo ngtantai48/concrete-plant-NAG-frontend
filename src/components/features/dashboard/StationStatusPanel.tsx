@@ -1,14 +1,16 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Textarea } from "@/components/ui/textarea";
 import type { DeviceStationStatus } from "@/hooks/useDeviceHeartbeat";
+import transportApi from "@/services/transport.service";
 import stationApi from "@/services/station.service";
 import type { Order } from "@/types/order";
 import type { Station } from "@/types/station";
-import { RotateCw, Video } from "lucide-react";
+import { LogIn, LogOut, RotateCw, Video, Wrench } from "lucide-react";
 import { useTranslations } from "next-intl";
-import React, { useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 interface StationStatusPanelProps {
@@ -16,6 +18,10 @@ interface StationStatusPanelProps {
   orders: Order[];
   deviceStationStatusMap?: Record<string, DeviceStationStatus>;
   onStationUpdated?: () => void;
+  pendingOrders?: Order[];
+  hasManualFallbackAccess?: boolean;
+  yardOrders?: Order[];
+  isPastDate?: boolean;
 }
 
 const EMPTY_DEVICE_STATION_STATUS_MAP: Record<string, DeviceStationStatus> = {};
@@ -25,6 +31,10 @@ const StationStatusPanel = ({
   orders,
   deviceStationStatusMap = EMPTY_DEVICE_STATION_STATUS_MAP,
   onStationUpdated,
+  pendingOrders = [],
+  hasManualFallbackAccess = false,
+  yardOrders = [],
+  isPastDate = false,
 }: StationStatusPanelProps) => {
   const t = useTranslations("DashboardPage");
 
@@ -47,10 +57,20 @@ const StationStatusPanel = ({
   const [viewingCameraStation, setViewingCameraStation] = useState<Station | null>(null);
   const [cameraKey, setCameraKey] = useState(() => Date.now());
 
+  // Manual camera fallback states
+  const [manualEntryStation, setManualEntryStation] = useState<Station | null>(null);
+  const [manualEntrySubmitting, setManualEntrySubmitting] = useState<number | null>(null);
+  const [confirmManualEntryOrder, setConfirmManualEntryOrder] = useState<{ order: Order; station: Station } | null>(null);
+  const [manualExitOrder, setManualExitOrder] = useState<{ order: Order; station: Station } | null>(null);
+  const [manualExitSubmitting, setManualExitSubmitting] = useState(false);
+
   const vehiclesByStation = useMemo(() => {
     const map: Record<number, { license_plate: string; status: string; order_number: number }[]> = {};
+    // Use yardOrders (current active vehicles) only if we are looking at today.
+    // If looking at a past date, only use the historical 'orders' array for that day.
+    const source = (!isPastDate && yardOrders.length > 0) ? yardOrders : orders;
 
-    orders.forEach((order) => {
+    source.forEach((order) => {
       const isAtStation =
         order.order_status === "collecting" ||
         (order.station_checks?.check_in_datetime && !order.station_checks?.check_out_datetime);
@@ -76,7 +96,7 @@ const StationStatusPanel = ({
     });
 
     return map;
-  }, [orders]);
+  }, [orders, yardOrders, isPastDate]);
 
   const performToggleStatus = async (station: Station) => {
     const nextStatus = station.station_status === "operating" ? "stopped" : "operating";
@@ -125,6 +145,82 @@ const StationStatusPanel = ({
     setCameraKey(Date.now());
     setViewingCameraStation(station);
   };
+
+  // ─── Manual Camera Fallback: Vehicle Enter Station ───
+  const collectingOrdersByStation = useMemo(() => {
+    const map: Record<number, Order[]> = {};
+    // Use yardOrders only for the current date to ensure manual fallback logic 
+    // works for orders started on previous days but still active.
+    const source = (!isPastDate && yardOrders.length > 0) ? yardOrders : orders;
+    source.forEach((order) => {
+      if (order.order_status === "collecting" && order.stations?.station_id) {
+        if (!map[order.stations.station_id]) {
+          map[order.stations.station_id] = [];
+        }
+        map[order.stations.station_id].push(order);
+      }
+    });
+    return map;
+  }, [orders, yardOrders, isPastDate]);
+
+  const handleManualEntry = useCallback(async () => {
+    if (!confirmManualEntryOrder) return;
+    const { order, station } = confirmManualEntryOrder;
+    setManualEntrySubmitting(order.order_id);
+    try {
+      const vehicleName = order.vehicles?.vehicle_name;
+      if (!vehicleName) {
+        toast.error(t('manualEntryFailed'), { position: 'top-right' });
+        return;
+      }
+      await transportApi.cmrStationCheck({
+        vehicle_name: vehicleName,
+        station_id: station.station_id,
+      });
+      toast.success(
+        t('manualEntrySuccess', {
+          vehiclePlate: order.vehicles?.vehicle_license_plate
+            ? `${order.vehicles.vehicle_license_plate}${order.vehicles.vehicle_name ? ` | ${order.vehicles.vehicle_name}` : ''}`
+            : `#${order.order_id}`,
+          stationName: station.station_name,
+        }),
+        { position: 'top-right' },
+      );
+      setManualEntryStation(null);
+      setConfirmManualEntryOrder(null);
+      onStationUpdated?.();
+    } catch {
+      toast.error(t('manualEntryFailed'), { position: 'top-right' });
+    } finally {
+      setManualEntrySubmitting(null);
+    }
+  }, [confirmManualEntryOrder, onStationUpdated, t]);
+
+  // ─── Manual Camera Fallback: Vehicle Leave Station ───
+  const handleManualExit = useCallback(async () => {
+    if (!manualExitOrder) return;
+    setManualExitSubmitting(true);
+    try {
+      await transportApi.cmrStationCheckout({
+        station_id: manualExitOrder.station.station_id,
+      });
+      toast.success(
+        t('manualExitSuccess', {
+          vehiclePlate: manualExitOrder.order.vehicles?.vehicle_license_plate
+            ? `${manualExitOrder.order.vehicles.vehicle_license_plate}${manualExitOrder.order.vehicles.vehicle_name ? ` | ${manualExitOrder.order.vehicles.vehicle_name}` : ''}`
+            : `#${manualExitOrder.order.order_id}`,
+          stationName: manualExitOrder.station.station_name,
+        }),
+        { position: 'top-right' },
+      );
+      setManualExitOrder(null);
+      onStationUpdated?.();
+    } catch {
+      toast.error(t('manualExitFailed'), { position: 'top-right' });
+    } finally {
+      setManualExitSubmitting(false);
+    }
+  }, [manualExitOrder, onStationUpdated, t]);
 
   const getStatusTheme = (status: string) => {
     if (status === "operating") {
@@ -209,18 +305,15 @@ const StationStatusPanel = ({
               className="dd-card dd-glow-border flex min-h-0 flex-row overflow-hidden"
               style={{ borderColor: theme.borderGlow }}
             >
-              <div className="flex min-w-0 flex-1 flex-col p-2">
-                <div className="flex flex-wrap items-center gap-1.5 px-1 py-0.5">
+              <div className="flex min-w-0 flex-1 flex-col gap-1 p-2">
+                <div className="flex flex-wrap items-center gap-2 p-1">
                   <h3 className="whitespace-nowrap text-base font-black text-slate-900">
                     {station.station_name}
                   </h3>
 
-                  <Badge
-                    variant="outline"
-                    onClick={() => handleOpenCamera(station)}
-                    className={`h-7 shrink-0 cursor-pointer gap-1.5 px-2 py-0 text-sm font-normal shadow-none transition-all hover:bg-slate-100 ${cameraStatusClass}`}
+                  <Badge onClick={() => handleOpenCamera(station)}
+                    className={`shrink-0 cursor-pointer text-sm transition-all hover:bg-slate-300 ${cameraStatusClass}`}
                   >
-                    <Video className="h-3.5 w-3.5" />
                     {cameraStatusLabel}
                   </Badge>
 
@@ -242,20 +335,54 @@ const StationStatusPanel = ({
                   </Badge>
                 </div>
 
-                <div className="flex flex-1 flex-col gap-1 px-1 py-1">
+                <div className="flex flex-1 flex-col gap-1 p-1">
                   <div
                     className="rounded-md px-3 py-1 shadow-sm"
                     style={{ border: "1px solid var(--dd-border)" }}
                   >
                     <div className="flex min-h-7 items-center justify-between">
-                      <span className="text-xs font-bold uppercase">{t("vehicleUnloading")}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-bold uppercase">{t("vehicleUnloading")}</span>
+
+                        {hasManualFallbackAccess && deviceStatus == "connected" && (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                variant="outline"
+                                size="iconSquare"
+                                className={`h-6 w-6 transition-all ${activeVehicle
+                                  ? "text-amber-500 hover:text-amber-800 hover:border-amber-400"
+                                  : "text-sky-500 hover:text-sky-800 hover:border-sky-400"
+                                  }`}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (activeVehicle) {
+                                    const stationCollecting = collectingOrdersByStation[station.station_id];
+                                    if (stationCollecting && stationCollecting.length > 0) {
+                                      setManualExitOrder({ order: stationCollecting[0], station });
+                                    }
+                                  } else {
+                                    setManualEntryStation(station);
+                                  }
+                                }}
+                              >
+                                {activeVehicle ? <LogOut /> : <LogIn />}
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent side="bottom">
+                              {activeVehicle ? t("manualVehicleExit") : t("manualVehicleEntry")}
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
+                      </div>
+
                       {activeVehicle ? (
                         <div className="flex items-center">
                           <span
-                            className="inline-flex items-center gap-2 rounded-md px-1.5 py-0.5 text-sm font-extrabold"
+                            className="inline-flex items-center gap-2 rounded-md text-sm font-black"
                             style={{ color: "var(--dd-text-accent)" }}
                           >
-                            <RotateCw className="h-3 w-3 animate-soft-spin" />
+                            <RotateCw className="h-4 w-4 animate-spin" />
                             {activeVehicle.license_plate}
                           </span>
                           {remainingVehicles > 0 && (
@@ -269,6 +396,7 @@ const StationStatusPanel = ({
                       )}
                     </div>
                   </div>
+
 
                 </div>
               </div>
@@ -357,6 +485,176 @@ const StationStatusPanel = ({
               disabled={togglingId === stationToPause?.station_id}
             >
               {togglingId === stationToPause?.station_id ? t("processing") : t("stopped")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Manual Entry Dialog: Choose a pending vehicle ─── */}
+      <Dialog
+        open={!!manualEntryStation}
+        onOpenChange={(isOpen) => {
+          if (!isOpen) setManualEntryStation(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-lg max-h-[70vh] flex flex-col">
+          <DialogHeader>
+            <div className="flex items-center gap-2 border-b border-slate-200 pb-3">
+              <Wrench className="h-5 w-5 text-sky-500" />
+              <div className="text-left">
+                <DialogTitle className="text-lg font-bold uppercase text-slate-900">
+                  {t("manualEntryTitle")} — {manualEntryStation?.station_name}
+                </DialogTitle>
+                <DialogDescription className="mt-0.5 text-sm text-slate-500">
+                  {t("manualEntryDescription", { stationName: manualEntryStation?.station_name ?? "" })}
+                </DialogDescription>
+              </div>
+            </div>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto py-2">
+            {pendingOrders.length === 0 ? (
+              <div className="flex items-center justify-center py-8 text-sm font-bold uppercase text-slate-400">
+                {t("manualNoPendingVehicles")}
+              </div>
+            ) : (
+              <ul className="flex flex-col gap-1.5">
+                {pendingOrders.map((order, idx) => {
+                  const plate = order.vehicles?.vehicle_license_plate
+                    ? `${order.vehicles.vehicle_license_plate}${order.vehicles.vehicle_name ? ` | ${order.vehicles.vehicle_name}` : ""}`
+                    : `#${order.order_id}`;
+                  const isSubmitting = manualEntrySubmitting === order.order_id;
+                  return (
+                    <li
+                      key={order.order_id}
+                      className="flex items-center justify-between rounded-lg border px-3 py-2.5 transition-colors hover:border-sky-300 hover:bg-sky-50/50"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <span
+                          className="flex h-7 w-7 items-center justify-center rounded-full text-sm font-bold"
+                          style={{ background: "rgba(14, 165, 233, 0.1)", color: "#0ea5e9" }}
+                        >
+                          {idx + 1}
+                        </span>
+                        <span className="text-base font-bold">{plate}</span>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => manualEntryStation && setConfirmManualEntryOrder({ order, station: manualEntryStation })}
+                        disabled={isSubmitting || manualEntrySubmitting !== null}
+                        className="text-xs font-bold uppercase text-sky-700 hover:bg-sky-100 shrink-0"
+                      >
+                        {isSubmitting ? (<RotateCw className="animate-spin" />) : (<LogIn />)}
+                        {t("manualSelectVehicleToEnter")}
+                      </Button>
+                    </li>
+                  );
+                })}
+              </ul>
+            )}
+          </div>
+          <DialogFooter className="mt-2 sm:justify-end">
+            <Button
+              variant="outline"
+              onClick={() => setManualEntryStation(null)}
+              disabled={manualEntrySubmitting !== null}
+            >
+              {t("cancel")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ─── Manual Exit Dialog: Confirm vehicle leaving ─── */}
+      <Dialog
+        open={!!manualExitOrder}
+        onOpenChange={(isOpen) => {
+          if (!isOpen) setManualExitOrder(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <div className="flex items-center gap-2 border-b border-slate-200 pb-3">
+              <div className="text-left">
+                <DialogTitle className="text-lg font-bold uppercase text-slate-900">
+                  {t("manualExitTitle")}
+                </DialogTitle>
+                <DialogDescription className="mt-0.5 text-sm text-slate-500">
+                  {t("manualExitDescription", {
+                    vehiclePlate: manualExitOrder?.order.vehicles?.vehicle_license_plate
+                      ? `${manualExitOrder.order.vehicles.vehicle_license_plate}${manualExitOrder.order.vehicles.vehicle_name ? ` | ${manualExitOrder.order.vehicles.vehicle_name}` : ""}`
+                      : `#${manualExitOrder?.order.order_id ?? ""}`,
+                    stationName: manualExitOrder?.station.station_name ?? "",
+                  })}
+                </DialogDescription>
+              </div>
+            </div>
+          </DialogHeader>
+          <DialogFooter className="mt-4 flex gap-3 sm:justify-end">
+            <Button
+              variant="outline"
+              onClick={() => setManualExitOrder(null)}
+              disabled={manualExitSubmitting}
+            >
+              {t("cancel")}
+            </Button>
+            <Button
+              variant="primary"
+              onClick={handleManualExit}
+              disabled={manualExitSubmitting}
+              className="gap-1.5 font-bold uppercase bg-amber-500 hover:bg-amber-600 text-white"
+            >
+              {manualExitSubmitting ? (
+                <RotateCw className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <LogOut className="h-3.5 w-3.5" />
+              )}
+              {t("manualExitConfirm")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {/* ─── Manual Entry Confirmation Dialog ─── */}
+      <Dialog
+        open={!!confirmManualEntryOrder}
+        onOpenChange={(isOpen) => {
+          if (!isOpen) setConfirmManualEntryOrder(null);
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <div className="flex items-center gap-2 border-b border-slate-200 pb-3">
+              <div className="text-left">
+                <DialogTitle className="text-lg font-bold uppercase text-slate-900">
+                  {t("manualEntryConfirmTitle")}
+                </DialogTitle>
+                <DialogDescription className="mt-0.5 text-sm text-slate-500">
+                  {t("manualEntryConfirmDescription", {
+                    vehiclePlate: confirmManualEntryOrder?.order.vehicles?.vehicle_license_plate
+                      ? `${confirmManualEntryOrder.order.vehicles.vehicle_license_plate}${confirmManualEntryOrder.order.vehicles.vehicle_name ? ` | ${confirmManualEntryOrder.order.vehicles.vehicle_name}` : ""}`
+                      : `#${confirmManualEntryOrder?.order.order_id ?? ""}`,
+                    stationName: confirmManualEntryOrder?.station.station_name ?? "",
+                  })}
+                </DialogDescription>
+              </div>
+            </div>
+          </DialogHeader>
+          <DialogFooter className="mt-4 flex gap-3 sm:justify-end">
+            <Button
+              variant="outline"
+              onClick={() => setConfirmManualEntryOrder(null)}
+              disabled={manualEntrySubmitting !== null}
+            >
+              {t("cancel")}
+            </Button>
+            <Button
+              variant="primary"
+              onClick={handleManualEntry}
+              disabled={manualEntrySubmitting !== null}
+              className="gap-1.5 font-bold uppercase bg-sky-500 hover:bg-sky-600 text-white"
+            >
+              {manualEntrySubmitting !== null ? (<RotateCw className="animate-spin" />) : (<LogIn />)}
+              {t("manualEntryConfirmButton")}
             </Button>
           </DialogFooter>
         </DialogContent>
