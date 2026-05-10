@@ -667,13 +667,10 @@ export default function AdminDashboard() {
           <div className="flex items-center justify-between gap-3">
             {/* Title + Clock */}
             <div className="flex items-center gap-3 min-w-0">
-              <h1 className="text-xl font-black uppercase leading-none whitespace-nowrap" style={{ color: 'var(--dd-text-primary)' }}>
-                {t("title")}
-              </h1>
-              <span className="text-xs font-bold uppercase whitespace-nowrap"
-                style={{ color: 'var(--dd-text-muted)' }}>
-                {t('systemTime')}: <ClockDisplay locale={locale} />
-              </span>
+              <h1 className="text-xl font-black uppercase leading-none whitespace-nowrap">{t("title")}</h1>
+              <div className="flex items-center gap-2 border-l border-slate-300 pl-3">
+                <ClockDisplay locale={locale} />
+              </div>
             </div>
 
             {/* Right Controls */}
@@ -1018,7 +1015,7 @@ export default function AdminDashboard() {
 
               {/* ═══ SYSTEM TELEMETRY ═══ */}
               <div className="shrink-0">
-                <StationStatusPanel stations={stations} orders={orders} deviceStationStatusMap={stationStatusMap} onStationUpdated={fetchAll} />
+                <StationStatusPanel stations={stations} orders={orders} deviceStationStatusMap={stationStatusMap} onStationUpdated={fetchAll} pendingOrders={activeFlowOrders} hasManualFallbackAccess={hasActionAccess(SIDEBAR.DASHBOARD, PERMISSIONS.DASHBOARD.MANUAL_CAMERA_FALLBACK)} yardOrders={yardOrders} isPastDate={isPastDate} />
               </div>
 
               {/* Vehicles + Dispatch side by side */}
