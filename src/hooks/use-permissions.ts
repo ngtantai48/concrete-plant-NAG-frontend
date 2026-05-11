@@ -1,4 +1,5 @@
 import { navigationConfig, NavItem } from "@/config/navigation";
+import { ROLES } from "@/constants/roles";
 import { useAppSelector } from "@/hooks/use-app-selector";
 
 export type RolePermissions = Record<string, string[]>;
@@ -8,7 +9,7 @@ export const usePermissions = () => {
   const role = user?.role || "user";
   const userPermissions = user?.permissions || [];
 
-  const isAdmin = role === "admin";
+  const isAdmin = role === ROLES.ADMIN;
 
   /**
    * Check if user has access to a specific page.

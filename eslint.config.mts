@@ -1,30 +1,53 @@
-import js from "@eslint/js";
-import globals from "globals";
-import tseslint from "typescript-eslint";
-import pluginReact from "eslint-plugin-react";
 import { defineConfig } from "eslint/config";
-import { FlatCompat } from '@eslint/eslintrc'
-
-const compat = new FlatCompat({
-  baseDirectory: import.meta.dirname,
-})
+import nextVitals from "eslint-config-next/core-web-vitals";
+import nextTypescript from "eslint-config-next/typescript";
+import prettierConfig from "eslint-config-prettier";
 
 export default defineConfig([
   {
-    files: ["**/*.{js,mjs,cjs,ts,mts,cts,jsx,tsx}"],
-    extends: ["js/recommended"],
-    languageOptions: {
-      globals: {
-        ...globals.browser,
-        ...globals.node,
-      },
+    ignores: [
+      ".next/**",
+      "out/**",
+      "build/**",
+      "dist/**",
+      "node_modules/**",
+
+      ".claude/**",
+      ".ida-mcp/**",
+      ".qwen/**",
+      ".vscode/**",
+      ".idea/**",
+
+      "*.swp",
+      "*.lcov",
+      "*.tgz",
+      "coverage/**",
+
+      ".env",
+      ".env*.local",
+      "eslint.config.*",
+      "next-env.d.ts",
+      "pnpm-lock.yaml",
+      "package-lock.json",
+      "yarn.lock",
+
+
+      "public/**",
+      "**/*.d.ts",
+      "**/*.css",
+    ],
+  },
+  ...nextVitals,
+  ...nextTypescript,
+  prettierConfig,
+  {
+    settings: { react: { version: "detect" } },
+    rules: {
+      "@typescript-eslint/no-explicit-any": "warn",
+      "@typescript-eslint/no-unused-vars": ["warn", { argsIgnorePattern: "^_" }],
+      "react/react-in-jsx-scope": "off",
+      "react/prop-types": "off",
+      "no-console": ["warn", { allow: ["warn", "error"] }],
     },
   },
-  js.configs.recommended,
-  ...tseslint.configs.recommended,
-  pluginReact.configs.flat.recommended,
-
-  ...compat.config({
-    extends: ['next', 'prettier', 'next/core-web-vitals'],
-  }),
 ]);
