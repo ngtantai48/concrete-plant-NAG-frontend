@@ -344,7 +344,7 @@ const StationStatusPanel = ({
                       <div className="flex items-center gap-2">
                         <span className="text-xs font-bold uppercase">{t("vehicleUnloading")}</span>
 
-                        {hasManualFallbackAccess && deviceStatus == "connected" && (
+                        {hasManualFallbackAccess && deviceStatus === "disconnected" && (
                           <Tooltip>
                             <TooltipTrigger asChild>
                               <Button
