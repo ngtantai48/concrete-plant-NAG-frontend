@@ -28,6 +28,7 @@ export default function InitAuth() {
                         role_id: res.data.role_id,
                         accessToken: res.data.accessToken,
                         user_full_name: res.data.user_full_name,
+                        permissions: res.data.permissions,
                     })
                 );
             } catch {

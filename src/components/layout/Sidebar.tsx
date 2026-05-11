@@ -5,16 +5,14 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { ADMIN, USER } from "@/constants/route";
+import { navigationConfig, NavItem } from "@/config/navigation";
 import { useAppSelector } from "@/hooks/use-app-selector";
 import { useNavigationStore } from "@/hooks/use-navigation-store";
+import { usePermissions } from "@/hooks/use-permissions";
 import { DoubleLeftOutlined, DoubleRightOutlined } from "@ant-design/icons";
 import { createSelector } from "@reduxjs/toolkit";
 import { Avatar, Button, Layout, Menu, MenuProps } from "antd";
-import {
-  CalendarCheck, Car, Gauge, Layers, MapPin, Package,
-  User, UsersRound, UtensilsCrossed, Wrench
-} from "lucide-react";
+import { User } from "lucide-react";
 import { useTranslations } from "next-intl";
 import Image from "next/image";
 import Link from "next/link";
@@ -83,6 +81,7 @@ export default function Sidebar() {
   const [mounted, setMounted] = useState(false);
   const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
   const [pendingUrl, setPendingUrl] = useState<string>("");
+  const { hasPageAccess } = usePermissions();
 
   const { isDirty, setDirty } = useNavigationStore();
 
@@ -102,34 +101,38 @@ export default function Sidebar() {
     return query ? `${pathname}?${query}` : pathname;
   }, [pathname, searchParams]);
 
-  const baseMenuItems = useMemo(
-    () => [
-      { key: ADMIN.DASHBOARD, label: t("dashboard"), icon: <Gauge />, roles: ["admin"] },
-      // { key: ADMIN.USER_MANAGE, label: t("userManagement"), icon: <UsersRound />, roles: ["admin"] },
-      // { key: ADMIN.DRIVERS, label: t("drivers"), icon: <Truck />, roles: ["admin"] },
-      // { key: ADMIN.SHIFT_SLOTS, label: t("shiftSlots"), icon: <ClipboardList />, roles: ["admin"] },
-      { key: ADMIN.VEHICLES, label: t("vehicles"), icon: <Car />, roles: ["admin"] },
-      { key: ADMIN.VEHICLE_MAINTENANCES, label: t("vehicleMaintenances"), icon: <Wrench />, roles: ["admin"] },
-      { key: ADMIN.VEHICLE_TYPES, label: t("vehicleTypes"), icon: <Layers />, roles: ["admin"] },
-      { key: ADMIN.STATIONS, label: t("stations"), icon: <MapPin />, roles: ["admin"] },
-      {
-        key: "tools-menu", label: t("tools"), icon: <Package />, roles: ["admin"],
-        children: [
-          { key: ADMIN.MEAL_CHECK, label: t("mealCheck"), icon: <UtensilsCrossed /> },
-          { key: ADMIN.ATTENDANCE, label: t("attendance"), icon: <CalendarCheck /> },
-        ],
-      },
-      //{ key: ADMIN.SYSTEM_SETTINGS, label: t("systemSettings"), icon: <Settings />, roles: ["admin"] },
-      // { key: ADMIN.DRIVER_DISPLAY, label: t("driverDisplay"), icon: <Monitor />, roles: ["admin"] },
-
-      { key: USER.DASHBOARD, label: t("dashboard"), icon: <Gauge />, roles: ["user"] },
-    ],
-    [t]
-  );
+  const baseMenuItems = useMemo(() => {
+    const translateItems = (items: NavItem[]): any[] => {
+      return items.map((item) => ({
+        ...item,
+        label: t(item.label),
+        children: item.children ? translateItems(item.children) : undefined,
+      }));
+    };
+    return translateItems(navigationConfig);
+  }, [t]);
 
   const menuItems = useMemo(() => {
-    return baseMenuItems.filter((item) => item.roles.includes(role));
-  }, [baseMenuItems, role]);
+    const filterItems = (items: any[]): any[] => {
+      return items
+        .map(item => ({ ...item }))
+        .filter((item) => {
+          // 1. Check if item is restricted to specific roles
+          if (item.roles && !item.roles.includes(role || "")) {
+            return false;
+          }
+
+          if (item.children) {
+            item.children = filterItems(item.children);
+            // Folder is visible if it has visible children
+            return item.children.length > 0;
+          }
+          // All items now rely on RBAC check
+          return hasPageAccess(item.key);
+        });
+    };
+    return filterItems(baseMenuItems);
+  }, [baseMenuItems, role, hasPageAccess]);
 
   const handleLinkClick = (e: React.MouseEvent, url: string) => {
     if (isDirty) {

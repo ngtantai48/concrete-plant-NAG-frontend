@@ -6,7 +6,7 @@ export default async function Forbidden() {
     const t = await getTranslations('Forbidden');
 
     return (
-        <div className="h-full flex flex-col items-center justify-center bg-gray-50 px-6">
+        <div className="min-h-screen flex flex-col items-center justify-center px-6">
             <div className="text-center max-w-md">
                 <h1 className="text-5xl font-bold mb-4 text-red-500">403</h1>
                 <h2 className="text-2xl font-semibold mb-2">{t('access_forbidden')}</h2>
