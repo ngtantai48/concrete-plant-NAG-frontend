@@ -4,6 +4,7 @@ import type { ToolDefinition, ToolResult } from "./types";
 import { getTodayOrdersTool, getOrdersByStatusTool } from "./orders";
 import { getVehicleStatusTool, getMaintenanceForecastTool } from "./vehicles";
 import { getProductionReportTool } from "./production";
+import { ORDER_STATUS_BUSINESS_RULES } from "./order-status";
 import type { MemoryEntry } from "../chat-memory";
 
 const TOOLS: ReadonlyArray<ToolDefinition> = [
@@ -62,7 +63,7 @@ function memoryBlock(memory: readonly MemoryEntry[]): string {
   }));
   return [
     "",
-    'Boi canh phien gan day. Dung de hieu cac tham chieu nhu "cac xe do", "don do", "bien so nao":',
+    'Bối cảnh phiên gần đây. Dùng để hiểu các tham chiếu như "các xe đó", "đơn đó", "biển số nào":',
     "```json",
     JSON.stringify(compact, null, 2),
     "```",
@@ -80,25 +81,27 @@ export function buildRouterPrompt(
   }).join("\n");
 
   return [
-    "Boi canh: Bo dinh tuyen tool cho he thong quan ly tram be-tong Nguyen Anh II.",
-    `Hom nay la ${today}.`,
+    "Bối cảnh: Bộ định tuyến tool cho hệ thống quản lý trạm bê tông Nguyên Anh II.",
+    `Hôm nay là ${today}.`,
     memoryBlock(memory),
     "",
-    "Danh sach tool:",
+    "Danh sách tool:",
     catalog,
-    "- none: chitchat, cau hoi khong can du lieu he thong, hoac da du du lieu trong boi canh phien.",
+    "- none: chitchat, câu hỏi không cần dữ liệu hệ thống, hoặc đã đủ dữ liệu trong bối cảnh phiên.",
     "",
-    "Quy tac uu tien:",
-    "- Neu hoi xe nao san sang/ranh/trong theo ca, lich xe, ca chieu/ca sang: BAT BUOC dung getTodayOrders vi nguon dung la orders/lich chuyen. KHONG dung getVehicleStatus cho nhom cau hoi nay.",
-    "- getVehicleStatus chi dung cho cau hoi trang thai cuoi ngay/GPS/bat thuong cua xe, khong dung de suy luan xe san sang theo ca.",
-    "- Neu hoi san luong/bao cao/tong quan theo ngay: uu tien getProductionReport.",
+    "Quy tắc ưu tiên:",
+    "- Nếu hỏi xe nào sẵn sàng/rảnh/trống theo ca, lịch xe, ca chiều/ca sáng: BẮT BUỘC dùng getTodayOrders vì nguồn đúng là orders/lịch chuyến. KHÔNG dùng getVehicleStatus cho nhóm câu hỏi này.",
+    "- getVehicleStatus chỉ dùng cho câu hỏi trạng thái cuối ngày/GPS/bất thường của xe, không dùng để suy luận xe sẵn sàng theo ca.",
+    "- Nếu hỏi sản lượng/báo cáo/tổng quan theo ngày: ưu tiên getProductionReport.",
+    "- Scope trạm cố định là NGUYÊN ANH/NGUYÊN ANH II. Không chọn tool hay lập luận chỉ để phân tích phân bổ theo trạm.",
+    `- ${ORDER_STATUS_BUSINESS_RULES}`,
     "",
-    `Cau hoi: "${question.replace(/"/g, '\\"')}"`,
+    `Câu hỏi: "${question.replace(/"/g, '\\"')}"`,
     "",
-    'Khi cau hoi tham chieu ket qua truoc (vd "xe do", "chuyen do"), hay lay id/bien so/ngay tu boi canh phien de dien args.',
-    'Tra ve DUY NHAT JSON mot dong dang {"tool":"...","args":{...}}.',
-    'Neu khong can tool moi: {"tool":"none","args":{}}.',
-    "KHONG giai thich, KHONG markdown, KHONG code block.",
+    'Khi câu hỏi tham chiếu kết quả trước (ví dụ "xe đó", "chuyến đó"), hãy lấy id/biển số/ngày từ bối cảnh phiên để điền args.',
+    'Trả về DUY NHẤT JSON một dòng dạng {"tool":"...","args":{...}}.',
+    'Nếu không cần tool mới: {"tool":"none","args":{}}.',
+    "KHÔNG giải thích, KHÔNG markdown, KHÔNG code block.",
   ].join("\n");
 }
 
@@ -191,17 +194,18 @@ export function buildContextMessage(
   const orderScheduleHint =
     toolResult.tool === "getTodayOrders"
       ? [
-          "Huong dan rieng cho cau hoi xe san sang theo ca:",
-          "- Uu tien field afternoon_availability neu co.",
-          "- Xe ban ca chieu la xe co order tu 12:00 tro di voi status init/pending/collecting/transporting/running.",
-          "- Xe ung vien san sang la xe trong orders hom nay khong co order active ca chieu.",
-          "- Neu khong co du lieu tat ca xe, noi ro ket luan chi dua tren orders hom nay.",
-          "- BAT BUOC render table danh sach xe ung vien va gantt lich ca chieu neu co moc gio.",
+          "Hướng dẫn riêng cho câu hỏi xe sẵn sàng theo ca:",
+          "- Ưu tiên field afternoon_availability nếu có.",
+          "- Xe bận ca chiều là xe có order từ 12:00 trở đi với status init/pending/collecting/transporting/running.",
+          `- ${ORDER_STATUS_BUSINESS_RULES}`,
+          "- Xe ứng viên sẵn sàng là xe trong orders hôm nay không có order chưa hoàn thành trong ca chiều.",
+          "- Nếu không có dữ liệu tất cả xe, nói rõ kết luận chỉ dựa trên orders hôm nay.",
+          "- BẮT BUỘC render table danh sách xe ứng viên và gantt lịch ca chiều nếu có mốc giờ.",
         ].join("\n")
       : "";
 
   return [
-    `Boi canh du lieu noi bo Nguyen Anh II (lay luc ${today}, tu tool ${toolResult.tool}):`,
+    `Bối cảnh dữ liệu nội bộ Nguyên Anh II (lấy lúc ${today}, từ tool ${toolResult.tool}):`,
     "```json",
     JSON.stringify(payload, null, 2),
     "```",
@@ -209,12 +213,14 @@ export function buildContextMessage(
     "",
     orderScheduleHint,
     "",
-    "Dua HOAN TOAN vao du lieu tren (ke ca boi canh phien neu co), tra loi cau hoi bang tieng Viet ngan gon, co so lieu cu the, dung **bold** cho cac so quan trong. Neu du lieu rong hay noi ro.",
-    "CHART-FIRST: Neu du lieu tool khong rong, KHONG duoc tra markdown tron. Phai chen render block phu hop theo system prompt.",
-    "Neu co so lieu tong quan hay trang thai: them kpi_grid/bar_chart/donut_chart. Neu co chuoi thoi gian: them line_chart/area_chart. Neu co lich/ca/order: them gantt/table.",
-    "Toi thieu 1 render block cho cau tra loi co du lieu; nen co 2 render block neu co ca tong quan va chi tiet.",
+    "Dựa HOÀN TOÀN vào dữ liệu trên (kể cả bối cảnh phiên nếu có), trả lời câu hỏi bằng tiếng Việt có dấu, ngắn gọn, có số liệu cụ thể, dùng **bold** cho các số quan trọng. Nếu dữ liệu rỗng hãy nói rõ.",
+    "CHART-FIRST: Nếu dữ liệu tool không rỗng, KHÔNG được trả markdown trơn. Phải chèn render block phù hợp theo system prompt.",
+    "Nếu có số liệu tổng quan hay trạng thái: thêm kpi_grid/bar_chart/donut_chart. Nếu có chuỗi thời gian: thêm line_chart/area_chart. Nếu có lịch/ca/order: thêm gantt/table.",
+    "Không tạo chart/table/followup phân tích theo trạm; trạm NGUYÊN ANH là scope cố định, không phải chiều so sánh.",
+    ORDER_STATUS_BUSINESS_RULES,
+    "Tối thiểu 1 render block cho câu trả lời có dữ liệu; nên có 2 render block nếu có cả tổng quan và chi tiết.",
     "",
-    `Cau hoi: ${question}`,
+    `Câu hỏi: ${question}`,
   ].join("\n");
 }
 
@@ -224,16 +230,17 @@ export function buildMemoryContextMessage(
 ): string {
   const today = dayjs().format("YYYY-MM-DD");
   return [
-    `Boi canh phien Nguyen Anh II (lay luc ${today}, du lieu cac tool da goi gan day):`,
+    `Bối cảnh phiên Nguyên Anh II (lấy lúc ${today}, dữ liệu các tool đã gọi gần đây):`,
     "```json",
     JSON.stringify(memory, null, 2),
     "```",
     "",
-    "Dua HOAN TOAN vao du lieu tren, tra loi cau hoi bang tieng Viet ngan gon, co so lieu cu the, dung **bold** cho cac so quan trong. Neu du lieu tren khong du de tra loi, hay noi ro va de xuat cau hoi khac.",
-    "CHART-FIRST: Neu du lieu phien co so lieu/danh sach/lich, KHONG duoc tra markdown tron. Phai chen render block phu hop theo system prompt.",
-    "Toi thieu 1 render block cho cau tra loi co du lieu; nen co 2 render block neu co ca tong quan va chi tiet.",
+    "Dựa HOÀN TOÀN vào dữ liệu trên, trả lời câu hỏi bằng tiếng Việt có dấu, ngắn gọn, có số liệu cụ thể, dùng **bold** cho các số quan trọng. Nếu dữ liệu trên không đủ để trả lời, hãy nói rõ và đề xuất câu hỏi khác.",
+    "CHART-FIRST: Nếu dữ liệu phiên có số liệu/danh sách/lịch, KHÔNG được trả markdown trơn. Phải chèn render block phù hợp theo system prompt.",
+    "Không tạo chart/table/followup phân tích theo trạm; trạm NGUYÊN ANH là scope cố định, không phải chiều so sánh.",
+    "Tối thiểu 1 render block cho câu trả lời có dữ liệu; nên có 2 render block nếu có cả tổng quan và chi tiết.",
     "",
-    `Cau hoi: ${question}`,
+    `Câu hỏi: ${question}`,
   ].join("\n");
 }
 

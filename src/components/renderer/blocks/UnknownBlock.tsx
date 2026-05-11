@@ -36,7 +36,7 @@ export function BlockSkeleton() {
       <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(115deg,transparent_0%,rgba(0,122,255,0.10)_42%,transparent_70%)] blur-xl" />
       <div className="relative mb-3 flex items-center gap-2 text-[12.5px] font-bold text-[#0A66E0] dark:text-[#6DB4FF]">
         <span className="size-3 animate-spin rounded-full border-2 border-[#007AFF]/25 border-t-[#007AFF]" />
-        Dang render...
+        Đang render...
       </div>
       <div className="relative rounded-lg border border-black/[0.06] bg-zinc-50/85 p-3 blur-[0.6px] dark:border-white/[0.08] dark:bg-white/[0.04]">
         <div className="mb-3 flex items-end gap-2">

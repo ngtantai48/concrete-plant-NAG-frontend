@@ -4,9 +4,11 @@ import { ChartFrame, Legend, LineChart } from "@/components/charts";
 import type { AreaChartBlock } from "@/components/renderer/types";
 
 export function AreaChartBlockComponent({ data }: { data: AreaChartBlock }) {
+  const title = data.title?.trim() || "Diễn biến dữ liệu";
+
   return (
     <div data-testid="render-block-area_chart">
-      <ChartFrame subtitle={data.subtitle} title={data.title}>
+      <ChartFrame subtitle={data.subtitle} title={title}>
         <LineChart annotations={data.annotations} area height={180} series={data.series} />
         <Legend series={data.series} />
         {data.stacked && (
@@ -16,4 +18,3 @@ export function AreaChartBlockComponent({ data }: { data: AreaChartBlock }) {
     </div>
   );
 }
-

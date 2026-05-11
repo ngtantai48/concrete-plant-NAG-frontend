@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 
+function responseContentType(value: unknown): string {
+  return typeof value === "string" && value.trim() ? value : "image/jpeg";
+}
+
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const ip = searchParams.get('ip');
@@ -45,7 +49,7 @@ export async function GET(req: NextRequest) {
     if (initRes.status === 200) {
         return new NextResponse(initRes.data, {
             headers: {
-              'Content-Type': initRes.headers['content-type'] || 'image/jpeg',
+              'Content-Type': responseContentType(initRes.headers['content-type']),
               'Cache-Control': 'no-store, max-age=0',
             }
         });
@@ -80,7 +84,7 @@ export async function GET(req: NextRequest) {
           if (authRes.status === 200) {
             return new NextResponse(authRes.data, {
               headers: {
-                'Content-Type': authRes.headers['content-type'] || 'image/jpeg',
+                'Content-Type': responseContentType(authRes.headers['content-type']),
                 'Cache-Control': 'no-store, max-age=0',
               }
             });
@@ -96,7 +100,7 @@ export async function GET(req: NextRequest) {
       if (basicRes.status === 200) {
         return new NextResponse(basicRes.data, {
           headers: {
-            'Content-Type': basicRes.headers['content-type'] || 'image/jpeg',
+            'Content-Type': responseContentType(basicRes.headers['content-type']),
             'Cache-Control': 'no-store, max-age=0',
           }
         });
@@ -152,7 +156,7 @@ export async function GET(req: NextRequest) {
                 if (authRes.status === 200) {
                   return new NextResponse(authRes.data, {
                     headers: {
-                      'Content-Type': authRes.headers['content-type'] || 'image/jpeg',
+                      'Content-Type': responseContentType(authRes.headers['content-type']),
                       'Cache-Control': 'no-store, max-age=0',
                     }
                   });

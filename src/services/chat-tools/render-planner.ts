@@ -1,4 +1,5 @@
 import type { ToolResult } from "./types";
+import { aggregateOrderStatusGroups, orderStatusLabel } from "./order-status";
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
@@ -29,6 +30,30 @@ function positiveRows(rows: Array<{ label: string; value: number; color?: string
   return rows.filter((row) => row.value > 0);
 }
 
+function statusRowsFromGroups(
+  statusGroups: unknown,
+  fallbackCounts: Record<string, unknown>,
+): Array<{ label: string; value: number; color?: string }> {
+  const groups = asRecordArray(statusGroups);
+  if (groups.length > 0) {
+    return positiveRows(
+      groups.map((group) => ({
+        label: stringValue(group.label, "Khác"),
+        value: numberValue(group.value),
+        color: typeof group.color === "string" ? group.color : undefined,
+      })),
+    );
+  }
+
+  return positiveRows(
+    aggregateOrderStatusGroups(fallbackCounts).map((group) => ({
+      label: group.label,
+      value: group.value,
+      color: group.color,
+    })),
+  );
+}
+
 function plannedProductionBlocks(data: Record<string, unknown>) {
   const stamp = hhmm();
   const summary = isRecord(data.summary) ? data.summary : {};
@@ -36,25 +61,20 @@ function plannedProductionBlocks(data: Record<string, unknown>) {
   const to = stringValue(data.to);
   const dateLabel = from && to && from === to ? from : from && to ? `${from} - ${to}` : "hôm nay";
   const topVehicles = asRecordArray(data.top_vehicles);
-  const topStations = asRecordArray(data.top_stations);
-  const topDrivers = asRecordArray(data.top_drivers);
-  const statusRows = positiveRows([
-    { label: "Hoàn thành", value: numberValue(summary.completed), color: "#34C759" },
-    { label: "Đang chạy", value: numberValue(summary.running), color: "#007AFF" },
-    { label: "Đang thu thập", value: numberValue(summary.collecting), color: "#FF9F0A" },
-    { label: "Đang vận chuyển", value: numberValue(summary.transporting), color: "#AF52DE" },
-    { label: "Chờ xử lý", value: numberValue(summary.pending), color: "#8E8E93" },
-    { label: "Đã hủy", value: numberValue(summary.canceled), color: "#FF3B30" },
-  ]);
+  const moving = numberValue(summary.moving, numberValue(summary.running) + numberValue(summary.transporting));
+  const waiting = numberValue(summary.waiting, numberValue(summary.pending));
+  const statusRows = statusRowsFromGroups(summary.status_groups, isRecord(summary.byStatus) ? summary.byStatus : {
+    completed: summary.completed,
+    running: summary.running,
+    transporting: summary.transporting,
+    collecting: summary.collecting,
+    pending: summary.pending,
+    canceled: summary.canceled,
+  });
   const topVehicleRows = topVehicles.map((vehicle) => ({
     label: stringValue(vehicle.vehicle_name, stringValue(vehicle.vehicle_license_plate, "Xe")),
     value: numberValue(vehicle.total_orders),
   }));
-  const topStationRows = topStations.map((station) => ({
-    label: stringValue(station.station_name, "Trạm"),
-    value: numberValue(station.total_orders),
-  }));
-
   const blocks = [
     fence({
       type: "kpi_grid",
@@ -65,16 +85,8 @@ function plannedProductionBlocks(data: Record<string, unknown>) {
       items: [
         { label: "Tổng đơn", value: numberValue(summary.total_orders), unit: "đơn", tone: "blue" },
         { label: "Hoàn thành", value: numberValue(summary.completed), unit: "đơn", tone: "good" },
-        {
-          label: "Đang vận hành",
-          value:
-            numberValue(summary.running) +
-            numberValue(summary.collecting) +
-            numberValue(summary.transporting) +
-            numberValue(summary.pending),
-          unit: "đơn",
-          tone: "amber",
-        },
+        { label: "Đang di chuyển", value: moving, unit: "đơn", tone: "blue" },
+        { label: "Đang đợi", value: waiting, unit: "đơn", tone: "amber" },
         { label: "Quãng đường", value: numberValue(summary.total_distance_km), unit: "km", tone: "purple" },
       ],
     }),
@@ -125,38 +137,6 @@ function plannedProductionBlocks(data: Record<string, unknown>) {
     );
   }
 
-  if (topStationRows.length > 0) {
-    blocks.push(
-      fence({
-        type: "bar_chart",
-        id: `bar-phan-bo-theo-tram-${stamp}`,
-        title: "Phân bổ đơn hàng theo trạm",
-        unit: "đơn",
-        source: ["site_lookup"],
-        data: topStationRows,
-      }),
-    );
-  }
-
-  if (topDrivers.length > 0) {
-    blocks.push(
-      fence({
-        type: "table",
-        id: `table-top-tai-xe-${stamp}`,
-        title: "Top tài xế theo số đơn",
-        source: ["driver_schedule"],
-        columns: [
-          { key: "driver", header: "Tài xế" },
-          { key: "orders", header: "Số đơn", align: "right", format: "number" },
-        ],
-        rows: topDrivers.map((driver) => ({
-          driver: stringValue(driver.user_name),
-          orders: numberValue(driver.total_orders),
-        })),
-      }),
-    );
-  }
-
   blocks.push(
     fence({
       type: "source_chips",
@@ -166,7 +146,7 @@ function plannedProductionBlocks(data: Record<string, unknown>) {
     fence({
       type: "followups",
       id: `followups-production-${stamp}`,
-      items: ["Xem chi tiết đơn đang chạy", "Lọc top xe theo quãng đường", "Phân tích sản lượng theo trạm"],
+      items: ["Xem chi tiết đơn đang di chuyển", "Lọc top xe theo quãng đường", "Lọc xe đang di chuyển"],
     }),
   );
 
@@ -177,15 +157,12 @@ function plannedTodayOrdersBlocks(data: Record<string, unknown>) {
   const stamp = hhmm();
   const summary = isRecord(data.summary) ? data.summary : {};
   const byStatus = isRecord(summary.byStatus) ? summary.byStatus : {};
-  const statusRows = positiveRows(
-    Object.entries(byStatus).map(([label, value]) => ({
-      label,
-      value: numberValue(value),
-    })),
-  );
+  const statusRows = statusRowsFromGroups(summary.status_groups, byStatus);
   const orders = asRecordArray(data.orders).slice(0, 10);
   const availability = isRecord(data.afternoon_availability) ? data.afternoon_availability : {};
   const candidates = asRecordArray(availability.candidates).slice(0, 10);
+  const moving = numberValue(byStatus.running) + numberValue(byStatus.transporting);
+  const waiting = numberValue(byStatus.init) + numberValue(byStatus.pending);
 
   const blocks = [
     fence({
@@ -197,7 +174,8 @@ function plannedTodayOrdersBlocks(data: Record<string, unknown>) {
       items: [
         { label: "Tổng đơn", value: numberValue(summary.total), unit: "đơn", tone: "blue" },
         { label: "Xe liên quan", value: numberValue(summary.vehicles), unit: "xe", tone: "green" },
-        { label: "Trạm", value: numberValue(summary.stations), unit: "trạm", tone: "purple" },
+        { label: "Đang di chuyển", value: moving, unit: "đơn", tone: "blue" },
+        { label: "Đang đợi", value: waiting, unit: "đơn", tone: "amber" },
         { label: "Xe ứng viên ca chiều", value: numberValue(availability.candidate_count), unit: "xe", tone: "good" },
       ],
     }),
@@ -227,14 +205,12 @@ function plannedTodayOrdersBlocks(data: Record<string, unknown>) {
         columns: [
           { key: "license_plate", header: "Biển số" },
           { key: "vehicle", header: "Xe" },
-          { key: "driver", header: "Tài xế" },
           { key: "note", header: "Ghi chú" },
         ],
         rows: candidates.map((vehicle) => ({
           license_plate: stringValue(vehicle.license_plate),
           vehicle: stringValue(vehicle.name),
-          driver: stringValue(vehicle.driver),
-          note: "Không có order active ca chiều trong orders hôm nay",
+          note: "Không có order chưa hoàn thành trong ca chiều theo orders hôm nay",
         })),
       }),
     );
@@ -249,15 +225,11 @@ function plannedTodayOrdersBlocks(data: Record<string, unknown>) {
           { key: "order", header: "Đơn" },
           { key: "status", header: "Trạng thái", format: "badge" },
           { key: "vehicle", header: "Xe" },
-          { key: "driver", header: "Tài xế" },
-          { key: "station", header: "Trạm" },
         ],
         rows: orders.map((order) => ({
           order: String(order.order_number ?? order.order_id ?? ""),
-          status: stringValue(order.status),
+          status: stringValue(order.status_label, orderStatusLabel(order.status)),
           vehicle: stringValue(order.vehicle),
-          driver: stringValue(order.driver),
-          station: stringValue(order.station),
         })),
       }),
     );
@@ -272,7 +244,7 @@ function plannedTodayOrdersBlocks(data: Record<string, unknown>) {
     fence({
       type: "followups",
       id: `followups-orders-${stamp}`,
-      items: ["Lọc xe sẵn sàng ca chiều", "Xem đơn đang chạy", "Đề xuất điều xe cho trạm thiếu xe"],
+      items: ["Lọc xe sẵn sàng ca chiều", "Xem đơn đang di chuyển", "Đề xuất điều xe nếu thiếu xe"],
     }),
   );
 

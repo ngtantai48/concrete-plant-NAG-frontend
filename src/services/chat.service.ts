@@ -16,6 +16,7 @@ import { getMemorySnapshot, hasMemory, rememberToolCall } from "./chat-memory";
 
 const STREAM_ENDPOINT = "/api/chat/stream";
 const COMPLETE_ENDPOINT = "/api/chat/complete";
+const AI_GENERATION_MAX_TOKENS = 32_768;
 
 export interface ChatStreamHandlers {
   onStatus?: (status: string) => void;
@@ -41,13 +42,14 @@ export interface RunWithToolsHandlers {
 export interface RunWithToolsOptions {
   maxIterations?: number;
   injectSystemPrompt?: boolean;
+  model?: string;
 }
 
 const defaultRequest: Partial<ChatCompletionRequest> = {
   stream: true,
   thinking: true,
   temperature: 0.7,
-  max_tokens: 2048,
+  max_tokens: AI_GENERATION_MAX_TOKENS,
 };
 
 const routerRequest: Partial<ChatCompletionRequest> = {
@@ -181,12 +183,12 @@ const chatApi = {
 
       const question = history[lastUserIndex].content;
       handlers.onIteration?.(1);
-      handlers.onStatus?.("Dang phan tich yeu cau");
+      handlers.onStatus?.("Đang phân tích yêu cầu");
 
       let decision = routeByDeterministicRule(question);
       let decisionRaw = "";
       if (decision) {
-        handlers.onStatus?.(`Dinh tuyen theo orders (${decision.tool})`);
+        handlers.onStatus?.(`Định tuyến theo orders (${decision.tool})`);
       } else {
         try {
           decisionRaw = await chatApi.sendComplete(
@@ -199,7 +201,7 @@ const chatApi = {
           );
         } catch (error) {
           if ((error as Error).name === "AbortError") return;
-          handlers.onStatus?.("Khong dinh tuyen duoc tool, tra loi truc tiep.");
+          handlers.onStatus?.("Không định tuyến được tool, trả lời trực tiếp.");
         }
       }
 
@@ -212,7 +214,7 @@ const chatApi = {
       const messagesForStream: ChatMessage[] = [...history];
 
       if (wantsTool && decision) {
-        handlers.onStatus?.(`Dang goi ${decision.tool}`);
+        handlers.onStatus?.(`Đang gọi ${decision.tool}`);
         handlers.onToolStart?.(decision.tool, decision.args);
 
         const result = await dispatchTool(decision.tool, decision.args);
@@ -222,8 +224,8 @@ const chatApi = {
 
         handlers.onStatus?.(
           result.status === "ok"
-            ? `Da lay du lieu (${result.tool})`
-            : `${result.tool} loi: ${result.error ?? "khong ro"}`,
+            ? `Đã lấy dữ liệu (${result.tool})`
+            : `${result.tool} lỗi: ${result.error ?? "không rõ"}`,
         );
 
         if (result.status === "ok") {
@@ -239,14 +241,14 @@ const chatApi = {
           content: buildContextMessage(question, result, getMemorySnapshot()),
         };
 
-        handlers.onStatus?.("Dang soan cau tra loi");
+        handlers.onStatus?.("Đang soạn câu trả lời");
       } else if (hasMemory()) {
-        handlers.onStatus?.("Dung du lieu phien truoc");
+        handlers.onStatus?.("Dùng dữ liệu phiên trước");
         messagesForStream[lastUserIndex] = {
           role: "user",
           content: buildMemoryContextMessage(question, getMemorySnapshot()),
         };
-        handlers.onStatus?.("Dang soan cau tra loi");
+        handlers.onStatus?.("Đang soạn câu trả lời");
       }
 
       let streamError: Error | null = null;
@@ -256,8 +258,8 @@ const chatApi = {
 
       await chatApi.sendStream(
         options.injectSystemPrompt
-          ? { messages: streamMessages, thinking: false }
-          : { messages: streamMessages },
+          ? { messages: streamMessages, thinking: false, model: options.model }
+          : { messages: streamMessages, model: options.model },
         {
           signal: handlers.signal,
           onStatus: (status) => handlers.onStatus?.(status),

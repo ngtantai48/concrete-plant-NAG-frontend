@@ -1,6 +1,7 @@
 import type { StreamChunk } from "./types";
 
 const renderFencePattern = /:::render\s*([\s\S]*?):::/g;
+const renderLoadingMarker = "\uE000_RENDER_LOADING_\uE000";
 const knownRenderTypes = new Set([
   "kpi_grid",
   "line_chart",
@@ -61,6 +62,34 @@ function chartJsTitle(chart: Record<string, unknown>, fallback: string): string 
   return typeof title.text === "string" && title.text.trim() ? title.text.trim() : fallback;
 }
 
+function datasetLabel(dataset: Record<string, unknown> | undefined): string | undefined {
+  const label = dataset?.label;
+  return typeof label === "string" && label.trim() ? label.trim() : undefined;
+}
+
+function inferChartTitle(
+  kind: "bar" | "donut" | "line" | "area",
+  labels: string[] = [],
+  metric?: string,
+): string {
+  const cleanMetric = metric?.trim();
+  if (kind === "bar") {
+    if (cleanMetric) return `${cleanMetric} theo hạng mục`;
+    if (labels.some((label) => /^x\d+/i.test(label))) return "So sánh đội xe";
+    return "Biểu đồ cột theo hạng mục";
+  }
+  if (kind === "donut") {
+    if (cleanMetric) return `Cơ cấu ${cleanMetric.toLowerCase()}`;
+    return "Cơ cấu dữ liệu";
+  }
+  if (kind === "area") {
+    if (cleanMetric) return `Diễn biến ${cleanMetric.toLowerCase()}`;
+    return "Diễn biến dữ liệu";
+  }
+  if (cleanMetric) return `Xu hướng ${cleanMetric.toLowerCase()}`;
+  return "Xu hướng dữ liệu";
+}
+
 function chartColor(value: unknown, index: number): string | undefined {
   if (Array.isArray(value)) {
     const color = value[index];
@@ -111,6 +140,229 @@ function parseLooseKeyValueData(value: string): Array<{ label: string; value: nu
     items.push({ label: match[1], value: numericValue });
   }
   return items;
+}
+
+function splitTopLevel(value: string, separator: string) {
+  const parts: string[] = [];
+  let current = "";
+  let depth = 0;
+  let quote: "\"" | "'" | null = null;
+  let escaped = false;
+
+  for (const char of value) {
+    if (quote) {
+      current += char;
+      if (escaped) {
+        escaped = false;
+      } else if (char === "\\") {
+        escaped = true;
+      } else if (char === quote) {
+        quote = null;
+      }
+      continue;
+    }
+
+    if (char === "\"" || char === "'") {
+      quote = char;
+      current += char;
+      continue;
+    }
+
+    if (char === "[" || char === "{" || char === "(") depth += 1;
+    if (char === "]" || char === "}" || char === ")") depth = Math.max(0, depth - 1);
+
+    if (char === separator && depth === 0) {
+      parts.push(current);
+      current = "";
+      continue;
+    }
+
+    current += char;
+  }
+
+  parts.push(current);
+  return parts;
+}
+
+function parseTemplateAttributes(body: string): { name: string; attributes: Record<string, string> } | null {
+  const segments = splitTopLevel(decodeHtmlEntities(body).trim(), "|")
+    .map((segment) => segment.trim())
+    .filter(Boolean);
+  const name = segments.shift()?.trim().toLowerCase();
+  if (!name) return null;
+
+  const attributes: Record<string, string> = {};
+  for (const segment of segments) {
+    const equalsIndex = segment.indexOf("=");
+    if (equalsIndex <= 0) continue;
+    const key = segment.slice(0, equalsIndex).trim().toLowerCase();
+    const value = segment.slice(equalsIndex + 1).trim();
+    if (key) attributes[key] = value;
+  }
+
+  return { name, attributes };
+}
+
+function parseTemplateValue(value: string | undefined): unknown {
+  if (value === undefined) return undefined;
+  const trimmed = decodeHtmlEntities(value).trim();
+  if (!trimmed) return "";
+  const parsed = parseLooseChartObject(trimmed);
+  if (parsed !== null) return parsed;
+  return unquoteYamlValue(trimmed);
+}
+
+function templateString(value: string | undefined): string | undefined {
+  const parsed = parseTemplateValue(value);
+  if (typeof parsed === "string" && parsed.trim()) return parsed.trim();
+  if (typeof parsed === "number" && Number.isFinite(parsed)) return String(parsed);
+  return undefined;
+}
+
+function templateArray(value: string | undefined): unknown[] {
+  const parsed = parseTemplateValue(value);
+  return Array.isArray(parsed) ? parsed : [];
+}
+
+function uniqueTableKey(header: string, index: number, used: Set<string>) {
+  const base = tableKey(header, index);
+  let key = base;
+  let suffix = 2;
+  while (used.has(key)) {
+    key = `${base}-${suffix}`;
+    suffix += 1;
+  }
+  used.add(key);
+  return key;
+}
+
+function convertTemplateTable(attributes: Record<string, string>): string | null {
+  const headers = templateArray(attributes.headers ?? attributes.columns).map(String);
+  const rowsData = templateArray(attributes.data ?? attributes.rows);
+  if (headers.length === 0 || rowsData.length === 0) return null;
+
+  const used = new Set<string>();
+  const columns = headers.map((header, index) => ({
+    key: uniqueTableKey(header, index, used),
+    header,
+  }));
+  const rows = rowsData
+    .map((row) => {
+      if (Array.isArray(row)) {
+        return columns.reduce<Record<string, unknown>>((acc, column, index) => {
+          acc[column.key] = row[index] ?? "";
+          return acc;
+        }, {});
+      }
+      if (isRecord(row)) return row;
+      return null;
+    })
+    .filter((row): row is Record<string, unknown> => row !== null);
+
+  if (rows.length === 0) return null;
+  const title = templateString(attributes.title) ?? "Chi tiết dữ liệu";
+  return renderFence({
+    type: "table",
+    id: `table-${slugify(title)}-${currentHHmm()}`,
+    title,
+    columns,
+    rows,
+  });
+}
+
+function convertTemplateChart(name: string, attributes: Record<string, string>): string | null {
+  const chartType = chartJsTypeFromXmlType(attributes.type ?? name);
+  if (!chartType) return null;
+
+  const labels = asLabelArray(templateArray(attributes.labels ?? attributes.label ?? attributes.x));
+  const values = asNumberArray(templateArray(attributes.values ?? attributes.value ?? attributes.y));
+  if (labels.length === 0 || values.length === 0) return null;
+
+  const title =
+    templateString(attributes.title) ??
+    inferChartTitle(
+      chartType === "area" ? "area" : chartType === "line" ? "line" : chartType === "bar" ? "bar" : "donut",
+      labels,
+      templateString(attributes.y_label ?? attributes.ylabel ?? attributes.unit),
+    );
+  const unit = templateString(attributes.y_label ?? attributes.ylabel ?? attributes.unit);
+  const data = labels.slice(0, values.length).map((label, index) => ({
+    label,
+    value: values[index] ?? 0,
+  }));
+
+  if (chartType === "bar") {
+    return renderFence({
+      type: "bar_chart",
+      id: `bar-${slugify(title)}-${currentHHmm()}`,
+      title,
+      unit,
+      data,
+    });
+  }
+
+  if (chartType === "donut") {
+    const total = data.reduce((sum, item) => sum + item.value, 0);
+    return renderFence({
+      type: "donut_chart",
+      id: `donut-${slugify(title)}-${currentHHmm()}`,
+      title,
+      centerLabel: `${total}`,
+      showLegend: true,
+      data,
+    });
+  }
+
+  return renderFence({
+    type: chartType === "area" ? "area_chart" : "line_chart",
+    id: `${chartType === "area" ? "area" : "line"}-${slugify(title)}-${currentHHmm()}`,
+    title,
+    yAxisLabel: unit,
+    series: [
+      {
+        name: unit ?? title,
+        data: data.map((item) => ({ x: item.label, y: item.value })),
+      },
+    ],
+  });
+}
+
+function convertTemplateRender(body: string): string | null {
+  const parsed = parseTemplateAttributes(body);
+  if (!parsed) return null;
+  if (parsed.name === "table") return convertTemplateTable(parsed.attributes);
+  if (parsed.name === "chart") return convertTemplateChart(parsed.attributes.type ?? parsed.name, parsed.attributes);
+  return convertTemplateChart(parsed.name, parsed.attributes);
+}
+
+function normalizeTemplateRenderBlocks(text: string): string {
+  if (!/\{\{\s*(?:chart|bar|bar_chart|donut|donut_chart|pie|pie_chart|doughnut|line|line_chart|area|area_chart|table)\b/i.test(text)) {
+    return text;
+  }
+
+  let output = "";
+  let cursor = 0;
+  while (cursor < text.length) {
+    const start = text.indexOf("{{", cursor);
+    if (start < 0) {
+      output += text.slice(cursor);
+      break;
+    }
+
+    output += text.slice(cursor, start);
+    const end = text.indexOf("}}", start + 2);
+    if (end < 0) {
+      output += text.slice(start);
+      break;
+    }
+
+    const candidate = text.slice(start + 2, end);
+    const converted = convertTemplateRender(candidate);
+    output += converted ?? text.slice(start, end + 2);
+    cursor = end + 2;
+  }
+
+  return output;
 }
 
 function chartJsTypeFromXmlType(value: string): string | null {
@@ -263,12 +515,19 @@ function convertYamlChartBlock(body: string): string | null {
   const chartType = typeMatch?.[1] ? chartJsTypeFromXmlType(typeMatch[1].trim()) : null;
   if (!chartType) return null;
 
-  const titleMatch = /^title\s*:\s*(.+)$/im.exec(decoded);
-  const title = titleMatch?.[1] ? unquoteYamlValue(titleMatch[1]) : "Chart";
   const lines = decoded.split(/\r?\n/);
   const labels = parseYamlArrayKey(lines, "labels")?.values.map(String) ?? [];
   const datasets = parseYamlDatasets(lines);
   if (labels.length === 0 || datasets.length === 0) return null;
+  const titleMatch = /^title\s*:\s*(.+)$/im.exec(decoded);
+  const firstDataset = datasets[0];
+  const title = titleMatch?.[1]
+    ? unquoteYamlValue(titleMatch[1])
+    : inferChartTitle(
+        chartType === "area" ? "area" : chartType === "line" ? "line" : chartType === "bar" ? "bar" : "donut",
+        labels,
+        datasetLabel(firstDataset),
+      );
 
   return convertChartJsBlock({
     type: chartType,
@@ -280,9 +539,13 @@ function convertYamlChartBlock(body: string): string | null {
 function convertXmlChartTag(tag: string): string | null {
   const attributes = parseChartTagAttributes(tag);
   const type = attributes.type?.toLowerCase();
-  const title = attributes.title?.trim() || "Chart";
   const data = parseLooseKeyValueData(attributes.data ?? "");
   if (!type || data.length === 0) return null;
+  const labels = data.map((item) => item.label);
+  const title = attributes.title?.trim() || inferChartTitle(
+    type === "bar_chart" || type === "bar" ? "bar" : type === "line_chart" || type === "line" ? "line" : type === "area_chart" || type === "area" ? "area" : "donut",
+    labels,
+  );
 
   if (type === "donut_chart" || type === "pie_chart" || type === "doughnut" || type === "donut" || type === "pie") {
     const total = data.reduce((sum, item) => sum + item.value, 0);
@@ -326,7 +589,8 @@ function convertXmlChartElement(openTag: string, body: string): string | null {
   const attributes = parseChartTagAttributes(openTag);
   const type = attributes.type?.toLowerCase();
   const chartType = type ? chartJsTypeFromXmlType(type) : null;
-  const title = attributes.title?.trim() || "Chart";
+  const inferredKind = chartType === "area" ? "area" : chartType === "line" ? "line" : chartType === "bar" ? "bar" : "donut";
+  const title = attributes.title?.trim() || inferChartTitle(inferredKind);
   const decodedBody = decodeHtmlEntities(body).trim();
   if (!chartType || !decodedBody) return null;
 
@@ -382,9 +646,9 @@ function parseMermaidDuration(value: string): number | null {
 function mermaidTone(tokens: string[]): "blue" | "green" | "amber" | "red" | "purple" {
   const joined = tokens.join(" ").toLowerCase();
   if (joined.includes("crit") || joined.includes("late") || joined.includes("overdue") || joined.includes("blocked")) return "red";
-  if (joined.includes("done") || joined.includes("complete")) return "green";
-  if (joined.includes("active") || joined.includes("running")) return "blue";
-  if (joined.includes("pending") || joined.includes("wait") || joined.includes("collecting")) return "amber";
+  if (joined.includes("done") || joined.includes("complete") || joined.includes("completed") || joined.includes("hoàn thành")) return "green";
+  if (joined.includes("active") || joined.includes("running") || joined.includes("transporting") || joined.includes("moving") || joined.includes("di chuyển")) return "blue";
+  if (joined.includes("pending") || joined.includes("wait") || joined.includes("waiting") || joined.includes("đang đợi") || joined.includes("collecting")) return "amber";
   return "purple";
 }
 
@@ -518,7 +782,10 @@ function unwrapRenderFenceWrappers(text: string): string {
         /(^|\n)[ \t]*`{3,}[ \t]*(?:chart|render|json|ya?ml)?[ \t]*\r?\n(?=[ \t]*:::render\b)/gi,
         "$1",
       )
-      .replace(/(:::[ \t]*)\r?\n[ \t]*`{3,}[ \t]*(?=\r?\n|$)/g, "$1\n");
+      .replace(
+        /(^|\n)[ \t]*:::[ \t]*\r?\n[ \t]*`{3,}[ \t]*(?:chart|render|json|ya?ml|mermaid|gantt)?[ \t]*(?=\r?\n|$)/gi,
+        "$1:::\n",
+      );
 
     if (next === output) break;
     output = next;
@@ -539,7 +806,7 @@ function convertChartJsBlock(chart: unknown): string | null {
     const dataset = datasets[0];
     const values = asNumberArray(dataset.data);
     if (values.length === 0) return null;
-    const title = chartJsTitle(chart, "Donut chart");
+    const title = chartJsTitle(chart, inferChartTitle("donut", labels, datasetLabel(dataset)));
     const total = values.reduce((sum, value) => sum + value, 0);
     return renderFence({
       type: "donut_chart",
@@ -559,7 +826,7 @@ function convertChartJsBlock(chart: unknown): string | null {
     const firstDataset = datasets[0];
     const firstValues = asNumberArray(firstDataset.data);
     if (firstValues.length === 0) return null;
-    const title = chartJsTitle(chart, "Bar chart");
+    const title = chartJsTitle(chart, inferChartTitle("bar", labels, datasetLabel(firstDataset)));
     const firstLabel = typeof firstDataset.label === "string" ? firstDataset.label : undefined;
     const blocks = [
       renderFence({
@@ -609,7 +876,7 @@ function convertChartJsBlock(chart: unknown): string | null {
   }
 
   if (chartType === "line" || chartType === "area") {
-    const title = chartJsTitle(chart, "Line chart");
+    const title = chartJsTitle(chart, inferChartTitle(chartType === "area" ? "area" : "line", labels, datasetLabel(datasets[0])));
     const series = datasets
       .map((dataset, index) => {
         const values = asNumberArray(dataset.data);
@@ -676,7 +943,7 @@ function isInsideRenderFence(text: string, index: number): boolean {
 }
 
 function normalizeChartJsRenderBlocks(text: string): string {
-  if (!/"type"\s*:\s*"(?:bar|doughnut|donut|pie|line)"/i.test(text)) {
+  if (!/["']?type["']?\s*:\s*["'](?:bar|doughnut|donut|pie|line|area)["']/i.test(text)) {
     return text;
   }
 
@@ -705,7 +972,8 @@ function normalizeChartJsRenderBlocks(text: string): string {
     }
 
     try {
-      const converted = convertChartJsBlock(JSON.parse(candidate) as unknown);
+      const parsed = parseLooseChartObject(candidate);
+      const converted = parsed ? convertChartJsBlock(parsed) : null;
       output += converted ?? candidate;
     } catch {
       output += candidate;
@@ -717,10 +985,33 @@ function normalizeChartJsRenderBlocks(text: string): string {
   return output;
 }
 
+function isChartLikeCodeFence(language: string | undefined, body: string): boolean {
+  const normalizedLanguage = (language ?? "").trim().toLowerCase();
+  const decodedBody = decodeHtmlEntities(body).trim();
+
+  if (/^(chart|render|ya?ml|mermaid|gantt)$/i.test(normalizedLanguage)) return true;
+  return /^(?:type\s*:\s*(?:bar|bar_chart|pie|pie_chart|donut|donut_chart|doughnut|line|line_chart|area|area_chart)|gantt\b|:::render\b|{\s*["']?type["']?\s*:\s*["'](?:bar|doughnut|donut|pie|line|area|bar_chart|donut_chart|line_chart|area_chart|gantt|kpi_grid|table|timeline|map_view|alert|action_proposal|source_chips|followups)|<chart\b)/i.test(
+    decodedBody,
+  );
+}
+
+function hideUnresolvedRenderBuffers(text: string): string {
+  return text
+    .replace(
+      /`{3,}\s*([a-zA-Z_-]+)?[^\n]*\n([\s\S]*?)`{3,}/g,
+      (fence, language: string | undefined, body: string) => (isChartLikeCodeFence(language, body) ? renderLoadingMarker : fence),
+    )
+    .replace(/(?:<|&lt;)chart\b[\s\S]*?(?:\/>|\/&gt;)/gi, renderLoadingMarker)
+    .replace(/(?:<|&lt;)chart\b[\s\S]*?(?:>|&gt;)[\s\S]*?(?:<|&lt;)\/chart(?:>|&gt;)/gi, renderLoadingMarker)
+    .replace(/\{\{\s*(?:chart|bar|bar_chart|donut|donut_chart|pie|pie_chart|doughnut|line|line_chart|area|area_chart|table)\b[\s\S]*?\}\}/gi, renderLoadingMarker);
+}
+
 export function normalizeLooseRenderBlocks(text: string): string {
   const normalized = normalizeChartCodeFences(
     normalizeYamlChartFences(
-      normalizeMermaidGanttBlocks(normalizeXmlChartTags(normalizeChartJsRenderBlocks(unwrapRenderFenceWrappers(text)))),
+      normalizeMermaidGanttBlocks(
+        normalizeTemplateRenderBlocks(normalizeXmlChartTags(normalizeChartJsRenderBlocks(unwrapRenderFenceWrappers(text)))),
+      ),
     ),
   );
   const unwrapped = unwrapRenderFenceWrappers(normalized);
@@ -743,7 +1034,7 @@ export function normalizeLooseRenderBlocks(text: string): string {
     const previousLine = previousIndex >= 0 ? output[previousIndex].trim() : "";
     const headingMatch = /^Render Block:\s*(.+?)(?:\s*\((?:Donut Chart|donut_chart)\))?\s*$/i.exec(previousLine);
 
-    let title = headingMatch?.[1]?.trim() ?? "Donut chart";
+    let title = headingMatch?.[1]?.trim() ?? inferChartTitle("donut");
     const data: Array<{ label: string; value: number }> = [];
     let cursor = index + 1;
 
@@ -833,12 +1124,24 @@ function findPendingMermaidGanttStart(text: string): number {
 }
 
 function findPendingChartJsonStart(text: string): number {
-  const pattern = /{\s*"type"\s*:\s*"(?:bar|doughnut|donut|pie|line)"/gi;
+  const pattern = /{\s*["']?type["']?\s*:\s*["'](?:bar|doughnut|donut|pie|line|area)["']/gi;
   let match: RegExpExecArray | null;
   let pendingStart = -1;
 
   while ((match = pattern.exec(text)) !== null) {
     if (findJsonObjectEnd(text, match.index) < 0) pendingStart = match.index;
+  }
+
+  return pendingStart;
+}
+
+function findPendingTemplateRenderStart(text: string): number {
+  const pattern = /\{\{\s*(?:chart|bar|bar_chart|donut|donut_chart|pie|pie_chart|doughnut|line|line_chart|area|area_chart|table)\b/gi;
+  let match: RegExpExecArray | null;
+  let pendingStart = -1;
+
+  while ((match = pattern.exec(text)) !== null) {
+    if (text.indexOf("}}", match.index + match[0].length) < 0) pendingStart = match.index;
   }
 
   return pendingStart;
@@ -857,7 +1160,7 @@ function findPendingYamlChartFenceStart(text: string): number {
 }
 
 function findPendingGenericChartFenceStart(text: string): number {
-  const pattern = /`{3,}\s*(?:chart|render)\b/gi;
+  const pattern = /`{3,}\s*(?:chart|render|json|ya?ml|mermaid|gantt)\b/gi;
   let match: RegExpExecArray | null;
   let pendingStart = -1;
 
@@ -874,6 +1177,7 @@ function findPendingRenderStart(text: string): number {
     findPendingChartTagStart(text),
     findPendingMermaidGanttStart(text),
     findPendingChartJsonStart(text),
+    findPendingTemplateRenderStart(text),
     findPendingYamlChartFenceStart(text),
     findPendingGenericChartFenceStart(text),
   ].filter((index) => index >= 0);
@@ -881,10 +1185,19 @@ function findPendingRenderStart(text: string): number {
   return starts.length > 0 ? Math.min(...starts) : -1;
 }
 
+function pushMarkdownOrLoading(chunks: StreamChunk[], markdown: string): void {
+  const pieces = markdown.split(renderLoadingMarker);
+  pieces.forEach((piece, index) => {
+    const body = piece.trim();
+    if (body) chunks.push({ kind: "md", body });
+    if (index < pieces.length - 1) chunks.push({ kind: "block-loading" });
+  });
+}
+
 export function parseStream(text: string): StreamChunk[] {
   const chunks: StreamChunk[] = [];
   if (!text) return chunks;
-  const normalizedText = normalizeLooseRenderBlocks(text);
+  const normalizedText = hideUnresolvedRenderBuffers(normalizeLooseRenderBlocks(text));
 
   let lastIndex = 0;
   let match: RegExpExecArray | null;
@@ -893,7 +1206,7 @@ export function parseStream(text: string): StreamChunk[] {
   while ((match = renderFencePattern.exec(normalizedText)) !== null) {
     if (match.index > lastIndex) {
       const markdown = normalizedText.slice(lastIndex, match.index).trim();
-      if (markdown) chunks.push({ kind: "md", body: markdown });
+      if (markdown) pushMarkdownOrLoading(chunks, markdown);
     }
 
     try {
@@ -909,12 +1222,12 @@ export function parseStream(text: string): StreamChunk[] {
   const pendingRenderStart = findPendingRenderStart(tail);
   if (pendingRenderStart >= 0) {
     const before = tail.slice(0, pendingRenderStart).trim();
-    if (before) chunks.push({ kind: "md", body: before });
+    if (before) pushMarkdownOrLoading(chunks, before);
     chunks.push({ kind: "block-loading" });
     return chunks;
   }
 
   const trailingMarkdown = tail.trim();
-  if (trailingMarkdown) chunks.push({ kind: "md", body: trailingMarkdown });
+  if (trailingMarkdown) pushMarkdownOrLoading(chunks, trailingMarkdown);
   return chunks;
 }

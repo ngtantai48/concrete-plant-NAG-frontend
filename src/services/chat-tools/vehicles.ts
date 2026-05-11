@@ -52,7 +52,6 @@ export const getVehicleStatusTool: ToolDefinition<z.infer<typeof vehicleStatusAr
       vehicle_id: v.vehicle_id,
       license_plate: v.vehicle_license_plate,
       name: v.vehicle_name,
-      driver: v.driver_name,
       final_status: v.final_status,
       is_abnormal: v.is_abnormal,
       finished_at: v.finished_at,

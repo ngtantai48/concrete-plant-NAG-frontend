@@ -3,16 +3,12 @@ import dayjs from "dayjs";
 import orderApi from "@/services/order.service";
 import type { Order } from "@/types/order";
 import type { ToolDefinition } from "./types";
-
-const ORDER_STATUSES = [
-  "init",
-  "pending",
-  "collecting",
-  "transporting",
-  "running",
-  "completed",
-  "canceled",
-] as const;
+import {
+  aggregateOrderStatusGroups,
+  ORDER_STATUSES,
+  ORDER_STATUS_BUSINESS_RULES,
+  orderStatusLabel,
+} from "./order-status";
 
 interface OrderListResponse {
   data?: Order[];
@@ -22,17 +18,16 @@ interface OrderListResponse {
 function summarizeOrders(orders: Order[]) {
   const byStatus: Record<string, number> = {};
   const vehicleSet = new Set<number>();
-  const stationSet = new Set<number>();
   for (const o of orders) {
     byStatus[o.order_status] = (byStatus[o.order_status] ?? 0) + 1;
     if (o.vehicles?.vehicle_id) vehicleSet.add(o.vehicles.vehicle_id);
-    if (o.stations?.station_id) stationSet.add(o.stations.station_id);
   }
   return {
     total: orders.length,
     byStatus,
+    status_groups: aggregateOrderStatusGroups(byStatus),
+    status_meaning: ORDER_STATUS_BUSINESS_RULES,
     vehicles: vehicleSet.size,
-    stations: stationSet.size,
   };
 }
 
@@ -41,12 +36,11 @@ function compactOrder(o: Order) {
     order_id: o.order_id,
     order_number: o.order_number,
     status: o.order_status,
+    status_label: orderStatusLabel(o.order_status),
     init_at: o.order_init_datetime,
     start_at: o.order_start_datetime,
     end_at: o.order_end_datetime,
     vehicle: o.vehicles?.vehicle_license_plate ?? null,
-    driver: o.users?.user_full_name ?? null,
-    station: o.stations?.station_name ?? null,
   };
 }
 
@@ -75,7 +69,6 @@ function buildAfternoonAvailability(orders: Order[]) {
       vehicle_id: number;
       license_plate: string | null;
       name: string | null;
-      driver: string | null;
       orders: ReturnType<typeof compactOrder>[];
       busyAfternoonOrders: ReturnType<typeof compactOrder>[];
     }
@@ -90,7 +83,6 @@ function buildAfternoonAvailability(orders: Order[]) {
         vehicle_id: vehicleId,
         license_plate: order.vehicles?.vehicle_license_plate ?? null,
         name: order.vehicles?.vehicle_name ?? null,
-        driver: order.users?.user_full_name ?? null,
         orders: [],
         busyAfternoonOrders: [],
       };
@@ -109,7 +101,6 @@ function buildAfternoonAvailability(orders: Order[]) {
       vehicle_id: vehicle.vehicle_id,
       license_plate: vehicle.license_plate,
       name: vehicle.name,
-      driver: vehicle.driver,
       orders: vehicle.busyAfternoonOrders,
     }));
   const candidates = vehicles
@@ -122,7 +113,6 @@ function buildAfternoonAvailability(orders: Order[]) {
         vehicle_id: vehicle.vehicle_id,
         license_plate: vehicle.license_plate,
         name: vehicle.name,
-        driver: vehicle.driver,
         last_order: sortedOrders[0] ?? null,
       };
     });
@@ -130,7 +120,7 @@ function buildAfternoonAvailability(orders: Order[]) {
   return {
     source: "orders",
     rule:
-      "Ca chiều tính từ 12:00. Xe bận nếu có order ca chiều ở trạng thái init/pending/collecting/transporting/running.",
+      `Ca chiều tính từ 12:00. Xe bận nếu có order ca chiều ở trạng thái init/pending/collecting/transporting/running. ${ORDER_STATUS_BUSINESS_RULES}`,
     caveat: "Xe không xuất hiện trong orders hôm nay không được kết luận từ dữ liệu này.",
     busy_count: busy.length,
     candidate_count: candidates.length,
@@ -160,7 +150,7 @@ const ordersByStatusArgs = z.object({
 export const getTodayOrdersTool: ToolDefinition<z.infer<typeof todayOrdersArgs>> = {
   name: "getTodayOrders",
   description:
-    "Lấy danh sách chuyến (đơn hàng) trong một ngày cụ thể. Mặc định là hôm nay nếu không truyền date. Trả về tổng số chuyến, phân loại theo trạng thái, số xe và trạm liên quan.",
+    `Lấy danh sách chuyến (đơn hàng) trong một ngày cụ thể, trong phạm vi trạm NGUYÊN ANH. Mặc định là hôm nay nếu không truyền date. Trả về tổng số chuyến, phân loại theo trạng thái và số xe liên quan; không dùng để phân tích phân bổ theo trạm. ${ORDER_STATUS_BUSINESS_RULES}`,
   schema: todayOrdersArgs,
   parameters: {
     type: "object",
@@ -188,14 +178,14 @@ export const getTodayOrdersTool: ToolDefinition<z.infer<typeof todayOrdersArgs>>
 export const getOrdersByStatusTool: ToolDefinition<z.infer<typeof ordersByStatusArgs>> = {
   name: "getOrdersByStatus",
   description:
-    "Lấy danh sách chuyến (đơn hàng) theo trạng thái. Trạng thái hợp lệ: init, pending, collecting, transporting, running, completed, canceled.",
+    `Lấy danh sách chuyến (đơn hàng) theo trạng thái. Trạng thái hợp lệ: init, pending, collecting, transporting, running, completed, canceled. ${ORDER_STATUS_BUSINESS_RULES}`,
   schema: ordersByStatusArgs,
   parameters: {
     type: "object",
     properties: {
       status: {
         type: "string",
-        description: "Trạng thái đơn cần lọc.",
+        description: `Trạng thái đơn cần lọc. ${ORDER_STATUS_BUSINESS_RULES}`,
         enum: ORDER_STATUSES,
       },
     },
