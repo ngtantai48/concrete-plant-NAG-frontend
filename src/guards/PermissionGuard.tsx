@@ -22,12 +22,12 @@ export default function PermissionGuard({
     const { hasPageAccess } = usePermissions();
 
     useEffect(() => {
-        if (loading || !isAuthenticated) return;
+        // Only check permissions if we are fully authenticated and have user data
+        if (loading || !isAuthenticated || !user) return;
 
         // 1. Check by Roles (Legacy/Quick check)
-        if (roles && !roles.includes(user?.role)) {
+        if (roles && !roles.includes(user.role)) {
             forbidden();
-            return;
         }
 
         // 2. Check by Permissions (Granular check)

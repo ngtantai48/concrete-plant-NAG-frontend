@@ -488,10 +488,10 @@ export default function AdminDashboard() {
       const aTrips = vehicleTripMap.get(a.vehicle_id) || [];
       const bTrips = vehicleTripMap.get(b.vehicle_id) || [];
 
-      // Priority score: running=2, transporting=1, rest=0
+      // Priority score: transporting=2, running=1, rest=0
       const getPriority = (trips: typeof aTrips) => {
-        if (trips.some(o => o.order_status === 'running')) return 2;
-        if (trips.some(o => o.order_status === 'transporting')) return 1;
+        if (trips.some(o => o.order_status === 'transporting')) return 2;
+        if (trips.some(o => o.order_status === 'running')) return 1;
         return 0;
       };
       const aPriority = getPriority(aTrips);
@@ -590,9 +590,9 @@ export default function AdminDashboard() {
     const hasTrips = trips.length > 0;
     const hasRunning = trips.some(o => o.order_status === 'running');
     const hasTransporting = trips.some(o => o.order_status === 'transporting');
-    const accentColor = hasRunning ? '#0ea5e9' : hasTransporting ? '#f59e0b' : (hasTrips ? '#10b981' : '#94a3b8');
-    const hoverBorder = hasRunning ? 'rgba(14, 165, 233, 0.4)' : hasTransporting ? 'rgba(245, 158, 11, 0.4)' : (hasTrips ? 'rgba(16, 185, 129, 0.4)' : 'rgba(148, 163, 184, 0.3)');
-    const chipClass = hasRunning ? 'dd-chip-sky' : hasTransporting ? 'dd-chip-amber' : 'dd-chip-emerald';
+    const accentColor = hasTransporting ? '#f59e0b' : hasRunning ? '#0ea5e9' : (hasTrips ? '#10b981' : '#94a3b8');
+    const hoverBorder = hasTransporting ? 'rgba(245, 158, 11, 0.4)' : hasRunning ? 'rgba(14, 165, 233, 0.4)' : (hasTrips ? 'rgba(16, 185, 129, 0.4)' : 'rgba(148, 163, 184, 0.3)');
+    const chipClass = hasTransporting ? 'dd-chip-amber' : hasRunning ? 'dd-chip-sky' : 'dd-chip-emerald';
     const stats = vehicleStatsMap.get(v.vehicle_id);
     const stopDurationStr = stats ? formatDuration(stats.totalStopMins, stats.stopHours, stats.stopMinsRemain, tCommon('hour'), tCommon('minute')) : '';
     const mixTotalDurationStr = stats ? formatDuration(stats.totalMixMins, stats.mixTotalHours, stats.mixTotalMinsRemain, tCommon('hour'), tCommon('minute')) : '';
@@ -613,7 +613,7 @@ export default function AdminDashboard() {
           </div>
           {hasTrips ? (
             <span className={`dd-chip ${chipClass} text-[10px] px-1.5 py-0.5`}>
-              {hasRunning ? t('moving') : hasTransporting ? t('collected') : t('tripCount', { count: trips.length })}
+              {hasTransporting ? t('collected') : hasRunning ? t('moving') : t('tripCount', { count: trips.length })}
             </span>
           ) : (
             <span className="dd-chip dd-chip-slate text-[10px] px-1.5 py-0.5">
