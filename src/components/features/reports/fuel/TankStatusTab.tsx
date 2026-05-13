@@ -14,10 +14,10 @@ import FuelEventsTab from "./FuelEventsTab";
 import type { Vehicle } from "@/types/vehicle";
 import fuelApi from "@/services/fuel.service";
 import { logHttpError } from "@/lib/http-error";
-import SafeResponsiveChart from "@/components/features/admin/reports/SafeResponsiveChart";
+import SafeResponsiveChart from "@/components/features/reports/SafeResponsiveChart";
 
 const StationMap = dynamic(
-  () => import("@/components/features/admin/dashboard/StationMap"),
+  () => import("@/components/features/dashboard/StationMap"),
   {
     ssr: false,
     loading: () => (

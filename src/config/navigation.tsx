@@ -40,7 +40,7 @@ export const navigationConfig: NavItem[] = [
     roles: [ROLES.ADMIN],
     children: [
       {
-        key: SIDEBAR.USER_MANAGE,   // đang sai ở key này, xem xét đổi cấu trúc route lại
+        key: SIDEBAR.USER_MANAGE,
         label: "allUsers",
         icon: <UserCog size={18} />,
         actions: [
@@ -133,25 +133,24 @@ export const navigationConfig: NavItem[] = [
     key: "reports-group",
     label: "reports",
     icon: <ClipboardList />,
-    roles: [ROLES.ADMIN],
+    // roles: [ROLES.ADMIN],
     children: [
-      {
-        key: SIDEBAR.REPORT_PRODUCTION,
-        label: "reportProduction",
-        icon: <Gauge size={18} />,
-      },
       {
         key: SIDEBAR.REPORT_FUEL,
         label: "reportFuel",
         icon: <ArrowRightLeft size={18} />,
       },
+      {
+        key: SIDEBAR.REPORT_MAINTENANCE,
+        label: "reportMaintenance",
+        icon: <Wrench size={18} />,
+      },
+      {
+        key: SIDEBAR.REPORT_PRODUCTION,
+        label: "reportProduction",
+        icon: <Gauge size={18} />,
+      },
     ],
-  },
-  {
-    key: SIDEBAR.END_OF_DAY,
-    label: "endOfDay",
-    icon: <CalendarCheck />,
-    roles: [ROLES.ADMIN],
   },
   {
     key: SIDEBAR.SYSTEM_SETTINGS,

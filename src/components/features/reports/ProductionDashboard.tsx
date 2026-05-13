@@ -11,7 +11,7 @@ import { exportProductionProExcel } from "@/utils/exportProductionProExcel";
 import type { ProProductionSection, ProReportSummaryCard, ProReportTripRow } from "@/utils/exportProductionProReport";
 import orderApi from "@/services/order.service";
 import type { Order } from "@/types/order";
-import VehicleRanking from "@/components/features/admin/reports/VehicleRanking";
+import VehicleRanking from "@/components/features/reports/VehicleRanking";
 import vehicleApi from "@/services/vehicle.service";
 import vehicleTypeApi from "@/services/vehicle-type.service";
 import stationApi from "@/services/station.service";
@@ -1289,8 +1289,8 @@ export default function ProductionDashboard() {
                   <div className="font-black text-[32px] mb-1" style={{ color: "#0f172a" }}>{(s?.total_orders ?? 0).toLocaleString("vi-VN")}</div>
                   <div className="w-full h-[60px]">
                     <ResponsiveContainer width="100%" height="100%">
-                      <BarChart 
-                        data={trend.slice(-8)} 
+                      <BarChart
+                        data={trend.slice(-8)}
                         margin={{ top: 0, right: 2, left: 2, bottom: 0 }}
                         onClick={(e: any) => {
                           const payload = e?.activePayload?.[0]?.payload;
@@ -1346,9 +1346,9 @@ export default function ProductionDashboard() {
                 </div>
                 <div className="w-full h-[240px]">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart 
-                      data={trend} 
-                      margin={{ top: 0, right: 0, left: -20, bottom: 0 }} 
+                    <BarChart
+                      data={trend}
+                      margin={{ top: 0, right: 0, left: -20, bottom: 0 }}
                       barCategoryGap="25%"
                       onClick={(e: any) => {
                         const payload = e?.activePayload?.[0]?.payload;
@@ -1632,13 +1632,13 @@ export default function ProductionDashboard() {
           {/* Summary strip */}
           {periodOrders.length > 0 && (
             <div className="grid grid-cols-4 gap-3 mt-2">
-                {[
-                  { label: "Tổng chuyến", value: filteredPeriodOrders.length, color: "#fff" },
-                  { label: "Hoàn thành", value: filteredPeriodOrders.filter(o => o.order_status === "completed").length, color: "#86efac" },
-                  { label: "Đang xử lý", value: filteredPeriodOrders.filter(o => ["running", "collecting", "transporting"].includes(o.order_status ?? "")).length, color: "#fde68a" },
-                  { label: "Tổng Km", value: Math.round(filteredPeriodOrders.reduce((sum, o) => sum + getOrderDistanceKm(o), 0)).toLocaleString("vi-VN"), color: "#93c5fd" },
-                ].map((item, i) => (
-                  <div key={i} className="rounded-xl px-3 py-2" style={{ background: "rgba(255,255,255,.12)" }}>
+              {[
+                { label: "Tổng chuyến", value: filteredPeriodOrders.length, color: "#fff" },
+                { label: "Hoàn thành", value: filteredPeriodOrders.filter(o => o.order_status === "completed").length, color: "#86efac" },
+                { label: "Đang xử lý", value: filteredPeriodOrders.filter(o => ["running", "collecting", "transporting"].includes(o.order_status ?? "")).length, color: "#fde68a" },
+                { label: "Tổng Km", value: Math.round(filteredPeriodOrders.reduce((sum, o) => sum + getOrderDistanceKm(o), 0)).toLocaleString("vi-VN"), color: "#93c5fd" },
+              ].map((item, i) => (
+                <div key={i} className="rounded-xl px-3 py-2" style={{ background: "rgba(255,255,255,.12)" }}>
                   <div className="text-[11px] font-semibold opacity-70">{item.label}</div>
                   <div className="text-[22px] font-black leading-tight" style={{ color: item.color }}>{item.value}</div>
                 </div>
@@ -1680,68 +1680,68 @@ export default function ProductionDashboard() {
                 </div>
               ) : (
                 <div className="rounded-2xl bg-white border border-slate-200/80 shadow-sm overflow-hidden">
-              <Table
-                columns={[
-                { title: "STT", key: "n", width: 56, align: "center" as const, render: (_: any, __: any, i: number) => <span className="text-[14px] font-bold text-slate-500">{(drawerPage - 1) * DRAWER_PAGE_SIZE + i + 1}</span> },
-                {
-                  title: "Xe", key: "xe", width: 164, render: (_: any, r: Order) => (
-                    <div>
-                      <div className="font-black text-[15px] leading-tight" style={{ color: "#0f172a" }}>{r.vehicles?.vehicle_name ?? "-"}</div>
-                      <span style={{ background: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: 6, padding: "2px 8px", fontFamily: "monospace", fontSize: 12, color: "#334155", fontWeight: 700, display: "inline-block", marginTop: 3 }}>{r.vehicles?.vehicle_license_plate ?? "-"}</span>
-                    </div>
-                  )
-                },
-                {
-                  title: "Trạng thái", dataIndex: "order_status", key: "st", width: 124, render: (v: string) => {
-                    const M: Record<string, { l: string; c: string; bg: string }> = {
-                      completed: { l: "Hoàn thành", c: "#059669", bg: "#d1fae5" },
-                      canceled: { l: "Đã hủy", c: "#dc2626", bg: "#fee2e2" },
-                      running: { l: "Đang chạy", c: "#2563eb", bg: "#dbeafe" },
-                      collecting: { l: "Nhận hàng", c: "#7c3aed", bg: "#ede9fe" },
-                      transporting: { l: "Vận chuyển", c: "#d97706", bg: "#fef3c7" },
-                      pending: { l: "Chờ xử lý", c: "#64748b", bg: "#f1f5f9" }
-                    };
-                    const m = M[v] ?? { l: v, c: "#64748b", bg: "#f1f5f9" };
-                    return <span style={{ background: m.bg, color: m.c, fontWeight: 700, fontSize: 13, padding: "4px 12px", borderRadius: 20, display: "inline-block" }}>{m.l}</span>;
-                  }
-                },
-                { title: "Trạm", key: "sta", width: 108, render: (_: any, r: Order) => <span className="text-[14px] font-bold" style={{ color: "#0f172a" }}>{r.stations?.station_name ?? "-"}</span> },
-                {
-                  title: "Km", key: "km", width: 68, align: "center" as const, render: (_: any, r: Order) => {
-                    const km = Math.round(getOrderDistanceKm(r));
-                    return <span className="font-mono text-[15px] font-black" style={{ color: km > 0 ? "#2563eb" : "#94a3b8" }}>{km > 0 ? km.toLocaleString("vi-VN") : "0"}</span>;
-                  }
-                },
-                {
-                  title: "Dừng/Đỗ", key: "stops", width: 74, align: "center" as const, render: (_: any, r: Order) => {
-                    const stops = r.order_multi?.nStop_end ?? 0;
-                    return <span className="text-[14px] font-bold" style={{ color: stops > 0 ? "#d97706" : "#94a3b8" }}>{stops}</span>;
-                  }
-                },
-                {
-                  title: "Bắt đầu", dataIndex: "order_start_datetime", key: "sd", width: 130, render: (v: string | null) => v ? (
-                    <div>
-                      <div className="text-[14px] font-bold" style={{ color: "#0f172a" }}>{dayjs(v).format("HH:mm")}</div>
-                      <div className="text-[12px] font-semibold text-slate-400 leading-tight">{dayjs(v).format("DD/MM/YYYY")}</div>
-                    </div>
-                  ) : <span className="text-slate-300 text-[14px]">—</span>
-                },
-                {
-                  title: "Kết thúc", dataIndex: "order_end_datetime", key: "ed", width: 130, render: (v: string | null) => v ? (
-                    <div>
-                      <div className="text-[14px] font-bold" style={{ color: "#0f172a" }}>{dayjs(v).format("HH:mm")}</div>
-                      <div className="text-[12px] font-semibold text-slate-400 leading-tight">{dayjs(v).format("DD/MM/YYYY")}</div>
-                    </div>
-                  ) : <span className="text-slate-300 text-[14px]">—</span>
-                },
-              ]}
-              dataSource={filteredPeriodOrders.map((o, i) => ({ ...o, key: (o as any).order_id ?? i }))}
-              size="middle"
-              tableLayout="fixed"
-              pagination={filteredPeriodOrders.length > DRAWER_PAGE_SIZE ? { pageSize: DRAWER_PAGE_SIZE, showSizeChanger: false, showTotal: (t, range) => `${range[0]}–${range[1]} / ${t} chuyến`, onChange: (p) => setDrawerPage(p) } : false}
-              className="drawer-tbl"
-              />
-            </div>
+                  <Table
+                    columns={[
+                      { title: "STT", key: "n", width: 56, align: "center" as const, render: (_: any, __: any, i: number) => <span className="text-[14px] font-bold text-slate-500">{(drawerPage - 1) * DRAWER_PAGE_SIZE + i + 1}</span> },
+                      {
+                        title: "Xe", key: "xe", width: 164, render: (_: any, r: Order) => (
+                          <div>
+                            <div className="font-black text-[15px] leading-tight" style={{ color: "#0f172a" }}>{r.vehicles?.vehicle_name ?? "-"}</div>
+                            <span style={{ background: "#f1f5f9", border: "1px solid #cbd5e1", borderRadius: 6, padding: "2px 8px", fontFamily: "monospace", fontSize: 12, color: "#334155", fontWeight: 700, display: "inline-block", marginTop: 3 }}>{r.vehicles?.vehicle_license_plate ?? "-"}</span>
+                          </div>
+                        )
+                      },
+                      {
+                        title: "Trạng thái", dataIndex: "order_status", key: "st", width: 124, render: (v: string) => {
+                          const M: Record<string, { l: string; c: string; bg: string }> = {
+                            completed: { l: "Hoàn thành", c: "#059669", bg: "#d1fae5" },
+                            canceled: { l: "Đã hủy", c: "#dc2626", bg: "#fee2e2" },
+                            running: { l: "Đang chạy", c: "#2563eb", bg: "#dbeafe" },
+                            collecting: { l: "Nhận hàng", c: "#7c3aed", bg: "#ede9fe" },
+                            transporting: { l: "Vận chuyển", c: "#d97706", bg: "#fef3c7" },
+                            pending: { l: "Chờ xử lý", c: "#64748b", bg: "#f1f5f9" }
+                          };
+                          const m = M[v] ?? { l: v, c: "#64748b", bg: "#f1f5f9" };
+                          return <span style={{ background: m.bg, color: m.c, fontWeight: 700, fontSize: 13, padding: "4px 12px", borderRadius: 20, display: "inline-block" }}>{m.l}</span>;
+                        }
+                      },
+                      { title: "Trạm", key: "sta", width: 108, render: (_: any, r: Order) => <span className="text-[14px] font-bold" style={{ color: "#0f172a" }}>{r.stations?.station_name ?? "-"}</span> },
+                      {
+                        title: "Km", key: "km", width: 68, align: "center" as const, render: (_: any, r: Order) => {
+                          const km = Math.round(getOrderDistanceKm(r));
+                          return <span className="font-mono text-[15px] font-black" style={{ color: km > 0 ? "#2563eb" : "#94a3b8" }}>{km > 0 ? km.toLocaleString("vi-VN") : "0"}</span>;
+                        }
+                      },
+                      {
+                        title: "Dừng/Đỗ", key: "stops", width: 74, align: "center" as const, render: (_: any, r: Order) => {
+                          const stops = r.order_multi?.nStop_end ?? 0;
+                          return <span className="text-[14px] font-bold" style={{ color: stops > 0 ? "#d97706" : "#94a3b8" }}>{stops}</span>;
+                        }
+                      },
+                      {
+                        title: "Bắt đầu", dataIndex: "order_start_datetime", key: "sd", width: 130, render: (v: string | null) => v ? (
+                          <div>
+                            <div className="text-[14px] font-bold" style={{ color: "#0f172a" }}>{dayjs(v).format("HH:mm")}</div>
+                            <div className="text-[12px] font-semibold text-slate-400 leading-tight">{dayjs(v).format("DD/MM/YYYY")}</div>
+                          </div>
+                        ) : <span className="text-slate-300 text-[14px]">—</span>
+                      },
+                      {
+                        title: "Kết thúc", dataIndex: "order_end_datetime", key: "ed", width: 130, render: (v: string | null) => v ? (
+                          <div>
+                            <div className="text-[14px] font-bold" style={{ color: "#0f172a" }}>{dayjs(v).format("HH:mm")}</div>
+                            <div className="text-[12px] font-semibold text-slate-400 leading-tight">{dayjs(v).format("DD/MM/YYYY")}</div>
+                          </div>
+                        ) : <span className="text-slate-300 text-[14px]">—</span>
+                      },
+                    ]}
+                    dataSource={filteredPeriodOrders.map((o, i) => ({ ...o, key: (o as any).order_id ?? i }))}
+                    size="middle"
+                    tableLayout="fixed"
+                    pagination={filteredPeriodOrders.length > DRAWER_PAGE_SIZE ? { pageSize: DRAWER_PAGE_SIZE, showSizeChanger: false, showTotal: (t, range) => `${range[0]}–${range[1]} / ${t} chuyến`, onChange: (p) => setDrawerPage(p) } : false}
+                    className="drawer-tbl"
+                  />
+                </div>
               )}
             </div>
           )}

@@ -1,4 +1,4 @@
-import MaintenanceForecast from "@/components/features/admin/reports/MaintenanceForecast";
+import MaintenanceForecast from "@/components/features/reports/MaintenanceForecast";
 
 export default function MaintenancePage() {
   return (

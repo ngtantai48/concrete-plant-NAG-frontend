@@ -1,4 +1,4 @@
-import ProductionDashboard from "@/components/features/admin/reports/ProductionDashboard";
+import ProductionDashboard from "@/components/features/reports/ProductionDashboard";
 
 export default function ProductionPage() {
   return (

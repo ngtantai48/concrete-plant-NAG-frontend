@@ -1,4 +1,4 @@
-import FuelConsumptionReport from "@/components/features/admin/reports/FuelConsumptionReport";
+import FuelConsumptionReport from "@/components/features/reports/FuelConsumptionReport";
 
 export default function FuelPage() {
   return (

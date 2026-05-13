@@ -38,7 +38,7 @@ import ClockDisplay from "./ClockDisplay";
 import StationStatusPanel from "./StationStatusPanel";
 import { computeTripStats, formatDuration } from "./trip-stats";
 import VehicleStatusChange from "./VehicleStatusChange";
-import EndOfDayModal from "../end-of-day/EndOfDayModal";
+import EndOfDayModal from "./EndOfDayModal";
 import { SIDEBAR } from "@/constants/route";
 import { PERMISSIONS } from "@/constants/permissions";
 
