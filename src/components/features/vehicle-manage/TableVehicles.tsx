@@ -17,8 +17,8 @@ import { useAppDispatch, useAppSelector } from "@/hooks/use-app-selector";
 import { useNavigationStore } from "@/hooks/use-navigation-store";
 import { usePermissions } from "@/hooks/use-permissions";
 // import { useRfidScanner } from "@/hooks/use-rfid-scanner";
-import driverApi from "@/services/driver.service";
 import mediaApi from "@/services/media.service";
+import { userApi } from "@/services/user.service";
 import vehicleTypeApi from "@/services/vehicle-type.service";
 import vehicleApi from "@/services/vehicle.service";
 import { clearVehicles, fetchVehicles, setPagination, } from "@/store/slices/vehicleSlice";
@@ -175,7 +175,7 @@ export default function TableVehicles() {
   const fetchDrivers = useCallback(async () => {
     setLoadingDrivers(true);
     try {
-      const res = await driverApi.getAll({ limit: 1000 });
+      const res = await userApi.list({ limit: 1000 });
       const driverData = getDriversFromResponse(res.data);
       setDrivers(
         driverData
