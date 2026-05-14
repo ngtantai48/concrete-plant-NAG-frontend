@@ -5,7 +5,7 @@ import orderApi from "@/services/order.service";
 import type { Order } from "@/types/order";
 
 import type { ToolDefinition } from "./types";
-import { aggregateOrderStatusGroups, ORDER_STATUS_BUSINESS_RULES } from "./order-status";
+import { aggregateOrderStatusGroups, orderStatusLabel, ORDER_STATUS_BUSINESS_RULES } from "./order-status";
 
 interface OrderListResponse {
   data?: Order[];
@@ -39,6 +39,107 @@ function distanceKm(order: Order): number {
   return Math.max(0, end - start);
 }
 
+function orderScheduleAt(order: Order): string | null {
+  return order.order_start_datetime ?? order.order_init_datetime ?? null;
+}
+
+function compactOrder(order: Order) {
+  return {
+    order_id: order.order_id,
+    order_number: order.order_number,
+    status: order.order_status,
+    status_label: orderStatusLabel(order.order_status),
+    init_at: order.order_init_datetime,
+    start_at: order.order_start_datetime,
+    end_at: order.order_end_datetime,
+    checkin_time_station: order.checkin_time_station ?? order.order_multi?.checkin_time_station ?? null,
+    checkout_time_station: order.checkout_time_station ?? order.order_multi?.checkout_time_station ?? null,
+    vehicle_name: order.vehicles?.vehicle_name ?? null,
+    vehicle_license_plate: order.vehicles?.vehicle_license_plate ?? null,
+    station_name: order.stations?.station_name ?? null,
+    distance_km: Math.round(distanceKm(order)),
+  };
+}
+
+function buildHourlyActivity(orders: Order[]) {
+  const map = new Map<
+    string,
+    {
+      hour: string;
+      total_orders: number;
+      completed: number;
+      moving: number;
+      waiting: number;
+      collecting: number;
+      canceled: number;
+      total_distance_km: number;
+      vehicles: Set<string>;
+    }
+  >();
+
+  for (const order of orders) {
+    const scheduledAt = orderScheduleAt(order);
+    if (!scheduledAt) continue;
+    const parsed = dayjs(scheduledAt);
+    if (!parsed.isValid()) continue;
+
+    const hour = `${parsed.format("HH")}:00`;
+    const metric =
+      map.get(hour) ??
+      {
+        hour,
+        total_orders: 0,
+        completed: 0,
+        moving: 0,
+        waiting: 0,
+        collecting: 0,
+        canceled: 0,
+        total_distance_km: 0,
+        vehicles: new Set<string>(),
+      };
+
+    metric.total_orders += 1;
+    metric.total_distance_km += distanceKm(order);
+    if (order.vehicles?.vehicle_license_plate) metric.vehicles.add(order.vehicles.vehicle_license_plate);
+
+    if (order.order_status === "completed") metric.completed += 1;
+    else if (order.order_status === "running" || order.order_status === "transporting") metric.moving += 1;
+    else if (order.order_status === "collecting") metric.collecting += 1;
+    else if (order.order_status === "canceled") metric.canceled += 1;
+    else metric.waiting += 1;
+
+    map.set(hour, metric);
+  }
+
+  return [...map.values()]
+    .sort((left, right) => left.hour.localeCompare(right.hour))
+    .map((metric) => ({
+      hour: metric.hour,
+      total_orders: metric.total_orders,
+      completed: metric.completed,
+      moving: metric.moving,
+      waiting: metric.waiting,
+      collecting: metric.collecting,
+      canceled: metric.canceled,
+      total_distance_km: Math.round(metric.total_distance_km),
+      vehicle_count: metric.vehicles.size,
+    }));
+}
+
+function buildTimeCoverage(orders: Order[]) {
+  const scheduled = orders
+    .map(orderScheduleAt)
+    .filter((value): value is string => Boolean(value))
+    .sort();
+
+  return {
+    order_count: orders.length,
+    orders_with_schedule_time: scheduled.length,
+    earliest_at: scheduled[0] ?? null,
+    latest_at: scheduled[scheduled.length - 1] ?? null,
+  };
+}
+
 function addGroupMetric(
   map: Map<string, GroupMetric>,
   key: string,
@@ -62,7 +163,7 @@ function topRows(map: Map<string, GroupMetric>) {
 export const getProductionReportTool: ToolDefinition<z.infer<typeof productionReportArgs>> = {
   name: "getProductionReport",
   description:
-    `Lấy báo cáo sản lượng và đội xe từ orders theo ngày trong phạm vi trạm NGUYÊN ANH. Trả về tổng đơn, trạng thái, quãng đường và top xe. Không dùng để phân tích phân bổ theo trạm hoặc theo tài xế. ${ORDER_STATUS_BUSINESS_RULES}`,
+    `Lấy báo cáo sản lượng và đội xe từ orders theo ngày trong phạm vi trạm NGUYÊN ANH. Trả về tổng đơn, trạng thái, quãng đường, top xe, compact orders có mốc thời gian và hourly_activity. Không dùng để phân tích phân bổ theo trạm hoặc theo tài xế. ${ORDER_STATUS_BUSINESS_RULES}`,
   schema: productionReportArgs,
   parameters: {
     type: "object",
@@ -127,6 +228,10 @@ export const getProductionReportTool: ToolDefinition<z.infer<typeof productionRe
         total_orders: row.total_orders,
         total_distance_km: Math.round(row.total_distance_km),
       })),
+      time_coverage: buildTimeCoverage(orders),
+      hourly_activity: buildHourlyActivity(orders),
+      orders: orders.slice(0, 100).map(compactOrder),
+      truncated: orders.length > 100,
     };
   },
 };

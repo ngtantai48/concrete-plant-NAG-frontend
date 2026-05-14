@@ -61,6 +61,7 @@ function plannedProductionBlocks(data: Record<string, unknown>) {
   const to = stringValue(data.to);
   const dateLabel = from && to && from === to ? from : from && to ? `${from} - ${to}` : "hôm nay";
   const topVehicles = asRecordArray(data.top_vehicles);
+  const hourlyActivity = asRecordArray(data.hourly_activity);
   const moving = numberValue(summary.moving, numberValue(summary.running) + numberValue(summary.transporting));
   const waiting = numberValue(summary.waiting, numberValue(summary.pending));
   const statusRows = statusRowsFromGroups(summary.status_groups, isRecord(summary.byStatus) ? summary.byStatus : {
@@ -102,6 +103,35 @@ function plannedProductionBlocks(data: Record<string, unknown>) {
         showLegend: true,
         source: ["production_query"],
         data: statusRows,
+      }),
+    );
+  }
+
+  if (hourlyActivity.length > 1) {
+    blocks.push(
+      fence({
+        type: "line_chart",
+        id: `line-don-hang-theo-gio-${stamp}`,
+        title: `Đơn hàng theo giờ ${dateLabel}`,
+        xAxisLabel: "Giờ",
+        yAxisLabel: "đơn",
+        source: ["production_query"],
+        series: [
+          {
+            name: "Tổng đơn",
+            data: hourlyActivity.map((row) => ({
+              x: stringValue(row.hour),
+              y: numberValue(row.total_orders),
+            })),
+          },
+          {
+            name: "Đang di chuyển",
+            data: hourlyActivity.map((row) => ({
+              x: stringValue(row.hour),
+              y: numberValue(row.moving),
+            })),
+          },
+        ],
       }),
     );
   }
