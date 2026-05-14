@@ -17,7 +17,7 @@ import { logHttpError } from "@/lib/http-error";
 import SafeResponsiveChart from "@/components/features/reports/SafeResponsiveChart";
 
 const StationMap = dynamic(
-  () => import("@/components/features/admin/dashboard/StationMap"),
+  () => import("@/components/features/dashboard/StationMap"),
   {
     ssr: false,
     loading: () => (
@@ -269,10 +269,7 @@ export default function TankStatusTab({ tanks, loading, useVTracking, setUseVTra
       return;
     }
     if (useVTracking && !isOverviewReady) return;
-      setTodaySnapshot(null);
-      return;
-    }
-    if (useVTracking && !isOverviewReady) return;
+
     const reqId = ++todayReqIdRef.current;
     setLoadingTodaySnapshot(true);
     fuelApi.getTankStatus({
@@ -1025,11 +1022,7 @@ export default function TankStatusTab({ tanks, loading, useVTracking, setUseVTra
               ) : timeseries.length === 0 ? (
                 <Empty description="Chưa có dữ liệu biểu đồ" />
               ) : (
-<<<<<<< HEAD:src/components/features/reports/fuel/TankStatusTab.tsx
-                <ResponsiveContainer width="100%" height={200}>
-=======
                 <SafeResponsiveChart>
->>>>>>> fe8689c (feat: implement fuel management and reporting features including tank status monitoring, consumption analytics, and maintenance forecasting.):src/components/features/admin/reports/fuel/TankStatusTab.tsx
                   <LineChart data={timeseries} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                     <XAxis

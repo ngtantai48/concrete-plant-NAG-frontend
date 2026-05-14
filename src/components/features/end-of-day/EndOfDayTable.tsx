@@ -2,7 +2,7 @@
 
 // import React, { useState, useEffect, useCallback, useMemo } from "react";
 // import { exportToExcel } from "@/utils/exportReport";
-// import { Table, Tag, Button, Drawer, Typography, Space, Card, Row, Col, DatePicker, Spin, Empty, Input, Select, Tabs } from "antd";
+// import { Table, Tag, Button, Drawer, Typography, Space, Card, Row, Col, DatePicker, Spin, Empty, Input, Select } from "antd";
 // import {
 //   AlertCircle,
 //   CheckCircle2,
@@ -12,15 +12,12 @@
 //   Truck,
 //   User,
 //   MapPin,
-//   Calendar,
-//   Search,
 //   AlertTriangle,
 //   Info,
-//   Filter,
-//   ListChecks,
+//   Search,
 // } from "lucide-react";
 // import { motion } from "framer-motion";
-// import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip } from "recharts";
+// import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 // import dayjs from "dayjs";
 // import vehicleApi from "@/services/vehicle.service";
 // import type { EndOfDayStatusResponse, EndOfDayVehicle, EndOfDayOperationItem } from "@/services/vehicle.service";
@@ -31,17 +28,6 @@
 //   warning: { color: "#f59e0b", icon: <AlertTriangle size={12} /> },
 //   info: { color: "#3b82f6", icon: <Info size={12} /> },
 //   status: { color: "#64748b", icon: <Clock size={12} /> },
-// };
-
-// const CustomTooltip = ({ active, payload }: any) => {
-//   if (!active || !payload?.length) return null;
-//   return (
-//     <div style={{ background: "rgba(255,255,255,0.96)", borderRadius: 12, padding: "10px 14px", boxShadow: "0 4px 20px rgba(0,0,0,0.08)", border: "1px solid #f1f5f9" }}>
-//       {payload.map((p: any) => (
-//         <div key={p.name} style={{ fontSize: 13 }}><span style={{ color: p.payload.color, fontWeight: 600 }}>{p.name}</span>: <strong>{p.value}</strong></div>
-//       ))}
-//     </div>
-//   );
 // };
 
 // export default function EndOfDayTable() {
@@ -92,7 +78,6 @@
 //     { name: "Bất thường", value: abnormalCount, color: "#ef4444" },
 //   ].filter(d => d.value > 0), [normalCount, abnormalCount]);
 
-//   /* station breakdown */
 //   const stationBreakdown = useMemo(() => {
 //     const map: Record<string, { name: string; total: number; abnormal: number }> = {};
 //     (data?.vehicles ?? []).forEach(v => {
@@ -175,7 +160,6 @@
 
 //   return (
 //     <div className="space-y-5">
-//       {/* ── header ─────────────────────────────────────────────────────── */}
 //       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
 //         <Card className="border-0 shadow-lg rounded-2xl overflow-hidden relative" style={{ background: "linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #0f172a 100%)" }}>
 //           <div style={{ position: "absolute", inset: 0, background: "radial-gradient(circle at 80% 50%, rgba(139,92,246,0.12), transparent 60%)" }} />
@@ -197,7 +181,6 @@
 //         </Card>
 //       </motion.div>
 
-//       {/* ── summary + pie ──────────────────────────────────────────────── */}
 //       <Row gutter={[12, 12]}>
 //         <Col xs={12} sm={12} lg={5}>
 //           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}>
@@ -269,7 +252,6 @@
 //         </Col>
 //       </Row>
 
-//       {/* ── station breakdown ──────────────────────────────────────────── */}
 //       {stationBreakdown.length > 0 && (
 //         <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
 //           <Card className="border-0 shadow-sm rounded-2xl" bodyStyle={{ padding: "16px 20px" }}>
@@ -290,7 +272,6 @@
 //         </motion.div>
 //       )}
 
-//       {/* ── table ──────────────────────────────────────────────────────── */}
 //       <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.25 }}>
 //         <Card className="border-0 shadow-sm rounded-2xl overflow-hidden" bodyStyle={{ padding: 0 }}>
 //           <div className="px-6 py-4 border-b border-gray-50 flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
@@ -316,14 +297,12 @@
 //         </Card>
 //       </motion.div>
 
-//       {/* ── detail drawer ──────────────────────────────────────────────── */}
 //       <Drawer
 //         title={<Space><Truck size={20} className="text-violet-500" /><Title level={5} className="m-0">Chi tiết: {selectedVehicle?.vehicle_name}</Title></Space>}
 //         placement="right" onClose={() => setIsDrawerOpen(false)} open={isDrawerOpen} width={480}
 //       >
 //         {selectedVehicle && (
 //           <div className="space-y-5">
-//             {/* info */}
 //             <div style={{ background: "#f8fafc", padding: 16, borderRadius: 16 }}>
 //               {[
 //                 ["Biển số", selectedVehicle.vehicle_license_plate],
@@ -336,7 +315,6 @@
 //               ))}
 //             </div>
 
-//             {/* abnormal alerts */}
 //             {selectedVehicle.is_abnormal && selectedVehicle.abnormal_notes && selectedVehicle.abnormal_notes.length > 0 && (
 //               <div style={{ background: "#fef2f2", padding: 16, borderRadius: 16, border: "1px solid #fecaca" }}>
 //                 <div className="flex items-center gap-2 text-red-600 mb-3"><AlertCircle size={18} /><Text strong className="text-red-600">Chi tiết bất thường</Text></div>
@@ -364,7 +342,6 @@
 //               </div>
 //             )}
 
-//             {/* operation log */}
 //             {selectedVehicle.operation_items && selectedVehicle.operation_items.length > 0 && (
 //               <div>
 //                 <Title level={5} className="mb-4">Dòng thời gian vận hành</Title>
