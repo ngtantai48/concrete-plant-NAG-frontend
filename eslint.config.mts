@@ -4,9 +4,6 @@ import nextTypescript from "eslint-config-next/typescript";
 import prettierConfig from "eslint-config-prettier";
 
 export default defineConfig([
-  ...nextVitals,
-  ...nextTypescript,
-  prettierConfig,
   {
     ignores: [
       ".next/**",
