@@ -20,6 +20,44 @@ const knownRenderTypes = new Set([
   "pie_chart",
 ]);
 
+const standaloneRenderKeyPattern =
+  /{\s*["'](?:kpi_grid|line_chart|bar_chart|donut_chart|area_chart|gantt|timeline|table|map_view|alert|action_proposal|markdown|source_chips|followups|pie_chart)["']\s*:/i;
+
+const standaloneRenderKeyGlobalPattern =
+  /{\s*["'](?:kpi_grid|line_chart|bar_chart|donut_chart|area_chart|gantt|timeline|table|map_view|alert|action_proposal|markdown|source_chips|followups|pie_chart)["']\s*:/gi;
+
+const typedRenderObjectPattern =
+  /{\s*["']type["']\s*:\s*["'](?:kpi_grid|line_chart|bar_chart|donut_chart|area_chart|gantt|timeline|table|map_view|alert|action_proposal|markdown|source_chips|followups|pie_chart|bar|donut|pie|doughnut|line|area)["']/i;
+
+const typedRenderObjectGlobalPattern =
+  /{\s*["']type["']\s*:\s*["'](?:kpi_grid|line_chart|bar_chart|donut_chart|area_chart|gantt|timeline|table|map_view|alert|action_proposal|markdown|source_chips|followups|pie_chart|bar|donut|pie|doughnut|line|area)["']/gi;
+
+const renderTypeOrder = [
+  "kpi_grid",
+  "line_chart",
+  "bar_chart",
+  "donut_chart",
+  "area_chart",
+  "gantt",
+  "timeline",
+  "table",
+  "map_view",
+  "alert",
+  "action_proposal",
+  "markdown",
+  "source_chips",
+  "followups",
+  "pie_chart",
+] as const;
+
+const toneValues = new Set(["blue", "green", "amber", "red", "purple", "neutral", "good", "warn", "bad", "info"]);
+
+type LooseChartRow = {
+  label: string;
+  value: number;
+  color?: string;
+};
+
 function slugify(value: string) {
   return value
     .normalize("NFD")
@@ -234,6 +272,217 @@ function uniqueTableKey(header: string, index: number, used: Set<string>) {
   }
   used.add(key);
   return key;
+}
+
+function canonicalRenderType(value: string): string | null {
+  const type = value.trim().toLowerCase();
+  if (type === "pie_chart" || type === "pie" || type === "doughnut" || type === "donut") return "donut_chart";
+  if (type === "bar") return "bar_chart";
+  if (type === "line") return "line_chart";
+  if (type === "area") return "area_chart";
+  return knownRenderTypes.has(type) ? type : null;
+}
+
+function looseString(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+function looseNumber(value: unknown): number | undefined {
+  const numeric = typeof value === "number" ? value : Number(value);
+  return Number.isFinite(numeric) ? numeric : undefined;
+}
+
+function blockBase(type: string, data: Record<string, unknown>): Record<string, unknown> {
+  const title = looseString(data.title) ?? type;
+  const id = looseString(data.id) ?? `${type.replace(/_chart$/, "")}-${slugify(title)}-${currentHHmm()}`;
+  return { ...data, type, id, title };
+}
+
+function toneFromLooseValues(tone: unknown, color: unknown): string | undefined {
+  const normalizedTone = looseString(tone)?.toLowerCase();
+  if (normalizedTone && toneValues.has(normalizedTone)) return normalizedTone;
+
+  const normalizedColor = looseString(color)?.toLowerCase();
+  if (!normalizedColor) return undefined;
+  if (normalizedColor === "#007aff" || normalizedColor === "#0a66e0" || normalizedColor.includes("54, 162, 235")) return "blue";
+  if (normalizedColor === "#34c759" || normalizedColor === "#4caf50" || normalizedColor.includes("75, 192, 192")) return "green";
+  if (normalizedColor === "#ff9f0a" || normalizedColor === "#ff9800" || normalizedColor.includes("255, 205, 86")) return "amber";
+  if (normalizedColor === "#ff3b30" || normalizedColor === "#f44336" || normalizedColor.includes("255, 99, 132")) return "red";
+  if (normalizedColor === "#af52de" || normalizedColor === "#9c27b0") return "purple";
+  if (normalizedColor === "#8e8e93" || normalizedColor === "#e0e0e0") return "neutral";
+  return undefined;
+}
+
+function looseChartRows(data: Record<string, unknown>): LooseChartRow[] {
+  const arrayData = Array.isArray(data.data) ? data.data : Array.isArray(data.items) ? data.items : undefined;
+  if (arrayData) {
+    const rows = asRecordArray(arrayData)
+      .map((item): LooseChartRow | null => {
+        const value = looseNumber(item.value ?? item.y ?? item.count ?? item.total);
+        const label = looseString(item.label ?? item.x ?? item.name);
+        if (!label || value === undefined) return null;
+        return {
+          label,
+          value,
+          color: looseString(item.color ?? item.backgroundColor),
+        };
+      })
+      .filter((item): item is LooseChartRow => item !== null);
+    if (rows.length > 0) return rows;
+  }
+
+  const chartData = isRecord(data.data) ? data.data : data;
+  const labels = asLabelArray(chartData.labels);
+  const values = asNumberArray(chartData.values ?? chartData.value);
+  if (labels.length > 0 && values.length > 0) {
+    return labels.slice(0, values.length).map((label, index) => ({
+      label,
+      value: values[index] ?? 0,
+      color: chartColor(chartData.backgroundColor ?? chartData.colors, index),
+    }));
+  }
+
+  const datasets = asRecordArray(chartData.datasets);
+  const firstDataset = datasets[0];
+  const datasetValues = asNumberArray(firstDataset?.data);
+  if (labels.length > 0 && datasetValues.length > 0) {
+    return labels.slice(0, datasetValues.length).map((label, index) => ({
+      label,
+      value: datasetValues[index] ?? 0,
+      color: chartColor(firstDataset?.backgroundColor ?? firstDataset?.borderColor, index),
+    }));
+  }
+
+  return [];
+}
+
+function normalizeKpiGridBlock(data: Record<string, unknown>): Record<string, unknown> {
+  const rawItems = Array.isArray(data.items) ? data.items : Array.isArray(data.data) ? data.data : [];
+  const items = asRecordArray(rawItems).map((item) => {
+    const sparkline = asNumberArray(item.sparkline);
+    return {
+      label: looseString(item.label ?? item.name) ?? "Chỉ số",
+      value:
+        typeof item.value === "string" || typeof item.value === "number"
+          ? item.value
+          : looseString(item.value) ?? looseNumber(item.value) ?? "",
+      unit: looseString(item.unit),
+      tone: toneFromLooseValues(item.tone, item.color),
+      delta: looseNumber(item.delta),
+      deltaLabel: looseString(item.deltaLabel),
+      icon: looseString(item.icon),
+      sparkline: sparkline.length > 0 ? sparkline : undefined,
+    };
+  });
+
+  return {
+    ...blockBase("kpi_grid", data),
+    columns: [2, 3, 4].includes(Number(data.columns)) ? Number(data.columns) : undefined,
+    items,
+  };
+}
+
+function normalizeSimpleChartBlock(type: "bar_chart" | "donut_chart", data: Record<string, unknown>): Record<string, unknown> {
+  const rows = looseChartRows(data).map((row) => ({
+    label: row.label,
+    value: row.value,
+    color: row.color,
+  }));
+  const base = blockBase(type, data);
+  return {
+    ...base,
+    centerLabel:
+      type === "donut_chart" && !looseString(base.centerLabel)
+        ? `${rows.reduce((sum, row) => sum + row.value, 0)}`
+        : base.centerLabel,
+    showLegend: type === "donut_chart" ? data.showLegend ?? true : undefined,
+    data: rows,
+  };
+}
+
+function normalizeSeriesChartBlock(type: "line_chart" | "area_chart", data: Record<string, unknown>): Record<string, unknown> {
+  if (Array.isArray(data.series)) return blockBase(type, data);
+  const rows = looseChartRows(data);
+  return {
+    ...blockBase(type, data),
+    series: [
+      {
+        name: looseString(data.unit ?? data.yAxisLabel) ?? looseString(data.title) ?? "AI gen",
+        data: rows.map((row) => ({ x: row.label, y: row.value })),
+      },
+    ],
+  };
+}
+
+function normalizeTableBlock(data: Record<string, unknown>): Record<string, unknown> {
+  if (Array.isArray(data.columns) && Array.isArray(data.rows) && asRecordArray(data.columns).length > 0) {
+    return blockBase("table", data);
+  }
+
+  const headers = asLabelArray(data.headers ?? data.columns);
+  const rawRows = Array.isArray(data.rows) ? data.rows : Array.isArray(data.data) ? data.data : [];
+  const used = new Set<string>();
+  const baseColumns = headers.map((header, index) => ({
+    key: uniqueTableKey(header, index, used),
+    header,
+  }));
+  const rows = rawRows
+    .map((row) => {
+      if (Array.isArray(row)) {
+        return baseColumns.reduce<Record<string, unknown>>((acc, column, index) => {
+          acc[column.key] = row[index] ?? "";
+          return acc;
+        }, {});
+      }
+      return isRecord(row) ? row : null;
+    })
+    .filter((row): row is Record<string, unknown> => row !== null);
+  const columns = baseColumns.map((column) => {
+    const numeric = rows.some((row) => typeof row[column.key] === "number");
+    return numeric ? { ...column, align: "right", format: "number" } : column;
+  });
+
+  return {
+    ...blockBase("table", data),
+    columns,
+    rows,
+  };
+}
+
+function normalizeStandaloneBlock(type: string, value: unknown): Record<string, unknown> | null {
+  const canonical = canonicalRenderType(type);
+  if (!canonical) return null;
+  const data = isRecord(value) ? value : {};
+
+  if (canonical === "kpi_grid") return normalizeKpiGridBlock(data);
+  if (canonical === "bar_chart" || canonical === "donut_chart") return normalizeSimpleChartBlock(canonical, data);
+  if (canonical === "line_chart" || canonical === "area_chart") return normalizeSeriesChartBlock(canonical, data);
+  if (canonical === "table") return normalizeTableBlock(data);
+  if (canonical === "followups" && Array.isArray(value)) {
+    return {
+      ...blockBase("followups", { title: "Gợi ý hỏi tiếp" }),
+      items: value.map(String),
+    };
+  }
+
+  return blockBase(canonical, data);
+}
+
+function convertStandaloneRenderObject(value: unknown): string | null {
+  if (!isRecord(value)) return null;
+
+  if (typeof value.type === "string") {
+    const normalized = normalizeStandaloneBlock(value.type, value);
+    if (normalized) return renderFence(normalized);
+  }
+
+  const fences = Object.entries(value)
+    .filter(([key]) => renderTypeOrder.includes(key as (typeof renderTypeOrder)[number]))
+    .map(([key, block]) => normalizeStandaloneBlock(key, block))
+    .filter((block): block is Record<string, unknown> => block !== null)
+    .map(renderFence);
+
+  return fences.length > 0 ? fences.join("\n\n") : null;
 }
 
 function convertTemplateTable(attributes: Record<string, string>): string | null {
@@ -755,6 +1004,9 @@ function convertChartCodeFence(body: string): string | null {
   if (gantt) return gantt;
 
   const parsed = parseLooseChartObject(decoded);
+  const standalone = convertStandaloneRenderObject(parsed);
+  if (standalone) return standalone;
+
   if (isRecord(parsed) && typeof parsed.type === "string") {
     const convertedChart = convertChartJsBlock(parsed);
     if (convertedChart) return convertedChart;
@@ -771,6 +1023,58 @@ function normalizeChartCodeFences(text: string): string {
     /`{3,}\s*(?:chart|render|json|ya?ml|mermaid|gantt)?\s*\n([\s\S]*?)`{3,}/gi,
     (fence, body: string) => convertChartCodeFence(body) ?? fence,
   );
+}
+
+function normalizeStandaloneRenderJsonBlocks(text: string): string {
+  if (!standaloneRenderKeyPattern.test(text) && !typedRenderObjectPattern.test(text)) return text;
+
+  let output = "";
+  let cursor = 0;
+
+  while (cursor < text.length) {
+    standaloneRenderKeyGlobalPattern.lastIndex = cursor;
+    typedRenderObjectGlobalPattern.lastIndex = cursor;
+    const multiBlockMatch = standaloneRenderKeyGlobalPattern.exec(text);
+    const typedBlockMatch = typedRenderObjectGlobalPattern.exec(text);
+    const match =
+      multiBlockMatch && typedBlockMatch
+        ? multiBlockMatch.index <= typedBlockMatch.index
+          ? multiBlockMatch
+          : typedBlockMatch
+        : multiBlockMatch ?? typedBlockMatch;
+
+    if (!match) {
+      output += text.slice(cursor);
+      break;
+    }
+
+    const start = match.index;
+    output += text.slice(cursor, start);
+    const end = findJsonObjectEnd(text, start);
+    if (end < 0) {
+      output += text.slice(start);
+      break;
+    }
+
+    const candidate = text.slice(start, end + 1);
+    if (isInsideRenderFence(text, start)) {
+      output += candidate;
+      cursor = end + 1;
+      continue;
+    }
+
+    try {
+      const parsed = parseLooseChartObject(candidate);
+      const converted = convertStandaloneRenderObject(parsed);
+      output += converted ?? candidate;
+    } catch {
+      output += candidate;
+    }
+
+    cursor = end + 1;
+  }
+
+  return output;
 }
 
 function unwrapRenderFenceWrappers(text: string): string {
@@ -990,7 +1294,7 @@ function isChartLikeCodeFence(language: string | undefined, body: string): boole
   const decodedBody = decodeHtmlEntities(body).trim();
 
   if (/^(chart|render|ya?ml|mermaid|gantt)$/i.test(normalizedLanguage)) return true;
-  return /^(?:type\s*:\s*(?:bar|bar_chart|pie|pie_chart|donut|donut_chart|doughnut|line|line_chart|area|area_chart)|gantt\b|:::render\b|{\s*["']?type["']?\s*:\s*["'](?:bar|doughnut|donut|pie|line|area|bar_chart|donut_chart|line_chart|area_chart|gantt|kpi_grid|table|timeline|map_view|alert|action_proposal|source_chips|followups)|<chart\b)/i.test(
+  return /^(?:type\s*:\s*(?:bar|bar_chart|pie|pie_chart|donut|donut_chart|doughnut|line|line_chart|area|area_chart)|gantt\b|:::render\b|{\s*["']?type["']?\s*:\s*["'](?:bar|doughnut|donut|pie|line|area|bar_chart|donut_chart|line_chart|area_chart|gantt|kpi_grid|table|timeline|map_view|alert|action_proposal|source_chips|followups)|{\s*["'](?:kpi_grid|line_chart|bar_chart|donut_chart|area_chart|gantt|timeline|table|map_view|alert|action_proposal|markdown|source_chips|followups|pie_chart)["']\s*:|<chart\b)/i.test(
     decodedBody,
   );
 }
@@ -1010,7 +1314,9 @@ export function normalizeLooseRenderBlocks(text: string): string {
   const normalized = normalizeChartCodeFences(
     normalizeYamlChartFences(
       normalizeMermaidGanttBlocks(
-        normalizeTemplateRenderBlocks(normalizeXmlChartTags(normalizeChartJsRenderBlocks(unwrapRenderFenceWrappers(text)))),
+        normalizeTemplateRenderBlocks(
+          normalizeXmlChartTags(normalizeStandaloneRenderJsonBlocks(normalizeChartJsRenderBlocks(unwrapRenderFenceWrappers(text)))),
+        ),
       ),
     ),
   );
@@ -1088,7 +1394,9 @@ export function normalizeLooseRenderBlocks(text: string): string {
 
 function normalizeRenderBlockData(data: unknown): unknown {
   if (!isRecord(data)) return data;
-  if (data.type === "pie_chart") return { ...data, type: "donut_chart" };
+  if (typeof data.type === "string") {
+    return normalizeStandaloneBlock(data.type, data) ?? data;
+  }
   return data;
 }
 
@@ -1130,6 +1438,21 @@ function findPendingChartJsonStart(text: string): number {
 
   while ((match = pattern.exec(text)) !== null) {
     if (findJsonObjectEnd(text, match.index) < 0) pendingStart = match.index;
+  }
+
+  return pendingStart;
+}
+
+function findPendingStandaloneRenderJsonStart(text: string): number {
+  const patterns = [standaloneRenderKeyGlobalPattern, typedRenderObjectGlobalPattern];
+  let pendingStart = -1;
+
+  for (const pattern of patterns) {
+    pattern.lastIndex = 0;
+    let match: RegExpExecArray | null;
+    while ((match = pattern.exec(text)) !== null) {
+      if (!isInsideRenderFence(text, match.index) && findJsonObjectEnd(text, match.index) < 0) pendingStart = match.index;
+    }
   }
 
   return pendingStart;
@@ -1177,6 +1500,7 @@ function findPendingRenderStart(text: string): number {
     findPendingChartTagStart(text),
     findPendingMermaidGanttStart(text),
     findPendingChartJsonStart(text),
+    findPendingStandaloneRenderJsonStart(text),
     findPendingTemplateRenderStart(text),
     findPendingYamlChartFenceStart(text),
     findPendingGenericChartFenceStart(text),

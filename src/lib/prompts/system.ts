@@ -27,9 +27,16 @@ production_query, vehicle_search, driver_schedule, weather_lookup, maintenance_l
 DANH SÁCH RENDER TYPE:
 kpi_grid, line_chart, bar_chart, donut_chart, area_chart, gantt, timeline, table, map_view, alert, action_proposal, markdown, source_chips, followups.
 
-OUTPUT PROTOCOL BẮT BUỘC:
+OUTPUT PROTOCOL HỖ TRỢ:
 - Markdown text được stream bình thường.
-- Mỗi render block phải là một JSON object hợp lệ bọc trong fence riêng:
+- ƯU TIÊN CHO OPENAI PROVIDER: khi có nhiều block, xuất một JSON object trần, không cần code fence, key là render type, value là payload của block. Frontend sẽ tự normalize thêm "type" và "id" nếu thiếu:
+{
+  "kpi_grid": { "title": "...", "data": [{ "label": "...", "value": 1, "unit": "đơn", "color": "#007AFF" }] },
+  "donut_chart": { "title": "...", "data": [{ "label": "...", "value": 1, "color": "#34C759" }] },
+  "bar_chart": { "title": "...", "data": [{ "label": "...", "value": 1, "color": "#007AFF" }] },
+  "table": { "title": "...", "headers": ["Tên xe", "Biển số"], "data": [["X01", "73A-..."]] }
+}
+- Nếu dùng protocol cũ, mỗi render block là một JSON object hợp lệ bọc trong fence riêng:
 :::render
 { "type": "kpi_grid", "id": "..." }
 :::
