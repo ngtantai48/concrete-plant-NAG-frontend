@@ -69,19 +69,51 @@ export async function POST(request: Request) {
     const existing = meta.data.sheets?.find((s) => s.properties?.title === sheetName);
 
     if (!existing) {
-      // Create sheet
-      await sheets.spreadsheets.batchUpdate({
-        spreadsheetId,
-        requestBody: {
-          requests: [
-            {
-              addSheet: {
-                properties: { title: sheetName, gridProperties: { columnCount: 36, rowCount: 200 } },
+      const templateSheet = (meta.data.sheets || [])
+        .map((s) => {
+          const title = (s.properties?.title || "").normalize("NFC");
+          const sheetId = s.properties?.sheetId;
+          const m = title.match(/^CÔNG THÁNG\s+(\d+)/);
+          if (!m || typeof sheetId !== "number") return null;
+          const month = parseInt(m[1], 10);
+          if (isNaN(month) || month >= thang) return null;
+          return { title, sheetId, month };
+        })
+        .filter((s): s is { title: string; sheetId: number; month: number } => s !== null)
+        .sort((a, b) => b.month - a.month)[0];
+
+      if (templateSheet) {
+        await sheets.spreadsheets.batchUpdate({
+          spreadsheetId,
+          requestBody: {
+            requests: [
+              {
+                duplicateSheet: {
+                  sourceSheetId: templateSheet.sheetId,
+                  newSheetName: sheetName,
+                },
               },
-            },
-          ],
-        },
-      });
+            ],
+          },
+        });
+        await sheets.spreadsheets.values.clear({
+          spreadsheetId,
+          range: `'${sheetName}'!A:AJ`,
+        });
+      } else {
+        await sheets.spreadsheets.batchUpdate({
+          spreadsheetId,
+          requestBody: {
+            requests: [
+              {
+                addSheet: {
+                  properties: { title: sheetName, gridProperties: { columnCount: 36, rowCount: 200 } },
+                },
+              },
+            ],
+          },
+        });
+      }
 
       // Build header rows
       const headerRows: string[][] = [];
@@ -300,7 +332,6 @@ export async function POST(request: Request) {
     // Write attendance for the day column
     const col = ngay + 1; // day 1 → col C (index 2)
     const updates: { range: string; values: string[][] }[] = [];
-    let tongCong = 0;
 
     // Group totals tracking
     const groupTotals: Record<string, number> = {};
@@ -322,7 +353,6 @@ export async function POST(request: Request) {
 
       // Calculate work points
       const points = r.status === "1" ? 1 : r.status === "0.5" ? 0.5 : 0;
-      tongCong += points;
 
       // Find which group this person belongs to
       for (const nhom of nhomNS) {

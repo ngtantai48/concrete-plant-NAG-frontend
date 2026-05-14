@@ -33,6 +33,7 @@
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.6.0",
     "@reduxjs/toolkit": "^2.11.2",
+    "@types/jszip": "^3.4.1",
     "@types/three": "^0.184.0",
     "@types/ws": "^8.18.1",
     "antd": "^6.3.6",
@@ -48,6 +49,7 @@
     "framer-motion": "^12.38.0",
     "googleapis": "^171.4.0",
     "html-to-image": "^1.11.13",
+    "jszip": "^3.10.1",
     "jwt-decode": "^4.0.0",
     "leaflet": "^1.9.4",
     "lucide-react": "^1.8.0",
@@ -59,7 +61,11 @@
     "react-dom": "19.2.5",
     "react-hook-form": "^7.73.1",
     "react-leaflet": "^5.0.0",
+    "react-markdown": "^10.1.0",
     "react-redux": "^9.2.0",
+    "recharts": "^3.8.1",
+    "remark-breaks": "^4.0.0",
+    "remark-gfm": "^4.0.1",
     "socket.io-client": "^4.8.3",
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.5.0",
@@ -91,5 +97,5 @@
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.59.0"
   },
-  "packageManager": "pnpm@10.33.1+sha512.05ba3c1d5d1c18f68df06470d74055e62d41fc110a0c660db1b2dfb2785327f04cf0f68345d4609bc52089e7fa0343c31593b2f9594e2c5d5da426230acc9820"
+  "packageManager": "pnpm@11.1.1+sha512.d1fdf5f73c617b64fa1a56a81c3c8dfe0e966e33a6010aa256b517ae77be21d93e05affc0de1a83b0e4f29d569f68b446ae8f068cd7247c0bb3df0fb4d7bdf9a"
 }

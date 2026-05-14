@@ -12,12 +12,15 @@ import {
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+
+
 import { useDeviceHeartbeat } from "@/hooks/useDeviceHeartbeat";
 import { useNearbyVehicles } from "@/hooks/useNearbyVehicles";
 import { useRealtimeUpdates } from "@/hooks/useRealtimeUpdates";
 import { cn } from "@/lib/utils";
 import orderApi from "@/services/order.service";
 import stationApi from "@/services/station.service";
+import systemApi, { type TankerQueueSnapshotItem } from "@/services/system.service";
 import vehicleApi from "@/services/vehicle.service";
 import { usePermissions } from "@/hooks/use-permissions";
 import type { Order } from "@/types/order";
@@ -26,7 +29,7 @@ import type { Vehicle } from "@/types/vehicle";
 import { format } from "date-fns";
 import {
   ArrowRight, Calendar as CalendarIcon, CheckCircle2, Clock, Ellipsis, FileSpreadsheet,
-  Eye, EyeOff, LayoutGrid, Map as MapIcon, MapPin, Radio, RefreshCw, Route, Search, Timer, Truck, X, Save
+  Eye, EyeOff, LayoutGrid, History, Map as MapIcon, MapPin, Radio, RefreshCw, Route, Search, Timer, Truck, X, Save
 } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import dynamic from "next/dynamic";
@@ -38,7 +41,7 @@ import ClockDisplay from "./ClockDisplay";
 import StationStatusPanel from "./StationStatusPanel";
 import { computeTripStats, formatDuration } from "./trip-stats";
 import VehicleStatusChange from "./VehicleStatusChange";
-import EndOfDayModal from "../end-of-day/EndOfDayModal";
+import EndOfDayModal from "./EndOfDayModal";
 import { SIDEBAR } from "@/constants/route";
 import { PERMISSIONS } from "@/constants/permissions";
 
@@ -58,6 +61,12 @@ const getTodayDate = () => {
   const now = new Date();
   const timezoneOffset = now.getTimezoneOffset() * 60 * 1000;
   return new Date(now.getTime() - timezoneOffset).toISOString().slice(0, 10);
+};
+
+const getYesterdayDate = () => {
+  const today = new Date(getTodayDate());
+  today.setDate(today.getDate() - 1);
+  return format(today, "yyyy-MM-dd");
 };
 
 const YARD_ENTRY_TIME_VISIBILITY_STORAGE_KEY = 'admin-dashboard-yard-entry-time-visible';
@@ -196,18 +205,8 @@ export default function AdminDashboard() {
     fetchAll();
   }, [fetchAll]);
 
-  // const activeStations = useMemo(
-  //   () => stations.filter((s) => s.station_types?.station_type_id === 1 && s.station_status === "operating"),
-  //   [stations],
-  // );
-
   const {
     vehicles: vtrackingVehicles,
-    // inRangeCount, 
-    // loading: nearbyLoading, 
-    // lastUpdated, 
-    // error: nearbyError, 
-    // refetch: refetchVehicles 
   } = useNearbyVehicles(
     geofenceStation?.station_gps_longitude ?? null,
     geofenceStation?.station_gps_latitude ?? null,
@@ -216,7 +215,7 @@ export default function AdminDashboard() {
   );
 
   const { stationStatusMap, isLedConnected } = useDeviceHeartbeat();
-  const { isConnected: socketConnected, /* lastSignal, */ lastSignalTime } = useRealtimeUpdates(fetchAll);
+  const { isConnected: socketConnected, lastSignalTime } = useRealtimeUpdates(fetchAll);
 
   const vehicleTimeFormatter = useMemo(
     () => new Intl.DateTimeFormat(locale === 'vi' ? 'vi-VN' : 'en-US', {
@@ -315,56 +314,29 @@ export default function AdminDashboard() {
     });
   }, [pendingOrders]);
 
-  // const ordersAtStation = useMemo(() => orders.filter(o => o.order_status === "collecting"), [orders]);
-  // const ordersPending = useMemo(() => {
-  //   return pendingOrders.filter(o => o.vehicles?.vehicle_status === "available");
-  // }, [pendingOrders]);
-  // const ordersInTransit = useMemo(() => orders.filter(o => o.order_status === "transporting" || o.order_status === "running"), [orders]);
   const ordersCompleted = useMemo(() => {
     return orders.filter(o => o.order_status === "completed");
   }, [orders]);
-
-  // const ordersActive = useMemo(() => {
-  //   return orders.filter(o =>
-  //     o.order_status === "collecting" || o.order_status === "transporting" || o.order_status === "running"
-  //   );
-  // }, [orders]);
-
-  // const ordersTodayPanel = useMemo(() => {
-  //   return [...ordersActive, ...ordersCompleted].sort(
-  //     (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
-  //   );
-  // }, [ordersActive, ordersCompleted]);
 
   const hasUnclosedShift = useMemo(() => {
     return pendingOrders.some((o) => o.shift_closing?.shift_status === 0);
   }, [pendingOrders]);
 
-  // const [isShiftClosing, setIsShiftClosing] = useState(false);
-  // const [isShiftCloseDialogOpen, setIsShiftCloseDialogOpen] = useState(false);
-
-  // const handleShiftClose = useCallback(async () => {
-  //   setIsShiftCloseDialogOpen(false);
-  //   setIsShiftClosing(true);
-  //   try {
-  //     await orderApi.shiftClose({ operation_date: selectedDate });
-  //     toast.success(t('shiftCloseSuccess', { date: selectedDate }));
-  //     fetchAll();
-  //   } catch {
-  //     toast.error(t('shiftCloseFailed'));
-  //   } finally {
-  //     setIsShiftClosing(false);
-  //   }
-  // }, [selectedDate, t, fetchAll]);
-
   const [isSyncingShift, setIsSyncingShift] = useState(false);
   const [isSyncShiftDialogOpen, setIsSyncShiftDialogOpen] = useState(false);
+  const [isQueueHistoryDialogOpen, setIsQueueHistoryDialogOpen] = useState(false);
+  const [queueHistoryDate, setQueueHistoryDate] = useState(() => getYesterdayDate());
+  const [queueHistoryLoading, setQueueHistoryLoading] = useState(false);
+  const [queueHistoryItems, setQueueHistoryItems] = useState<TankerQueueSnapshotItem[]>([]);
+  const queueHistoryDateLabel = useMemo(() => {
+    const parsed = new Date(queueHistoryDate);
+    return Number.isNaN(parsed.getTime()) ? queueHistoryDate : format(parsed, "dd/MM/yyyy");
+  }, [queueHistoryDate]);
 
   const handleSyncShift = useCallback(async () => {
     setIsSyncShiftDialogOpen(false);
     setIsSyncingShift(true);
     try {
-      // Build maToStt from pending orders, sorted by order_number (matches ActivityFlow display)
       const sorted = [...activeFlowOrders].sort(
         (a, b) => (a.order_number || 0) - (b.order_number || 0),
       );
@@ -377,12 +349,9 @@ export default function AdminDashboard() {
           skipped.push({ order_number: o.order_number, reason: 'no_vehicle_name', raw });
           continue;
         }
-        // Normalize: trim + uppercase + strip whitespace + strip leading zeros after X
-        // e.g. "X02" -> "X2", "X09" -> "X9" so it matches sheet entries "X2", "X9"
         const upper = String(raw).trim().toUpperCase().replace(/\s+/g, "");
         const m = upper.match(/^X0*(\d+)$/);
         const maX = m ? `X${m[1]}` : upper;
-        // Only accept valid X-codes (X1, X2, ..., X21); skip duplicates (first occurrence wins)
         if (!/^X\d+$/.test(maX)) {
           skipped.push({ order_number: o.order_number, reason: 'invalid_format', raw });
           continue;
@@ -419,6 +388,41 @@ export default function AdminDashboard() {
       setIsSyncingShift(false);
     }
   }, [activeFlowOrders, t]);
+
+  const fetchQueueHistory = useCallback(async (targetDate: string) => {
+    if (!targetDate) return;
+    const parsedTargetDate = new Date(targetDate);
+    const targetDateLabel = Number.isNaN(parsedTargetDate.getTime()) ? targetDate : format(parsedTargetDate, "dd/MM/yyyy");
+    setQueueHistoryLoading(true);
+    try {
+      const response = await systemApi.getTankerQueueSnapshot(targetDate);
+      const payload = response.data?.multi_data;
+      const sortedItems = [...(payload?.items || [])].sort((a, b) => (a.position || 0) - (b.position || 0));
+      setQueueHistoryItems(sortedItems);
+      if (sortedItems.length === 0) {
+        toast(`Chưa có lịch sử lốt xe ngày ${targetDateLabel}`);
+      }
+    } catch (error) {
+      const status = (error as any)?.response?.status;
+      if (status === 404) {
+        setQueueHistoryItems([]);
+        toast(`Chưa có lịch sử lốt xe ngày ${targetDateLabel}`);
+      } else {
+        console.error("[fetchQueueHistory] error:", error);
+        toast.error("Không tải được lịch sử lốt xe");
+        setQueueHistoryItems([]);
+      }
+    } finally {
+      setQueueHistoryLoading(false);
+    }
+  }, []);
+
+  const handleOpenQueueHistory = useCallback(async () => {
+    const defaultHistoryDate = getYesterdayDate();
+    setQueueHistoryDate(defaultHistoryDate);
+    setIsQueueHistoryDialogOpen(true);
+    await fetchQueueHistory(defaultHistoryDate);
+  }, [fetchQueueHistory]);
 
   const [selectedSyncOrderIds, setSelectedSyncOrderIds] = useState<number[]>([]);
   const [isApplyingToEnd, setIsApplyingToEnd] = useState(false);
@@ -488,10 +492,10 @@ export default function AdminDashboard() {
       const aTrips = vehicleTripMap.get(a.vehicle_id) || [];
       const bTrips = vehicleTripMap.get(b.vehicle_id) || [];
 
-      // Priority score: running=2, transporting=1, rest=0
+      // Priority score: transporting=2, running=1, rest=0
       const getPriority = (trips: typeof aTrips) => {
-        if (trips.some(o => o.order_status === 'running')) return 2;
-        if (trips.some(o => o.order_status === 'transporting')) return 1;
+        if (trips.some(o => o.order_status === 'transporting')) return 2;
+        if (trips.some(o => o.order_status === 'running')) return 1;
         return 0;
       };
       const aPriority = getPriority(aTrips);
@@ -590,9 +594,9 @@ export default function AdminDashboard() {
     const hasTrips = trips.length > 0;
     const hasRunning = trips.some(o => o.order_status === 'running');
     const hasTransporting = trips.some(o => o.order_status === 'transporting');
-    const accentColor = hasRunning ? '#0ea5e9' : hasTransporting ? '#f59e0b' : (hasTrips ? '#10b981' : '#94a3b8');
-    const hoverBorder = hasRunning ? 'rgba(14, 165, 233, 0.4)' : hasTransporting ? 'rgba(245, 158, 11, 0.4)' : (hasTrips ? 'rgba(16, 185, 129, 0.4)' : 'rgba(148, 163, 184, 0.3)');
-    const chipClass = hasRunning ? 'dd-chip-sky' : hasTransporting ? 'dd-chip-amber' : 'dd-chip-emerald';
+    const accentColor = hasTransporting ? '#f59e0b' : hasRunning ? '#0ea5e9' : (hasTrips ? '#10b981' : '#94a3b8');
+    const hoverBorder = hasTransporting ? 'rgba(245, 158, 11, 0.4)' : hasRunning ? 'rgba(14, 165, 233, 0.4)' : (hasTrips ? 'rgba(16, 185, 129, 0.4)' : 'rgba(148, 163, 184, 0.3)');
+    const chipClass = hasTransporting ? 'dd-chip-amber' : hasRunning ? 'dd-chip-sky' : 'dd-chip-emerald';
     const stats = vehicleStatsMap.get(v.vehicle_id);
     const stopDurationStr = stats ? formatDuration(stats.totalStopMins, stats.stopHours, stats.stopMinsRemain, tCommon('hour'), tCommon('minute')) : '';
     const mixTotalDurationStr = stats ? formatDuration(stats.totalMixMins, stats.mixTotalHours, stats.mixTotalMinsRemain, tCommon('hour'), tCommon('minute')) : '';
@@ -613,7 +617,7 @@ export default function AdminDashboard() {
           </div>
           {hasTrips ? (
             <span className={`dd-chip ${chipClass} text-[10px] px-1.5 py-0.5`}>
-              {hasRunning ? t('moving') : hasTransporting ? t('collected') : t('tripCount', { count: trips.length })}
+              {hasTransporting ? t('collected') : hasRunning ? t('moving') : t('tripCount', { count: trips.length })}
             </span>
           ) : (
             <span className="dd-chip dd-chip-slate text-[10px] px-1.5 py-0.5">
@@ -797,6 +801,20 @@ export default function AdminDashboard() {
                   </TooltipContent>
                 </Tooltip>
 
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button size="sm" variant="outline"
+                      onClick={handleOpenQueueHistory}
+                      className="uppercase border-indigo-200 text-indigo-700 hover:bg-indigo-50"
+                    >
+                      <History />Lịch sử lốt xe
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Xem thứ tự lốt theo ngày</p>
+                  </TooltipContent>
+                </Tooltip>
+
                 {!isPastDate && hasUnclosedShift && (
                   <>
                     {/* Chốt ca button hidden — keeping handleShiftClose for potential re-enable */}
@@ -858,91 +876,98 @@ export default function AdminDashboard() {
                     </Tooltip>
 
                     <Dialog open={isSyncShiftDialogOpen} onOpenChange={setIsSyncShiftDialogOpen}>
-                      <DialogContent className="sm:max-w-3xl max-h-[85vh] flex flex-col">
+                      <DialogContent className="max-h-[85vh] flex flex-col">
                         <DialogHeader>
                           <DlgTitle>{t('syncShiftPopupTitle')}</DlgTitle>
                           <DialogDescription>{t('syncShiftPopupDescription')}</DialogDescription>
                         </DialogHeader>
 
-                        <div className="flex-1 overflow-auto rounded-md border">
-                          <table className="w-full text-sm">
-                            <thead className="sticky top-0 bg-muted/60 border-b">
-                              <tr>
-                                <th className="w-10 px-3 py-2 text-left">
-                                  <Checkbox
-                                    checked={
-                                      sortedActiveFlowOrders.length > 0 &&
-                                      selectedSyncOrderIds.length === sortedActiveFlowOrders.length
-                                    }
-                                    onCheckedChange={(checked) => {
-                                      if (checked) {
-                                        setSelectedSyncOrderIds(sortedActiveFlowOrders.map((o) => o.order_id));
-                                      } else {
-                                        setSelectedSyncOrderIds([]);
-                                      }
-                                    }}
-                                    aria-label={t('syncShiftSelectAll')}
-                                  />
-                                </th>
-                                <th className="w-16 px-3 py-2 text-left font-bold uppercase">
-                                  {t('syncShiftSttColumn')}
-                                </th>
-                                <th className="px-3 py-2 text-left font-bold uppercase">
-                                  {t('syncShiftVehicleColumn')}
-                                </th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {sortedActiveFlowOrders.map((o, idx) => {
-                                const isChecked = selectedSyncOrderIds.includes(o.order_id);
-                                return (
-                                  <tr
-                                    key={o.order_id}
-                                    className="border-b last:border-0 hover:bg-muted/30 cursor-pointer"
-                                    onClick={() => {
-                                      setSelectedSyncOrderIds((prev) =>
-                                        prev.includes(o.order_id)
-                                          ? prev.filter((id) => id !== o.order_id)
-                                          : [...prev, o.order_id],
-                                      );
-                                    }}
-                                  >
-                                    <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
-                                      <Checkbox
-                                        checked={isChecked}
-                                        onCheckedChange={(checked) => {
-                                          setSelectedSyncOrderIds((prev) =>
-                                            checked
-                                              ? [...prev, o.order_id]
-                                              : prev.filter((id) => id !== o.order_id),
-                                          );
-                                        }}
-                                      />
-                                    </td>
-                                    <td className="px-3 py-2 font-bold">{idx + 1}</td>
-                                    <td className="px-3 py-2">
-                                      <span className="font-semibold">
-                                        {o.vehicles?.vehicle_license_plate}
+                        <div className="flex-1 flex flex-col min-h-0 border rounded-xl overflow-hidden bg-slate-50/30">
+                          {/* Header / Select All area */}
+                          <div className="px-4 py-3 bg-white border-b flex items-center gap-3 sticky top-0 z-10 shadow-sm">
+                            <Checkbox
+                              id="select-all-sync"
+                              checked={
+                                sortedActiveFlowOrders.length > 0 &&
+                                selectedSyncOrderIds.length === sortedActiveFlowOrders.length
+                              }
+                              onCheckedChange={(checked) => {
+                                if (checked) {
+                                  setSelectedSyncOrderIds(sortedActiveFlowOrders.map((o) => o.order_id));
+                                } else {
+                                  setSelectedSyncOrderIds([]);
+                                }
+                              }}
+                            />
+                            <label htmlFor="select-all-sync" className="text-sm font-bold uppercase cursor-pointer select-none flex-1">
+                              {t('syncShiftSelectAll')} ({sortedActiveFlowOrders.length})
+                            </label>
+                          </div>
+
+                          {/* List area */}
+                          <div className="flex-1 overflow-y-auto p-2 space-y-1">
+                            {sortedActiveFlowOrders.map((o, idx) => {
+                              const isChecked = selectedSyncOrderIds.includes(o.order_id);
+                              const checkboxId = `sync-order-${o.order_id}`;
+
+                              return (
+                                <div
+                                  key={o.order_id}
+                                  className={cn(
+                                    "group flex items-center gap-8 px-4 py-3 rounded-lg border transition-all cursor-pointer",
+                                    isChecked
+                                      ? "bg-indigo-50/50 border-indigo-200 shadow-sm"
+                                      : "bg-white border-transparent hover:border-slate-200 hover:bg-slate-50"
+                                  )}
+                                  onClick={() => {
+                                    setSelectedSyncOrderIds((prev) =>
+                                      prev.includes(o.order_id)
+                                        ? prev.filter((id) => id !== o.order_id)
+                                        : [...prev, o.order_id],
+                                    );
+                                  }}
+                                >
+                                  <div onClick={(e) => e.stopPropagation()} className="flex items-center">
+                                    <Checkbox
+                                      id={checkboxId}
+                                      checked={isChecked}
+                                      onCheckedChange={(checked) => {
+                                        setSelectedSyncOrderIds((prev) =>
+                                          checked
+                                            ? [...prev, o.order_id]
+                                            : prev.filter((id) => id !== o.order_id),
+                                        );
+                                      }}
+                                    />
+                                  </div>
+
+                                  <div className="flex items-center gap-10 flex-1 min-w-0">
+                                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-base font-bold text-slate-600 group-hover:bg-indigo-100 group-hover:text-indigo-600 transition-colors">
+                                      {idx + 1}
+                                    </span>
+                                    <div className="flex flex-col min-w-0">
+                                      <span className="font-bold text-slate-900 truncate">
+                                        {o.vehicles?.vehicle_license_plate} | {o.vehicles?.vehicle_name}
                                       </span>
-                                      {o.vehicles?.vehicle_name && (
-                                        <span className="ml-2 text-muted-foreground">
-                                          ({o.vehicles.vehicle_name})
-                                        </span>
-                                      )}
-                                    </td>
-                                  </tr>
-                                );
-                              })}
-                              {sortedActiveFlowOrders.length === 0 && (
-                                <tr>
-                                  <td colSpan={3} className="px-3 py-8 text-center text-muted-foreground">
-                                    {t('syncShiftEmpty')}
-                                  </td>
-                                </tr>
-                              )}
-                            </tbody>
-                          </table>
+                                    </div>
+                                  </div>
+
+                                  {isChecked && (
+                                    <div className="h-2 w-2 rounded-full bg-indigo-500 animate-pulse shrink-0" />
+                                  )}
+                                </div>
+                              );
+                            })}
+
+                            {sortedActiveFlowOrders.length === 0 && (
+                              <div className="flex flex-col items-center justify-center py-12 text-slate-400 space-y-2">
+                                <FileSpreadsheet className="h-8 w-8 opacity-20" />
+                                <p className="text-sm italic">{t('syncShiftEmpty')}</p>
+                              </div>
+                            )}
+                          </div>
                         </div>
+
 
                         <DialogFooter className="sm:justify-between gap-2">
                           <Button
@@ -983,6 +1008,90 @@ export default function AdminDashboard() {
                     </Dialog>
                   </>
                 )}
+
+                <Dialog open={isQueueHistoryDialogOpen} onOpenChange={setIsQueueHistoryDialogOpen}>
+                  <DialogContent className="sm:max-w-2xl max-h-[85vh] flex flex-col p-0 overflow-hidden">
+                    <DialogHeader className="px-5 pt-5 pb-2 border-b bg-white">
+                      <div className="flex items-start gap-3">
+                        <div className="h-10 w-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                          <CalendarIcon className="h-5 w-5" />
+                        </div>
+                        <div>
+                          <DlgTitle className="text-2xl font-black">Lịch sử lốt xe</DlgTitle>
+                          <DialogDescription className="mt-1">
+                            Chọn ngày để xem lịch sử thứ tự lốt xe cuối ngày.
+                          </DialogDescription>
+                        </div>
+                      </div>
+                    </DialogHeader>
+
+                    <div className="px-5 py-1">
+                      <div className="rounded-xl border bg-white p-3 space-y-2">
+                        <div className="text-xs font-bold text-slate-500">Chọn ngày</div>
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                          <Input
+                            type="date"
+                            value={queueHistoryDate}
+                            onChange={(event) => setQueueHistoryDate(event.target.value)}
+                            className="w-[180px] bg-white"
+                          />
+                          <Button
+                            variant="primary"
+                            onClick={() => fetchQueueHistory(queueHistoryDate)}
+                            disabled={queueHistoryLoading || !queueHistoryDate}
+                            className="sm:min-w-[130px]"
+                          >
+                            {queueHistoryLoading ? <RefreshCw className="animate-spin h-4 w-4" /> : <Search className="h-4 w-4" />}
+                            Xem lịch sử
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="px-5 py-3 flex-1 min-h-0 overflow-hidden bg-slate-50/40">
+                      <div className="h-[50vh] max-h-[50vh] overflow-y-auto p-2 space-y-1 rounded-xl border border-slate-200 bg-white">
+                        {queueHistoryItems.map((item) => (
+                          <div
+                            key={`${item.order_id}-${item.position}`}
+                            className="flex items-center gap-4 px-4 py-3 rounded-lg border border-transparent bg-white hover:border-slate-200 hover:bg-slate-50 transition-all shadow-sm"
+                          >
+                            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-sm font-black text-indigo-600">
+                              {item.position}
+                            </span>
+
+                            <div className="flex-1 min-w-0">
+                              <div className="font-extrabold text-slate-800 truncate">
+                                {item.vehicle_name}
+                              </div>
+                              <div className="inline-flex items-center rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 font-mono text-[10px] font-semibold text-slate-700">
+                                {item.vehicle_license_plate}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+
+                        {!queueHistoryLoading && queueHistoryItems.length === 0 && (
+                          <div className="flex flex-col items-center justify-center py-20 text-slate-400 space-y-2">
+                            <CalendarIcon className="h-8 w-8 opacity-20" />
+                            <p className="text-sm italic">
+                              Chưa có lịch sử lốt xe ngày {queueHistoryDateLabel}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+
+                    <DialogFooter className="border-t bg-white px-5 py-3 sm:justify-between">
+                      <div className="text-xs text-slate-500 font-semibold">Tổng số {queueHistoryItems.length} kết quả</div>
+                      <div className="flex items-center gap-2">
+                        <Button variant="outline" onClick={() => setIsQueueHistoryDialogOpen(false)}>
+                          Đóng
+                        </Button>
+                      </div>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
               </div>
             </div>
           </div>
