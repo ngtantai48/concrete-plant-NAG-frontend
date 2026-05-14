@@ -12,6 +12,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+
+
 import { useDeviceHeartbeat } from "@/hooks/useDeviceHeartbeat";
 import { useNearbyVehicles } from "@/hooks/useNearbyVehicles";
 import { useRealtimeUpdates } from "@/hooks/useRealtimeUpdates";
@@ -801,14 +803,11 @@ export default function AdminDashboard() {
 
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Button
-                      size="sm"
-                      variant="outline"
+                    <Button size="sm" variant="outline"
                       onClick={handleOpenQueueHistory}
                       className="uppercase border-indigo-200 text-indigo-700 hover:bg-indigo-50"
                     >
-                      <History className="h-4 w-4 mr-1.5" />
-                      Lịch sử lốt xe
+                      <History />Lịch sử lốt xe
                     </Button>
                   </TooltipTrigger>
                   <TooltipContent>
@@ -877,91 +876,98 @@ export default function AdminDashboard() {
                     </Tooltip>
 
                     <Dialog open={isSyncShiftDialogOpen} onOpenChange={setIsSyncShiftDialogOpen}>
-                      <DialogContent className="sm:max-w-3xl max-h-[85vh] flex flex-col">
+                      <DialogContent className="max-h-[85vh] flex flex-col">
                         <DialogHeader>
                           <DlgTitle>{t('syncShiftPopupTitle')}</DlgTitle>
                           <DialogDescription>{t('syncShiftPopupDescription')}</DialogDescription>
                         </DialogHeader>
 
-                        <div className="flex-1 overflow-auto rounded-md border">
-                          <table className="w-full text-sm">
-                            <thead className="sticky top-0 bg-muted/60 border-b">
-                              <tr>
-                                <th className="w-10 px-3 py-2 text-left">
-                                  <Checkbox
-                                    checked={
-                                      sortedActiveFlowOrders.length > 0 &&
-                                      selectedSyncOrderIds.length === sortedActiveFlowOrders.length
-                                    }
-                                    onCheckedChange={(checked) => {
-                                      if (checked) {
-                                        setSelectedSyncOrderIds(sortedActiveFlowOrders.map((o) => o.order_id));
-                                      } else {
-                                        setSelectedSyncOrderIds([]);
-                                      }
-                                    }}
-                                    aria-label={t('syncShiftSelectAll')}
-                                  />
-                                </th>
-                                <th className="w-16 px-3 py-2 text-left font-bold uppercase">
-                                  {t('syncShiftSttColumn')}
-                                </th>
-                                <th className="px-3 py-2 text-left font-bold uppercase">
-                                  {t('syncShiftVehicleColumn')}
-                                </th>
-                              </tr>
-                            </thead>
-                            <tbody>
-                              {sortedActiveFlowOrders.map((o, idx) => {
-                                const isChecked = selectedSyncOrderIds.includes(o.order_id);
-                                return (
-                                  <tr
-                                    key={o.order_id}
-                                    className="border-b last:border-0 hover:bg-muted/30 cursor-pointer"
-                                    onClick={() => {
-                                      setSelectedSyncOrderIds((prev) =>
-                                        prev.includes(o.order_id)
-                                          ? prev.filter((id) => id !== o.order_id)
-                                          : [...prev, o.order_id],
-                                      );
-                                    }}
-                                  >
-                                    <td className="px-3 py-2" onClick={(e) => e.stopPropagation()}>
-                                      <Checkbox
-                                        checked={isChecked}
-                                        onCheckedChange={(checked) => {
-                                          setSelectedSyncOrderIds((prev) =>
-                                            checked
-                                              ? [...prev, o.order_id]
-                                              : prev.filter((id) => id !== o.order_id),
-                                          );
-                                        }}
-                                      />
-                                    </td>
-                                    <td className="px-3 py-2 font-bold">{idx + 1}</td>
-                                    <td className="px-3 py-2">
-                                      <span className="font-semibold">
-                                        {o.vehicles?.vehicle_license_plate}
+                        <div className="flex-1 flex flex-col min-h-0 border rounded-xl overflow-hidden bg-slate-50/30">
+                          {/* Header / Select All area */}
+                          <div className="px-4 py-3 bg-white border-b flex items-center gap-3 sticky top-0 z-10 shadow-sm">
+                            <Checkbox
+                              id="select-all-sync"
+                              checked={
+                                sortedActiveFlowOrders.length > 0 &&
+                                selectedSyncOrderIds.length === sortedActiveFlowOrders.length
+                              }
+                              onCheckedChange={(checked) => {
+                                if (checked) {
+                                  setSelectedSyncOrderIds(sortedActiveFlowOrders.map((o) => o.order_id));
+                                } else {
+                                  setSelectedSyncOrderIds([]);
+                                }
+                              }}
+                            />
+                            <label htmlFor="select-all-sync" className="text-sm font-bold uppercase cursor-pointer select-none flex-1">
+                              {t('syncShiftSelectAll')} ({sortedActiveFlowOrders.length})
+                            </label>
+                          </div>
+
+                          {/* List area */}
+                          <div className="flex-1 overflow-y-auto p-2 space-y-1">
+                            {sortedActiveFlowOrders.map((o, idx) => {
+                              const isChecked = selectedSyncOrderIds.includes(o.order_id);
+                              const checkboxId = `sync-order-${o.order_id}`;
+
+                              return (
+                                <div
+                                  key={o.order_id}
+                                  className={cn(
+                                    "group flex items-center gap-8 px-4 py-3 rounded-lg border transition-all cursor-pointer",
+                                    isChecked
+                                      ? "bg-indigo-50/50 border-indigo-200 shadow-sm"
+                                      : "bg-white border-transparent hover:border-slate-200 hover:bg-slate-50"
+                                  )}
+                                  onClick={() => {
+                                    setSelectedSyncOrderIds((prev) =>
+                                      prev.includes(o.order_id)
+                                        ? prev.filter((id) => id !== o.order_id)
+                                        : [...prev, o.order_id],
+                                    );
+                                  }}
+                                >
+                                  <div onClick={(e) => e.stopPropagation()} className="flex items-center">
+                                    <Checkbox
+                                      id={checkboxId}
+                                      checked={isChecked}
+                                      onCheckedChange={(checked) => {
+                                        setSelectedSyncOrderIds((prev) =>
+                                          checked
+                                            ? [...prev, o.order_id]
+                                            : prev.filter((id) => id !== o.order_id),
+                                        );
+                                      }}
+                                    />
+                                  </div>
+
+                                  <div className="flex items-center gap-10 flex-1 min-w-0">
+                                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-base font-bold text-slate-600 group-hover:bg-indigo-100 group-hover:text-indigo-600 transition-colors">
+                                      {idx + 1}
+                                    </span>
+                                    <div className="flex flex-col min-w-0">
+                                      <span className="font-bold text-slate-900 truncate">
+                                        {o.vehicles?.vehicle_license_plate} | {o.vehicles?.vehicle_name}
                                       </span>
-                                      {o.vehicles?.vehicle_name && (
-                                        <span className="ml-2 text-muted-foreground">
-                                          ({o.vehicles.vehicle_name})
-                                        </span>
-                                      )}
-                                    </td>
-                                  </tr>
-                                );
-                              })}
-                              {sortedActiveFlowOrders.length === 0 && (
-                                <tr>
-                                  <td colSpan={3} className="px-3 py-8 text-center text-muted-foreground">
-                                    {t('syncShiftEmpty')}
-                                  </td>
-                                </tr>
-                              )}
-                            </tbody>
-                          </table>
+                                    </div>
+                                  </div>
+
+                                  {isChecked && (
+                                    <div className="h-2 w-2 rounded-full bg-indigo-500 animate-pulse shrink-0" />
+                                  )}
+                                </div>
+                              );
+                            })}
+
+                            {sortedActiveFlowOrders.length === 0 && (
+                              <div className="flex flex-col items-center justify-center py-12 text-slate-400 space-y-2">
+                                <FileSpreadsheet className="h-8 w-8 opacity-20" />
+                                <p className="text-sm italic">{t('syncShiftEmpty')}</p>
+                              </div>
+                            )}
+                          </div>
                         </div>
+
 
                         <DialogFooter className="sm:justify-between gap-2">
                           <Button
@@ -982,7 +988,7 @@ export default function AdminDashboard() {
                               ) : null}
                               {t('syncShiftApplyToEndAction', { count: selectedSyncOrderIds.length })}
                             </Button>
-                             {hasActionAccess(SIDEBAR.DASHBOARD, PERMISSIONS.DASHBOARD.SYNC_SLOTS) && (
+                            {hasActionAccess(SIDEBAR.DASHBOARD, PERMISSIONS.DASHBOARD.SYNC_SLOTS) && (
                               <Button
                                 variant="primary"
                                 onClick={handleSyncShift}
@@ -1019,7 +1025,7 @@ export default function AdminDashboard() {
                       </div>
                     </DialogHeader>
 
-                    <div className="px-5 pt-4 pb-3 bg-slate-50/60 border-b">
+                    <div className="px-5 py-1">
                       <div className="rounded-xl border bg-white p-3 space-y-2">
                         <div className="text-xs font-bold text-slate-500">Chọn ngày</div>
                         <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -1043,44 +1049,38 @@ export default function AdminDashboard() {
                     </div>
 
                     <div className="px-5 py-3 flex-1 min-h-0 overflow-hidden bg-slate-50/40">
-                      <div className="h-[50vh] max-h-[50vh] overflow-y-scroll rounded-xl border border-slate-200 bg-white pb-2">
-                        <table className="w-full text-sm">
-                          <thead className="sticky top-0 border-b bg-slate-50">
-                            <tr>
-                              <th className="w-24 px-4 py-3 text-center text-xs font-black uppercase text-slate-500">Thứ tự</th>
-                              <th className="w-40 px-4 py-3 text-center text-xs font-black uppercase text-slate-500">Xe</th>
-                              <th className="px-4 py-3 text-center text-xs font-black uppercase text-slate-500">Biển số</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {queueHistoryItems.map((item) => (
-                              <tr key={`${item.order_id}-${item.position}`} className="border-b border-slate-100 last:border-0 hover:bg-blue-50/40 transition-colors">
-                                <td className="px-4 py-2.5 text-center">
-                                  <span className="inline-flex min-w-7 items-center justify-center rounded-full bg-indigo-50 px-2 py-1 text-sm font-black text-indigo-600 mx-auto">
-                                    {item.position}
-                                  </span>
-                                </td>
-                                <td className="px-4 py-2.5 text-center">
-                                  <span className="font-extrabold text-slate-800">{item.vehicle_name}</span>
-                                </td>
-                                <td className="px-4 py-2.5 text-center">
-                                  <span className="inline-flex items-center rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 font-mono text-xs font-semibold text-slate-700 mx-auto">
-                                    {item.vehicle_license_plate}
-                                  </span>
-                                </td>
-                              </tr>
-                            ))}
-                            {!queueHistoryLoading && queueHistoryItems.length === 0 && (
-                              <tr>
-                                <td colSpan={3} className="px-3 py-10 text-center text-muted-foreground">
-                                  Chưa có lịch sử lốt xe ngày {queueHistoryDateLabel}
-                                </td>
-                              </tr>
-                            )}
-                          </tbody>
-                        </table>
+                      <div className="h-[50vh] max-h-[50vh] overflow-y-auto p-2 space-y-1 rounded-xl border border-slate-200 bg-white">
+                        {queueHistoryItems.map((item) => (
+                          <div
+                            key={`${item.order_id}-${item.position}`}
+                            className="flex items-center gap-4 px-4 py-3 rounded-lg border border-transparent bg-white hover:border-slate-200 hover:bg-slate-50 transition-all shadow-sm"
+                          >
+                            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-sm font-black text-indigo-600">
+                              {item.position}
+                            </span>
+
+                            <div className="flex-1 min-w-0">
+                              <div className="font-extrabold text-slate-800 truncate">
+                                {item.vehicle_name}
+                              </div>
+                              <div className="inline-flex items-center rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 font-mono text-[10px] font-semibold text-slate-700">
+                                {item.vehicle_license_plate}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+
+                        {!queueHistoryLoading && queueHistoryItems.length === 0 && (
+                          <div className="flex flex-col items-center justify-center py-20 text-slate-400 space-y-2">
+                            <CalendarIcon className="h-8 w-8 opacity-20" />
+                            <p className="text-sm italic">
+                              Chưa có lịch sử lốt xe ngày {queueHistoryDateLabel}
+                            </p>
+                          </div>
+                        )}
                       </div>
                     </div>
+
 
                     <DialogFooter className="border-t bg-white px-5 py-3 sm:justify-between">
                       <div className="text-xs text-slate-500 font-semibold">Tổng số {queueHistoryItems.length} kết quả</div>
