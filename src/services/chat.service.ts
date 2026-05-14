@@ -11,7 +11,6 @@ import {
   routeByDeterministicRule,
 } from "./chat-tools";
 import type { ToolResult } from "./chat-tools/types";
-import { buildPlannedRenderStream } from "./chat-tools/render-planner";
 import { getMemorySnapshot, hasMemory, rememberToolCall } from "./chat-memory";
 
 const STREAM_ENDPOINT = "/api/chat/stream";
@@ -230,10 +229,6 @@ const chatApi = {
 
         if (result.status === "ok") {
           rememberToolCall({ tool: result.tool, args: decision.args, data: result.data });
-          if (options.injectSystemPrompt) {
-            const plannedRenderStream = buildPlannedRenderStream(result);
-            if (plannedRenderStream) handlers.onContent?.(`${plannedRenderStream}\n\n`);
-          }
         }
 
         messagesForStream[lastUserIndex] = {
