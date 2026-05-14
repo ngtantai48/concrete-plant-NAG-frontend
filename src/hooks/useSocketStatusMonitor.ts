@@ -6,63 +6,13 @@
 import { useEffect, useState, useRef } from 'react';
 import { SocketManager } from '@/lib/socket';
 
-export interface SocketStatusInfo {
-  namespace: string;
-  isConnected: boolean;
-  lastError?: string;
-  reconnectAttempts: number;
-}
+import { useSocket } from '@/context/socket-context';
 
 /**
  * Hook theo dõi trạng thái kết nối socket cho monitoring
  */
-export function useSocketStatusMonitor(namespaces: string[] = ['notifications', 'updates']) {
-  const [statusMap, setStatusMap] = useState<Record<string, SocketStatusInfo>>({});
-  const managersRef = useRef<Map<string, SocketManager>>(new Map());
-
-  useEffect(() => {
-    const updates: Record<string, SocketStatusInfo> = {};
-
-    namespaces.forEach((namespace) => {
-      try {
-        const manager = SocketManager.getInstance(namespace);
-        managersRef.current.set(namespace, manager);
-
-        updates[namespace] = {
-          namespace,
-          isConnected: manager.isConnected,
-          reconnectAttempts: 0,
-        };
-
-        const unsubscribe = manager.onConnectionChange((connected) => {
-          setStatusMap((prev) => ({
-            ...prev,
-            [namespace]: {
-              ...prev[namespace],
-              namespace,
-              isConnected: connected,
-              lastError: connected ? undefined : prev[namespace]?.lastError,
-            },
-          }));
-        });
-
-        return unsubscribe;
-      } catch (error) {
-        updates[namespace] = {
-          namespace,
-          isConnected: false,
-          lastError: error instanceof Error ? error.message : 'Unknown error',
-          reconnectAttempts: 0,
-        };
-      }
-    });
-
-    setStatusMap(updates);
-
-    return () => {
-      managersRef.current.clear();
-    };
-  }, [namespaces.join(',')]); // Only re-run if namespaces change
+export function useSocketStatusMonitor() {
+  const { statusMap } = useSocket();
 
   return {
     statusMap,

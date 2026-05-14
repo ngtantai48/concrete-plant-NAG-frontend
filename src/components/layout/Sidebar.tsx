@@ -5,16 +5,14 @@ import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { ADMIN, CUSTOMER, USER } from "@/constants/route";
+import { navigationConfig, NavItem } from "@/config/navigation";
 import { useAppSelector } from "@/hooks/use-app-selector";
 import { useNavigationStore } from "@/hooks/use-navigation-store";
+import { usePermissions } from "@/hooks/use-permissions";
 import { DoubleLeftOutlined, DoubleRightOutlined } from "@ant-design/icons";
 import { createSelector } from "@reduxjs/toolkit";
 import { Avatar, Button, Layout, Menu, MenuProps } from "antd";
-import {
-  Bot, CalendarCheck, Car, Gauge, Layers, MapPin, Settings,
-  User, UtensilsCrossed, Wrench
-} from "lucide-react";
+import { User } from "lucide-react";
 import { useTranslations } from "next-intl";
 import Image from "next/image";
 import Link from "next/link";
@@ -31,12 +29,14 @@ const UserProfile = ({ collapsed, userName, userRole, isLoading }: {
 
   const roleMap: Record<string, string> = {
     admin: t("role.admin"),
+    manager: t("role.manager"),
+    dispatcher: t("role.dispatcher"),
+    driver: t("role.driver"),
     user: t("role.user"),
-    customer: t("role.customer"),
   };
 
   return (
-    <div className="flex items-center border-t border-gray-700 p-3 bg-gray-900 min-h-[70px]">
+    <div className="flex items-center border-t border-gray-700 p-3 bg-gray-900 min-h-17.5">
       <div className="flex items-center gap-4 w-full px-3">
         {isLoading ? (
           <>
@@ -81,6 +81,7 @@ export default function Sidebar() {
   const [mounted, setMounted] = useState(false);
   const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
   const [pendingUrl, setPendingUrl] = useState<string>("");
+  const { hasPageAccess } = usePermissions();
 
   const { isDirty, setDirty } = useNavigationStore();
 
@@ -100,37 +101,36 @@ export default function Sidebar() {
     return query ? `${pathname}?${query}` : pathname;
   }, [pathname, searchParams]);
 
-  const baseMenuItems = useMemo(
-    () => [
-      { key: ADMIN.DASHBOARD, label: t("dashboard"), icon: <Gauge />, roles: ["admin"] },
-
-      { key: ADMIN.AI_ASSISTANT, label: "Trợ lý AI", icon: <Bot />, roles: ["admin"] },
-      // { key: ADMIN.DRIVERS, label: t("drivers"), icon: <Truck />, roles: ["admin"] },
-      // { key: ADMIN.SHIFT_SLOTS, label: t("shiftSlots"), icon: <ClipboardList />, roles: ["admin"] },
-      { key: ADMIN.VEHICLES, label: t("vehicles"), icon: <Car />, roles: ["admin"] },
-      { key: ADMIN.VEHICLE_MAINTENANCES, label: t("vehicleMaintenances"), icon: <Wrench />, roles: ["admin"] },
-      { key: ADMIN.VEHICLE_TYPES, label: t("vehicleTypes"), icon: <Layers />, roles: ["admin"] },
-      { key: ADMIN.STATIONS, label: t("stations"), icon: <MapPin />, roles: ["admin"] },
-      {
-        key: "tools-menu",
-        label: t("tools"),
-        icon: <Settings />,
-        roles: ["admin"],
-        children: [
-          { key: ADMIN.MEAL_CHECK, label: t("mealCheck"), icon: <UtensilsCrossed /> },
-          { key: ADMIN.ATTENDANCE, label: t("attendance"), icon: <CalendarCheck /> },
-        ],
-      },
-      { key: USER.DASHBOARD, label: t("dashboard"), icon: <Gauge />, roles: ["user"] },
-      { key: CUSTOMER.DASHBOARD, label: t("dashboard"), icon: <Gauge />, roles: ["customer"] },
-      // { key: ADMIN.DRIVER_DISPLAY, label: t("driverDisplay"), icon: <Monitor />, roles: ["admin"] },
-    ],
-    [t]
-  );
+  const baseMenuItems = useMemo(() => {
+    const translateItems = (items: NavItem[]): NavItem[] => {
+      return items.map((item) => ({
+        ...item,
+        label: t(item.label),
+        children: item.children ? translateItems(item.children) : undefined,
+      }));
+    };
+    return translateItems(navigationConfig);
+  }, [t]);
 
   const menuItems = useMemo(() => {
-    return baseMenuItems.filter((item) => item.roles.includes(role));
-  }, [baseMenuItems, role]);
+    const filterItems = (items: NavItem[]): NavItem[] => {
+      return items
+        .map((item) => ({ ...item }))
+        .filter((item) => {
+          if (item.roles && !item.roles.includes(role || "")) {
+            return false;
+          }
+
+          if (item.children) {
+            item.children = filterItems(item.children);
+            return item.children.length > 0;
+          }
+
+          return hasPageAccess(item.key);
+        });
+    };
+    return filterItems(baseMenuItems);
+  }, [baseMenuItems, role, hasPageAccess]);
 
   const handleLinkClick = (e: React.MouseEvent, url: string) => {
     if (isDirty) {
@@ -150,7 +150,7 @@ export default function Sidebar() {
   };
 
   const buildMenuItems = useCallback(
-    (items: any[]): MenuProps["items"] => {
+    (items: NavItem[]): MenuProps["items"] => {
       return items.map((item) => {
         if (item.children) {
           return {
@@ -176,7 +176,7 @@ export default function Sidebar() {
   );
 
   const selectedKey = useMemo(() => {
-    const findMatchedKey = (items: any[]): string | null => {
+    const findMatchedKey = (items: NavItem[]): string | null => {
       for (const item of items) {
         if (item.children) {
           const childMatch = findMatchedKey(item.children);
@@ -222,24 +222,14 @@ export default function Sidebar() {
         collapsedWidth={80}
         collapsed={collapsed}
         className="bg-gray-900! text-white! p-0!"
-        style={{
-          position: "fixed",
-          left: 0,
-          top: 0,
-          bottom: 0,
-          zIndex: 100,
-          overflow: "hidden",
-        }}
+        style={{ position: "fixed", left: 0, top: 0, bottom: 0, zIndex: 100, overflow: "hidden" }}
         trigger={null}
       >
         <div className="flex flex-col h-full">
           <div className="shrink-0">
             <div className="flex items-center justify-between p-4 border-b border-gray-700 bg-gray-900">
               {!collapsed && (
-                <div
-                  className="flex items-center justify-center m-3"
-                  style={{ width: 140, height: 40 }}
-                >
+                <div className="flex items-center justify-center m-3" style={{ width: 140, height: 40 }}>
                   <Image className="object-contain" src={Logo} alt="SAVINA Logo" priority />
                 </div>
               )}

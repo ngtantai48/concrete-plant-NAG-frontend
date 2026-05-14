@@ -8,6 +8,7 @@ interface LoginResponse {
     role: string;
     role_id: number;
     accessToken: string;
+    permissions: string[];
 }
 
 interface AuthState {
@@ -16,6 +17,7 @@ interface AuthState {
         role: string;
         role_id: number;
         fullName?: string;
+        permissions: string[];
     } | null;
     token: string | null;
     loading: boolean;
@@ -55,13 +57,15 @@ const authSlice = createSlice({
             role: string;
             role_id: number;
             accessToken: string;
-            user_full_name?: string
+            user_full_name?: string;
+            permissions: string[];
         }>) => {
             state.user = {
                 id: action.payload.user_id,
                 role: action.payload.role,
                 role_id: action.payload.role_id,
                 fullName: action.payload.user_full_name,
+                permissions: action.payload.permissions,
             };
             state.token = action.payload.accessToken;
             state.isAuthenticated = true;
@@ -93,6 +97,7 @@ const authSlice = createSlice({
                     role: action.payload.role,
                     role_id: action.payload.role_id,
                     fullName: action.payload.user_full_name,
+                    permissions: action.payload.permissions,
                 };
                 state.token = action.payload.accessToken;
                 state.isAuthenticated = true;

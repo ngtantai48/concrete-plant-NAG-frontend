@@ -1,28 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 
-function responseContentType(value: unknown): string {
-  return typeof value === "string" && value.trim() ? value : "image/jpeg";
-}
+const getContentType = (value: unknown): string => {
+  if (typeof value === 'string' && value.trim()) return value;
+  if (Array.isArray(value)) {
+    const first = value.find((v) => typeof v === 'string' && v.trim());
+    if (typeof first === 'string') return first;
+  }
+  return 'image/jpeg';
+};
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const ip = searchParams.get('ip');
-  let port = searchParams.get('port');
-  
+  const port = searchParams.get('port');
+
   if (!ip) {
     return new NextResponse('Missing IP', { status: 400 });
   }
 
-  // Remove hardcoded mapping. We will try HTTP first, then HTTPS.
   const protocol = port === '443' ? 'https' : 'http';
-  let targetUrl = `${protocol}://${ip}:${port || 80}/ISAPI/Streaming/channels/102/picture`;
+  const targetUrl = `${protocol}://${ip}:${port || 80}/ISAPI/Streaming/channels/102/picture`;
   const user = 'admin';
   const pass = '14526525aA@';
 
   try {
     // Helper function to fetch with axios to ignore self-signed certs
-    const fetchWithAxios = async (url: string, headers: any = {}) => {
+    const fetchWithAxios = async (url: string, headers: Record<string, string> = {}) => {
       try {
         const { default: axios } = await import('axios');
         const https = await import('https');
@@ -34,25 +38,20 @@ export async function GET(req: NextRequest) {
           validateStatus: () => true // Resolve all statuses
         });
         return res;
-      } catch (err: any) {
+      } catch (err) {
         throw err;
       }
     };
 
-    let initRes = await fetchWithAxios(targetUrl);
-    
-    // If HTTP connection reset or timeout, and port isn't 80, try HTTPS
-    if (initRes.status === 0 || !initRes.status) {
-       // axios throws on network error, so this might not be reached, but we catch it below.
-    }
+    const initRes = await fetchWithAxios(targetUrl);
 
     if (initRes.status === 200) {
-        return new NextResponse(initRes.data, {
-            headers: {
-              'Content-Type': responseContentType(initRes.headers['content-type']),
-              'Cache-Control': 'no-store, max-age=0',
-            }
-        });
+      return new NextResponse(initRes.data, {
+        headers: {
+          'Content-Type': getContentType(initRes.headers['content-type']),
+          'Cache-Control': 'no-store, max-age=0',
+        }
+      });
     }
 
     if (initRes.status === 401) {
@@ -61,30 +60,29 @@ export async function GET(req: NextRequest) {
         const realmMatch = wwwAuth.match(/realm="([^"]+)"/);
         const nonceMatch = wwwAuth.match(/nonce="([^"]+)"/);
         const qopMatch = wwwAuth.match(/qop="([^"]+)"/);
-        
+
         if (realmMatch && nonceMatch) {
           const realm = realmMatch[1];
           const nonce = nonceMatch[1];
           const qop = qopMatch ? qopMatch[1] : '';
-          
+
           const method = 'GET';
-          const uri = '/ISAPI/Streaming/channels/102/picture'; // FIXED URI
-          
+          const uri = '/ISAPI/Streaming/channels/102/picture';
+
           const ha1 = crypto.createHash('md5').update(`${user}:${realm}:${pass}`).digest('hex');
           const ha2 = crypto.createHash('md5').update(`${method}:${uri}`).digest('hex');
           const nc = '00000001';
           const cnonce = crypto.randomBytes(4).toString('hex');
           const response = crypto.createHash('md5').update(`${ha1}:${nonce}:${nc}:${cnonce}:auth:${ha2}`).digest('hex');
-          
-          const authHeader = `Digest username="${user}", realm="${realm}", nonce="${nonce}", uri="${uri}", qop=auth, nc=${nc}, cnonce="${cnonce}", response="${response}"`;
-          
-          // 2. Second request with Digest auth
+
+          const authHeader = `Digest username="${user}", realm="${realm}", nonce="${nonce}", uri="${uri}", qop=${qop || 'auth'}, nc=${nc}, cnonce="${cnonce}", response="${response}"`;
+
           const authRes = await fetchWithAxios(targetUrl, { 'Authorization': authHeader });
 
           if (authRes.status === 200) {
             return new NextResponse(authRes.data, {
               headers: {
-                'Content-Type': responseContentType(authRes.headers['content-type']),
+                'Content-Type': getContentType(authRes.headers['content-type']),
                 'Cache-Control': 'no-store, max-age=0',
               }
             });
@@ -92,15 +90,14 @@ export async function GET(req: NextRequest) {
           return new NextResponse(`Camera returned ${authRes.status}`, { status: authRes.status });
         }
       }
-      
-      // Basic auth fallback
+
       const basicAuth = 'Basic ' + Buffer.from(`${user}:${pass}`).toString('base64');
       const basicRes = await fetchWithAxios(targetUrl, { 'Authorization': basicAuth });
-      
+
       if (basicRes.status === 200) {
         return new NextResponse(basicRes.data, {
           headers: {
-            'Content-Type': responseContentType(basicRes.headers['content-type']),
+            'Content-Type': getContentType(basicRes.headers['content-type']),
             'Cache-Control': 'no-store, max-age=0',
           }
         });
@@ -109,67 +106,67 @@ export async function GET(req: NextRequest) {
     }
 
     return new NextResponse(`Failed to fetch from camera: ${initRes.status}`, { status: initRes.status });
-  } catch (err: any) {
-    // If HTTP fails, try HTTPS fallback
+  } catch (err) {
     if (!targetUrl.startsWith('https')) {
       try {
         const httpsUrl = `https://${ip}:${port || 443}/ISAPI/Streaming/channels/102/picture`;
         const { default: axios } = await import('axios');
         const https = await import('https');
-        
-        // Try initial HTTPS request to get auth header
+
         const httpsInitRes = await axios.get(httpsUrl, {
-           responseType: 'arraybuffer',
-           httpsAgent: new https.Agent({ rejectUnauthorized: false }),
-           timeout: 5000,
-           validateStatus: () => true
+          responseType: 'arraybuffer',
+          httpsAgent: new https.Agent({ rejectUnauthorized: false }),
+          timeout: 5000,
+          validateStatus: () => true
         });
 
         if (httpsInitRes.status === 401) {
-           const wwwAuth = httpsInitRes.headers['www-authenticate'];
-           if (wwwAuth && wwwAuth.includes('Digest')) {
-              const realmMatch = wwwAuth.match(/realm="([^"]+)"/);
-              const nonceMatch = wwwAuth.match(/nonce="([^"]+)"/);
-              
-              if (realmMatch && nonceMatch) {
-                const realm = realmMatch[1];
-                const nonce = nonceMatch[1];
-                const method = 'GET';
-                const uri = '/ISAPI/Streaming/channels/102/picture';
-                
-                const ha1 = crypto.createHash('md5').update(`${user}:${realm}:${pass}`).digest('hex');
-                const ha2 = crypto.createHash('md5').update(`${method}:${uri}`).digest('hex');
-                const nc = '00000001';
-                const cnonce = crypto.randomBytes(4).toString('hex');
-                const response = crypto.createHash('md5').update(`${ha1}:${nonce}:${nc}:${cnonce}:auth:${ha2}`).digest('hex');
-                
-                const authHeader = `Digest username="${user}", realm="${realm}", nonce="${nonce}", uri="${uri}", qop=auth, nc=${nc}, cnonce="${cnonce}", response="${response}"`;
-                
-                const authRes = await axios.get(httpsUrl, {
-                  headers: { 'Authorization': authHeader },
-                  responseType: 'arraybuffer',
-                  httpsAgent: new https.Agent({ rejectUnauthorized: false }),
-                  timeout: 5000,
-                  validateStatus: () => true
-                });
+          const wwwAuth = httpsInitRes.headers['www-authenticate'];
+          if (wwwAuth && wwwAuth.includes('Digest')) {
+            const realmMatch = wwwAuth.match(/realm="([^"]+)"/);
+            const nonceMatch = wwwAuth.match(/nonce="([^"]+)"/);
 
-                if (authRes.status === 200) {
-                  return new NextResponse(authRes.data, {
-                    headers: {
-                      'Content-Type': responseContentType(authRes.headers['content-type']),
-                      'Cache-Control': 'no-store, max-age=0',
-                    }
-                  });
-                }
-                return new NextResponse(`HTTPS Camera returned ${authRes.status}`, { status: authRes.status });
+            if (realmMatch && nonceMatch) {
+              const realm = realmMatch[1];
+              const nonce = nonceMatch[1];
+              const method = 'GET';
+              const uri = '/ISAPI/Streaming/channels/102/picture';
+
+              const ha1 = crypto.createHash('md5').update(`${user}:${realm}:${pass}`).digest('hex');
+              const ha2 = crypto.createHash('md5').update(`${method}:${uri}`).digest('hex');
+              const nc = '00000001';
+              const cnonce = crypto.randomBytes(4).toString('hex');
+              const response = crypto.createHash('md5').update(`${ha1}:${nonce}:${nc}:${cnonce}:auth:${ha2}`).digest('hex');
+
+              const authHeader = `Digest username="${user}", realm="${realm}", nonce="${nonce}", uri="${uri}", qop=auth, nc=${nc}, cnonce="${cnonce}", response="${response}"`;
+
+              const authRes = await axios.get(httpsUrl, {
+                headers: { 'Authorization': authHeader },
+                responseType: 'arraybuffer',
+                httpsAgent: new https.Agent({ rejectUnauthorized: false }),
+                timeout: 5000,
+                validateStatus: () => true
+              });
+
+              if (authRes.status === 200) {
+                return new NextResponse(authRes.data, {
+                  headers: {
+                    'Content-Type': getContentType(authRes.headers['content-type']),
+                    'Cache-Control': 'no-store, max-age=0',
+                  }
+                });
               }
-           }
+              return new NextResponse(`HTTPS Camera returned ${authRes.status}`, { status: authRes.status });
+            }
+          }
         }
         return new NextResponse(`Failed HTTPS proxy: ${httpsInitRes.status}`, { status: httpsInitRes.status });
-      } catch (httpsErr: any) {
-        return new NextResponse(`Proxy error (HTTP and HTTPS failed): ${httpsErr.message}`, { status: 500 });
+      } catch (httpsErr) {
+        const message = httpsErr instanceof Error ? httpsErr.message : String(httpsErr);
+        return new NextResponse(`Proxy error (HTTP and HTTPS failed): ${message}`, { status: 500 });
       }
     }
-    return new NextResponse(`Proxy error: ${err.message}`, { status: 500 });
+    const message = err instanceof Error ? err.message : String(err);
+    return new NextResponse(`Proxy error: ${message}`, { status: 500 });
   }
 }

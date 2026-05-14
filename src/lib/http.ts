@@ -1,6 +1,6 @@
 import authApi from "@/services/auth.service";
 import type { RootState, Store } from "@/store";
-import { logoutSuccess } from "@/store/slices/authSlice";
+import { loginSuccess, logoutSuccess } from "@/store/slices/authSlice";
 import axios, { InternalAxiosRequestConfig } from "axios";
 import { jwtDecode } from "jwt-decode";
 import { handleHttpError } from "./http-error";
@@ -17,9 +17,7 @@ const serializeParams = (params: Record<string, unknown>): string => {
     const searchParams = new URLSearchParams();
 
     Object.entries(params).forEach(([key, value]) => {
-        if (value === undefined || value === null) {
-            return;
-        }
+        if (value === undefined || value === null) return;
 
         if (Array.isArray(value)) {
             value.forEach((item) => {
@@ -35,12 +33,18 @@ const serializeParams = (params: Record<string, unknown>): string => {
 
     return searchParams.toString();
 };
+
 const http = axios.create({
     baseURL: process.env.NEXT_PUBLIC_API_URL,
     headers: { "Content-Type": "application/json" },
     withCredentials: true,
     paramsSerializer: (params) => serializeParams(params as Record<string, unknown>),
 });
+
+const AUTH_ENDPOINTS = {
+    LOGIN: "/auth/login",
+    REFRESH: "/auth/refresh",
+};
 
 const isTokenExpired = (token: string): boolean => {
     try {
@@ -52,43 +56,49 @@ const isTokenExpired = (token: string): boolean => {
     }
 };
 
-let refreshTokenPromise: Promise<any> | null = null;
+let refreshTokenPromise: Promise<string> | null = null;
+
+const handleRefreshToken = async (): Promise<string> => {
+    if (refreshTokenPromise) return refreshTokenPromise;
+
+    refreshTokenPromise = authApi.refreshToken()
+        .then((res) => {
+            const newToken = res.data.accessToken;
+            storeInstance?.dispatch(
+                loginSuccess({
+                    user_id: res.data.user_id,
+                    role: res.data.role,
+                    role_id: res.data.role_id,
+                    accessToken: newToken,
+                    user_full_name: res.data.user_full_name,
+                    permissions: res.data.permissions,
+                })
+            );
+            return newToken;
+        })
+        .catch((err) => {
+            storeInstance?.dispatch(logoutSuccess());
+            throw err;
+        })
+        .finally(() => {
+            refreshTokenPromise = null;
+        });
+
+    return refreshTokenPromise;
+};
 
 http.interceptors.request.use(async (config: InternalAxiosRequestConfig) => {
+    const isAuthRequest = config.url?.includes(AUTH_ENDPOINTS.LOGIN) || config.url?.includes(AUTH_ENDPOINTS.REFRESH);
+
     const state: RootState | undefined = storeInstance?.getState();
     let token = state?.auth?.token;
 
-    if (token) {
+    if (!isAuthRequest && token) {
         if (isTokenExpired(token)) {
-            if (!refreshTokenPromise) {
-                refreshTokenPromise = authApi.refreshToken()
-                    .then((res) => {
-                        const newToken = res.data.accessToken;
-                        storeInstance?.dispatch({
-                            type: "auth/login/fulfilled",
-                            payload: {
-                                user_id: res.data.user_id,
-                                role: res.data.role,
-                                role_id: res.data.role_id,
-                                accessToken: newToken,
-                                user_full_name: res.data.user_full_name,
-                            },
-                        });
-                        return newToken;
-                    })
-                    .catch((err) => {
-                        storeInstance?.dispatch(logoutSuccess());
-                        throw err;
-                    })
-                    .finally(() => {
-                        refreshTokenPromise = null;
-                    });
-            }
-
             try {
-                token = await refreshTokenPromise;
+                token = await handleRefreshToken();
             } catch (err) {
-                return config;
+                return Promise.reject(err);
             }
         }
 
@@ -108,46 +118,22 @@ http.interceptors.response.use(
 
         // If 401 or 403 error and hasn't retried yet
         if ((status === 401 || status === 403) && !originalRequest._retry) {
-            // Do not retry if the request is refresh or login itself
-            if (originalRequest.url?.includes("/auth/refresh") || originalRequest.url?.includes("/auth/login")) {
+            const isAuthRequest = originalRequest.url?.includes(AUTH_ENDPOINTS.LOGIN) || originalRequest.url?.includes(AUTH_ENDPOINTS.REFRESH);
+            
+            if (isAuthRequest) {
                 return handleHttpError(error);
             }
 
             originalRequest._retry = true;
 
-            if (!refreshTokenPromise) {
-                refreshTokenPromise = authApi.refreshToken()
-                    .then((res) => {
-                        const newToken = res.data.accessToken;
-                        storeInstance?.dispatch({
-                            type: "auth/login/fulfilled",
-                            payload: {
-                                user_id: res.data.user_id,
-                                role: res.data.role,
-                                role_id: res.data.role_id,
-                                accessToken: newToken,
-                                user_full_name: res.data.user_full_name,
-                            },
-                        });
-                        return newToken;
-                    })
-                    .catch((err) => {
-                        storeInstance?.dispatch(logoutSuccess());
-                        throw err;
-                    })
-                    .finally(() => {
-                        refreshTokenPromise = null;
-                    });
-            }
-
             try {
-                const newToken = await refreshTokenPromise;
+                const newToken = await handleRefreshToken();
                 if (originalRequest.headers) {
                     originalRequest.headers.Authorization = `Bearer ${newToken}`;
                 }
                 return http(originalRequest);
-            } catch (retryError) {
-                return Promise.reject(retryError);
+            } catch (retryError: any) {
+                return handleHttpError(retryError);
             }
         }
 

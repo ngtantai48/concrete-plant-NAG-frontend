@@ -61,8 +61,7 @@ export function useNearbyVehicles(
             distance: Math.round(dist),
             inRange: dist <= radiusMeters,
           };
-        })
-        .sort((a, b) => a.distance - b.distance);
+        });
 
       setVehicles(results);
       setLastUpdated(new Date());

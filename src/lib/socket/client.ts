@@ -23,7 +23,7 @@ interface SocketConfig {
 
 const DEFAULT_CONFIG: SocketConfig = {
   transports: ['websocket'],
-  autoConnect: true,
+  autoConnect: false,
   reconnection: true,
   reconnectionDelay: 1000,
   reconnectionDelayMax: 5000,
@@ -45,6 +45,7 @@ export class SocketManager {
   private eventListeners = new Map<string, Set<Function>>();
   private reconnectAttempts = 0;
   private authProvider?: () => string | undefined;
+  private visibilityHandler: (() => void) | null = null;
 
   private constructor(namespace: string, config?: Partial<SocketConfig>) {
     const baseUrl = process.env.NEXT_PUBLIC_SOCKET_URL;
@@ -93,28 +94,23 @@ export class SocketManager {
    * Kết nối tới server (lazy connect)
    */
   connect(): Socket {
-    if (this.socket?.connected) {
-      return this.socket;
+    const socket = this.ensureSocket();
+
+    if (socket.connected) {
+      return socket;
     }
 
-    this.socket = io(this.connectionUrl, {
-      ...this.config,
-      auth: (cb: (data: Record<string, string>) => void) => {
-        const token = this.authProvider?.();
-        cb(token ? { token: `Bearer ${token}` } : {});
-      },
-    });
+    this.setupVisibilityHandler();
+    socket.connect();
 
-    this.setupConnectionEvents();
-    this.socket.connect();
-
-    return this.socket;
+    return socket;
   }
 
   /**
    * Ngắt kết nối và cleanup
    */
   disconnect(): void {
+    this.teardownVisibilityHandler();
     if (this.socket) {
       this.socket.removeAllListeners();
       this.socket.disconnect();
@@ -132,10 +128,7 @@ export class SocketManager {
     eventName: EventName,
     handler: Function
   ): () => void {
-    if (!this.socket) {
-      console.warn(`[SocketManager] Cannot register listener "${String(eventName)}" - socket not connected`);
-      return () => { };
-    }
+    const socket = this.ensureSocket();
 
     const key = String(eventName);
     if (!this.eventListeners.has(key)) {
@@ -151,12 +144,12 @@ export class SocketManager {
       }
     };
 
-    this.socket.on(key, eventHandler);
+    socket.on(key, eventHandler);
 
     // Return unsubscribe function
     return () => {
       this.eventListeners.get(key)?.delete(handler);
-      this.socket?.off(key, eventHandler);
+      socket.off(key, eventHandler);
     };
   }
 
@@ -165,15 +158,12 @@ export class SocketManager {
    * Trả về unsubscribe function
    */
   onAny(handler: (eventName: string, ...args: unknown[]) => void): () => void {
-    if (!this.socket) {
-      console.warn('[SocketManager] Cannot register onAny listener - socket not connected');
-      return () => { };
-    }
+    const socket = this.ensureSocket();
 
-    this.socket.onAny(handler);
+    socket.onAny(handler);
 
     return () => {
-      this.socket?.offAny(handler);
+      socket.offAny(handler);
     };
   }
 
@@ -214,7 +204,14 @@ export class SocketManager {
    * Force reconnect (chỉ dùng khi cần thiết, ví dụ: token mới)
    */
   reconnect(): void {
-    this.disconnect();
+    if (!this.socket) {
+      this.connect();
+      return;
+    }
+
+    this.socket.disconnect();
+    this.isConnectedState = false;
+    this.notifyConnectionListeners(false);
     // Delay nhỏ để đảm bảo cleanup hoàn tất
     setTimeout(() => this.connect(), 100);
   }
@@ -223,11 +220,31 @@ export class SocketManager {
   // Private Methods
   // ============================================================
 
+  private ensureSocket(): Socket {
+    if (this.socket) {
+      return this.socket;
+    }
+
+    this.socket = io(this.connectionUrl, {
+      ...this.config,
+      autoConnect: false,
+      auth: (cb: (data: Record<string, string>) => void) => {
+        const token = this.authProvider?.();
+        cb(token ? { token: `Bearer ${token}` } : {});
+      },
+    });
+
+    this.setupConnectionEvents();
+    this.setupVisibilityHandler();
+
+    return this.socket;
+  }
+
   private setupConnectionEvents(): void {
     if (!this.socket) return;
 
     this.socket.on('connect', () => {
-      console.log(`[SocketManager] Connected to ${this.connectionUrl}`);
+      // console.log(`[SocketManager] Connected to ${this.connectionUrl}`);
       this.isConnectedState = true;
       this.reconnectAttempts = 0;
       this.notifyConnectionListeners(true);
@@ -248,6 +265,39 @@ export class SocketManager {
         console.warn('[SocketManager] Too many reconnect attempts, token may be expired');
       }
     });
+  }
+
+  /**
+   * Đăng ký visibilitychange listener để tự động reconnect khi tab trở lại foreground.
+   * Giải quyết vấn đề browser throttle timers ở background tab khiến server timeout ping/pong
+   * và ngắt kết nối. Khi user chuyển lại tab, handler kiểm tra ngay và reconnect nếu cần.
+   */
+  private setupVisibilityHandler(): void {
+    if (typeof document === 'undefined') return; // SSR guard
+    if (this.visibilityHandler) return; // Tránh đăng ký nhiều lần
+
+    this.visibilityHandler = () => {
+      if (document.visibilityState === 'visible') {
+        // Tab vừa trở lại foreground
+        if (this.socket && !this.socket.connected) {
+          // console.log(`[SocketManager] Tab visible — socket disconnected, reconnecting ${this.connectionUrl}`);
+          this.socket.connect();
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', this.visibilityHandler);
+  }
+
+  /**
+   * Gỡ bỏ visibilitychange listener khi disconnect
+   */
+  private teardownVisibilityHandler(): void {
+    if (typeof document === 'undefined') return;
+    if (this.visibilityHandler) {
+      document.removeEventListener('visibilitychange', this.visibilityHandler);
+      this.visibilityHandler = null;
+    }
   }
 
   private notifyConnectionListeners(connected: boolean): void {

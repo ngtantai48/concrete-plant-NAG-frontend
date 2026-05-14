@@ -2,31 +2,24 @@ export const ROUTES = {
   LOGIN: "/login",
 };
 
-export const ADMIN = {
-  DASHBOARD: "/admin/dashboard",
-  AI_ASSISTANT: "/admin/ai-assistant",
-  USER_MANAGE: "/admin/user-manage",
-  END_OF_DAY_VEHICLES: "/admin/end-of-day-vehicles",
-  DRIVERS: "/admin/drivers",
-  VEHICLES: "/admin/vehicles",
-  VEHICLE_TYPES: "/admin/vehicle-types",
-  STATIONS: "/admin/stations",
-  VEHICLE_MAINTENANCES: "/admin/vehicle-maintenances",
-  PROFILE: "/profile",
-  DRIVER_DISPLAY: "/admin/driver-display",
-  MEAL_CHECK: "/admin/meal-check",
-  ATTENDANCE: "/admin/attendance",
-  SHIFT_SLOTS: "/admin/shift-slots",
+export const SIDEBAR = {
+  DASHBOARD: "/dashboard",
+  AI_ASSISTANT: "/ai-assistant",
+  END_OF_DAY_VEHICLES: "/end-of-day-vehicles",
+  DRIVERS: "/drivers",
+  VEHICLES: "/vehicles",
+  VEHICLE_TYPES: "/vehicle-types",
+  STATIONS: "/stations",
+  VEHICLE_MAINTENANCES: "/vehicle-maintenances",
+  DRIVER_DISPLAY: "/driver-display",
+  MEAL_CHECK: "/meal-check",
+  ATTENDANCE: "/attendance",
+  SHIFT_SLOTS: "/shift-slots",
+  SYSTEM_SETTINGS: "/system-settings",
+  USER_MANAGE: "/user-manage",
+  ROLE_PERMISSIONS: "/role-permissions",
 };
 
 export const SHARE = {
   PROFILE: "/profile",
-};
-
-export const CUSTOMER = {
-  DASHBOARD: "/customer/dashboard",
-};
-
-export const USER = {
-  DASHBOARD: "/user/dashboard",
 };

@@ -8,33 +8,49 @@ export interface ListVehicles {
   limit: number;
 }
 
-export interface EndOfDayVehicleStatus {
+export interface EndOfDayVehicle {
   vehicle_id: number;
-  vehicle_license_plate?: string | null;
-  vehicle_name?: string | null;
-  driver_name?: string | null;
-  final_status?: string | null;
-  is_abnormal?: boolean;
-  finished_at?: string | null;
-  station_name?: string | null;
+  vehicle_name: string;
+  vehicle_license_plate: string;
+  driver_name: string;
+  final_status: string;
+  is_abnormal: boolean;
+  finished_at: string | null;
+  operation_note: string;
+  operation_notes?: string[];
+  operation_items?: EndOfDayOperationItem[];
+  abnormal_notes?: string[];
+  abnormal_event_items?: EndOfDayOperationItem[];
+  order_id: number;
+  order_number: number;
+  order_status: string;
+  station_name: string;
+}
+
+export interface EndOfDayOperationItem {
+  event: string;
+  message: string;
+  level: "warning" | "info" | "status" | string;
+  occurred_at?: string | null;
   order_id?: number | null;
+  station_name?: string | null;
 }
 
 export interface EndOfDayStatusResponse {
-  date?: string;
-  total?: number;
-  abnormal_total?: number;
-  vehicles?: EndOfDayVehicleStatus[];
+  date: string;
+  total: number;
+  abnormal_total: number;
+  vehicles: EndOfDayVehicle[];
 }
 
 const vehicleApi = {
-  getAll: (params?: { page?: number; limit?: number; vehicle_license_plate?: string; vehicle_status?: string; user_id?: number }) => 
+  getAll: (params?: { page?: number; limit?: number; vehicle_license_plate?: string; vehicle_status?: string; user_id?: number }) =>
     http.get<ListVehicles>("/vehicles", { params }),
-  getEndOfDayStatus: () => http.get<EndOfDayStatusResponse>("/vehicles/end-of-day-status"),
   getById: (id: number) => http.get(`/vehicles/${id}`),
   create: (data: Partial<Vehicle>) => http.post("/vehicles", data),
   update: (id: number, data: Partial<Vehicle>) => http.put(`/vehicles/${id}`, data),
   delete: (id: number) => http.delete(`/vehicles/${id}`),
+  getEndOfDayStatus: () => http.get<EndOfDayStatusResponse>("/vehicles/end-of-day-status"),
 };
 
 export default vehicleApi;

@@ -3,7 +3,6 @@ import { isStationHeartbeat, validateDevicePayload } from "@/lib/socket/schema";
 import type { DeviceStationStatus as DeviceStationStatusType, DeviceUpdatePayload } from "@/lib/socket/types";
 import { useEffect, useMemo, useRef, useState } from "react";
 
-// Re-export để backward compatible
 export type { DeviceStationStatusType as DeviceStationStatus, DeviceUpdatePayload };
 
 interface DeviceHeartbeatState {
@@ -12,8 +11,19 @@ interface DeviceHeartbeatState {
   stationStatusMap: Record<string, DeviceStationStatusType>;
 }
 
-// Persist the status map across component unmounts/remounts
 let globalStationStatusMap: Record<string, DeviceStationStatusType> = {};
+
+type DeviceConnectionStatus = "connected" | "disconnected";
+
+const CONNECTED_VALUES = new Set(["connected", "online", "up", "true", "1"]);
+const DISCONNECTED_VALUES = new Set(["disconnected", "offline", "down", "false", "0"]);
+
+function normalizeConnectionStatus(value: unknown): DeviceConnectionStatus | null {
+  const status = String(value ?? "").trim().toLowerCase();
+  if (CONNECTED_VALUES.has(status)) return "connected";
+  if (DISCONNECTED_VALUES.has(status)) return "disconnected";
+  return null;
+}
 
 export function useDeviceHeartbeat(): DeviceHeartbeatState {
   const managerRef = useRef<SocketManager | null>(null);
@@ -23,13 +33,10 @@ export function useDeviceHeartbeat(): DeviceHeartbeatState {
   const bufferRef = useRef<Record<string, Partial<DeviceStationStatusType>>>({});
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Initialize socket manager (singleton - shares /updates namespace with useRealtimeUpdates)
   useEffect(() => {
     const socketUrl = process.env.NEXT_PUBLIC_SOCKET_URL;
     if (!socketUrl) return;
 
-    // Sử dụng cùng instance 'updates' với useRealtimeUpdates
-    // SocketManager đảm bảo chỉ 1 connection per namespace
     const manager = SocketManager.getInstance('updates', {
       reconnectionDelay: 2000,
       reconnectionDelayMax: 5000,
@@ -37,33 +44,18 @@ export function useDeviceHeartbeat(): DeviceHeartbeatState {
 
     managerRef.current = manager;
 
-    // Connection state listener
     const unsubscribeConnection = manager.onConnectionChange((connected) => {
       setIsSocketConnected(connected);
     });
 
-    // Connect
-    manager.connect();
-
-    return () => {
-      unsubscribeConnection();
-    };
-  }, []);
-
-  // Setup event listeners
-  useEffect(() => {
-    const manager = managerRef.current;
-    if (!manager || !isSocketConnected) return;
-
     const unsubscribes: Array<() => void> = [];
 
-    // Trigger update batching
     const scheduleUpdate = () => {
       if (!timeoutRef.current) {
         timeoutRef.current = setTimeout(() => {
           setStationStatusMap((prev) => {
             const flushed = { ...bufferRef.current };
-            bufferRef.current = {}; // clear buffer ngay lập tức để nhận event mới
+            bufferRef.current = {};
 
             if (Object.keys(flushed).length === 0) return prev;
 
@@ -72,8 +64,7 @@ export function useDeviceHeartbeat(): DeviceHeartbeatState {
               const existing = nextMap[stationId] || {
                 stationId,
                 deviceStatus: "disconnected",
-                cameraStatus: "disconnected",
-                ledStatus: "disconnected",
+                lastPayload: null,
               };
 
               nextMap[stationId] = { ...existing, ...flushed[stationId] };
@@ -84,11 +75,10 @@ export function useDeviceHeartbeat(): DeviceHeartbeatState {
           });
 
           timeoutRef.current = null;
-        }, 800); // Batch các thay đổi trong 800ms
+        }, 800);
       }
     };
 
-    // Handle heartbeat payloads
     const handleHeartbeat = (rawPayload: unknown) => {
       const payload = validateDevicePayload(rawPayload);
 
@@ -97,19 +87,31 @@ export function useDeviceHeartbeat(): DeviceHeartbeatState {
       }
 
       const stationId = String(payload!.station_id);
-      const deviceStatus = payload!.device_status === "connected" ? "connected" : "disconnected";
+      const deviceStatus = normalizeConnectionStatus(payload!.device_status);
+      if (!deviceStatus) return;
 
-      // Lưu partial update vào bufferRef thay vì setState
+      const updateType = payload!.update_type;
+      const nextStatus: Partial<DeviceStationStatusType> = {
+        deviceStatus,
+        lastPayload: payload!,
+      };
+
+      if (updateType === "camera_checks") {
+        nextStatus.cameraStatus = deviceStatus;
+      }
+
+      if (updateType === "led_checks" || updateType === "led" || updateType === "led_status") {
+        nextStatus.ledStatus = deviceStatus;
+      }
+
       bufferRef.current[stationId] = {
         ...(bufferRef.current[stationId] || {}),
-        deviceStatus: deviceStatus,
-        lastPayload: payload!,
+        ...nextStatus,
       };
 
       scheduleUpdate();
     };
 
-    // Handle camera-status events
     const handleCameraStatus = (rawPayload: unknown) => {
       let payload = rawPayload;
       if (typeof rawPayload === 'string') {
@@ -121,18 +123,14 @@ export function useDeviceHeartbeat(): DeviceHeartbeatState {
         }
       }
 
-      // Chuẩn hóa payload về một mảng chứa dữ liệu các trạm
       let itemsToProcess: any[] = [];
 
       if (Array.isArray(payload)) {
-        // Nếu payload bị bọc thêm 1 lớp mảng (ví dụ: `[[{station_id: 1}]]`)
         itemsToProcess = Array.isArray(payload[0]) ? payload[0] : payload;
       } else if (payload && typeof payload === 'object') {
-        // Nếu chỉ là một object duy nhất (khi server thay đổi trạng thái 1 trạm)
         if ('station_id' in payload || 'id' in payload) {
           itemsToProcess = [payload];
         } else {
-          // Fallback (cố gắng tìm mảng bên trong object)
           const dataArr = Object.values(payload).find(val => Array.isArray(val));
           if (dataArr) {
             itemsToProcess = dataArr as any[];
@@ -148,12 +146,12 @@ export function useDeviceHeartbeat(): DeviceHeartbeatState {
           const stationId = String(item.station_id || item.id || "");
           if (!stationId) return;
 
-          const statusStr = String(item.status || item.device_status || "").trim().toLowerCase();
-          const status = statusStr === "connected" ? "connected" : "disconnected";
+          const status = normalizeConnectionStatus(item.status ?? item.device_status);
+          if (!status) return;
 
           bufferRef.current[stationId] = {
             ...(bufferRef.current[stationId] || {}),
-            deviceStatus: status, // Giữ tương thích với cấu trúc hiện tại
+            deviceStatus: status,
             cameraStatus: status,
             lastPayload: item,
           };
@@ -166,36 +164,36 @@ export function useDeviceHeartbeat(): DeviceHeartbeatState {
       }
     };
 
-    // Register 'camera-status' listener
     unsubscribes.push(
       manager.on('camera-status', (payload: unknown) => {
         handleCameraStatus(payload);
       })
     );
 
-    // Catch-all for heartbeat events
     unsubscribes.push(
       manager.onAny((eventName, payload) => {
         if (eventName === 'camera-status') {
-          return; // Already handled above
+          return;
         }
 
         handleHeartbeat(payload);
       })
     );
 
+    manager.connect();
+
     return () => {
+      unsubscribeConnection();
       unsubscribes.forEach((unsub) => unsub());
       if (timeoutRef.current) {
         clearTimeout(timeoutRef.current);
         timeoutRef.current = null;
       }
     };
-  }, [isSocketConnected]);
+  }, []);
 
   const isLedConnected = useMemo(() => {
-    // Theo backend, station_id = 4 là tín hiệu của LED
-    return stationStatusMap["4"]?.deviceStatus === "connected";
+    return stationStatusMap["4"]?.ledStatus === "connected";
   }, [stationStatusMap]);
 
   return useMemo(
