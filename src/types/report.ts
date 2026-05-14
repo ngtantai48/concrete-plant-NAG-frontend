@@ -20,3 +20,53 @@ export interface MaintenanceForecastResponse {
   total?: number;
   items?: MaintenanceForecastItem[];
 }
+
+export type AiReportContext = "fleet" | "production" | "maintenance";
+
+export interface AiReportTurn {
+  id: string;
+  role: "user" | "assistant";
+  text: string;
+  createdAt: string;
+  status?: "streaming" | "done" | "error";
+  totalMs?: number;
+}
+
+export interface AiReportBlock {
+  id: string;
+  type: string;
+  title?: string;
+  createdAt: string;
+  data: unknown;
+}
+
+export interface CreateAiReportPayload {
+  conversationId: string;
+  title: string;
+  createdAt: string;
+  lastMessageAt: string;
+  activeContext: AiReportContext;
+  shareUrl?: string;
+  turns: AiReportTurn[];
+  blocks: AiReportBlock[];
+}
+
+export interface AiGeneratedReport {
+  id: string;
+  conversationId: string;
+  title: string;
+  createdAt: string;
+  filename: string;
+  format: "pdf";
+  mimeType: "application/pdf";
+  markdown: string;
+  html?: string;
+  blockCount: number;
+  turnCount: number;
+  sizeBytes?: number;
+}
+
+export interface CreateAiReportResponse extends AiGeneratedReport {
+  pdfBase64: string;
+  sizeBytes: number;
+}

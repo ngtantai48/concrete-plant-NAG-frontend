@@ -45,8 +45,10 @@ import { persist } from "zustand/middleware";
 
 import { cn } from "@/lib/utils";
 import chatApi from "@/services/chat.service";
+import reportApi from "@/services/report.service";
 import type { ToolResult } from "@/services/chat-tools/types";
 import type { ChatMessage as ApiChatMessage } from "@/types/chat";
+import type { AiGeneratedReport, AiReportBlock, CreateAiReportPayload } from "@/types/report";
 
 import { ReasoningTree } from "./ReasoningTree";
 import { RenderBlock } from "./RenderBlock";
@@ -106,6 +108,7 @@ type RendererStore = {
   conversations: Conversation[];
   currentConversationId: string;
   pinnedBlocks: PinnedBlock[];
+  savedReports: AiGeneratedReport[];
   feedback: Record<string, FeedbackVote>;
   inspectorOpen: boolean;
   activeContext: WorkContext;
@@ -113,6 +116,7 @@ type RendererStore = {
   createConversation: () => string;
   deleteConversation: (conversationId: string) => void;
   replaceConversationPins: (conversationId: string, blocks: PinnedBlock[]) => void;
+  saveReport: (report: AiGeneratedReport) => void;
   selectConversation: (conversationId: string) => void;
   setConversationTitle: (conversationId: string, title: string) => void;
   setFeedback: (turnId: string, vote: FeedbackVote) => void;
@@ -189,6 +193,7 @@ const useRendererStore = create<RendererStore>()(
       inspectorOpen: true,
       activeContext: "fleet",
       pinnedBlocks: [],
+      savedReports: [],
       appendTurn: (conversationId, turn) =>
         set((state) => ({
           conversations: state.conversations.map((conversation) =>
@@ -226,6 +231,13 @@ const useRendererStore = create<RendererStore>()(
             ...state.pinnedBlocks.filter((block) => block.conversationId !== conversationId),
             ...blocks,
           ],
+        })),
+      saveReport: (report) =>
+        set((state) => ({
+          savedReports: [
+            report,
+            ...state.savedReports.filter((item) => item.id !== report.id),
+          ].slice(0, 20),
         })),
       selectConversation: (conversationId) => set({ currentConversationId: conversationId }),
       setConversationTitle: (conversationId, title) =>
@@ -276,6 +288,7 @@ const useRendererStore = create<RendererStore>()(
         inspectorOpen: state.inspectorOpen,
         activeContext: state.activeContext,
         pinnedBlocks: state.pinnedBlocks,
+        savedReports: state.savedReports,
       }),
     },
   ),
@@ -360,8 +373,30 @@ function stringifyCell(value: unknown): string {
   return JSON.stringify(value);
 }
 
+function isEditableTarget(target: EventTarget | null) {
+  if (!(target instanceof HTMLElement)) return false;
+  return Boolean(target.closest("input, textarea, select, [contenteditable='true']"));
+}
+
 function copyText(value: string) {
   return navigator.clipboard?.writeText(value).catch(() => undefined);
+}
+
+function downloadBase64File(filename: string, base64: string, mimeType: string) {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let index = 0; index < binary.length; index += 1) {
+    bytes[index] = binary.charCodeAt(index);
+  }
+  const blob = new Blob([bytes], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(url);
 }
 
 function buildShareUrl(conversationId: string, turnId?: string) {
@@ -371,6 +406,49 @@ function buildShareUrl(conversationId: string, turnId?: string) {
   url.searchParams.set("conversation", conversationId);
   if (turnId) url.hash = turnId;
   return url.toString();
+}
+
+function getRenderBlockTitle(data: RenderBlockData) {
+  return "title" in data && typeof data.title === "string" ? data.title : undefined;
+}
+
+function buildBlocksSummary(blocks: PinnedBlock[]) {
+  if (blocks.length === 0) return "Chưa có khối trực quan nào trong cuộc trò chuyện.";
+  return [
+    `Tóm tắt vận hành có ${blocks.length} khối trực quan:`,
+    ...blocks.map((block, index) => `${index + 1}. ${getRenderBlockTitle(block.data) ?? block.data.type} (${block.data.type})`),
+  ].join("\n");
+}
+
+function buildReportPayload(
+  conversation: Conversation,
+  blocks: PinnedBlock[],
+  activeContext: WorkContext,
+  shareUrl: string,
+): CreateAiReportPayload {
+  return {
+    conversationId: conversation.id,
+    title: conversation.title,
+    createdAt: conversation.createdAt,
+    lastMessageAt: conversation.lastMessageAt,
+    activeContext,
+    shareUrl,
+    turns: conversation.turns.map((turn) => ({
+      id: turn.id,
+      role: turn.role,
+      text: turn.text,
+      createdAt: turn.createdAt,
+      status: turn.role === "assistant" ? turn.status : undefined,
+      totalMs: turn.role === "assistant" ? turn.totalMs : undefined,
+    })),
+    blocks: blocks.map((block): AiReportBlock => ({
+      id: block.blockId,
+      type: block.data.type,
+      title: getRenderBlockTitle(block.data),
+      createdAt: block.createdAt,
+      data: block.data,
+    })),
+  };
 }
 
 function LogoMark({
@@ -603,16 +681,20 @@ function TopBar({
   inspectorOpen,
   onContextChange,
   onQuickAction,
+  onSaveReport,
   onToggleInspector,
   readOnly,
+  reportSaving,
   shareUrl,
 }: {
   activeContext: WorkContext;
   inspectorOpen: boolean;
   onContextChange: (context: WorkContext) => void;
   onQuickAction: (message: string) => void;
+  onSaveReport: () => void;
   onToggleInspector: () => void;
   readOnly: boolean;
+  reportSaving: boolean;
   shareUrl: string;
 }) {
   return (
@@ -668,14 +750,12 @@ function TopBar({
         </button>
         <button
           className="hidden h-8 items-center gap-1.5 rounded-lg border border-black/10 px-2.5 text-[12px] font-semibold text-zinc-600 transition hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-[#007AFF]/35 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/10 dark:text-zinc-300 dark:hover:bg-white/10 lg:flex"
-          disabled={readOnly}
-          onClick={() => {
-            void fetch("/api/reports", { method: "POST" }).catch(() => undefined);
-            onQuickAction("Đang chuẩn bị báo cáo");
-          }}
+          disabled={readOnly || reportSaving}
+          onClick={onSaveReport}
           type="button"
         >
-          <Download size={13} /> Lưu báo cáo
+          {reportSaving ? <Loader2 className="animate-spin" size={13} /> : <Download size={13} />}
+          {reportSaving ? "Đang tạo" : "Lưu báo cáo"}
         </button>
         <button
           aria-label={inspectorOpen ? "Ẩn bảng ngữ cảnh" : "Hiện bảng ngữ cảnh"}
@@ -1092,21 +1172,76 @@ function ChatColumn({
 function Inspector({
   blocks,
   onQuickAction,
+  onSaveReport,
   readOnly,
   reasoning,
 }: {
   blocks: PinnedBlock[];
   onQuickAction: (message: string) => void;
+  onSaveReport: () => void;
   readOnly: boolean;
   reasoning: ReasoningStep[];
 }) {
   const [tab, setTab] = useState<InspectorTab>("tools");
   const chartBlocks = blocks.filter((block) => inspectorChartTypes.has(block.data.type));
+  const actions = useMemo(
+    () => [
+      {
+        icon: <FileText size={14} />,
+        key: "r",
+        label: "Tạo báo cáo ca hiện tại",
+        run: () => onSaveReport(),
+        shortcut: "R",
+      },
+      {
+        icon: <BarChart3 size={14} />,
+        key: "b",
+        label: "Mở biểu đồ tương tác",
+        run: () => {
+          setTab("charts");
+          onQuickAction("Đã mở tab Biểu đồ");
+        },
+        shortcut: "B",
+      },
+      {
+        icon: <Clipboard size={14} />,
+        key: "c",
+        label: "Sao chép tóm tắt vận hành",
+        run: () => {
+          void copyText(buildBlocksSummary(blocks));
+          onQuickAction("Đã sao chép tóm tắt vận hành");
+        },
+        shortcut: "C",
+      },
+      {
+        icon: <Wrench size={14} />,
+        key: "m",
+        label: "Kiểm tra bảo trì xe ghim",
+        run: () => onQuickAction("Đang kiểm tra bảo trì xe ghim"),
+        shortcut: "M",
+      },
+    ],
+    [blocks, onQuickAction, onSaveReport],
+  );
   const tabs: Array<{ key: InspectorTab; label: string; icon: ReactNode }> = [
     { key: "tools", label: "Công cụ", icon: <Activity size={13} /> },
     { key: "charts", label: "Biểu đồ", icon: <BarChart3 size={13} /> },
     { key: "actions", label: "Hành động", icon: <Gauge size={13} /> },
   ];
+
+  useEffect(() => {
+    if (tab !== "actions" || readOnly) return undefined;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey || isEditableTarget(event.target)) return;
+      const action = actions.find((item) => item.key === event.key.toLowerCase());
+      if (!action) return;
+      event.preventDefault();
+      action.run();
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [actions, readOnly, tab]);
 
   return (
     <aside className="fixed inset-x-0 bottom-0 z-50 flex max-h-[52vh] min-w-0 flex-col overflow-hidden rounded-t-2xl border-t border-black/10 bg-white shadow-2xl dark:border-white/10 dark:bg-zinc-950 lg:static lg:max-h-none lg:w-[340px] lg:rounded-none lg:border-l lg:border-t-0 lg:shadow-none">
@@ -1227,23 +1362,24 @@ function Inspector({
 
         {tab === "actions" && (
           <div className="space-y-2">
-            {[
-              { icon: <FileText size={14} />, label: "Tạo báo cáo ca hiện tại", message: "Đang chuẩn bị báo cáo ca" },
-              { icon: <BarChart3 size={14} />, label: "Mở biểu đồ tương tác", message: "Đang mở canvas biểu đồ" },
-              { icon: <Clipboard size={14} />, label: "Sao chép tóm tắt vận hành", message: "Đã sao chép tóm tắt" },
-              { icon: <Wrench size={14} />, label: "Kiểm tra bảo trì xe ghim", message: "Đang kiểm tra bảo trì" },
-            ].map((action) => (
+            <div className="rounded-xl border border-[rgba(0,122,255,0.16)] bg-[rgba(0,122,255,0.05)] px-3 py-2 text-[11px] font-semibold text-zinc-500 dark:border-[rgba(109,180,255,0.20)] dark:bg-[rgba(0,122,255,0.10)] dark:text-zinc-300">
+              Dùng phím <Kbd>R</Kbd> <Kbd>B</Kbd> <Kbd>C</Kbd> <Kbd>M</Kbd> khi tab Hành động đang mở.
+            </div>
+            {actions.map((action) => (
               <button
-                className="flex w-full items-center gap-2 rounded-xl border border-black/10 bg-zinc-50 p-2.5 text-left text-[12px] font-bold text-zinc-800 transition hover:border-[#007AFF]/40 hover:bg-white focus:outline-none focus:ring-2 focus:ring-[#007AFF]/35 dark:border-white/10 dark:bg-white/[0.04] dark:text-zinc-100 dark:hover:bg-white/[0.08]"
+                className="group flex w-full items-center gap-2 rounded-xl border border-black/10 bg-zinc-50 p-2.5 text-left text-[12px] font-bold text-zinc-800 transition hover:border-[#007AFF]/40 hover:bg-white focus:outline-none focus:ring-2 focus:ring-[#007AFF]/35 dark:border-white/10 dark:bg-white/[0.04] dark:text-zinc-100 dark:hover:bg-white/[0.08]"
                 disabled={readOnly}
                 key={action.label}
-                onClick={() => onQuickAction(action.message)}
+                onClick={action.run}
                 type="button"
               >
                 <span className="grid size-7 place-items-center rounded-lg bg-white text-[#0A66E0] dark:bg-zinc-950 dark:text-[#6DB4FF]">
                   {action.icon}
                 </span>
-                {action.label}
+                <span className="min-w-0 flex-1">{action.label}</span>
+                <span className="rounded-md border border-black/10 bg-white px-2 py-1 font-mono text-[10px] text-zinc-400 transition group-hover:border-[#007AFF]/25 group-hover:text-[#0A66E0] dark:border-white/10 dark:bg-zinc-950 dark:group-hover:text-[#6DB4FF]">
+                  {action.shortcut}
+                </span>
               </button>
             ))}
             {blocks.length > 0 && (
@@ -1277,6 +1413,7 @@ export function RendererShell() {
   const createConversation = useRendererStore((state) => state.createConversation);
   const deleteConversation = useRendererStore((state) => state.deleteConversation);
   const replaceConversationPins = useRendererStore((state) => state.replaceConversationPins);
+  const saveReport = useRendererStore((state) => state.saveReport);
   const selectConversation = useRendererStore((state) => state.selectConversation);
   const setConversationTitle = useRendererStore((state) => state.setConversationTitle);
   const setFeedback = useRendererStore((state) => state.setFeedback);
@@ -1285,6 +1422,7 @@ export function RendererShell() {
   const toggleInspector = useRendererStore((state) => state.toggleInspector);
   const updateAssistantTurn = useRendererStore((state) => state.updateAssistantTurn);
   const [toast, setToast] = useState<string | null>(null);
+  const [reportSaving, setReportSaving] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const readOnly =
     searchParams.get("share") === "1" ||
@@ -1336,6 +1474,47 @@ export function RendererShell() {
   }, [currentConversation, currentPins, readOnly, replaceConversationPins]);
 
   const isBusy = currentConversation?.turns.some((turn) => turn.role === "assistant" && turn.status === "streaming") ?? false;
+
+  const saveCurrentReport = useCallback(async () => {
+    if (readOnly) {
+      showToast("Link chia sẻ chỉ được xem");
+      return;
+    }
+    if (!currentConversation || reportSaving) return;
+    if (currentConversation.turns.length === 0 && currentPins.length === 0) {
+      showToast("Chưa có nội dung để tạo báo cáo");
+      return;
+    }
+
+    setReportSaving(true);
+    showToast("Đang tạo báo cáo");
+    try {
+      const report = await reportApi.createAiReport(
+        buildReportPayload(currentConversation, currentPins, activeContext, shareUrl),
+      );
+      const storedReport: AiGeneratedReport = {
+        blockCount: report.blockCount,
+        conversationId: report.conversationId,
+        createdAt: report.createdAt,
+        filename: report.filename,
+        format: report.format,
+        id: report.id,
+        markdown: report.markdown,
+        mimeType: report.mimeType,
+        sizeBytes: report.sizeBytes,
+        title: report.title,
+        turnCount: report.turnCount,
+      };
+      saveReport(storedReport);
+      downloadBase64File(report.filename, report.pdfBase64, report.mimeType);
+      showToast(`Đã tạo báo cáo: ${report.filename}`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Không thể tạo báo cáo";
+      showToast(message);
+    } finally {
+      setReportSaving(false);
+    }
+  }, [activeContext, currentConversation, currentPins, readOnly, reportSaving, saveReport, shareUrl, showToast]);
 
   const sendMessage = useCallback(
     async (text: string, regenerated = false) => {
@@ -1569,8 +1748,10 @@ export function RendererShell() {
           showToast(`Đã chuyển hướng: ${contextOptions[context].label}`);
         }}
         onQuickAction={showToast}
+        onSaveReport={saveCurrentReport}
         onToggleInspector={toggleInspector}
         readOnly={readOnly}
+        reportSaving={reportSaving}
         shareUrl={shareUrl}
       />
       <div className="relative flex min-h-0 flex-1 overflow-hidden">
@@ -1620,6 +1801,7 @@ export function RendererShell() {
           <Inspector
             blocks={pinnedBlocks.filter((block) => block.conversationId === currentConversation.id)}
             onQuickAction={showToast}
+            onSaveReport={saveCurrentReport}
             readOnly={readOnly}
             reasoning={latestReasoning}
           />

@@ -9,11 +9,13 @@ The production Chat AI renderer is integrated into the admin app at `/admin/ai-a
 - `:::render` JSON blocks are parsed by `src/components/renderer/parseStream.ts`.
 - Valid blocks render through `src/components/renderer/RenderBlock.tsx`.
 - Invalid block JSON/schema falls back to `UnknownBlock` without crashing.
-- V1 Three-Pane Studio shell is the only active layout: history rail, 620px chat column, full Studio canvas.
-- Conversations and pinned Studio blocks persist in localStorage via Zustand.
+- Full-Page shell from `fullpage-export/option3-fullpage-detailed.jsx` is the active layout: conversation sidebar, chat workspace, and right Inspector.
+- Conversations, pinned render blocks, pinned entities, feedback, Inspector state, and model mode persist in localStorage via Zustand.
 - Chat uses the existing popup flow in `src/services/chat.service.ts`: router completion -> internal tool dispatch -> streamed answer with the render system prompt.
 - Streaming goes through `/api/chat/stream` and `/api/chat/complete`, both proxying `CHAT_API_URL` with `CHAT_API_TOKEN`.
+- The report action posts conversation turns plus render-block JSON to `/api/reports`; the server renders the HTML report template and returns a PDF download.
 - No renderer mock endpoint or fixture tool layer is kept in production source.
+- Legacy/incorrect chart output (`<chart>`, Chart.js JSON, `pie_chart`, mermaid/yaml chart fences) is normalized to the locked 14 render types where possible; unresolved chart buffers render as a blurred loading skeleton instead of leaking raw code.
 
 ## Environment Variables
 
@@ -32,12 +34,14 @@ The live tool layer reuses `src/services/chat-tools/*` from the existing chat po
 src/app/api/chat/stream/route.ts Proxy streaming endpoint for CHAT_API_URL
 src/app/api/chat/complete/route.ts Proxy non-stream endpoint for CHAT_API_URL
 src/app/api/chat/action/route.ts dispatch_action validator; returns 501 until a real dispatch endpoint is wired
-src/app/(dashboard)/admin/ai-assistant/page.tsx V1 renderer shell entry
+src/app/api/reports/route.ts HTML-to-PDF report generator for pinned AI render blocks
+src/app/(dashboard)/admin/ai-assistant/page.tsx Full-page renderer shell entry
 src/components/renderer/         Stream parser, render blocks, shell, reasoning tree
 src/components/charts/           SVG chart primitives
 src/lib/prompts/system.ts        System prompt template
 src/services/chat-tools/         Real tool router/handlers reused from chat popup
 tests/e2e/renderer.spec.ts       Playwright smoke test
+tests/e2e/renderer-buffer.spec.ts Parser regression test for leaked chart buffers
 ```
 
 ## Run
