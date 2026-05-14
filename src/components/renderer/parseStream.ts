@@ -58,6 +58,22 @@ type LooseChartRow = {
   color?: string;
 };
 
+type GanttTone = "blue" | "green" | "amber" | "red" | "purple";
+
+type GanttOutputBlock = {
+  start: number;
+  end: number;
+  label: string;
+  tone: GanttTone;
+  tripId?: string;
+};
+
+type GanttOutputRow = {
+  label: string;
+  sub?: string;
+  blocks: GanttOutputBlock[];
+};
+
 function slugify(value: string) {
   return value
     .normalize("NFD")
@@ -313,6 +329,24 @@ function toneFromLooseValues(tone: unknown, color: unknown): string | undefined 
   return undefined;
 }
 
+function normalizeForSearch(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/đ/g, "d")
+    .replace(/Đ/g, "D")
+    .toLowerCase();
+}
+
+function ganttTone(tokens: string[]): GanttTone {
+  const normalized = normalizeForSearch(tokens.join(" "));
+  if (/(crit|late|overdue|blocked|canceled|cancelled|da huy|loi|tre)/.test(normalized)) return "red";
+  if (/(done|complete|completed|hoan thanh)/.test(normalized)) return "green";
+  if (/(active|running|transporting|moving|dang di chuyen|di chuyen|dang chay)/.test(normalized)) return "blue";
+  if (/(pending|wait|waiting|collecting|init|dang doi|cho|dang thu thap|thu thap)/.test(normalized)) return "amber";
+  return mermaidTone(tokens);
+}
+
 function looseChartRows(data: Record<string, unknown>): LooseChartRow[] {
   const arrayData = Array.isArray(data.data) ? data.data : Array.isArray(data.items) ? data.items : undefined;
   if (arrayData) {
@@ -449,6 +483,209 @@ function normalizeTableBlock(data: Record<string, unknown>): Record<string, unkn
   };
 }
 
+function parseLooseHour(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value) && value >= 0 && value <= 24) return value;
+  if (typeof value !== "string") return null;
+
+  const trimmed = value.trim();
+  const mermaidHour = parseMermaidHour(trimmed);
+  if (mermaidHour !== null) return mermaidHour;
+
+  const hourMatch = /^(\d{1,2})\s*h(?:\s*(\d{1,2}))?$/i.exec(trimmed);
+  if (!hourMatch?.[1]) return null;
+  const hour = Number(hourMatch[1]);
+  const minute = hourMatch[2] ? Number(hourMatch[2]) : 0;
+  if (!Number.isFinite(hour) || !Number.isFinite(minute) || hour < 0 || hour > 24 || minute < 0 || minute > 59) {
+    return null;
+  }
+  return hour + minute / 60;
+}
+
+function collectHoursFromText(value: unknown): number[] {
+  if (typeof value !== "string") return [];
+  const hours: number[] = [];
+  const pattern = /(\d{1,2})(?::(\d{2})|h(?:\s*(\d{1,2}))?)/gi;
+  let match: RegExpExecArray | null;
+
+  while ((match = pattern.exec(value)) !== null) {
+    const hour = Number(match[1]);
+    const minute = match[2] ? Number(match[2]) : match[3] ? Number(match[3]) : 0;
+    if (Number.isFinite(hour) && Number.isFinite(minute) && hour >= 0 && hour <= 24 && minute >= 0 && minute <= 59) {
+      hours.push(hour + minute / 60);
+    }
+  }
+
+  return hours;
+}
+
+function expandHourRange(start: number, end: number): number[] {
+  const first = Math.max(0, Math.floor(Math.min(start, end)));
+  const last = Math.min(24, Math.ceil(Math.max(start, end)));
+  return Array.from({ length: Math.max(1, last - first + 1) }, (_, index) => first + index);
+}
+
+function uniqueSortedHours(values: number[]) {
+  return [...new Set(values.filter((hour) => Number.isFinite(hour) && hour >= 0 && hour <= 24))]
+    .sort((left, right) => left - right);
+}
+
+function ganttHours(data: Record<string, unknown>, chartData: Record<string, unknown>) {
+  const explicit = Array.isArray(data.hours) ? data.hours : Array.isArray(chartData.hours) ? chartData.hours : [];
+  const explicitHours = uniqueSortedHours(explicit.map(parseLooseHour).filter((hour): hour is number => hour !== null));
+  if (explicitHours.length > 0) return explicitHours;
+
+  const labels = asLabelArray(chartData.labels ?? data.labels ?? chartData.headers ?? data.headers);
+  const labelHours = uniqueSortedHours(labels.map(parseLooseHour).filter((hour): hour is number => hour !== null));
+  if (labelHours.length > 0) return labelHours;
+
+  const titleHours = collectHoursFromText(looseString(data.title) ?? "");
+  if (titleHours.length >= 2) return expandHourRange(titleHours[0] ?? 0, titleHours[1] ?? titleHours[0] ?? 0);
+  return [];
+}
+
+function ganttCellDescriptor(value: unknown): { label: string; tone: GanttTone; tripId?: string } | null {
+  if (value === null || value === undefined || value === false) return null;
+  if (typeof value === "number" && value <= 0) return null;
+
+  if (isRecord(value)) {
+    const label = looseString(value.label ?? value.title ?? value.status ?? value.value ?? value.order ?? value.order_number);
+    if (!label || ["0", "-", "—", "none", "null", "false"].includes(label.toLowerCase())) return null;
+    return {
+      label,
+      tone: ganttTone([label, looseString(value.tone) ?? ""]),
+      tripId: looseString(value.tripId ?? value.trip_id ?? value.order_id ?? value.order_number),
+    };
+  }
+
+  const label = String(value).trim();
+  if (!label || ["0", "-", "—", "none", "null", "false"].includes(label.toLowerCase())) return null;
+  return {
+    label,
+    tone: ganttTone([label]),
+  };
+}
+
+function normalizeExplicitGanttRows(rows: Array<Record<string, unknown>>): GanttOutputRow[] {
+  return rows
+    .map((row, rowIndex): GanttOutputRow | null => {
+      const rawBlocks = Array.isArray(row.blocks) ? row.blocks : [];
+      const blocks = asRecordArray(rawBlocks)
+        .map((block): GanttOutputBlock | null => {
+          const start = parseLooseHour(block.start);
+          const end = parseLooseHour(block.end);
+          const label = looseString(block.label ?? block.title ?? block.status) ?? "Hoạt động";
+          if (start === null) return null;
+          return {
+            start,
+            end: end !== null && end > start ? end : start + 1,
+            label,
+            tone: ganttTone([label, looseString(block.tone) ?? ""]),
+            tripId: looseString(block.tripId ?? block.trip_id),
+          };
+        })
+        .filter((block): block is GanttOutputBlock => block !== null);
+
+      const label = looseString(row.label ?? row.vehicle ?? row.vehicle_name ?? row.name) ?? `Dòng ${rowIndex + 1}`;
+      return blocks.length > 0
+        ? {
+            label,
+            sub: looseString(row.sub ?? row.vehicle_license_plate ?? row.license_plate),
+            blocks,
+          }
+        : null;
+    })
+    .filter((row): row is GanttOutputRow => row !== null);
+}
+
+function normalizeMatrixGanttRows(rawRows: unknown[], labels: string[], hours: number[]): GanttOutputRow[] {
+  const hourColumns = labels
+    .map((label, index) => ({ hour: parseLooseHour(label), index }))
+    .filter((item): item is { hour: number; index: number } => item.hour !== null);
+  const columns = hourColumns.length > 0
+    ? hourColumns
+    : hours.map((hour, index) => ({ hour, index }));
+
+  return rawRows
+    .map((rawRow, rowIndex): GanttOutputRow | null => {
+      const rowRecord = isRecord(rawRow) ? rawRow : null;
+      const values = rowRecord && Array.isArray(rowRecord.data)
+        ? rowRecord.data
+        : rowRecord && Array.isArray(rowRecord.values)
+          ? rowRecord.values
+          : Array.isArray(rawRow)
+            ? rawRow
+            : [];
+      const label =
+        (rowRecord && looseString(rowRecord.label ?? rowRecord.vehicle ?? rowRecord.vehicle_name ?? rowRecord.name)) ??
+        (Array.isArray(rawRow) && columns[0]?.index !== 0 ? looseString(rawRow[0]) : undefined) ??
+        `Dòng ${rowIndex + 1}`;
+      const sub = rowRecord ? looseString(rowRecord.sub ?? rowRecord.vehicle_license_plate ?? rowRecord.license_plate) : undefined;
+      const valueOffset = !rowRecord && Array.isArray(rawRow) && columns[0]?.index === 0 && values.length === columns.length + 1 ? 1 : 0;
+      const usesLabelIndexes = values.length >= labels.length && hourColumns.length > 0;
+      const blocks: GanttOutputBlock[] = [];
+
+      columns.forEach((column, columnIndex) => {
+        const rawCell = values[usesLabelIndexes ? column.index : columnIndex + valueOffset];
+        const descriptor = ganttCellDescriptor(rawCell);
+        if (!descriptor) return;
+        const start = column.hour;
+        const end = columns[columnIndex + 1]?.hour ?? start + 1;
+        const previous = blocks[blocks.length - 1];
+        if (previous && previous.label === descriptor.label && previous.tone === descriptor.tone && Math.abs(previous.end - start) < 0.001) {
+          previous.end = end;
+          return;
+        }
+        blocks.push({
+          start,
+          end,
+          label: descriptor.label,
+          tone: descriptor.tone,
+          tripId: descriptor.tripId,
+        });
+      });
+
+      return blocks.length > 0 ? { label, sub, blocks } : null;
+    })
+    .filter((row): row is GanttOutputRow => row !== null);
+}
+
+function normalizeGanttBlock(data: Record<string, unknown>): Record<string, unknown> {
+  const chartData = isRecord(data.data) ? data.data : data;
+  const base = blockBase("gantt", data);
+  const labels = asLabelArray(chartData.labels ?? data.labels ?? chartData.headers ?? data.headers);
+  let hours = ganttHours(data, chartData);
+
+  const explicitRows = asRecordArray(data.rows ?? chartData.rows);
+  let rows = explicitRows.length > 0 && explicitRows.some((row) => Array.isArray(row.blocks))
+    ? normalizeExplicitGanttRows(explicitRows)
+    : [];
+
+  if (rows.length === 0) {
+    const matrixRows = Array.isArray(chartData.rows)
+      ? chartData.rows
+      : Array.isArray(chartData.data)
+        ? chartData.data
+        : Array.isArray(data.rows)
+          ? data.rows
+          : Array.isArray(chartData.datasets)
+            ? chartData.datasets
+            : [];
+    rows = normalizeMatrixGanttRows(matrixRows, labels, hours);
+  }
+
+  if (hours.length === 0 && rows.length > 0) {
+    const starts = rows.flatMap((row) => row.blocks.map((block) => block.start));
+    const ends = rows.flatMap((row) => row.blocks.map((block) => block.end));
+    hours = expandHourRange(Math.min(...starts), Math.max(...ends));
+  }
+
+  return {
+    ...base,
+    hours,
+    rows,
+  };
+}
+
 function normalizeStandaloneBlock(type: string, value: unknown): Record<string, unknown> | null {
   const canonical = canonicalRenderType(type);
   if (!canonical) return null;
@@ -458,6 +695,7 @@ function normalizeStandaloneBlock(type: string, value: unknown): Record<string, 
   if (canonical === "bar_chart" || canonical === "donut_chart") return normalizeSimpleChartBlock(canonical, data);
   if (canonical === "line_chart" || canonical === "area_chart") return normalizeSeriesChartBlock(canonical, data);
   if (canonical === "table") return normalizeTableBlock(data);
+  if (canonical === "gantt") return normalizeGanttBlock(data);
   if (canonical === "followups" && Array.isArray(value)) {
     return {
       ...blockBase("followups", { title: "Gợi ý hỏi tiếp" }),
