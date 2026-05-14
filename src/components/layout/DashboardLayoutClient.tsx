@@ -5,8 +5,11 @@ import { logoutSuccess } from "@/store/slices/authSlice";
 import { useAppDispatch, useAppSelector } from "@/hooks/use-app-selector";
 import { Layout } from "antd";
 import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 import AppHeader from "./Header";
 import Sidebar from "./Sidebar";
+
+const ChatbotPanel = dynamic(() => import("@/components/features/chatbot/ChatbotPanel"), { ssr: false });
 
 const { Content } = Layout;
 
@@ -34,6 +37,8 @@ export default function DashboardLayoutClient({ children }: { children: React.Re
                     {children}
                 </Content>
             </Layout>
+            {/* Floating AI Chatbot — visible on all admin pages */}
+            <ChatbotPanel />
         </Layout>
     );
 }
