@@ -60,16 +60,11 @@
     "mealCheck": "Cơm ca",
     "attendance": "Chấm công",
     "shiftSlots": "Quản lý lốt ca",
-    "reports": "Báo cáo phân tích",
-    "reportFuel": "Tiêu hao Nhiên liệu",
-    "reportProduction": "Báo cáo Sản lượng",
-    "reportMaintenance": "Báo cáo Bảo trì",
     "endOfDay": "Chốt Cuối Ngày",
     "systemSettings": "Cấu hình hệ thống",
     "reports": "Báo cáo phân tích",
     "reportProduction": "Sản lượng",
     "reportFuel": "Tiêu hao nhiên liệu",
-    "reportMaintenance": "Dự báo bảo trì",
     "role": {
       "admin": "Quản trị viên",
       "manager": "Quản lý",
@@ -780,11 +775,11 @@
     "syncError": "Lỗi đồng bộ: {message}"
   },
   "SystemSettingsPage": {
-    "title": "Cấu hình hệ thống",
+    "title": "Cấu hình vận hành",
     "transportsRuntime": "Cấu hình ngưỡng vận hành",
     "cmr_station_min_stay_minutes": "Thời gian tối thiểu xe vào trạm trộn để được tính là lấy hàng hợp lệ.",
     "station_checkout_vehicle_checkin_warning_minutes": "Thời gian cảnh báo xe chưa ra khỏi bãi sau khi lấy hàng thành công.",
-    "station_checkout_vehicle_checkin_timeout_minutes": "Thời gian đặt lại lốt xe của xe đó sau khi lấy hàng thành công mà không rời bãi.",
+    "station_checkout_vehicle_checkin_timeout_minutes": "Thời gian đặt lại lốt xe sau khi lấy hàng thành công mà không rời bãi.",
     "placeholder": "Nhập số phút...",
     "validation": {
       "required": "Trường này là bắt buộc",

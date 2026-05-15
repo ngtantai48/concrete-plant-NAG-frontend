@@ -59,16 +59,11 @@
     "mealCheck": "Meal Check",
     "attendance": "Attendance",
     "shiftSlots": "Shift Slots",
-    "reports": "Reports",
-    "reportFuel": "Fuel Consumption",
-    "reportProduction": "Production Report",
-    "reportMaintenance": "Maintenance Report",
     "endOfDay": "End of Day",
     "systemSettings": "System Settings",
     "reports": "Reports & Analytics",
-    "reportProduction": "Production Report",
+    "reportProduction": "Output",
     "reportFuel": "Fuel Consumption",
-    "reportMaintenance": "Maintenance Forecast",
     "role": {
       "admin": "Administrator",
       "manager": "Manager",
@@ -777,7 +772,7 @@
     "syncError": "Sync error: {message}"
   },
   "SystemSettingsPage": {
-    "title": "System Settings",
+    "title": "Operational Configuration",
     "transportsRuntime": "Operational Thresholds",
     "cmr_station_min_stay_minutes": "Min stay at station (min)",
     "station_checkout_vehicle_checkin_warning_minutes": "Warning after (min)",

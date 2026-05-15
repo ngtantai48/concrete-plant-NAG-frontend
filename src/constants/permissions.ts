@@ -4,6 +4,7 @@ export const PERMISSIONS = {
         MANUAL_SORT: 'manual_sort',
         SYNC_SLOTS: 'sync_slots',
         MANUAL_CAMERA_FALLBACK: 'manual_camera_fallback',
+        SYSTEM_SETTINGS: 'system_settings',
     },
 
     USER_MANAGE: {
@@ -48,11 +49,6 @@ export const PERMISSIONS = {
     // ATTENDANCE: {
     //     VIEW: 'view',
     // },
-
-    SYSTEM_SETTINGS: {
-        VIEW: 'view',
-        UPDATE: 'update',
-    },
 
     PERMISSIONS_MANAGE: {
         VIEW: 'view',

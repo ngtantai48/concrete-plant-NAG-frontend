@@ -3,7 +3,7 @@ import { ROLES } from "@/constants/roles";
 import { SIDEBAR } from "@/constants/route";
 import {
   CalendarCheck, Car, Gauge, Layers, MapPin, Package, UsersRound,
-  Wrench, Settings, ShieldCheck, UserCog, UtensilsCrossed, ClipboardList, ArrowRightLeft
+  CalendarClock, Wrench, Settings, ShieldCheck, UserCog, UtensilsCrossed, ClipboardList, ArrowRightLeft
 } from "lucide-react";
 import React from "react";
 
@@ -31,35 +31,7 @@ export const navigationConfig: NavItem[] = [
       { key: PERMISSIONS.DASHBOARD.MANUAL_SORT, label: "Sắp xếp thứ tự lốt xe" },
       { key: PERMISSIONS.DASHBOARD.SYNC_SLOTS, label: "Đồng bộ lốt xe" },
       { key: PERMISSIONS.DASHBOARD.MANUAL_CAMERA_FALLBACK, label: "Thao tác thủ công (camera sự cố)" },
-    ],
-  },
-  {
-    key: "user-manage-group",
-    label: "userManagement",
-    icon: <UsersRound />,
-    roles: [ROLES.ADMIN],
-    children: [
-      {
-        key: SIDEBAR.USER_MANAGE,
-        label: "allUsers",
-        icon: <UserCog size={18} />,
-        actions: [
-          { key: PERMISSIONS.USER_MANAGE.VIEW, label: "Xem danh sách người dùng" },
-          { key: PERMISSIONS.USER_MANAGE.CREATE, label: "Thêm người dùng" },
-          { key: PERMISSIONS.USER_MANAGE.UPDATE, label: "Sửa người dùng" },
-          { key: PERMISSIONS.USER_MANAGE.DELETE, label: "Xóa người dùng" },
-        ],
-      },
-      {
-        key: SIDEBAR.ROLE_PERMISSIONS,
-        label: "rolePermissions",
-        icon: <ShieldCheck size={18} />,
-        roles: [ROLES.ADMIN],
-        actions: [
-          { key: PERMISSIONS.PERMISSIONS_MANAGE.VIEW, label: "Xem quyền hạn" },
-          { key: PERMISSIONS.PERMISSIONS_MANAGE.UPDATE, label: "Chỉnh sửa quyền hạn" },
-        ],
-      },
+      { key: PERMISSIONS.DASHBOARD.SYSTEM_SETTINGS, label: "Cấu hình vận hành" },
     ],
   },
   {
@@ -107,6 +79,23 @@ export const navigationConfig: NavItem[] = [
     ],
   },
   {
+    key: "reports-group",
+    label: "reports",
+    icon: <ClipboardList />,
+    children: [
+      {
+        key: SIDEBAR.REPORT_PRODUCTION,
+        label: "reportProduction",
+        icon: <Gauge size={18} />,
+      },
+      {
+        key: SIDEBAR.REPORT_FUEL,
+        label: "reportFuel",
+        icon: <ArrowRightLeft size={18} />,
+      },
+    ],
+  },
+  {
     key: "tools-group",
     label: "tools",
     icon: <Package />,
@@ -124,30 +113,32 @@ export const navigationConfig: NavItem[] = [
     ],
   },
   {
-    key: "reports-group",
-    label: "reports",
-    icon: <ClipboardList />,
-    actions: [{ key: PERMISSIONS.REPORTS.VIEW, label: "Xem" }],
+    key: "user-manage-group",
+    label: "userManagement",
+    icon: <UsersRound />,
+    roles: [ROLES.ADMIN],
     children: [
       {
-        key: SIDEBAR.REPORT_PRODUCTION,
-        label: "reportProduction",
-        icon: <Gauge size={18} />,
+        key: SIDEBAR.USER_MANAGE,
+        label: "allUsers",
+        icon: <UserCog size={18} />,
+        actions: [
+          { key: PERMISSIONS.USER_MANAGE.VIEW, label: "Xem danh sách người dùng" },
+          { key: PERMISSIONS.USER_MANAGE.CREATE, label: "Thêm người dùng" },
+          { key: PERMISSIONS.USER_MANAGE.UPDATE, label: "Sửa người dùng" },
+          { key: PERMISSIONS.USER_MANAGE.DELETE, label: "Xóa người dùng" },
+        ],
       },
       {
-        key: SIDEBAR.REPORT_FUEL,
-        label: "reportFuel",
-        icon: <ArrowRightLeft size={18} />,
+        key: SIDEBAR.ROLE_PERMISSIONS,
+        label: "rolePermissions",
+        icon: <ShieldCheck size={18} />,
+        roles: [ROLES.ADMIN],
+        actions: [
+          { key: PERMISSIONS.PERMISSIONS_MANAGE.VIEW, label: "Xem quyền hạn" },
+          { key: PERMISSIONS.PERMISSIONS_MANAGE.UPDATE, label: "Chỉnh sửa quyền hạn" },
+        ],
       },
-    ],
-  },
-  {
-    key: SIDEBAR.SYSTEM_SETTINGS,
-    label: "systemSettings",
-    icon: <Settings />,
-    actions: [
-      { key: PERMISSIONS.SYSTEM_SETTINGS.VIEW, label: "Xem" },
-      { key: PERMISSIONS.SYSTEM_SETTINGS.UPDATE, label: "Sửa" },
     ],
   },
 ];
