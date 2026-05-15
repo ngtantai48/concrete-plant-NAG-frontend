@@ -2,7 +2,7 @@ import { PERMISSIONS } from "@/constants/permissions";
 import { ROLES } from "@/constants/roles";
 import { SIDEBAR } from "@/constants/route";
 import {
-  ArrowRightLeft, Bot, CalendarCheck, Car, ClipboardList, Gauge, Layers, MapPin,
+  ArrowRightLeft, Bot, CalendarCheck, Car, CalendarClock, ClipboardList, Gauge, Layers, MapPin,
   Package, Settings, ShieldCheck, UserCog, UsersRound, UtensilsCrossed, Wrench
 } from "lucide-react";
 import React from "react";
@@ -28,9 +28,13 @@ export const navigationConfig: NavItem[] = [
     icon: <Gauge />,
     actions: [
       { key: PERMISSIONS.DASHBOARD.VIEW, label: "Xem" },
-      { key: PERMISSIONS.DASHBOARD.MANUAL_SORT, label: "Sắp xếp thứ tự lốt xe" },
       { key: PERMISSIONS.DASHBOARD.SYNC_SLOTS, label: "Đồng bộ lốt xe" },
+      { key: PERMISSIONS.DASHBOARD.HISTORY, label: "Lịch sử lốt xe" },
+      { key: PERMISSIONS.DASHBOARD.CHECKLOG, label: "Nhật ký vận hành" },
+      { key: PERMISSIONS.DASHBOARD.MANUAL_SORT, label: "Sắp xếp thứ tự lốt xe" },
+      { key: PERMISSIONS.DASHBOARD.VIEW_MAP, label: "Bản đồ" },
       { key: PERMISSIONS.DASHBOARD.MANUAL_CAMERA_FALLBACK, label: "Thao tác thủ công (camera sự cố)" },
+      { key: PERMISSIONS.DASHBOARD.SYSTEM_SETTINGS, label: "Cấu hình vận hành" },
     ],
   },
   {
@@ -113,27 +117,9 @@ export const navigationConfig: NavItem[] = [
     ],
   },
   {
-    key: "tools-group",
-    label: "tools",
-    icon: <Package />,
-    children: [
-      {
-        key: SIDEBAR.MEAL_CHECK,
-        label: "mealCheck",
-        icon: <UtensilsCrossed size={18} />,
-      },
-      {
-        key: SIDEBAR.ATTENDANCE,
-        label: "attendance",
-        icon: <CalendarCheck size={18} />,
-      },
-    ],
-  },
-  {
     key: "reports-group",
     label: "reports",
     icon: <ClipboardList />,
-    actions: [{ key: PERMISSIONS.REPORTS.VIEW, label: "Xem" }],
     children: [
       {
         key: SIDEBAR.REPORT_PRODUCTION,
@@ -148,12 +134,20 @@ export const navigationConfig: NavItem[] = [
     ],
   },
   {
-    key: SIDEBAR.SYSTEM_SETTINGS,
-    label: "systemSettings",
-    icon: <Settings />,
-    actions: [
-      { key: PERMISSIONS.SYSTEM_SETTINGS.VIEW, label: "Xem" },
-      { key: PERMISSIONS.SYSTEM_SETTINGS.UPDATE, label: "Sửa" },
+    key: "tools-group",
+    label: "tools",
+    icon: <Package />,
+    children: [
+      {
+        key: SIDEBAR.MEAL_CHECK,
+        label: "mealCheck",
+        icon: <UtensilsCrossed size={18} />,
+      },
+      {
+        key: SIDEBAR.ATTENDANCE,
+        label: "attendance",
+        icon: <CalendarCheck size={18} />,
+      },
     ],
   },
 ];

@@ -62,7 +62,7 @@ export function handleHttpError(error: AxiosError<ErrorResponse>) {
             break;
 
         case 404:
-            toast.error("Tài nguyên không tồn tại.");
+            toast.warning("Dữ liệu không tồn tại.");
             break;
 
         case 500:
