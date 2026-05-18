@@ -12,6 +12,9 @@ export interface ChatCompletionRequest {
   thinking?: boolean;
   temperature?: number;
   max_tokens?: number;
+  chat_mode?: string;
+  use_document?: boolean;
+  document_id?: string | string[];
 }
 
 export type ToolResult =

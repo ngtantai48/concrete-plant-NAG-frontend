@@ -1,43 +1,54 @@
-import js from "@eslint/js";
-import globals from "globals";
-import tseslint from "typescript-eslint";
 import { defineConfig } from "eslint/config";
+import nextVitals from "eslint-config-next/core-web-vitals";
+import nextTypescript from "eslint-config-next/typescript";
+import prettierConfig from "eslint-config-prettier";
 
 export default defineConfig([
   {
     ignores: [
       ".next/**",
-      ".claude/**",
-      ".ida-mcp/**",
-      ".qwen/**",
-      "renderer-pkg/**",
       "out/**",
       "build/**",
       "dist/**",
       "node_modules/**",
-      "coverage/**",
-      "*.lcov",
-      "*.tgz",
-      "**/*.css",
-      "**/*.d.ts",
+
+      ".claude/**",
+      ".ida-mcp/**",
+      ".qwen/**",
       ".vscode/**",
       ".idea/**",
+
+      "renderer-pkg/**",
+
       "*.swp",
+      "*.lcov",
+      "*.tgz",
+      "coverage/**",
+
+      ".env",
+      ".env*.local",
+      "eslint.config.*",
       "next-env.d.ts",
       "pnpm-lock.yaml",
       "package-lock.json",
       "yarn.lock",
+
+      "public/**",
+      "**/*.d.ts",
+      "**/*.css",
     ],
   },
+  ...nextVitals,
+  ...nextTypescript,
+  prettierConfig,
   {
-    files: ["**/*.{js,mjs,cjs,ts,mts,cts,jsx,tsx}"],
-    languageOptions: {
-      globals: {
-        ...globals.browser,
-        ...globals.node,
-      },
+    settings: { react: { version: "detect" } },
+    rules: {
+      "@typescript-eslint/no-explicit-any": "warn",
+      "@typescript-eslint/no-unused-vars": ["warn", { argsIgnorePattern: "^_" }],
+      "react/react-in-jsx-scope": "off",
+      "react/prop-types": "off",
+      "no-console": ["warn", { allow: ["warn", "error"] }],
     },
   },
-  js.configs.recommended,
-  ...tseslint.configs.recommended,
 ]);

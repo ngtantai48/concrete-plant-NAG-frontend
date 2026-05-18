@@ -18,6 +18,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import reportApi from "@/services/report.service";
 
 const UserProfile = ({ collapsed, userName, userRole, isLoading }: {
   collapsed: boolean;
@@ -50,11 +51,7 @@ const UserProfile = ({ collapsed, userName, userRole, isLoading }: {
           </>
         ) : (
           <>
-            <Avatar
-              className="shrink-0"
-              icon={<User size={20} />}
-              style={{ backgroundColor: "#722ed1" }}
-            />
+            <Avatar className="shrink-0" icon={<User size={20} />} style={{ backgroundColor: "#722ed1" }} />
             {!collapsed && (
               <div className="flex-1 min-w-0">
                 <p className="text-white font-semibold text-sm truncate m-0">
@@ -82,7 +79,6 @@ export default function Sidebar() {
   const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
   const [pendingUrl, setPendingUrl] = useState<string>("");
   const { hasPageAccess } = usePermissions();
-
   const { isDirty, setDirty } = useNavigationStore();
 
   const selectAuth = createSelector(

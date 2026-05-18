@@ -1,14 +1,29 @@
 import http from "@/lib/http";
-import type { CreateAiReportPayload, CreateAiReportResponse, MaintenanceForecastResponse } from "@/types/report";
-
-export interface MaintenanceForecastParams {
-  days_ahead?: number;
-  risk_level?: "all" | "normal" | "warning" | "critical";
-}
+import type {
+  CreateAiReportPayload,
+  CreateAiReportResponse,
+  FuelConsumptionQuery,
+  FuelConsumptionResponse,
+  MaintenanceForecastQuery,
+  MaintenanceForecastResponse,
+  ProductionQuery,
+  ProductionReportResponse,
+} from "@/types/report";
 
 const reportApi = {
-  getMaintenanceForecast: (params: MaintenanceForecastParams) =>
-    http.get<MaintenanceForecastResponse>("/reports/maintenance-forecast", { params }),
+  /** GET /api/v1/reports/production */
+  getProduction: (params?: ProductionQuery) =>
+    http.get<ProductionReportResponse>("/reports/production", { params }),
+
+  /** GET /api/v1/reports/maintenance/forecast */
+  getMaintenanceForecast: (params?: MaintenanceForecastQuery) =>
+    http.get<MaintenanceForecastResponse>("/reports/maintenance/forecast", { params }),
+
+  /** GET /api/v1/reports/fuel-consumption */
+  getFuelConsumption: (params?: FuelConsumptionQuery) =>
+    http.get<FuelConsumptionResponse>("/reports/fuel-consumption", { params }),
+
+  /** POST /api/reports (Next.js route) — generate AI PDF report */
   createAiReport: async (payload: CreateAiReportPayload): Promise<CreateAiReportResponse> => {
     const response = await fetch("/api/reports", {
       method: "POST",
