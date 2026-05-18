@@ -1,24 +1,38 @@
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import { readFileSync } from "node:fs";
+import { dirname, resolve } from "node:path";
 import test from "node:test";
 import ts from "typescript";
 
 const require = createRequire(import.meta.url);
+const tsModuleCache = new Map();
 
 function loadTsModule(filePath) {
-  const source = readFileSync(filePath, "utf8");
+  const resolvedPath = resolve(filePath);
+  const cached = tsModuleCache.get(resolvedPath);
+  if (cached) return cached.exports;
+
+  const source = readFileSync(resolvedPath, "utf8");
   const { outputText } = ts.transpileModule(source, {
     compilerOptions: {
       esModuleInterop: true,
       module: ts.ModuleKind.CommonJS,
       target: ts.ScriptTarget.ES2022,
     },
-    fileName: filePath,
+    fileName: resolvedPath,
   });
   const module = { exports: {} };
+  tsModuleCache.set(resolvedPath, module);
+  const localRequire = (specifier) => {
+    if (specifier.startsWith(".")) {
+      const tsPath = specifier.endsWith(".ts") ? specifier : `${specifier}.ts`;
+      return loadTsModule(resolve(dirname(resolvedPath), tsPath));
+    }
+    return require(specifier);
+  };
   const wrapped = new Function("module", "exports", "require", outputText);
-  wrapped(module, module.exports, require);
+  wrapped(module, module.exports, localRequire);
   return module.exports;
 }
 
@@ -89,6 +103,23 @@ const canonicalBlocks = [
     markers: [{ id: "x09", lat: 10.8, lng: 106.7, kind: "vehicle", label: "X09" }],
   },
   {
+    type: "image",
+    id: "image-contract",
+    title: "Contract image",
+    url: "/api/ai-artifacts?path=sample.png",
+    filename: "sample.png",
+    mimeType: "image/png",
+  },
+  {
+    type: "file",
+    id: "file-contract",
+    title: "Contract file",
+    url: "/api/ai-artifacts?path=report.xlsx",
+    filename: "report.xlsx",
+    mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    sizeBytes: 1024,
+  },
+  {
     type: "alert",
     id: "alert-contract",
     level: "warn",
@@ -135,12 +166,18 @@ function assertValidBlocks(chunks) {
   assert.ok(chunks.length > 0, "expected at least one block chunk");
   for (const chunk of chunks) {
     const parsed = renderBlockDataSchema.safeParse(chunk.data);
-    assert.equal(parsed.success, true, JSON.stringify(parsed.success ? null : parsed.error.issues, null, 2));
+    assert.equal(
+      parsed.success,
+      true,
+      JSON.stringify(parsed.success ? null : parsed.error.issues, null, 2)
+    );
   }
 }
 
 function assertNoRawRenderLeak(text, forbidden = []) {
-  const markdown = markdownChunks(text).map((chunk) => chunk.body).join("\n");
+  const markdown = markdownChunks(text)
+    .map((chunk) => chunk.body)
+    .join("\n");
   for (const token of forbidden) {
     assert.equal(markdown.includes(token), false, `raw token leaked into markdown: ${token}`);
   }
@@ -149,7 +186,10 @@ function assertNoRawRenderLeak(text, forbidden = []) {
 test("canonical :::render blocks cover all render types", () => {
   const text = canonicalBlocks.map(renderFence).join("\n\n");
   const chunks = blockChunks(text);
-  assert.deepEqual(chunks.map((chunk) => chunk.data.type), canonicalBlocks.map((block) => block.type));
+  assert.deepEqual(
+    chunks.map((chunk) => chunk.data.type),
+    canonicalBlocks.map((block) => block.type)
+  );
   assertValidBlocks(chunks);
 });
 
@@ -184,7 +224,10 @@ test("json-first multi-block object normalizes to canonical blocks", () => {
   };
   const text = `Top vehicles today\n${JSON.stringify(payload, null, 2)}`;
   const chunks = blockChunks(text);
-  assert.deepEqual(chunks.map((chunk) => chunk.data.type), ["kpi_grid", "donut_chart", "bar_chart", "table"]);
+  assert.deepEqual(
+    chunks.map((chunk) => chunk.data.type),
+    ["kpi_grid", "donut_chart", "bar_chart", "table"]
+  );
   assertValidBlocks(chunks);
   assertNoRawRenderLeak(text, ["kpi_grid", "donut_chart", "bar_chart"]);
 });
@@ -196,7 +239,10 @@ test("single json type block normalizes to canonical chart", () => {
     data: [{ label: "X09", value: 2 }],
   });
   const chunks = blockChunks(text);
-  assert.deepEqual(chunks.map((chunk) => chunk.data.type), ["bar_chart"]);
+  assert.deepEqual(
+    chunks.map((chunk) => chunk.data.type),
+    ["bar_chart"]
+  );
   assertValidBlocks(chunks);
 });
 
@@ -218,7 +264,10 @@ test("chart.js bar and doughnut json normalize to render chart blocks", () => {
     options: { plugins: { title: { text: "Order status" } } },
   });
   const chunks = blockChunks(`${bar}\n\n${doughnut}`);
-  assert.deepEqual(chunks.map((chunk) => chunk.data.type), ["bar_chart", "donut_chart"]);
+  assert.deepEqual(
+    chunks.map((chunk) => chunk.data.type),
+    ["bar_chart", "donut_chart"]
+  );
   assertValidBlocks(chunks);
 });
 
@@ -231,7 +280,10 @@ test("table headers/data json normalizes to columns/rows", () => {
   });
   const [chunk] = blockChunks(text);
   assert.equal(chunk.data.type, "table");
-  assert.deepEqual(chunk.data.columns.map((column) => column.key), ["vehicle", "plate", "orders"]);
+  assert.deepEqual(
+    chunk.data.columns.map((column) => column.key),
+    ["vehicle", "plate", "orders"]
+  );
   assert.deepEqual(chunk.data.rows, [{ vehicle: "X09", plate: "73A-32772", orders: 2 }]);
   assertValidBlocks([chunk]);
 });
@@ -265,15 +317,52 @@ test("xml, template, yaml and mermaid loose formats do not leak when recoverable
     "```mermaid\ngantt\ntitle Vehicle activity\nsection X09\nMoving : active, 01:00, 2h\n```",
   ].join("\n\n");
   const chunks = blockChunks(text);
-  assert.deepEqual(chunks.map((chunk) => chunk.data.type), ["donut_chart", "bar_chart", "bar_chart", "gantt"]);
+  assert.deepEqual(
+    chunks.map((chunk) => chunk.data.type),
+    ["donut_chart", "bar_chart", "bar_chart", "gantt"]
+  );
   assertValidBlocks(chunks);
   assertNoRawRenderLeak(text, ["<chart", "{{bar_chart", "```chart", "```mermaid"]);
 });
 
 test("partial render json becomes loading skeleton instead of raw markdown", () => {
-  const chunks = parseStream('Summary\n{"kpi_grid":{"title":"Daily overview","data":[{"label":"Total"');
+  const chunks = parseStream(
+    'Summary\n{"kpi_grid":{"title":"Daily overview","data":[{"label":"Total"'
+  );
   assert.equal(chunks.at(-1).kind, "block-loading");
-  assert.equal(chunks.some((chunk) => chunk.kind === "md" && chunk.body.includes("kpi_grid")), false);
+  assert.equal(
+    chunks.some((chunk) => chunk.kind === "md" && chunk.body.includes("kpi_grid")),
+    false
+  );
+});
+
+test("partial chart fences become loading skeleton instead of raw markdown", () => {
+  const chunks = parseStream(
+    "Fleet summary\n```chart\ntype: bar\ntitle: Top vehicles\nlabels: ['X09'"
+  );
+  assert.equal(chunks.at(-1).kind, "block-loading");
+  assert.equal(
+    chunks.some((chunk) => chunk.kind === "md" && chunk.body.includes("```chart")),
+    false
+  );
+});
+
+test("short no-data fallback after rendered blocks is suppressed", () => {
+  const block = renderFence({
+    type: "table",
+    id: "vehicle-detail",
+    title: "Vehicle detail",
+    columns: [{ key: "vehicle", header: "Vehicle" }],
+    rows: [{ vehicle: "X09" }],
+  });
+  const chunks = parseStream(
+    `${block}\n\nTôi không tìm thấy thông tin này trong dữ liệu Nguyên Anh Group.`
+  );
+  assert.equal(
+    chunks.some((chunk) => chunk.kind === "md" && chunk.body.includes("không tìm thấy")),
+    false
+  );
+  assert.equal(chunks.filter((chunk) => chunk.kind === "block").length, 1);
 });
 
 test("invalid render fence is contained and does not crash", () => {

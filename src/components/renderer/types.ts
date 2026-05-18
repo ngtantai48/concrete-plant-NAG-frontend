@@ -51,7 +51,7 @@ export const kpiGridBlockSchema = baseBlockSchema.extend({
       deltaLabel: z.string().optional(),
       icon: z.string().optional(),
       sparkline: z.array(z.number()).optional(),
-    }),
+    })
   ),
 });
 
@@ -79,7 +79,7 @@ export const lineChartBlockSchema = baseBlockSchema.extend({
         x: z.union([z.string(), z.number()]),
         label: z.string(),
         color: z.string().optional(),
-      }),
+      })
     )
     .optional(),
 });
@@ -93,7 +93,7 @@ export const barChartBlockSchema = baseBlockSchema.extend({
       value: z.number(),
       color: z.string().optional(),
       highlight: z.boolean().optional(),
-    }),
+    })
   ),
   unit: z.string().optional(),
   target: z.number().optional(),
@@ -106,7 +106,7 @@ export const donutChartBlockSchema = baseBlockSchema.extend({
       label: z.string(),
       value: z.number(),
       color: z.string().optional(),
-    }),
+    })
   ),
   centerLabel: z.string().optional(),
   showLegend: z.boolean().optional(),
@@ -124,7 +124,7 @@ export const areaChartBlockSchema = baseBlockSchema.extend({
         x: z.union([z.string(), z.number()]),
         label: z.string(),
         color: z.string().optional(),
-      }),
+      })
     )
     .optional(),
 });
@@ -144,9 +144,9 @@ export const ganttBlockSchema = baseBlockSchema.extend({
           label: z.string(),
           tone: z.enum(["blue", "green", "amber", "red", "purple"]).optional(),
           tripId: z.string().optional(),
-        }),
+        })
       ),
-    }),
+    })
   ),
 });
 
@@ -159,7 +159,7 @@ export const timelineBlockSchema = baseBlockSchema.extend({
       description: z.string().optional(),
       icon: z.string().optional(),
       tone: z.string().optional(),
-    }),
+    })
   ),
 });
 
@@ -172,7 +172,7 @@ export const tableBlockSchema = baseBlockSchema.extend({
       align: z.enum(["left", "right", "center"]).optional(),
       width: z.string().optional(),
       format: z.enum(["number", "currency", "percent", "date", "datetime", "badge"]).optional(),
-    }),
+    })
   ),
   rows: z.array(unknownRecordSchema),
   highlightRowWhere: z
@@ -197,7 +197,7 @@ export const mapViewBlockSchema = baseBlockSchema.extend({
       kind: z.enum(["vehicle", "station", "site", "alert"]),
       label: z.string().optional(),
       tone: z.string().optional(),
-    }),
+    })
   ),
   routes: z
     .array(
@@ -205,9 +205,34 @@ export const mapViewBlockSchema = baseBlockSchema.extend({
         id: z.string(),
         points: z.array(z.tuple([z.number(), z.number()])),
         color: z.string().optional(),
-      }),
+      })
     )
     .optional(),
+});
+
+const localAssetSchema = {
+  url: z.string().min(1).optional(),
+  path: z.string().min(1).optional(),
+  dataUrl: z.string().min(1).optional(),
+  base64: z.string().min(1).optional(),
+  mimeType: z.string().min(1).optional(),
+  filename: z.string().min(1).optional(),
+  sizeBytes: z.number().int().nonnegative().optional(),
+};
+
+export const imageBlockSchema = baseBlockSchema.extend({
+  type: z.literal("image"),
+  ...localAssetSchema,
+  alt: z.string().optional(),
+  caption: z.string().optional(),
+  width: z.number().positive().optional(),
+  height: z.number().positive().optional(),
+});
+
+export const fileBlockSchema = baseBlockSchema.extend({
+  type: z.literal("file"),
+  ...localAssetSchema,
+  description: z.string().optional(),
 });
 
 export const alertBlockSchema = baseBlockSchema.extend({
@@ -248,7 +273,7 @@ export const sourceChipsBlockSchema = baseBlockSchema.extend({
       tool: z.string(),
       label: z.string().optional(),
       count: z.number().optional(),
-    }),
+    })
   ),
 });
 
@@ -267,6 +292,8 @@ export const renderBlockDataSchema = z.discriminatedUnion("type", [
   timelineBlockSchema,
   tableBlockSchema,
   mapViewBlockSchema,
+  imageBlockSchema,
+  fileBlockSchema,
   alertBlockSchema,
   actionProposalBlockSchema,
   markdownBlockSchema,
@@ -283,6 +310,8 @@ export type GanttBlock = z.infer<typeof ganttBlockSchema>;
 export type TimelineBlock = z.infer<typeof timelineBlockSchema>;
 export type TableBlock = z.infer<typeof tableBlockSchema>;
 export type MapViewBlock = z.infer<typeof mapViewBlockSchema>;
+export type ImageBlock = z.infer<typeof imageBlockSchema>;
+export type FileBlock = z.infer<typeof fileBlockSchema>;
 export type AlertBlock = z.infer<typeof alertBlockSchema>;
 export type ActionProposalBlock = z.infer<typeof actionProposalBlockSchema>;
 export type MarkdownBlock = z.infer<typeof markdownBlockSchema>;
@@ -299,6 +328,8 @@ export type RenderBlockData =
   | TimelineBlock
   | TableBlock
   | MapViewBlock
+  | ImageBlock
+  | FileBlock
   | AlertBlock
   | ActionProposalBlock
   | MarkdownBlock
@@ -336,4 +367,3 @@ export type ChatSseEvent =
   | { type: "reasoning_complete"; totalMs: number; stepCount: number }
   | { type: "done" }
   | { type: "error"; error: string };
-

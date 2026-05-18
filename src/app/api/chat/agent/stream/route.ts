@@ -1,7 +1,7 @@
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const DEFAULT_AGENT_ACTION_URL = "https://chat.svnagentic.site/api/chat/nag/action";
+const DEFAULT_AGENT_STREAM_URL = "https://chat.svnagentic.site/api/chat/nag/agent/stream";
 const USER_CONTEXT_HEADERS = [
   "x-nag-user-id",
   "x-nag-role",
@@ -19,8 +19,8 @@ function envValue(...names: string[]) {
   return undefined;
 }
 
-function agentActionUrl() {
-  return envValue("CHAT_AGENT_ACTION_URL") ?? DEFAULT_AGENT_ACTION_URL;
+function agentStreamUrl() {
+  return envValue("CHAT_AGENT_STREAM_URL") ?? DEFAULT_AGENT_STREAM_URL;
 }
 
 function nagConfigHeaders(): HeadersInit {
@@ -31,6 +31,7 @@ function nagConfigHeaders(): HeadersInit {
 function agentHeaders(request: Request): HeadersInit {
   const token = envValue("CHAT_AGENT_API_TOKEN", "CHAT_API_TOKEN");
   const userAuthorization = request.headers.get("authorization");
+  const requestId = crypto.randomUUID();
   const contextHeaders: Record<string, string> = {};
 
   USER_CONTEXT_HEADERS.forEach((name) => {
@@ -39,8 +40,8 @@ function agentHeaders(request: Request): HeadersInit {
   });
 
   return {
-    "Content-Type": request.headers.get("content-type") ?? "application/json",
-    "X-Request-Id": crypto.randomUUID(),
+    "Content-Type": "application/json",
+    "X-Request-Id": requestId,
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...(userAuthorization ? { "X-User-Authorization": userAuthorization } : {}),
     ...nagConfigHeaders(),
@@ -51,17 +52,22 @@ function agentHeaders(request: Request): HeadersInit {
 export async function POST(request: Request) {
   const body = await request.text();
 
-  const upstream = await fetch(agentActionUrl(), {
+  const upstream = await fetch(agentStreamUrl(), {
     method: "POST",
     headers: agentHeaders(request),
     body,
     signal: request.signal,
   });
 
+  const headers = new Headers();
+  headers.set("Cache-Control", "no-cache, no-transform");
+  headers.set(
+    "Content-Type",
+    upstream.headers.get("content-type") ?? "text/event-stream; charset=utf-8"
+  );
+
   return new Response(upstream.body, {
-    headers: {
-      "Content-Type": upstream.headers.get("content-type") ?? "application/json",
-    },
+    headers,
     status: upstream.status,
     statusText: upstream.statusText,
   });

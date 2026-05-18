@@ -14,11 +14,38 @@ export interface ChatCompletionRequest {
   max_tokens?: number;
 }
 
+export type ToolResult =
+  | {
+      status: "ok";
+      tool: string;
+      data: unknown;
+      text?: string;
+    }
+  | {
+      status: "error";
+      tool: string;
+      error: string;
+    };
+
 export interface ChatStreamEvent {
+  type?:
+    | "status"
+    | "reasoning"
+    | "text"
+    | "tool_start"
+    | "tool_end"
+    | "iteration"
+    | "done"
+    | "error";
   status?: string;
   reasoning?: string;
   content?: string;
   text?: string;
   delta?: string;
   done?: boolean;
+  tool?: string;
+  args?: Record<string, unknown>;
+  result?: ToolResult | unknown;
+  iteration?: number;
+  error?: string;
 }

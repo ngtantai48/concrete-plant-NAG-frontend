@@ -16,6 +16,8 @@ import {
   Minimize2,
   MoreHorizontal,
   Paperclip,
+  PanelLeftClose,
+  PanelLeftOpen,
   Pin,
   Plus,
   RefreshCcw,
@@ -26,18 +28,10 @@ import {
   ThumbsDown,
   ThumbsUp,
   Trash2,
-  Truck,
   Wrench,
   X,
 } from "lucide-react";
-import {
-  type ReactNode,
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-} from "react";
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { useSearchParams } from "next/navigation";
 import { create } from "zustand";
@@ -46,8 +40,7 @@ import { persist } from "zustand/middleware";
 import { cn } from "@/lib/utils";
 import chatApi from "@/services/chat.service";
 import reportApi from "@/services/report.service";
-import type { ToolResult } from "@/services/chat-tools/types";
-import type { ChatMessage as ApiChatMessage } from "@/types/chat";
+import type { ChatMessage as ApiChatMessage, ToolResult } from "@/types/chat";
 import type { AiGeneratedReport, AiReportBlock, CreateAiReportPayload } from "@/types/report";
 
 import { ReasoningTree } from "./ReasoningTree";
@@ -123,14 +116,26 @@ type RendererStore = {
   setActiveContext: (context: WorkContext) => void;
   toggleConversationPin: (conversationId: string) => void;
   toggleInspector: () => void;
-  updateAssistantTurn: (conversationId: string, turnId: string, patch: Partial<AssistantTurn>) => void;
+  updateAssistantTurn: (
+    conversationId: string,
+    turnId: string,
+    patch: Partial<AssistantTurn>
+  ) => void;
 };
 
 const slashCommands = [
-  { cmd: "/tong-quan", hint: "Tổng quan sản lượng và đội xe hôm nay", example: "Cho tôi tổng quan sản lượng và đội xe hôm nay" },
+  {
+    cmd: "/tong-quan",
+    hint: "Tổng quan sản lượng và đội xe hôm nay",
+    example: "Cho tôi tổng quan sản lượng và đội xe hôm nay",
+  },
   { cmd: "/xe-ca-chieu", hint: "Xe sẵn sàng ca chiều", example: "Xe nào sẵn sàng ca chiều?" },
   { cmd: "/bao-tri", hint: "Lịch bảo trì", example: "Lịch bảo trì tuần này có xe nào rủi ro?" },
-  { cmd: "/don-dang-di-chuyen", hint: "Đơn đang di chuyển", example: "Liệt kê đơn đang di chuyển và xe phụ trách" },
+  {
+    cmd: "/don-dang-di-chuyen",
+    hint: "Đơn đang di chuyển",
+    example: "Liệt kê đơn đang di chuyển và xe phụ trách",
+  },
 ];
 
 const suggestedPrompts = [
@@ -138,24 +143,6 @@ const suggestedPrompts = [
   "Xe nào sẵn sàng ca chiều?",
   "Lọc top xe theo quãng đường",
 ];
-
-const contextOptions: Record<WorkContext, { label: string; instruction: string }> = {
-  fleet: {
-    label: "Đội xe",
-    instruction:
-      "Ngữ cảnh đang chọn: Đội xe. Ưu tiên orders/lịch xe/trạng thái xe; nếu hỏi xe sẵn sàng theo ca thì dùng dữ liệu đơn hàng và lịch chuyến, không suy luận từ trạng thái cuối ngày. Ngữ nghĩa trạng thái trong ngày: pending/init = Đang đợi; running/transporting = Đang di chuyển; completed = Hoàn thành.",
-  },
-  production: {
-    label: "Sản lượng",
-    instruction:
-      "Ngữ cảnh đang chọn: Sản lượng. Ưu tiên báo cáo sản lượng, đơn hàng và top xe; mặc định render kpi_grid, donut_chart, bar_chart và table nếu có dữ liệu. Khi nói trạng thái trong ngày: pending/init là Đang đợi, running/transporting là Đang di chuyển, completed là Hoàn thành. Source tập trung vào vehicle; tài xế chỉ là metadata tượng trưng, không phân tích hoặc vẽ chart theo tài xế. Scope trạm cố định là NGUYÊN ANH, không phân tích hoặc vẽ chart theo trạm.",
-  },
-  maintenance: {
-    label: "Bảo trì",
-    instruction:
-      "Ngữ cảnh đang chọn: Bảo trì. Ưu tiên dữ liệu bảo trì, xe rủi ro, hạn bảo dưỡng và cảnh báo; render table/alert/action_proposal khi cần người dùng duyệt xử lý.",
-  },
-};
 
 const inspectorChartTypes = new Set<RenderBlockData["type"]>([
   "kpi_grid",
@@ -203,7 +190,7 @@ const useRendererStore = create<RendererStore>()(
                   turns: [...conversation.turns, turn],
                   lastMessageAt: turn.createdAt,
                 }
-              : conversation,
+              : conversation
           ),
         })),
       createConversation: () => {
@@ -216,13 +203,21 @@ const useRendererStore = create<RendererStore>()(
       },
       deleteConversation: (conversationId) =>
         set((state) => {
-          const remaining = state.conversations.filter((conversation) => conversation.id !== conversationId);
+          const remaining = state.conversations.filter(
+            (conversation) => conversation.id !== conversationId
+          );
           const conversations = remaining.length > 0 ? remaining : [createBlankConversation()];
-          const currentStillExists = conversations.some((conversation) => conversation.id === state.currentConversationId);
+          const currentStillExists = conversations.some(
+            (conversation) => conversation.id === state.currentConversationId
+          );
           return {
             conversations,
-            currentConversationId: currentStillExists ? state.currentConversationId : conversations[0].id,
-            pinnedBlocks: state.pinnedBlocks.filter((block) => block.conversationId !== conversationId),
+            currentConversationId: currentStillExists
+              ? state.currentConversationId
+              : conversations[0].id,
+            pinnedBlocks: state.pinnedBlocks.filter(
+              (block) => block.conversationId !== conversationId
+            ),
           };
         }),
       replaceConversationPins: (conversationId, blocks) =>
@@ -243,7 +238,7 @@ const useRendererStore = create<RendererStore>()(
       setConversationTitle: (conversationId, title) =>
         set((state) => ({
           conversations: state.conversations.map((conversation) =>
-            conversation.id === conversationId ? { ...conversation, title } : conversation,
+            conversation.id === conversationId ? { ...conversation, title } : conversation
           ),
         })),
       setFeedback: (turnId, vote) =>
@@ -259,7 +254,9 @@ const useRendererStore = create<RendererStore>()(
       toggleConversationPin: (conversationId) =>
         set((state) => ({
           conversations: state.conversations.map((conversation) =>
-            conversation.id === conversationId ? { ...conversation, pinned: !conversation.pinned } : conversation,
+            conversation.id === conversationId
+              ? { ...conversation, pinned: !conversation.pinned }
+              : conversation
           ),
         })),
       toggleInspector: () => set((state) => ({ inspectorOpen: !state.inspectorOpen })),
@@ -270,11 +267,11 @@ const useRendererStore = create<RendererStore>()(
               ? {
                   ...conversation,
                   turns: conversation.turns.map((turn) =>
-                    turn.id === turnId && turn.role === "assistant" ? { ...turn, ...patch } : turn,
+                    turn.id === turnId && turn.role === "assistant" ? { ...turn, ...patch } : turn
                   ),
                   lastMessageAt: new Date().toISOString(),
                 }
-              : conversation,
+              : conversation
           ),
         })),
     }),
@@ -290,15 +287,17 @@ const useRendererStore = create<RendererStore>()(
         pinnedBlocks: state.pinnedBlocks,
         savedReports: state.savedReports,
       }),
-    },
-  ),
+    }
+  )
 );
 
 function relativeTime(value: string) {
   const diffMs = Date.now() - new Date(value).getTime();
   if (diffMs < 60_000) return "vừa xong";
   if (diffMs < 86_400_000) {
-    return new Intl.DateTimeFormat("vi-VN", { hour: "2-digit", minute: "2-digit" }).format(new Date(value));
+    return new Intl.DateTimeFormat("vi-VN", { hour: "2-digit", minute: "2-digit" }).format(
+      new Date(value)
+    );
   }
   if (diffMs < 172_800_000) return "Hôm qua";
   return new Intl.DateTimeFormat("vi-VN", { weekday: "short" }).format(new Date(value));
@@ -306,7 +305,8 @@ function relativeTime(value: string) {
 
 function summarizeToolResult(result: ToolResult): string {
   if (result.status === "error") return result.error ?? "Tool returned an error";
-  if (typeof result.text === "string" && result.text.trim()) return result.text.trim().slice(0, 180);
+  if (typeof result.text === "string" && result.text.trim())
+    return result.text.trim().slice(0, 180);
   if (result.data && typeof result.data === "object") return "Đã lấy dữ liệu nội bộ Nguyên Anh";
   return "Tool completed";
 }
@@ -329,18 +329,16 @@ function mapPopupToolToRendererTool(name: string): ToolName {
   return "production_query";
 }
 
-function withContextInstruction(text: string, context: WorkContext): string {
-  return `${contextOptions[context].instruction}\n\nCâu hỏi người dùng: ${text}`;
-}
-
-function toApiMessages(turns: Turn[], nextUserText: string, context: WorkContext): ApiChatMessage[] {
+function toApiMessages(turns: Turn[], nextUserText: string): ApiChatMessage[] {
   const messages = turns
     .filter((turn) => turn.text.trim().length > 0)
-    .map((turn): ApiChatMessage => ({
-      role: turn.role === "assistant" ? "assistant" : "user",
-      content: turn.text,
-    }));
-  return [...messages, { role: "user", content: withContextInstruction(nextUserText, context) }];
+    .map(
+      (turn): ApiChatMessage => ({
+        role: turn.role === "assistant" ? "assistant" : "user",
+        content: turn.text,
+      })
+    );
+  return [...messages, { role: "user", content: nextUserText }];
 }
 
 function extractPinnedBlocks(conversation: Conversation): PinnedBlock[] {
@@ -363,13 +361,17 @@ function extractPinnedBlocks(conversation: Conversation): PinnedBlock[] {
 }
 
 function conversationHasVehicleContext(conversation: Conversation) {
-  const text = conversation.turns.map((turn) => turn.text).join(" ").toLowerCase();
+  const text = conversation.turns
+    .map((turn) => turn.text)
+    .join(" ")
+    .toLowerCase();
   return /xe|biển|vehicle|truck/.test(text);
 }
 
 function stringifyCell(value: unknown): string {
   if (value === null || value === undefined) return "";
-  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") return String(value);
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean")
+    return String(value);
   return JSON.stringify(value);
 }
 
@@ -412,11 +414,33 @@ function getRenderBlockTitle(data: RenderBlockData) {
   return "title" in data && typeof data.title === "string" ? data.title : undefined;
 }
 
+function summarizePinnedConversation(conversation: Conversation, blocks: PinnedBlock[]) {
+  const title = conversation.title.trim() || "Cuộc trò chuyện đã ghim";
+  const blockCount = blocks.length;
+  const chartCount = blocks.filter((block) => inspectorChartTypes.has(block.data.type)).length;
+  const tableCount = blocks.filter((block) => block.data.type === "table").length;
+
+  return {
+    title,
+    meta: [
+      blockCount ? `${blockCount} khối` : undefined,
+      chartCount ? `${chartCount} biểu đồ` : undefined,
+      tableCount ? `${tableCount} bảng` : undefined,
+      relativeTime(conversation.lastMessageAt),
+    ]
+      .filter(Boolean)
+      .join(" · "),
+  };
+}
+
 function buildBlocksSummary(blocks: PinnedBlock[]) {
   if (blocks.length === 0) return "Chưa có khối trực quan nào trong cuộc trò chuyện.";
   return [
     `Tóm tắt vận hành có ${blocks.length} khối trực quan:`,
-    ...blocks.map((block, index) => `${index + 1}. ${getRenderBlockTitle(block.data) ?? block.data.type} (${block.data.type})`),
+    ...blocks.map(
+      (block, index) =>
+        `${index + 1}. ${getRenderBlockTitle(block.data) ?? block.data.type} (${block.data.type})`
+    ),
   ].join("\n");
 }
 
@@ -424,7 +448,7 @@ function buildReportPayload(
   conversation: Conversation,
   blocks: PinnedBlock[],
   activeContext: WorkContext,
-  shareUrl: string,
+  shareUrl: string
 ): CreateAiReportPayload {
   return {
     conversationId: conversation.id,
@@ -441,13 +465,15 @@ function buildReportPayload(
       status: turn.role === "assistant" ? turn.status : undefined,
       totalMs: turn.role === "assistant" ? turn.totalMs : undefined,
     })),
-    blocks: blocks.map((block): AiReportBlock => ({
-      id: block.blockId,
-      type: block.data.type,
-      title: getRenderBlockTitle(block.data),
-      createdAt: block.createdAt,
-      data: block.data,
-    })),
+    blocks: blocks.map(
+      (block): AiReportBlock => ({
+        id: block.blockId,
+        type: block.data.type,
+        title: getRenderBlockTitle(block.data),
+        createdAt: block.createdAt,
+        data: block.data,
+      })
+    ),
   };
 }
 
@@ -462,7 +488,7 @@ function LogoMark({
     <div
       className={cn(
         "grid shrink-0 place-items-center rounded-[10px] border border-[#EE2D2D]/15 bg-white shadow-[inset_0_1px_0_rgba(255,255,255,0.85),0_8px_20px_-16px_rgba(238,45,45,0.85)]",
-        sizeClass,
+        sizeClass
       )}
     >
       <Image
@@ -477,12 +503,18 @@ function LogoMark({
   );
 }
 
-function Avatar({ initials = "NA", sizeClass = "size-8" }: { initials?: string; sizeClass?: string }) {
+function Avatar({
+  initials = "NA",
+  sizeClass = "size-8",
+}: {
+  initials?: string;
+  sizeClass?: string;
+}) {
   return (
     <div
       className={cn(
         "grid shrink-0 place-items-center rounded-full bg-[linear-gradient(135deg,#FFC93C,#FF8A3C)] text-xs font-extrabold text-white",
-        sizeClass,
+        sizeClass
       )}
     >
       {initials}
@@ -524,7 +556,7 @@ function FilterChip({
         "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold transition focus:outline-none focus:ring-2 focus:ring-[#007AFF]/35",
         active
           ? "bg-[rgba(0,122,255,0.10)] text-[#0A66E0] dark:text-[#6DB4FF]"
-          : "bg-zinc-100 text-zinc-500 hover:bg-zinc-200 dark:bg-white/10 dark:hover:bg-white/15",
+          : "bg-zinc-100 text-zinc-500 hover:bg-zinc-200 dark:bg-white/10 dark:hover:bg-white/15"
       )}
       onClick={onClick}
       type="button"
@@ -536,15 +568,23 @@ function FilterChip({
 }
 
 function HistorySidebar({
+  collapsed,
   conversations,
   currentConversationId,
   onNew,
+  onDelete,
+  onToggleCollapse,
+  pinnedBlocks,
   onSelect,
   readOnly,
 }: {
+  collapsed: boolean;
   conversations: Conversation[];
   currentConversationId: string;
   onNew: () => void;
+  onDelete: (conversationId: string) => void;
+  onToggleCollapse: () => void;
+  pinnedBlocks: PinnedBlock[];
   onSelect: (conversationId: string) => void;
   readOnly: boolean;
 }) {
@@ -561,18 +601,114 @@ function HistorySidebar({
     });
   }, [conversations, filter, search]);
 
+  const pinnedConversationGroups = useMemo(() => {
+    const byConversation = new Map<string, PinnedBlock[]>();
+    pinnedBlocks.forEach((block) => {
+      byConversation.set(block.conversationId, [
+        ...(byConversation.get(block.conversationId) ?? []),
+        block,
+      ]);
+    });
+
+    return [...byConversation.entries()]
+      .map(([conversationId, blocks]) => {
+        const conversation = conversations.find((item) => item.id === conversationId);
+        if (!conversation) return null;
+        return { blocks, conversation, summary: summarizePinnedConversation(conversation, blocks) };
+      })
+      .filter((item): item is NonNullable<typeof item> => item !== null)
+      .sort(
+        (left, right) =>
+          new Date(right.conversation.lastMessageAt).getTime() -
+          new Date(left.conversation.lastMessageAt).getTime()
+      );
+  }, [conversations, pinnedBlocks]);
+
+  if (collapsed) {
+    return (
+      <aside className="hidden w-[64px] shrink-0 flex-col overflow-hidden border-r border-black/[0.07] bg-white dark:border-white/10 dark:bg-zinc-950 md:flex">
+        <div className="flex shrink-0 flex-col items-center gap-2 border-b border-black/[0.07] p-2 dark:border-white/10">
+          <button
+            aria-label="Mở lịch sử trò chuyện"
+            className="grid size-10 place-items-center rounded-md border border-black/10 text-zinc-500 transition hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-[#007AFF]/35 dark:border-white/10 dark:text-zinc-300 dark:hover:bg-white/10"
+            onClick={onToggleCollapse}
+            title="Mở lịch sử"
+            type="button"
+          >
+            <PanelLeftOpen size={16} />
+          </button>
+          <button
+            aria-label="Cuộc trò chuyện mới"
+            className="grid size-10 place-items-center rounded-md bg-[#007AFF] text-white shadow-[0_8px_18px_-12px_rgba(0,122,255,0.9)] transition hover:bg-[#0A66E0] focus:outline-none focus:ring-2 focus:ring-[#7CB6FF]/70 disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={readOnly}
+            onClick={onNew}
+            title="Cuộc trò chuyện mới"
+            type="button"
+          >
+            <Plus size={17} strokeWidth={2.4} />
+          </button>
+          <button
+            aria-label="Tìm cuộc trò chuyện"
+            className="grid size-10 place-items-center rounded-md border border-black/10 text-zinc-500 transition hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-[#007AFF]/35 dark:border-white/10 dark:text-zinc-300 dark:hover:bg-white/10"
+            onClick={onToggleCollapse}
+            title="Tìm cuộc trò chuyện"
+            type="button"
+          >
+            <Search size={16} />
+          </button>
+        </div>
+        <div className="min-h-0 flex-1 space-y-1 overflow-y-auto p-2">
+          {filtered.slice(0, 18).map((conversation) => {
+            const active = conversation.id === currentConversationId;
+            return (
+              <button
+                aria-label={conversation.title}
+                className={cn(
+                  "relative grid size-10 place-items-center rounded-md text-[12px] font-extrabold transition focus:outline-none focus:ring-2 focus:ring-[#007AFF]/35",
+                  active
+                    ? "bg-[rgba(0,122,255,0.12)] text-[#0A66E0] dark:text-[#6DB4FF]"
+                    : "text-zinc-500 hover:bg-zinc-50 dark:text-zinc-300 dark:hover:bg-white/[0.08]"
+                )}
+                key={conversation.id}
+                onClick={() => onSelect(conversation.id)}
+                title={conversation.title}
+                type="button"
+              >
+                {conversation.title.trim().charAt(0).toUpperCase() || "C"}
+                {conversation.pinned && (
+                  <Star className="absolute right-1 top-1 fill-[#FF9F0A] text-[#FF9F0A]" size={9} />
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </aside>
+    );
+  }
+
   return (
     <aside className="hidden w-[260px] shrink-0 flex-col overflow-hidden border-r border-black/[0.07] bg-white dark:border-white/10 dark:bg-zinc-950 md:flex">
       <div className="flex shrink-0 flex-col gap-2 border-b border-black/[0.07] p-3 dark:border-white/10">
-        <button
-          className="flex h-9 items-center justify-center gap-2 rounded-[9px] bg-[#007AFF] text-[13px] font-bold text-white shadow-[0_8px_18px_-12px_rgba(0,122,255,0.9)] transition hover:bg-[#0A66E0] focus:outline-none focus:ring-2 focus:ring-[#7CB6FF]/70 disabled:cursor-not-allowed disabled:opacity-50"
-          disabled={readOnly}
-          onClick={onNew}
-          type="button"
-        >
-          <Plus size={14} strokeWidth={2.4} />
-          Cuộc trò chuyện mới
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            className="flex h-9 flex-1 items-center justify-center gap-2 rounded-[9px] bg-[#007AFF] text-[13px] font-bold text-white shadow-[0_8px_18px_-12px_rgba(0,122,255,0.9)] transition hover:bg-[#0A66E0] focus:outline-none focus:ring-2 focus:ring-[#7CB6FF]/70 disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={readOnly}
+            onClick={onNew}
+            type="button"
+          >
+            <Plus size={14} strokeWidth={2.4} />
+            Cuộc trò chuyện mới
+          </button>
+          <button
+            aria-label="Thu gọn lịch sử trò chuyện"
+            className="grid size-9 shrink-0 place-items-center rounded-md border border-black/10 text-zinc-500 transition hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-[#007AFF]/35 dark:border-white/10 dark:text-zinc-300 dark:hover:bg-white/10"
+            onClick={onToggleCollapse}
+            title="Thu gọn"
+            type="button"
+          >
+            <PanelLeftClose size={15} />
+          </button>
+        </div>
         <label className="relative block">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 text-zinc-400" size={13} />
           <input
@@ -594,7 +730,12 @@ function HistorySidebar({
           )}
         </label>
         <div className="flex flex-wrap gap-1.5">
-          <FilterChip active={filter === "all"} count={conversations.length} label="Tất cả" onClick={() => setFilter("all")} />
+          <FilterChip
+            active={filter === "all"}
+            count={conversations.length}
+            label="Tất cả"
+            onClick={() => setFilter("all")}
+          />
           <FilterChip
             active={filter === "pinned"}
             count={conversations.filter((conversation) => conversation.pinned).length}
@@ -610,76 +751,87 @@ function HistorySidebar({
         </div>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto p-2">
+        {pinnedConversationGroups.length > 0 && (
+          <section className="mb-2 rounded-lg border border-black/[0.06] bg-zinc-50 p-2 dark:border-white/10 dark:bg-white/[0.04]">
+            <div className="mb-1.5 flex items-center gap-1.5 px-1 text-[10.5px] font-extrabold uppercase tracking-[0.08em] text-zinc-400">
+              <Pin size={11} />
+              Cuộc trò chuyện đã ghim
+            </div>
+            <div className="space-y-1">
+              {pinnedConversationGroups.slice(0, 5).map(({ conversation, summary }) => (
+                <button
+                  className={cn(
+                    "w-full rounded-md px-2 py-1.5 text-left transition focus:outline-none focus:ring-2 focus:ring-[#007AFF]/35",
+                    conversation.id === currentConversationId
+                      ? "bg-white text-[#0A66E0] shadow-sm dark:bg-zinc-950 dark:text-[#6DB4FF]"
+                      : "text-zinc-600 hover:bg-white dark:text-zinc-300 dark:hover:bg-zinc-950"
+                  )}
+                  key={conversation.id}
+                  onClick={() => onSelect(conversation.id)}
+                  type="button"
+                >
+                  <span className="line-clamp-1 text-[11.5px] font-bold">{summary.title}</span>
+                  <span className="mt-0.5 block text-[10px] text-zinc-400">{summary.meta}</span>
+                </button>
+              ))}
+            </div>
+          </section>
+        )}
         {filtered.map((conversation) => {
           const active = conversation.id === currentConversationId;
           return (
-            <button
+            <div
               className={cn(
-                "mb-1 w-full rounded-lg border-l-[3px] px-2.5 py-2 text-left transition focus:outline-none focus:ring-2 focus:ring-[#007AFF]/35",
+                "group relative mb-1 rounded-lg border-l-[3px] transition",
                 active
                   ? "border-l-[#007AFF] bg-[rgba(0,122,255,0.09)]"
-                  : "border-l-transparent hover:bg-zinc-50 dark:hover:bg-white/[0.06]",
+                  : "border-l-transparent hover:bg-zinc-50 dark:hover:bg-white/[0.06]"
               )}
               key={conversation.id}
-              onClick={() => onSelect(conversation.id)}
-              type="button"
             >
-              <div className="flex items-center gap-1.5">
-                {conversation.pinned && <Star className="fill-[#FF9F0A] text-[#FF9F0A]" size={12} />}
-                <span className="line-clamp-1 flex-1 text-[12.5px] font-bold text-zinc-950 dark:text-zinc-50">
-                  {conversation.title}
-                </span>
-                <span className="font-mono text-[10px] text-zinc-400">{relativeTime(conversation.lastMessageAt)}</span>
-              </div>
-              <div className="mt-1 line-clamp-1 text-[11px] text-zinc-400">
-                {conversation.turns.length} lượt · {conversationHasVehicleContext(conversation) ? "đội xe" : "vận hành"}
-              </div>
-            </button>
+              <button
+                className="w-full rounded-lg px-2.5 py-2 pr-8 text-left focus:outline-none focus:ring-2 focus:ring-[#007AFF]/35"
+                onClick={() => onSelect(conversation.id)}
+                type="button"
+              >
+                <div className="flex items-center gap-1.5">
+                  {conversation.pinned && (
+                    <Star className="fill-[#FF9F0A] text-[#FF9F0A]" size={12} />
+                  )}
+                  <span className="line-clamp-1 flex-1 text-[12.5px] font-bold text-zinc-950 dark:text-zinc-50">
+                    {conversation.title}
+                  </span>
+                  <span className="font-mono text-[10px] text-zinc-400">
+                    {relativeTime(conversation.lastMessageAt)}
+                  </span>
+                </div>
+                <div className="mt-1 line-clamp-1 text-[11px] text-zinc-400">
+                  {conversation.turns.length} lượt ·{" "}
+                  {conversationHasVehicleContext(conversation) ? "đội xe" : "vận hành"}
+                </div>
+              </button>
+              {!readOnly && (
+                <button
+                  aria-label="Xóa cuộc trò chuyện"
+                  className="absolute right-1.5 top-1.5 grid size-6 place-items-center rounded-md text-zinc-400 opacity-0 transition hover:bg-red-50 hover:text-red-600 focus:opacity-100 focus:outline-none focus:ring-2 focus:ring-red-200 group-hover:opacity-100 dark:hover:bg-red-500/10 dark:hover:text-red-300"
+                  onClick={() => {
+                    if (window.confirm("Xóa cuộc trò chuyện này?")) onDelete(conversation.id);
+                  }}
+                  type="button"
+                >
+                  <Trash2 size={12} />
+                </button>
+              )}
+            </div>
           );
         })}
-      </div>
-      <div className="border-t border-black/[0.07] px-3 py-2 text-[11px] text-zinc-400 dark:border-white/10">
-        <span className="font-semibold text-[#0A66E0] dark:text-[#6DB4FF]">⌘N</span> tạo nhanh
       </div>
     </aside>
   );
 }
 
-function ContextChip({
-  active,
-  children,
-  disabled = false,
-  icon,
-  onClick,
-}: {
-  active?: boolean;
-  children: ReactNode;
-  disabled?: boolean;
-  icon: ReactNode;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      className={cn(
-        "hidden items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12px] font-semibold transition focus:outline-none focus:ring-2 focus:ring-[#007AFF]/35 disabled:cursor-default disabled:opacity-60 sm:inline-flex",
-        active
-          ? "border-[rgba(0,122,255,0.25)] bg-[rgba(0,122,255,0.10)] text-[#0A66E0] dark:text-[#6DB4FF]"
-          : "border-black/10 text-zinc-600 hover:bg-zinc-50 dark:border-white/10 dark:text-zinc-300 dark:hover:bg-white/10",
-      )}
-      disabled={disabled}
-      onClick={onClick}
-      type="button"
-    >
-      {icon}
-      {children}
-    </button>
-  );
-}
-
 function TopBar({
-  activeContext,
   inspectorOpen,
-  onContextChange,
   onQuickAction,
   onSaveReport,
   onToggleInspector,
@@ -687,9 +839,7 @@ function TopBar({
   reportSaving,
   shareUrl,
 }: {
-  activeContext: WorkContext;
   inspectorOpen: boolean;
-  onContextChange: (context: WorkContext) => void;
   onQuickAction: (message: string) => void;
   onSaveReport: () => void;
   onToggleInspector: () => void;
@@ -702,35 +852,11 @@ function TopBar({
       <div className="flex items-center gap-2">
         <LogoMark />
         <div className="leading-tight">
-          <div className="text-[13px] font-extrabold text-zinc-950 dark:text-zinc-50">Không gian AI NAG</div>
+          <div className="text-[13px] font-extrabold text-zinc-950 dark:text-zinc-50">
+            Không gian AI NAG
+          </div>
           <div className="text-[10.5px] text-zinc-400">Điều hành bê tông · công cụ trực tiếp</div>
         </div>
-      </div>
-      <div className="ml-2 flex gap-1.5">
-        <ContextChip
-          active={activeContext === "fleet"}
-          disabled={readOnly}
-          icon={<Truck size={13} />}
-          onClick={() => onContextChange("fleet")}
-        >
-          Đội xe
-        </ContextChip>
-        <ContextChip
-          active={activeContext === "production"}
-          disabled={readOnly}
-          icon={<BarChart3 size={13} />}
-          onClick={() => onContextChange("production")}
-        >
-          Sản lượng
-        </ContextChip>
-        <ContextChip
-          active={activeContext === "maintenance"}
-          disabled={readOnly}
-          icon={<Wrench size={13} />}
-          onClick={() => onContextChange("maintenance")}
-        >
-          Bảo trì
-        </ContextChip>
       </div>
       <div className="ml-auto flex items-center gap-2">
         {readOnly && (
@@ -813,9 +939,12 @@ function ConversationHeader({
         />
       ) : (
         <div className="min-w-0 flex-1">
-          <h1 className="truncate text-[17px] font-extrabold text-zinc-950 dark:text-zinc-50">{conversation.title}</h1>
+          <h1 className="truncate text-[17px] font-extrabold text-zinc-950 dark:text-zinc-50">
+            {conversation.title}
+          </h1>
           <p className="mt-1 text-[11px] text-zinc-400">
-            {conversation.turns.filter((turn) => turn.role === "user").length} lượt hỏi · {relativeTime(conversation.lastMessageAt)}
+            {conversation.turns.filter((turn) => turn.role === "user").length} lượt hỏi ·{" "}
+            {relativeTime(conversation.lastMessageAt)}
           </p>
         </div>
       )}
@@ -828,7 +957,13 @@ function ConversationHeader({
       >
         {conversation.pinned ? <Star className="fill-[#FF9F0A]" size={14} /> : <Pin size={14} />}
       </button>
-      <button aria-label="Đổi tên" className="icon-soft" disabled={readOnly} onClick={() => setEditing(true)} type="button">
+      <button
+        aria-label="Đổi tên"
+        className="icon-soft"
+        disabled={readOnly}
+        onClick={() => setEditing(true)}
+        type="button"
+      >
         <Edit3 size={14} />
       </button>
       <button
@@ -849,7 +984,11 @@ function ConversationHeader({
 function SlashMenu({ onPick, query }: { onPick: (text: string) => void; query: string }) {
   const filtered = slashCommands.filter((command) => {
     const normalized = query.toLowerCase();
-    return !normalized || command.cmd.includes(normalized) || command.hint.toLowerCase().includes(normalized);
+    return (
+      !normalized ||
+      command.cmd.includes(normalized) ||
+      command.hint.toLowerCase().includes(normalized)
+    );
   });
   return (
     <div className="overflow-hidden rounded-xl border border-black/10 bg-white shadow-2xl dark:border-white/10 dark:bg-zinc-950">
@@ -862,9 +1001,13 @@ function SlashMenu({ onPick, query }: { onPick: (text: string) => void; query: s
         >
           <Slash className="mt-0.5 text-[#0A66E0]" size={14} />
           <span className="min-w-0 flex-1">
-            <span className="block font-mono text-[12px] font-bold text-zinc-950 dark:text-zinc-50">{command.cmd}</span>
+            <span className="block font-mono text-[12px] font-bold text-zinc-950 dark:text-zinc-50">
+              {command.cmd}
+            </span>
             <span className="block text-[11.5px] text-zinc-500">{command.hint}</span>
-            <span className="mt-0.5 block truncate font-mono text-[10.5px] text-zinc-400">{command.example}</span>
+            <span className="mt-0.5 block truncate font-mono text-[10.5px] text-zinc-400">
+              {command.example}
+            </span>
           </span>
         </button>
       ))}
@@ -891,7 +1034,10 @@ function AssistantToolbar({
     <div className="mt-2 flex flex-wrap items-center gap-1">
       <button
         aria-label="Hữu ích"
-        className={cn("toolbar-btn", feedback === "up" && "border-[#34C759]/40 bg-[#34C759]/10 text-[#1F8E47]")}
+        className={cn(
+          "toolbar-btn",
+          feedback === "up" && "border-[#34C759]/40 bg-[#34C759]/10 text-[#1F8E47]"
+        )}
         onClick={() => onFeedback("up")}
         type="button"
       >
@@ -899,13 +1045,21 @@ function AssistantToolbar({
       </button>
       <button
         aria-label="Chưa đúng"
-        className={cn("toolbar-btn", feedback === "down" && "border-[#FF3B30]/40 bg-[#FF3B30]/10 text-[#C92A2A]")}
+        className={cn(
+          "toolbar-btn",
+          feedback === "down" && "border-[#FF3B30]/40 bg-[#FF3B30]/10 text-[#C92A2A]"
+        )}
         onClick={() => onFeedback("down")}
         type="button"
       >
         <ThumbsDown size={13} />
       </button>
-      <button aria-label="Sao chép câu trả lời" className="toolbar-btn" onClick={onCopy} type="button">
+      <button
+        aria-label="Sao chép câu trả lời"
+        className="toolbar-btn"
+        onClick={onCopy}
+        type="button"
+      >
         <Copy size={13} /> Sao chép
       </button>
       <button aria-label="Trả lời lại" className="toolbar-btn" onClick={onRegenerate} type="button">
@@ -914,7 +1068,12 @@ function AssistantToolbar({
       <button aria-label="Chia sẻ tin nhắn" className="toolbar-btn" onClick={onShare} type="button">
         <Share2 size={13} /> Chia sẻ
       </button>
-      <button aria-label="Ghim tất cả" className="toolbar-btn ml-auto" onClick={onPinAll} type="button">
+      <button
+        aria-label="Ghim tất cả"
+        className="toolbar-btn ml-auto"
+        onClick={onPinAll}
+        type="button"
+      >
         <Pin size={13} /> Ghim tất cả
       </button>
     </div>
@@ -962,7 +1121,7 @@ function ChatColumn({
       setSlashOpen(false);
       await onSend(trimmed);
     },
-    [input, isBusy, onSend, readOnly],
+    [input, isBusy, onSend, readOnly]
   );
 
   useEffect(() => {
@@ -984,7 +1143,7 @@ function ChatColumn({
 
   return (
     <main className="flex min-w-0 flex-1 flex-col bg-[#F7F7F8] dark:bg-zinc-900">
-      <div className="shrink-0 px-5 pt-5">
+      <div className="hidden">
         <ConversationHeader
           conversation={conversation}
           onDelete={onDelete}
@@ -1001,7 +1160,7 @@ function ChatColumn({
         }}
         ref={scrollRef}
       >
-        <div className="mx-auto flex w-full max-w-[800px] flex-col gap-3">
+        <div className="mx-auto flex w-full max-w-[1040px] flex-col gap-3">
           {conversation.turns.length === 0 && (
             <div className="grid min-h-[48vh] place-items-center text-center">
               <div>
@@ -1009,7 +1168,9 @@ function ChatColumn({
                 <h2 className="mt-4 text-lg font-extrabold text-zinc-950 dark:text-zinc-50">
                   Trợ lý điều hành đội xe bê tông
                 </h2>
-                <p className="mt-2 text-[13px] text-zinc-500">Hỏi nhanh về sản lượng, orders, xe và bảo trì.</p>
+                <p className="mt-2 text-[13px] text-zinc-500">
+                  Hỏi nhanh về sản lượng, orders, xe và bảo trì.
+                </p>
                 <div className="mt-4 flex flex-wrap justify-center gap-2">
                   {suggestedPrompts.map((prompt) => (
                     <button
@@ -1037,14 +1198,14 @@ function ChatColumn({
             ) : (
               <div className="flex items-start gap-2.5" id={turn.id} key={turn.id}>
                 <div className="grid size-7 shrink-0 place-items-center rounded-full border border-[#EE2D2D]/15 bg-white shadow-sm">
-                    <Image
-                      alt=""
-                      aria-hidden
-                      className="size-5 object-contain"
-                      height={48}
-                      src="/icons/nguyen-anh-ai-48.png"
-                      width={48}
-                    />
+                  <Image
+                    alt=""
+                    aria-hidden
+                    className="size-5 object-contain"
+                    height={48}
+                    src="/icons/nguyen-anh-ai-48.png"
+                    width={48}
+                  />
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="mb-2 flex flex-wrap items-center gap-1.5 text-[11px] text-zinc-400">
@@ -1052,16 +1213,31 @@ function ChatColumn({
                     <span>·</span>
                     <span>Model nội bộ</span>
                     <span>·</span>
-                    <span>{turn.status === "streaming" ? "Đang stream" : turn.status === "error" ? "Lỗi" : "Đã trả lời"}</span>
+                    <span>
+                      {turn.status === "streaming"
+                        ? "Đang stream"
+                        : turn.status === "error"
+                          ? "Lỗi"
+                          : "Đã trả lời"}
+                    </span>
                     {turn.totalMs && <span>· {(turn.totalMs / 1000).toFixed(1)}s</span>}
-                    {turn.regenerated && <span className="rounded-full bg-zinc-100 px-1.5 py-0.5 text-[10px] font-bold dark:bg-white/10">Lượt trả lời lại</span>}
+                    {turn.regenerated && (
+                      <span className="rounded-full bg-zinc-100 px-1.5 py-0.5 text-[10px] font-bold dark:bg-white/10">
+                        Lượt trả lời lại
+                      </span>
+                    )}
                   </div>
                   {turn.reasoning.length > 0 && (
                     <div className="mb-2">
                       <ReasoningTree steps={turn.reasoning} totalMs={turn.totalMs} />
                     </div>
                   )}
-                  <div className={cn("rounded-[14px] bg-transparent", readOnly && "pointer-events-none select-text")}>
+                  <div
+                    className={cn(
+                      "rounded-[14px] bg-transparent",
+                      readOnly && "pointer-events-none select-text"
+                    )}
+                  >
                     <StreamView text={turn.text} streaming={turn.status === "streaming"} />
                   </div>
                   {turn.status !== "streaming" && !readOnly && (
@@ -1082,16 +1258,17 @@ function ChatColumn({
                   )}
                 </div>
               </div>
-            ),
+            )
           )}
         </div>
       </div>
 
       <div className="shrink-0 px-5 pb-4 pt-2">
-        <div className="mx-auto w-full max-w-[800px]">
+        <div className="mx-auto w-full max-w-[1040px]">
           {readOnly && (
             <div className="mb-2 rounded-xl border border-black/10 bg-white px-3 py-2 text-center text-[12px] font-semibold text-zinc-500 dark:border-white/10 dark:bg-zinc-950 dark:text-zinc-300">
-              Link chia sẻ đang ở chế độ chỉ xem. Không thể gửi tin, ghim, sửa hoặc thực hiện hành động.
+              Link chia sẻ đang ở chế độ chỉ xem. Không thể gửi tin, ghim, sửa hoặc thực hiện hành
+              động.
             </div>
           )}
           <div className="relative">
@@ -1129,22 +1306,50 @@ function ChatColumn({
                     void submit();
                   }
                 }}
-                placeholder={readOnly ? "Chế độ chỉ xem" : "Hỏi tiếp về sản lượng, xe, orders... gõ / để gọi lệnh"}
+                placeholder={
+                  readOnly
+                    ? "Chế độ chỉ xem"
+                    : "Hỏi tiếp về sản lượng, xe, orders... gõ / để gọi lệnh"
+                }
                 ref={textareaRef}
                 rows={2}
                 value={input}
               />
               <div className="flex items-center gap-1.5">
-                <button aria-label="Đính kèm" className="composer-tool" disabled={readOnly} onClick={() => onToast("Đính kèm đang chờ cấu hình")} type="button">
+                <button
+                  aria-label="Đính kèm"
+                  className="composer-tool"
+                  disabled={readOnly}
+                  onClick={() => onToast("Đính kèm đang chờ cấu hình")}
+                  type="button"
+                >
                   <Paperclip size={14} />
                 </button>
-                <button aria-label="Lệnh nhanh" className="composer-tool" disabled={readOnly} onClick={() => setSlashOpen((open) => !open)} type="button">
+                <button
+                  aria-label="Lệnh nhanh"
+                  className="composer-tool"
+                  disabled={readOnly}
+                  onClick={() => setSlashOpen((open) => !open)}
+                  type="button"
+                >
                   <Slash size={14} />
                 </button>
-                <button aria-label="Gắn thẻ" className="composer-tool" disabled={readOnly} onClick={() => setInput((value) => `${value}@`)} type="button">
+                <button
+                  aria-label="Gắn thẻ"
+                  className="composer-tool"
+                  disabled={readOnly}
+                  onClick={() => setInput((value) => `${value}@`)}
+                  type="button"
+                >
                   <AtSign size={14} />
                 </button>
-                <button aria-label="Nhập giọng nói" className="composer-tool" disabled={readOnly} onClick={() => onToast("Nhập giọng nói đang chờ cấu hình")} type="button">
+                <button
+                  aria-label="Nhập giọng nói"
+                  className="composer-tool"
+                  disabled={readOnly}
+                  onClick={() => onToast("Nhập giọng nói đang chờ cấu hình")}
+                  type="button"
+                >
                   <Mic size={14} />
                 </button>
                 <span className="ml-auto hidden items-center gap-1 text-[10.5px] text-zinc-400 sm:flex">
@@ -1158,7 +1363,11 @@ function ChatColumn({
                   onClick={() => void submit()}
                   type="button"
                 >
-                  {isBusy ? <Loader2 className="animate-spin" size={15} /> : <ArrowUp size={15} strokeWidth={2.5} />}
+                  {isBusy ? (
+                    <Loader2 className="animate-spin" size={15} />
+                  ) : (
+                    <ArrowUp size={15} strokeWidth={2.5} />
+                  )}
                 </button>
               </div>
             </div>
@@ -1221,7 +1430,7 @@ function Inspector({
         shortcut: "M",
       },
     ],
-    [blocks, onQuickAction, onSaveReport],
+    [blocks, onQuickAction, onSaveReport]
   );
   const tabs: Array<{ key: InspectorTab; label: string; icon: ReactNode }> = [
     { key: "tools", label: "Công cụ", icon: <Activity size={13} /> },
@@ -1232,7 +1441,14 @@ function Inspector({
   useEffect(() => {
     if (tab !== "actions" || readOnly) return undefined;
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.altKey || event.ctrlKey || event.metaKey || event.shiftKey || isEditableTarget(event.target)) return;
+      if (
+        event.altKey ||
+        event.ctrlKey ||
+        event.metaKey ||
+        event.shiftKey ||
+        isEditableTarget(event.target)
+      )
+        return;
       const action = actions.find((item) => item.key === event.key.toLowerCase());
       if (!action) return;
       event.preventDefault();
@@ -1249,8 +1465,12 @@ function Inspector({
         <div className="flex items-center gap-2">
           <LogoMark imageClass="size-5" sizeClass="size-7 rounded-lg" />
           <div className="min-w-0 flex-1">
-            <h2 className="text-[13px] font-extrabold text-zinc-950 dark:text-zinc-50">Bảng ngữ cảnh</h2>
-            <p className="text-[10.5px] text-zinc-400">Công cụ, biểu đồ, hành động cho câu trả lời</p>
+            <h2 className="text-[13px] font-extrabold text-zinc-950 dark:text-zinc-50">
+              Bảng ngữ cảnh
+            </h2>
+            <p className="text-[10.5px] text-zinc-400">
+              Công cụ, biểu đồ, hành động cho câu trả lời
+            </p>
           </div>
           <MoreHorizontal className="text-zinc-400" size={16} />
         </div>
@@ -1259,7 +1479,9 @@ function Inspector({
             <button
               className={cn(
                 "flex items-center justify-center gap-1 rounded-md px-1.5 py-1.5 text-[11px] font-bold transition focus:outline-none focus:ring-2 focus:ring-[#007AFF]/35",
-                tab === item.key ? "bg-white text-zinc-950 shadow-sm dark:bg-zinc-950 dark:text-zinc-50" : "text-zinc-500",
+                tab === item.key
+                  ? "bg-white text-zinc-950 shadow-sm dark:bg-zinc-950 dark:text-zinc-50"
+                  : "text-zinc-500"
               )}
               key={item.key}
               onClick={() => setTab(item.key)}
@@ -1287,7 +1509,9 @@ function Inspector({
                 )}
                 {reasoning.map((step) => {
                   const label = getReasoningStepLabel(step);
-                  const fallbackDetail = stringifyCell(isRecord(step.input) ? step.input.status : "");
+                  const fallbackDetail = stringifyCell(
+                    isRecord(step.input) ? step.input.status : ""
+                  );
                   return (
                     <button
                       className="group relative flex w-full items-start gap-2 rounded-xl p-0 text-left transition focus:outline-none focus:ring-2 focus:ring-[#007AFF]/35"
@@ -1303,7 +1527,7 @@ function Inspector({
                             ? "border-[#34C759] text-[#1F8E47]"
                             : step.status === "error"
                               ? "border-[#FF3B30] text-[#C8281D]"
-                              : "border-[#007AFF] text-[#0A66E0]",
+                              : "border-[#007AFF] text-[#0A66E0]"
                         )}
                       >
                         <span
@@ -1313,16 +1537,24 @@ function Inspector({
                               ? "bg-[#34C759]"
                               : step.status === "error"
                                 ? "bg-[#FF3B30]"
-                                : "animate-pulse bg-[#007AFF]",
+                                : "animate-pulse bg-[#007AFF]"
                           )}
                         />
                       </span>
                       <span className="min-w-0 flex-1 rounded-xl border border-black/10 bg-zinc-50 p-2.5 transition group-hover:border-[#007AFF]/40 group-hover:bg-white dark:border-white/10 dark:bg-white/[0.04] dark:group-hover:bg-white/[0.08]">
-                        <span className="line-clamp-2 block text-[11.5px] font-bold leading-4 text-zinc-800 dark:text-zinc-100">{label}</span>
+                        <span className="line-clamp-2 block text-[11.5px] font-bold leading-4 text-zinc-800 dark:text-zinc-100">
+                          {label}
+                        </span>
                         {!step.resultSummary && fallbackDetail && (
-                          <span className="mt-0.5 line-clamp-2 block text-[11px] leading-4 text-zinc-500">{fallbackDetail}</span>
+                          <span className="mt-0.5 line-clamp-2 block text-[11px] leading-4 text-zinc-500">
+                            {fallbackDetail}
+                          </span>
                         )}
-                        {step.durationMs !== undefined && <span className="mt-1 block font-mono text-[10px] text-zinc-400">{step.durationMs}ms</span>}
+                        {step.durationMs !== undefined && (
+                          <span className="mt-1 block font-mono text-[10px] text-zinc-400">
+                            {step.durationMs}ms
+                          </span>
+                        )}
                       </span>
                     </button>
                   );
@@ -1335,8 +1567,12 @@ function Inspector({
         {tab === "charts" && (
           <div>
             <div className="mb-2 flex items-center gap-2">
-              <span className="text-[12px] font-extrabold text-zinc-900 dark:text-zinc-100">Biểu đồ đã render</span>
-              <span className="rounded-full bg-[rgba(0,122,255,0.10)] px-2 py-0.5 text-[10px] font-bold text-[#0A66E0]">{chartBlocks.length}</span>
+              <span className="text-[12px] font-extrabold text-zinc-900 dark:text-zinc-100">
+                Biểu đồ đã render
+              </span>
+              <span className="rounded-full bg-[rgba(0,122,255,0.10)] px-2 py-0.5 text-[10px] font-bold text-[#0A66E0]">
+                {chartBlocks.length}
+              </span>
             </div>
             <div className="space-y-3">
               {chartBlocks.length === 0 && (
@@ -1349,7 +1585,7 @@ function Inspector({
                   aria-label={block.data.title ?? block.data.type}
                   className={cn(
                     "min-w-0 rounded-xl focus-within:ring-2 focus-within:ring-[#007AFF]/35",
-                    readOnly && "pointer-events-none select-text",
+                    readOnly && "pointer-events-none select-text"
                   )}
                   key={block.blockId}
                 >
@@ -1363,7 +1599,8 @@ function Inspector({
         {tab === "actions" && (
           <div className="space-y-2">
             <div className="rounded-xl border border-[rgba(0,122,255,0.16)] bg-[rgba(0,122,255,0.05)] px-3 py-2 text-[11px] font-semibold text-zinc-500 dark:border-[rgba(109,180,255,0.20)] dark:bg-[rgba(0,122,255,0.10)] dark:text-zinc-300">
-              Dùng phím <Kbd>R</Kbd> <Kbd>B</Kbd> <Kbd>C</Kbd> <Kbd>M</Kbd> khi tab Hành động đang mở.
+              Dùng phím <Kbd>R</Kbd> <Kbd>B</Kbd> <Kbd>C</Kbd> <Kbd>M</Kbd> khi tab Hành động đang
+              mở.
             </div>
             {actions.map((action) => (
               <button
@@ -1384,10 +1621,15 @@ function Inspector({
             ))}
             {blocks.length > 0 && (
               <div className="pt-3">
-                <div className="mb-2 text-[11px] font-extrabold uppercase text-zinc-400">Render blocks</div>
+                <div className="mb-2 text-[11px] font-extrabold uppercase text-zinc-400">
+                  Render blocks
+                </div>
                 <div className="flex flex-wrap gap-1.5">
                   {blocks.map((block) => (
-                    <span className="rounded-full bg-zinc-100 px-2 py-1 font-mono text-[10.5px] text-zinc-500 dark:bg-white/10" key={block.blockId}>
+                    <span
+                      className="rounded-full bg-zinc-100 px-2 py-1 font-mono text-[10.5px] text-zinc-500 dark:bg-white/10"
+                      key={block.blockId}
+                    >
                       {block.data.type}
                     </span>
                   ))}
@@ -1417,12 +1659,12 @@ export function RendererShell() {
   const selectConversation = useRendererStore((state) => state.selectConversation);
   const setConversationTitle = useRendererStore((state) => state.setConversationTitle);
   const setFeedback = useRendererStore((state) => state.setFeedback);
-  const setActiveContext = useRendererStore((state) => state.setActiveContext);
   const toggleConversationPin = useRendererStore((state) => state.toggleConversationPin);
   const toggleInspector = useRendererStore((state) => state.toggleInspector);
   const updateAssistantTurn = useRendererStore((state) => state.updateAssistantTurn);
   const [toast, setToast] = useState<string | null>(null);
   const [reportSaving, setReportSaving] = useState(false);
+  const [historyCollapsed, setHistoryCollapsed] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const readOnly =
     searchParams.get("share") === "1" ||
@@ -1439,7 +1681,7 @@ export function RendererShell() {
     () =>
       conversations.find((conversation) => conversation.id === currentConversationId) ??
       conversations[0],
-    [conversations, currentConversationId],
+    [conversations, currentConversationId]
   );
 
   useEffect(() => {
@@ -1451,12 +1693,12 @@ export function RendererShell() {
 
   const currentPins = useMemo(
     () => (currentConversation ? extractPinnedBlocks(currentConversation) : []),
-    [currentConversation],
+    [currentConversation]
   );
 
   const shareUrl = useMemo(
     () => (currentConversation ? buildShareUrl(currentConversation.id) : ""),
-    [currentConversation],
+    [currentConversation]
   );
 
   const latestReasoning = useMemo(() => {
@@ -1473,7 +1715,10 @@ export function RendererShell() {
     replaceConversationPins(currentConversation.id, currentPins);
   }, [currentConversation, currentPins, readOnly, replaceConversationPins]);
 
-  const isBusy = currentConversation?.turns.some((turn) => turn.role === "assistant" && turn.status === "streaming") ?? false;
+  const isBusy =
+    currentConversation?.turns.some(
+      (turn) => turn.role === "assistant" && turn.status === "streaming"
+    ) ?? false;
 
   const saveCurrentReport = useCallback(async () => {
     if (readOnly) {
@@ -1490,7 +1735,7 @@ export function RendererShell() {
     showToast("Đang tạo báo cáo");
     try {
       const report = await reportApi.createAiReport(
-        buildReportPayload(currentConversation, currentPins, activeContext, shareUrl),
+        buildReportPayload(currentConversation, currentPins, activeContext, shareUrl)
       );
       const storedReport: AiGeneratedReport = {
         blockCount: report.blockCount,
@@ -1514,7 +1759,16 @@ export function RendererShell() {
     } finally {
       setReportSaving(false);
     }
-  }, [activeContext, currentConversation, currentPins, readOnly, reportSaving, saveReport, shareUrl, showToast]);
+  }, [
+    activeContext,
+    currentConversation,
+    currentPins,
+    readOnly,
+    reportSaving,
+    saveReport,
+    shareUrl,
+    showToast,
+  ]);
 
   const sendMessage = useCallback(
     async (text: string, regenerated = false) => {
@@ -1537,7 +1791,7 @@ export function RendererShell() {
         createdAt: new Date().toISOString(),
         regenerated,
       };
-      const requestMessages = toApiMessages(conversation.turns, text, activeContext);
+      const requestMessages = toApiMessages(conversation.turns, text);
 
       if (conversation.turns.length === 0 && conversation.title === "Cuộc trò chuyện mới") {
         setConversationTitle(conversation.id, text.slice(0, 72));
@@ -1554,10 +1808,9 @@ export function RendererShell() {
       let reasoning: ReasoningStep[] = [];
 
       const mergeReasoningStep = (step: ReasoningStep) => {
-        reasoning = [
-          ...reasoning.filter((existing) => existing.id !== step.id),
-          step,
-        ].sort((left, right) => left.startedAt.localeCompare(right.startedAt));
+        reasoning = [...reasoning.filter((existing) => existing.id !== step.id), step].sort(
+          (left, right) => left.startedAt.localeCompare(right.startedAt)
+        );
         updateAssistantTurn(conversation.id, assistantTurn.id, { reasoning });
       };
 
@@ -1570,15 +1823,34 @@ export function RendererShell() {
         const startedAtMs = performance.now();
         const toolRuns = new Map<
           string,
-          { id: string; input: unknown; startedAt: string; startedAtMs: number; tool: ToolName }
+          Array<{
+            id: string;
+            input: unknown;
+            startedAt: string;
+            startedAtMs: number;
+            tool: ToolName;
+          }>
         >();
         let statusCount = 0;
+        let iterationCount = 0;
         let streamError: Error | null = null;
 
         await chatApi.runWithTools(
           requestMessages,
           {
             signal: controller.signal,
+            onIteration: (iteration) => {
+              iterationCount += 1;
+              mergeReasoningStep({
+                event: "reasoning_step",
+                id: `iteration-${assistantTurn.id}-${iterationCount}`,
+                tool: "production_query",
+                status: "done",
+                startedAt: new Date().toISOString(),
+                durationMs: 0,
+                resultSummary: `Vòng xử lý ${iteration}`,
+              });
+            },
             onStatus: (status) => {
               const trimmed = status.trim();
               if (!trimmed) return;
@@ -1599,13 +1871,15 @@ export function RendererShell() {
               const id = uid(`tool-${tool}`);
               const startedAt = new Date().toISOString();
               const input = { tool: name, args };
-              toolRuns.set(name, {
+              const runs = toolRuns.get(name) ?? [];
+              runs.push({
                 id,
                 input,
                 startedAt,
                 startedAtMs: performance.now(),
                 tool,
               });
+              toolRuns.set(name, runs);
               mergeReasoningStep({
                 event: "reasoning_step",
                 id,
@@ -1616,7 +1890,13 @@ export function RendererShell() {
               });
             },
             onToolEnd: (result) => {
-              const existing = toolRuns.get(result.tool);
+              const runs = toolRuns.get(result.tool) ?? [];
+              const existing = runs.shift();
+              if (runs.length > 0) {
+                toolRuns.set(result.tool, runs);
+              } else {
+                toolRuns.delete(result.tool);
+              }
               const tool = existing?.tool ?? mapPopupToolToRendererTool(result.tool);
               const startedAt = existing?.startedAt ?? new Date().toISOString();
               const startedAtMs = existing?.startedAtMs ?? performance.now();
@@ -1640,7 +1920,8 @@ export function RendererShell() {
           {
             injectSystemPrompt: true,
             maxIterations: 4,
-          },
+            sessionId: conversation.id,
+          }
         );
 
         updateAssistantTurn(conversation.id, assistantTurn.id, {
@@ -1662,7 +1943,7 @@ export function RendererShell() {
         });
       }
     },
-    [activeContext, appendTurn, currentConversation, isBusy, readOnly, setConversationTitle, updateAssistantTurn],
+    [appendTurn, currentConversation, isBusy, readOnly, setConversationTitle, updateAssistantTurn]
   );
 
   const regenerateTurn = useCallback(
@@ -1679,12 +1960,13 @@ export function RendererShell() {
         }
       }
     },
-    [currentConversation, readOnly, sendMessage, showToast],
+    [currentConversation, readOnly, sendMessage, showToast]
   );
 
   useEffect(() => {
     const onAction = (event: Event) => {
-      const detail = (event as CustomEvent<{ intent?: string; payload?: unknown; id?: string }>).detail;
+      const detail = (event as CustomEvent<{ intent?: string; payload?: unknown; id?: string }>)
+        .detail;
       if (!detail?.intent) return;
       if (readOnly) {
         showToast("Link chia sẻ chỉ được xem");
@@ -1694,21 +1976,21 @@ export function RendererShell() {
 
       if (detail.intent === "cancel" || detail.intent === "open_dispatch") return;
       const payload = isRecord(detail.payload) ? detail.payload : {};
-      void fetch("/api/chat/action", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          payload: {
+      void chatApi
+        .sendAction(
+          {
             ...payload,
             kind: detail.intent,
             reason: `User approved ${detail.id ?? "action_proposal"}`,
           },
-        }),
-      }).catch(() => undefined);
+          undefined,
+          currentConversation?.id
+        )
+        .catch(() => undefined);
     };
     window.addEventListener("render:action", onAction);
     return () => window.removeEventListener("render:action", onAction);
-  }, [readOnly, showToast]);
+  }, [currentConversation?.id, readOnly, showToast]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -1717,6 +1999,7 @@ export function RendererShell() {
       if (event.key.toLowerCase() === "n") {
         event.preventDefault();
         if (readOnly) return;
+        if (currentConversationId) void chatApi.clearMemory(undefined, currentConversationId);
         createConversation();
       }
       if (event.key === "\\") {
@@ -1725,28 +2008,34 @@ export function RendererShell() {
       }
       if (event.key === "[" || event.key === "]") {
         event.preventDefault();
-        const index = conversations.findIndex((conversation) => conversation.id === currentConversationId);
-        const nextIndex = event.key === "[" ? Math.max(index - 1, 0) : Math.min(index + 1, conversations.length - 1);
+        const index = conversations.findIndex(
+          (conversation) => conversation.id === currentConversationId
+        );
+        const nextIndex =
+          event.key === "["
+            ? Math.max(index - 1, 0)
+            : Math.min(index + 1, conversations.length - 1);
         const next = conversations[nextIndex];
         if (next) selectConversation(next.id);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [conversations, createConversation, currentConversationId, readOnly, selectConversation, toggleInspector]);
+  }, [
+    conversations,
+    createConversation,
+    currentConversationId,
+    readOnly,
+    selectConversation,
+    toggleInspector,
+  ]);
 
   if (!currentConversation) return null;
 
   return (
     <div className="flex h-[calc(100vh-64px)] min-h-0 flex-col overflow-hidden bg-[#F7F7F8] text-zinc-950 dark:bg-zinc-900 dark:text-zinc-50">
       <TopBar
-        activeContext={activeContext}
         inspectorOpen={inspectorOpen}
-        onContextChange={(context) => {
-          if (readOnly) return;
-          setActiveContext(context);
-          showToast(`Đã chuyển hướng: ${contextOptions[context].label}`);
-        }}
         onQuickAction={showToast}
         onSaveReport={saveCurrentReport}
         onToggleInspector={toggleInspector}
@@ -1757,9 +2046,20 @@ export function RendererShell() {
       <div className="relative flex min-h-0 flex-1 overflow-hidden">
         {!readOnly && (
           <HistorySidebar
+            collapsed={historyCollapsed}
             conversations={conversations}
             currentConversationId={currentConversation.id}
-            onNew={() => createConversation()}
+            onNew={() => {
+              void chatApi.clearMemory(undefined, currentConversation.id);
+              createConversation();
+            }}
+            onDelete={(conversationId) => {
+              void chatApi.clearMemory(undefined, conversationId);
+              deleteConversation(conversationId);
+              showToast("Đã xóa cuộc trò chuyện");
+            }}
+            onToggleCollapse={() => setHistoryCollapsed((value) => !value)}
+            pinnedBlocks={pinnedBlocks}
             onSelect={selectConversation}
             readOnly={false}
           />
@@ -1793,7 +2093,9 @@ export function RendererShell() {
           onTogglePin={() => {
             if (readOnly) return;
             toggleConversationPin(currentConversation.id);
-            showToast(currentConversation.pinned ? "Đã bỏ ghim cuộc trò chuyện" : "Đã ghim cuộc trò chuyện");
+            showToast(
+              currentConversation.pinned ? "Đã bỏ ghim cuộc trò chuyện" : "Đã ghim cuộc trò chuyện"
+            );
           }}
           readOnly={readOnly}
         />

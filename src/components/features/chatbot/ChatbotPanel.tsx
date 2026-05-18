@@ -3,7 +3,6 @@ import React, { useState, useRef, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { MessageCircle, X, ArrowUp, RotateCcw } from "lucide-react";
 import chatApi from "@/services/chat.service";
-import { clearMemory } from "@/services/chat-memory";
 import type { ChatMessage as ApiChatMessage } from "@/types/chat";
 import dayjs from "dayjs";
 import { ReasoningTree } from "@/components/renderer/ReasoningTree";
@@ -96,6 +95,10 @@ function TypingDots() {
   );
 }
 
+function createChatSessionId() {
+  return `chatbot-${globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`}`;
+}
+
 export default function ChatbotPanel() {
   const [open, setOpen] = useState(false);
   const [messages, setMessages] = useState<Message[]>([
@@ -106,6 +109,7 @@ export default function ChatbotPanel() {
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const sessionIdRef = useRef(createChatSessionId());
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -154,8 +158,7 @@ export default function ChatbotPanel() {
           m.map((msg) => {
             if (msg.id !== botId) return msg;
             const last = msg.toolSteps?.[msg.toolSteps.length - 1];
-            const nextSteps =
-              last === status ? msg.toolSteps! : [...(msg.toolSteps ?? []), status];
+            const nextSteps = last === status ? msg.toolSteps! : [...(msg.toolSteps ?? []), status];
             return { ...msg, status, toolSteps: nextSteps, loading: !accumulated };
           })
         );
@@ -176,6 +179,7 @@ export default function ChatbotPanel() {
             );
           },
           onToolStart: (name) => appendStep(`Đang gọi ${name}`),
+          onIteration: (iteration) => appendStep(`Vòng xử lý ${iteration}`),
           onDone: () => {
             setMessages((m) =>
               m.map((msg) =>
@@ -209,7 +213,7 @@ export default function ChatbotPanel() {
             setLoading(false);
           },
         },
-        { maxIterations: 4 }
+        { maxIterations: 4, sessionId: sessionIdRef.current }
       );
     },
     [messages, loading]
@@ -218,7 +222,9 @@ export default function ChatbotPanel() {
   const reset = () => {
     abortRef.current?.abort();
     setLoading(false);
-    clearMemory();
+    const previousSessionId = sessionIdRef.current;
+    sessionIdRef.current = createChatSessionId();
+    void chatApi.clearMemory(undefined, previousSessionId);
     setMessages([{ id: "0", role: "bot", text: WELCOME_TEXT, time: dayjs().format("HH:mm") }]);
   };
 
@@ -240,8 +246,7 @@ export default function ChatbotPanel() {
               width: 380,
               height: 560,
               borderRadius: 22,
-              boxShadow:
-                "0 30px 60px -10px rgba(0,0,0,0.18), 0 8px 16px -4px rgba(0,0,0,0.06)",
+              boxShadow: "0 30px 60px -10px rgba(0,0,0,0.18), 0 8px 16px -4px rgba(0,0,0,0.06)",
               overflow: "hidden",
               display: "flex",
               flexDirection: "column",
@@ -313,10 +318,7 @@ export default function ChatbotPanel() {
               </div>
             </div>
 
-            <div
-              className="flex-1 overflow-y-auto px-3 py-3"
-              style={{ background: "#F5F5F7" }}
-            >
+            <div className="flex-1 overflow-y-auto px-3 py-3" style={{ background: "#F5F5F7" }}>
               <div className="space-y-1">
                 {messages.map((msg, idx) => {
                   const prev = messages[idx - 1];
@@ -342,9 +344,7 @@ export default function ChatbotPanel() {
                               borderTopLeftRadius: 6,
                             }}
                           >
-                            <ReasoningTree
-                              steps={toReasoningSteps(msg.toolSteps, msg.loading)}
-                            />
+                            <ReasoningTree steps={toReasoningSteps(msg.toolSteps, msg.loading)} />
                           </div>
                         ) : msg.loading && !msg.text ? (
                           <div
@@ -366,8 +366,7 @@ export default function ChatbotPanel() {
                               letterSpacing: -0.1,
                               ...(isUser
                                 ? {
-                                    background:
-                                      "linear-gradient(180deg, #2C99FF 0%, #007AFF 100%)",
+                                    background: "linear-gradient(180deg, #2C99FF 0%, #007AFF 100%)",
                                     color: "#FFFFFF",
                                     borderBottomRightRadius: 6,
                                   }
@@ -420,9 +419,7 @@ export default function ChatbotPanel() {
                     whiteSpace: "nowrap",
                     letterSpacing: -0.1,
                   }}
-                  onMouseEnter={(e) =>
-                    !loading && (e.currentTarget.style.background = "#E5E5EA")
-                  }
+                  onMouseEnter={(e) => !loading && (e.currentTarget.style.background = "#E5E5EA")}
                   onMouseLeave={(e) => (e.currentTarget.style.background = "#F2F2F7")}
                 >
                   {s}
@@ -495,8 +492,7 @@ export default function ChatbotPanel() {
           height: 56,
           borderRadius: 18,
           background: "linear-gradient(135deg, #4DA1FF 0%, #0A7BFF 100%)",
-          boxShadow:
-            "0 12px 28px -6px rgba(10,123,255,0.45), 0 2px 6px rgba(0,0,0,0.08)",
+          boxShadow: "0 12px 28px -6px rgba(10,123,255,0.45), 0 2px 6px rgba(0,0,0,0.08)",
         }}
       >
         <AnimatePresence mode="wait">

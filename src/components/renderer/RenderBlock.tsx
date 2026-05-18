@@ -5,8 +5,10 @@ import { AlertBlockComponent } from "./blocks/AlertBlock";
 import { AreaChartBlockComponent } from "./blocks/AreaChartBlock";
 import { BarChartBlockComponent } from "./blocks/BarChartBlock";
 import { DonutChartBlockComponent } from "./blocks/DonutChartBlock";
+import { FileBlockComponent } from "./blocks/FileBlock";
 import { FollowupsBlockComponent } from "./blocks/FollowupsBlock";
 import { GanttBlockComponent } from "./blocks/GanttBlock";
+import { ImageBlockComponent } from "./blocks/ImageBlock";
 import { KpiGridBlockComponent } from "./blocks/KpiGridBlock";
 import { LineChartBlockComponent } from "./blocks/LineChartBlock";
 import { MapViewBlockComponent } from "./blocks/MapViewBlock";
@@ -40,6 +42,10 @@ export function RenderBlock({ data }: { data: unknown }) {
       return <TableBlockComponent data={parsed.data} />;
     case "map_view":
       return <MapViewBlockComponent data={parsed.data} />;
+    case "image":
+      return <ImageBlockComponent data={parsed.data} />;
+    case "file":
+      return <FileBlockComponent data={parsed.data} />;
     case "alert":
       return <AlertBlockComponent data={parsed.data} />;
     case "action_proposal":
@@ -54,4 +60,3 @@ export function RenderBlock({ data }: { data: unknown }) {
       return <UnknownBlock data={parsed.data} />;
   }
 }
-

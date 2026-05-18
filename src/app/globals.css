@@ -637,6 +637,49 @@
   /* starts hidden */
 }
 
+@keyframes renderer-stream-caret {
+  0%,
+  100% {
+    opacity: 0.32;
+    transform: scaleY(0.82);
+  }
+
+  45% {
+    opacity: 1;
+    transform: scaleY(1);
+  }
+}
+
+@keyframes renderer-markdown-in {
+  0% {
+    opacity: 0;
+    filter: blur(2px);
+    transform: translateY(2px);
+  }
+
+  100% {
+    opacity: 1;
+    filter: blur(0);
+    transform: translateY(0);
+  }
+}
+
+.renderer-stream-caret {
+  animation: renderer-stream-caret 1.05s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+  transform-origin: center;
+}
+
+.renderer-markdown-streaming :where(p, li, h1, h2, h3, blockquote, table) {
+  animation: renderer-markdown-in 0.18s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .renderer-stream-caret,
+  .renderer-markdown-streaming :where(p, li, h1, h2, h3, blockquote, table) {
+    animation: none;
+  }
+}
+
 @keyframes radar-pulse {
   0% {
     transform: scale(0.5);

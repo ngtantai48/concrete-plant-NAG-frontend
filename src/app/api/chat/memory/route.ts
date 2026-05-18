@@ -1,7 +1,7 @@
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const DEFAULT_AGENT_ACTION_URL = "https://chat.svnagentic.site/api/chat/nag/action";
+const DEFAULT_AGENT_MEMORY_URL = "https://chat.svnagentic.site/api/chat/nag/memory";
 const USER_CONTEXT_HEADERS = [
   "x-nag-user-id",
   "x-nag-role",
@@ -19,8 +19,8 @@ function envValue(...names: string[]) {
   return undefined;
 }
 
-function agentActionUrl() {
-  return envValue("CHAT_AGENT_ACTION_URL") ?? DEFAULT_AGENT_ACTION_URL;
+function agentMemoryUrl() {
+  return envValue("CHAT_AGENT_MEMORY_URL") ?? DEFAULT_AGENT_MEMORY_URL;
 }
 
 function nagConfigHeaders(): HeadersInit {
@@ -39,7 +39,7 @@ function agentHeaders(request: Request): HeadersInit {
   });
 
   return {
-    "Content-Type": request.headers.get("content-type") ?? "application/json",
+    "Content-Type": "application/json",
     "X-Request-Id": crypto.randomUUID(),
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...(userAuthorization ? { "X-User-Authorization": userAuthorization } : {}),
@@ -48,13 +48,10 @@ function agentHeaders(request: Request): HeadersInit {
   };
 }
 
-export async function POST(request: Request) {
-  const body = await request.text();
-
-  const upstream = await fetch(agentActionUrl(), {
-    method: "POST",
+export async function DELETE(request: Request) {
+  const upstream = await fetch(agentMemoryUrl(), {
+    method: "DELETE",
     headers: agentHeaders(request),
-    body,
     signal: request.signal,
   });
 
