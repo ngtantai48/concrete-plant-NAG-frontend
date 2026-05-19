@@ -43,6 +43,7 @@ import { persist } from "zustand/middleware";
 import { cn } from "@/lib/utils";
 import chatApi from "@/services/chat.service";
 import reportApi from "@/services/report.service";
+import speechApi from "@/services/speech.service";
 import type {
   ChatContentBlock,
   ChatMessage as ApiChatMessage,
@@ -1262,137 +1263,210 @@ function ConversationHeader({
   );
 }
 
-type SpeechRecognitionEventLike = {
-  resultIndex: number;
-  results: ArrayLike<{
-    isFinal: boolean;
-    0: { transcript: string };
-  }>;
-};
+async function convertBlobToWav16k(audioBlob: Blob): Promise<Blob> {
+  const AudioCtor: typeof AudioContext | undefined =
+    typeof window === "undefined"
+      ? undefined
+      : window.AudioContext ??
+        (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+  if (!AudioCtor) throw new Error("Trình duyệt không hỗ trợ Web Audio API");
 
-type SpeechRecognitionLike = {
-  lang: string;
-  continuous: boolean;
-  interimResults: boolean;
-  onresult: ((event: SpeechRecognitionEventLike) => void) | null;
-  onerror: ((event: { error?: string; message?: string }) => void) | null;
-  onend: (() => void) | null;
-  start: () => void;
-  stop: () => void;
-  abort: () => void;
-};
+  const audioContext = new AudioCtor({ sampleRate: 16000 });
+  try {
+    const arrayBuffer = await audioBlob.arrayBuffer();
+    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
 
-type SpeechRecognitionCtor = new () => SpeechRecognitionLike;
+    const numChannels = 1;
+    const sampleRate = 16000;
+    const bitsPerSample = 16;
+    const bytesPerSample = bitsPerSample / 8;
+    const blockAlign = numChannels * bytesPerSample;
 
-function getSpeechRecognitionCtor(): SpeechRecognitionCtor | null {
-  if (typeof window === "undefined") return null;
-  const w = window as unknown as {
-    SpeechRecognition?: SpeechRecognitionCtor;
-    webkitSpeechRecognition?: SpeechRecognitionCtor;
-  };
-  return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
+    const samples = audioBuffer.getChannelData(0);
+    const numSamples = samples.length;
+    const dataSize = numSamples * bytesPerSample;
+    const buffer = new ArrayBuffer(44 + dataSize);
+    const view = new DataView(buffer);
+
+    const writeString = (offset: number, str: string) => {
+      for (let i = 0; i < str.length; i += 1) {
+        view.setUint8(offset + i, str.charCodeAt(i));
+      }
+    };
+
+    writeString(0, "RIFF");
+    view.setUint32(4, 36 + dataSize, true);
+    writeString(8, "WAVE");
+    writeString(12, "fmt ");
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true);
+    view.setUint16(22, numChannels, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, sampleRate * blockAlign, true);
+    view.setUint16(32, blockAlign, true);
+    view.setUint16(34, bitsPerSample, true);
+    writeString(36, "data");
+    view.setUint32(40, dataSize, true);
+
+    let offset = 44;
+    for (let i = 0; i < numSamples; i += 1) {
+      const s = Math.max(-1, Math.min(1, samples[i]));
+      view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+      offset += 2;
+    }
+
+    return new Blob([buffer], { type: "audio/wav" });
+  } finally {
+    await audioContext.close().catch(() => undefined);
+  }
 }
 
-function useSpeechRecognition({
+type SpeechRecordingState = "idle" | "recording" | "processing";
+
+function useSpeechRecording({
   onFinalText,
   onError,
 }: {
   onFinalText: (text: string) => void;
   onError: (message: string) => void;
 }) {
-  const [listening, setListening] = useState(false);
-  const [interim, setInterim] = useState("");
-  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+  const [state, setState] = useState<SpeechRecordingState>("idle");
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
 
-  const supported = useMemo(() => Boolean(getSpeechRecognitionCtor()), []);
-
-  const stop = useCallback(() => {
-    const recognition = recognitionRef.current;
-    if (!recognition) return;
-    try {
-      recognition.stop();
-    } catch {
-      /* noop */
-    }
+  const supported = useMemo(() => {
+    if (typeof window === "undefined") return false;
+    return Boolean(navigator.mediaDevices) && typeof window.MediaRecorder !== "undefined";
   }, []);
 
-  const start = useCallback(() => {
-    const Ctor = getSpeechRecognitionCtor();
-    if (!Ctor) {
-      onError("Trình duyệt chưa hỗ trợ nhập giọng nói");
+  const cleanup = useCallback(() => {
+    const recorder = mediaRecorderRef.current;
+    if (recorder && recorder.state !== "inactive") {
+      try {
+        recorder.stop();
+      } catch {
+        /* noop */
+      }
+    }
+    streamRef.current?.getTracks().forEach((track) => track.stop());
+    mediaRecorderRef.current = null;
+    streamRef.current = null;
+  }, []);
+
+  useEffect(() => () => cleanup(), [cleanup]);
+
+  const transcribeBlob = useCallback(
+    async (audioBlob: Blob) => {
+      setState("processing");
+      try {
+        const wav = await convertBlobToWav16k(audioBlob);
+        const file = new File([wav], "recording.wav", { type: "audio/wav" });
+        const result = await speechApi.transcribe(file);
+        const text = result.text?.trim() ?? "";
+        if (text) onFinalText(text);
+        else onError("Không nhận diện được nội dung giọng nói");
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "Lỗi xử lý âm thanh";
+        onError(message);
+      } finally {
+        setState("idle");
+      }
+    },
+    [onError, onFinalText]
+  );
+
+  const start = useCallback(async () => {
+    if (!supported) {
+      onError("Trình duyệt không hỗ trợ ghi âm");
       return;
     }
-    if (recognitionRef.current) {
-      try {
-        recognitionRef.current.abort();
-      } catch {
-        /* noop */
-      }
-      recognitionRef.current = null;
-    }
-    const recognition = new Ctor();
-    recognition.lang = "vi-VN";
-    recognition.continuous = true;
-    recognition.interimResults = true;
-    recognition.onresult = (event) => {
-      let finalChunk = "";
-      let interimChunk = "";
-      for (let index = event.resultIndex; index < event.results.length; index += 1) {
-        const result = event.results[index];
-        const transcript = result[0]?.transcript ?? "";
-        if (result.isFinal) finalChunk += transcript;
-        else interimChunk += transcript;
-      }
-      if (finalChunk.trim()) {
-        onFinalText(finalChunk.trim());
-        setInterim("");
-      } else {
-        setInterim(interimChunk);
-      }
-    };
-    recognition.onerror = (event) => {
-      const code = event.error ?? "unknown";
-      const message =
-        code === "not-allowed" || code === "service-not-allowed"
-          ? "Vui lòng cấp quyền micro cho trình duyệt"
-          : code === "no-speech"
-            ? "Không nghe thấy tiếng nói, hãy thử lại"
-            : code === "network"
-              ? "Mất kết nối mạng khi nhận diện giọng nói"
-              : `Lỗi nhận diện giọng nói: ${code}`;
-      onError(message);
-      setListening(false);
-      setInterim("");
-    };
-    recognition.onend = () => {
-      setListening(false);
-      setInterim("");
-      recognitionRef.current = null;
-    };
     try {
-      recognition.start();
-      recognitionRef.current = recognition;
-      setListening(true);
+      audioChunksRef.current = [];
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          channelCount: 1,
+          sampleRate: 16000,
+          echoCancellation: true,
+          noiseSuppression: true,
+        },
+      });
+      streamRef.current = stream;
+
+      const mimeCandidates = [
+        "audio/webm;codecs=opus",
+        "audio/webm",
+        "audio/ogg;codecs=opus",
+        "audio/mp4",
+      ];
+      const mimeType = mimeCandidates.find((candidate) =>
+        typeof MediaRecorder.isTypeSupported === "function"
+          ? MediaRecorder.isTypeSupported(candidate)
+          : false
+      );
+      const recorder = mimeType
+        ? new MediaRecorder(stream, { mimeType })
+        : new MediaRecorder(stream);
+      mediaRecorderRef.current = recorder;
+
+      recorder.ondataavailable = (event) => {
+        if (event.data.size > 0) audioChunksRef.current.push(event.data);
+      };
+      recorder.onstop = () => {
+        streamRef.current?.getTracks().forEach((track) => track.stop());
+        streamRef.current = null;
+        const blob = new Blob(audioChunksRef.current, {
+          type: recorder.mimeType || "audio/webm",
+        });
+        audioChunksRef.current = [];
+        if (blob.size === 0) {
+          onError("Không ghi được âm thanh, hãy thử lại");
+          setState("idle");
+          return;
+        }
+        void transcribeBlob(blob);
+      };
+      recorder.onerror = () => {
+        cleanup();
+        setState("idle");
+        onError("Lỗi MediaRecorder khi ghi âm");
+      };
+
+      recorder.start();
+      setState("recording");
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Không thể bắt đầu thu âm";
+      const message =
+        error instanceof Error && error.name === "NotAllowedError"
+          ? "Vui lòng cấp quyền micro cho trình duyệt"
+          : error instanceof Error
+            ? error.message
+            : "Không thể truy cập microphone";
+      cleanup();
+      setState("idle");
       onError(message);
     }
-  }, [onError, onFinalText]);
+  }, [cleanup, onError, supported, transcribeBlob]);
 
-  useEffect(() => {
-    return () => {
-      const recognition = recognitionRef.current;
-      if (!recognition) return;
+  const stop = useCallback(() => {
+    const recorder = mediaRecorderRef.current;
+    if (recorder && recorder.state !== "inactive") {
       try {
-        recognition.abort();
+        recorder.stop();
       } catch {
         /* noop */
       }
-      recognitionRef.current = null;
-    };
+    }
   }, []);
 
-  return { listening, interim, start, stop, supported };
+  return {
+    state,
+    recording: state === "recording",
+    processing: state === "processing",
+    start,
+    stop,
+    supported,
+  };
 }
 
 function MentionMenu({ onPick }: { onPick: (token: string) => void }) {
@@ -1685,12 +1759,13 @@ function ChatColumn({
     [attachments, input, isBusy, onSend, readOnly]
   );
 
-  const voice = useSpeechRecognition({
+  const voice = useSpeechRecording({
     onFinalText: (text) => {
       setInput((current) => {
         const next = current.trim();
         return next.length === 0 ? text : `${next} ${text}`;
       });
+      onToast("Đã nhận diện giọng nói");
     },
     onError: (message) => {
       onToast(message);
@@ -1985,11 +2060,11 @@ function ChatColumn({
                 placeholder={
                   readOnly
                     ? "Chế độ chỉ xem"
-                    : voice.listening
-                      ? voice.interim
-                        ? `… ${voice.interim}`
-                        : "Đang nghe... hãy nói tiếng Việt"
-                      : "Hỏi tiếp về sản lượng, xe, orders... gõ / để gọi lệnh"
+                    : voice.recording
+                      ? "Đang ghi âm... bấm Mic để dừng"
+                      : voice.processing
+                        ? "Đang nhận diện giọng nói..."
+                        : "Hỏi tiếp về sản lượng, xe, orders... gõ / để gọi lệnh"
                 }
                 ref={textareaRef}
                 rows={2}
@@ -2033,30 +2108,45 @@ function ChatColumn({
                   <AtSign size={14} />
                 </button>
                 <button
-                  aria-label={voice.listening ? "Dừng nhập giọng nói" : "Nhập giọng nói"}
+                  aria-label={
+                    voice.processing
+                      ? "Đang xử lý giọng nói"
+                      : voice.recording
+                        ? "Dừng ghi âm"
+                        : "Ghi âm và nhận diện giọng nói"
+                  }
                   className={cn(
                     "composer-tool",
-                    voice.listening && "bg-[#FF3B30]/15 text-[#C8281D] animate-pulse"
+                    voice.recording && "bg-[#FF3B30]/15 text-[#C8281D] animate-pulse",
+                    voice.processing && "bg-[#0A66E0]/15 text-[#0A66E0]"
                   )}
-                  disabled={readOnly}
+                  disabled={readOnly || voice.processing}
                   onClick={() => {
                     if (!voice.supported) {
-                      onToast("Trình duyệt chưa hỗ trợ nhập giọng nói");
+                      onToast("Trình duyệt chưa hỗ trợ ghi âm");
                       return;
                     }
-                    if (voice.listening) voice.stop();
-                    else voice.start();
+                    if (voice.recording) voice.stop();
+                    else if (!voice.processing) void voice.start();
                   }}
                   title={
                     voice.supported
-                      ? voice.listening
-                        ? "Dừng nhập giọng nói"
-                        : "Nhập giọng nói (tiếng Việt)"
-                      : "Trình duyệt chưa hỗ trợ giọng nói"
+                      ? voice.processing
+                        ? "Đang nhận diện..."
+                        : voice.recording
+                          ? "Dừng ghi âm"
+                          : "Ghi âm (Savina STT, tiếng Việt)"
+                      : "Trình duyệt không hỗ trợ ghi âm"
                   }
                   type="button"
                 >
-                  {voice.listening ? <MicOff size={14} /> : <Mic size={14} />}
+                  {voice.processing ? (
+                    <Loader2 className="animate-spin" size={14} />
+                  ) : voice.recording ? (
+                    <MicOff size={14} />
+                  ) : (
+                    <Mic size={14} />
+                  )}
                 </button>
                 <span className="ml-auto hidden items-center gap-1 text-[10.5px] text-zinc-400 sm:flex">
                   <Kbd>⌘↵</Kbd> gửi
