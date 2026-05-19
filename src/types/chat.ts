@@ -1,8 +1,24 @@
 export type ChatRole = "system" | "user" | "assistant";
 
+export interface ChatTextBlock {
+  type: "text";
+  text: string;
+}
+
+export interface ChatImageBlock {
+  type: "image";
+  source: {
+    type: "base64";
+    media_type: string;
+    data: string;
+  };
+}
+
+export type ChatContentBlock = ChatTextBlock | ChatImageBlock;
+
 export interface ChatMessage {
   role: ChatRole;
-  content: string;
+  content: string | ChatContentBlock[];
 }
 
 export interface ChatCompletionRequest {

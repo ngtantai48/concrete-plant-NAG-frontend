@@ -5,14 +5,17 @@ import {
   ArrowUp,
   AtSign,
   BarChart3,
-  Clipboard,
   Copy,
   Download,
   Edit3,
+  Eraser,
+  ExternalLink,
   FileText,
-  Gauge,
+  Image as ImageIcon,
+  Keyboard,
   Loader2,
   Mic,
+  MicOff,
   Minimize2,
   MoreHorizontal,
   Paperclip,
@@ -24,11 +27,11 @@ import {
   Search,
   Share2,
   Slash,
+  Square,
   Star,
   ThumbsDown,
   ThumbsUp,
   Trash2,
-  Wrench,
   X,
 } from "lucide-react";
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -40,12 +43,17 @@ import { persist } from "zustand/middleware";
 import { cn } from "@/lib/utils";
 import chatApi from "@/services/chat.service";
 import reportApi from "@/services/report.service";
-import type { ChatMessage as ApiChatMessage, ToolResult } from "@/types/chat";
+import type {
+  ChatContentBlock,
+  ChatMessage as ApiChatMessage,
+  ToolResult,
+} from "@/types/chat";
 import type { AiGeneratedReport, AiReportBlock, CreateAiReportPayload } from "@/types/report";
 
 import { ReasoningTree } from "./ReasoningTree";
 import { RenderBlock } from "./RenderBlock";
 import { StreamView } from "./StreamView";
+import { assetHref, formatBytes } from "./blocks/asset-url";
 import { parseStream } from "./parseStream";
 import { isRecord } from "./tokens";
 import {
@@ -61,11 +69,19 @@ type HistoryFilter = "all" | "pinned" | "vehicles";
 type InspectorTab = "tools" | "charts" | "actions";
 type WorkContext = "fleet" | "production" | "maintenance";
 
+type UserTurnAttachment = {
+  kind: "image" | "file";
+  filename: string;
+  mimeType: string;
+  sizeBytes: number;
+};
+
 type UserTurn = {
   id: string;
   role: "user";
   text: string;
   createdAt: string;
+  attachments?: UserTurnAttachment[];
 };
 
 type AssistantTurn = {
@@ -123,6 +139,132 @@ type RendererStore = {
   ) => void;
 };
 
+type ComposerAttachment = {
+  id: string;
+  kind: "image" | "file";
+  filename: string;
+  mimeType: string;
+  sizeBytes: number;
+  previewUrl?: string;
+  textContent?: string;
+  base64?: string;
+};
+
+const ALLOWED_IMAGE_MIME = new Set(["image/jpeg", "image/jpg", "image/png", "image/webp"]);
+const MAX_IMAGE_COUNT = 5;
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+const IMAGE_SIZE_WARN_BYTES = 2 * 1024 * 1024;
+const ATTACHMENT_MAX_BYTES = 5 * 1024 * 1024;
+const ATTACHMENT_TEXT_MAX_CHARS = 4000;
+const TEXT_FILE_EXTENSIONS = new Set([
+  "txt",
+  "csv",
+  "md",
+  "markdown",
+  "json",
+  "log",
+  "tsv",
+  "yaml",
+  "yml",
+  "xml",
+  "ini",
+  "env",
+]);
+
+function isTextLikeMime(mime: string, filename: string): boolean {
+  if (mime.startsWith("text/")) return true;
+  if (
+    mime === "application/json" ||
+    mime === "application/xml" ||
+    mime === "application/x-yaml"
+  )
+    return true;
+  const ext = filename.toLowerCase().split(".").pop() ?? "";
+  return TEXT_FILE_EXTENSIONS.has(ext);
+}
+
+function formatAttachmentSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+}
+
+function readFileAsBase64Stripped(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const result = reader.result;
+      if (typeof result !== "string") {
+        reject(new Error("FileReader: unexpected non-string result"));
+        return;
+      }
+      const commaIdx = result.indexOf(",");
+      resolve(commaIdx >= 0 ? result.slice(commaIdx + 1) : result);
+    };
+    reader.onerror = () => reject(reader.error ?? new Error("FileReader failed"));
+    reader.readAsDataURL(file);
+  });
+}
+
+function buildContentBlocks(
+  text: string,
+  attachments: ComposerAttachment[]
+): string | ChatContentBlock[] {
+  const imageAttachments = attachments.filter(
+    (item): item is ComposerAttachment & { base64: string } =>
+      item.kind === "image" && Boolean(item.base64)
+  );
+  const textAttachments = attachments.filter(
+    (item) => item.kind === "file" && item.textContent
+  );
+
+  const blocks: ChatContentBlock[] = [];
+  const textParts: string[] = [];
+
+  for (const attachment of textAttachments) {
+    const truncated = (attachment.textContent ?? "").length > ATTACHMENT_TEXT_MAX_CHARS;
+    const body = (attachment.textContent ?? "").slice(0, ATTACHMENT_TEXT_MAX_CHARS);
+    const trailer = truncated ? "\n... (đã cắt bớt)" : "";
+    textParts.push(
+      `> [Tệp đính kèm] ${attachment.filename} · ${attachment.mimeType || "unknown"} · ${formatAttachmentSize(attachment.sizeBytes)}\n\`\`\`\n${body}${trailer}\n\`\`\``
+    );
+  }
+
+  if (text.trim()) textParts.push(text.trim());
+
+  const combinedText = textParts.join("\n\n").trim();
+
+  if (imageAttachments.length === 0) {
+    return combinedText;
+  }
+
+  if (combinedText) {
+    blocks.push({ type: "text", text: combinedText });
+  }
+
+  for (const image of imageAttachments) {
+    blocks.push({
+      type: "image",
+      source: {
+        type: "base64",
+        media_type: image.mimeType || "image/jpeg",
+        data: image.base64,
+      },
+    });
+  }
+
+  return blocks;
+}
+
+const mentionShortcuts: Array<{ token: string; hint: string }> = [
+  { token: "@san-luong", hint: "Nhắc tới tổng quan sản lượng hôm nay" },
+  { token: "@doi-xe", hint: "Nhắc tới trạng thái đội xe & tài xế" },
+  { token: "@bao-tri", hint: "Nhắc tới lịch bảo trì sắp tới" },
+  { token: "@don-hang", hint: "Nhắc tới đơn hàng đang xử lý" },
+  { token: "@ca-sang", hint: "Bối cảnh ca sáng" },
+  { token: "@ca-chieu", hint: "Bối cảnh ca chiều" },
+];
+
 const slashCommands = [
   {
     cmd: "/tong-quan",
@@ -133,8 +275,9 @@ const slashCommands = [
   { cmd: "/bao-tri", hint: "Lịch bảo trì", example: "Lịch bảo trì tuần này có xe nào rủi ro?" },
   {
     cmd: "/don-dang-di-chuyen",
-    hint: "Đơn đang di chuyển",
-    example: "Liệt kê đơn đang di chuyển và xe phụ trách",
+    hint: "Đơn đang di chuyển (running + transporting + collecting)",
+    example:
+      "Liệt kê tất cả đơn đang di chuyển (gồm running, transporting, collecting) và xe phụ trách",
   },
 ];
 
@@ -305,6 +448,15 @@ function relativeTime(value: string) {
 
 function summarizeToolResult(result: ToolResult): string {
   if (result.status === "error") return result.error ?? "Tool returned an error";
+  if (result.tool === "executeCode") {
+    const data = isRecord(result.data) ? result.data : {};
+    const title = typeof data.title === "string" && data.title.trim() ? data.title.trim() : "";
+    const artifacts = isRecord(data.artifacts) ? data.artifacts : {};
+    const totalRows = typeof artifacts.totalRows === "number" ? artifacts.totalRows : undefined;
+    if (title && totalRows) return `Đã tạo ${title} · ${totalRows} artifact`;
+    if (title) return `Đã tạo ${title}`;
+    return "Đã tạo biểu đồ / artifact";
+  }
   if (typeof result.text === "string" && result.text.trim())
     return result.text.trim().slice(0, 180);
   if (result.data && typeof result.data === "object") return "Đã lấy dữ liệu nội bộ Nguyên Anh";
@@ -320,6 +472,7 @@ function getReasoningStepLabel(step: ReasoningStep) {
 }
 
 function mapPopupToolToRendererTool(name: string): ToolName {
+  if (name === "executeCode") return "executeCode";
   if (name === "getTodayOrders" || name === "getOrdersByStatus") return "driver_schedule";
   if (name === "getVehicleStatus") return "vehicle_search";
   if (name === "getMaintenanceForecast") return "maintenance_log";
@@ -329,7 +482,18 @@ function mapPopupToolToRendererTool(name: string): ToolName {
   return "production_query";
 }
 
-function toApiMessages(turns: Turn[], nextUserText: string): ApiChatMessage[] {
+function compactToolArgsForReasoning(name: string, args: Record<string, unknown>) {
+  if (name !== "executeCode") return args;
+  return {
+    intent: args.intent,
+    title: args.title,
+  };
+}
+
+function toApiMessages(
+  turns: Turn[],
+  nextUserContent: string | ChatContentBlock[]
+): ApiChatMessage[] {
   const messages = turns
     .filter((turn) => turn.text.trim().length > 0)
     .map(
@@ -338,7 +502,7 @@ function toApiMessages(turns: Turn[], nextUserText: string): ApiChatMessage[] {
         content: turn.text,
       })
     );
-  return [...messages, { role: "user", content: nextUserText }];
+  return [...messages, { role: "user", content: nextUserContent }];
 }
 
 function extractPinnedBlocks(conversation: Conversation): PinnedBlock[] {
@@ -373,11 +537,6 @@ function stringifyCell(value: unknown): string {
   if (typeof value === "string" || typeof value === "number" || typeof value === "boolean")
     return String(value);
   return JSON.stringify(value);
-}
-
-function isEditableTarget(target: EventTarget | null) {
-  if (!(target instanceof HTMLElement)) return false;
-  return Boolean(target.closest("input, textarea, select, [contenteditable='true']"));
 }
 
 function copyText(value: string) {
@@ -433,17 +592,6 @@ function summarizePinnedConversation(conversation: Conversation, blocks: PinnedB
   };
 }
 
-function buildBlocksSummary(blocks: PinnedBlock[]) {
-  if (blocks.length === 0) return "Chưa có khối trực quan nào trong cuộc trò chuyện.";
-  return [
-    `Tóm tắt vận hành có ${blocks.length} khối trực quan:`,
-    ...blocks.map(
-      (block, index) =>
-        `${index + 1}. ${getRenderBlockTitle(block.data) ?? block.data.type} (${block.data.type})`
-    ),
-  ].join("\n");
-}
-
 function buildReportPayload(
   conversation: Conversation,
   blocks: PinnedBlock[],
@@ -474,6 +622,72 @@ function buildReportPayload(
         data: block.data,
       })
     ),
+  };
+}
+
+type InspectorAttachment = {
+  id: string;
+  kind: "report" | "file" | "image";
+  title: string;
+  filename: string;
+  href: string;
+  meta: string;
+  createdAt: string;
+};
+
+function joinAttachmentMeta(parts: Array<string | undefined>) {
+  return parts.filter((part): part is string => Boolean(part)).join(" · ");
+}
+
+function buildBlockAttachment(block: PinnedBlock): InspectorAttachment | null {
+  const { data } = block;
+  if (data.type !== "file" && data.type !== "image") return null;
+
+  const fallbackName =
+    data.type === "image" ? `ai-image-${block.blockId}.png` : `ai-file-${block.blockId}`;
+  const filename = data.filename ?? fallbackName;
+  const title = data.title ?? filename;
+  const kindLabel = data.type === "image" ? "Ảnh do AI tạo" : "Tệp do AI tạo";
+  const href = assetHref(data, { download: true });
+
+  if (!href) return null;
+
+  return {
+    id: block.blockId,
+    kind: data.type,
+    title,
+    filename,
+    href,
+    meta: joinAttachmentMeta([
+      kindLabel,
+      data.mimeType,
+      formatBytes(data.sizeBytes),
+      relativeTime(block.createdAt),
+    ]),
+    createdAt: block.createdAt,
+  };
+}
+
+function buildReportAttachment(report: AiGeneratedReport): InspectorAttachment | null {
+  const href = assetHref(
+    { base64: report.pdfBase64, mimeType: report.mimeType },
+    { download: true }
+  );
+  if (!href) return null;
+
+  return {
+    id: report.id,
+    kind: "report",
+    title: report.title || "Báo cáo vận hành",
+    filename: report.filename,
+    href,
+    meta: joinAttachmentMeta([
+      "Báo cáo PDF",
+      formatBytes(report.sizeBytes),
+      report.blockCount ? `${report.blockCount} khối` : undefined,
+      relativeTime(report.createdAt),
+    ]),
+    createdAt: report.createdAt,
   };
 }
 
@@ -527,6 +741,73 @@ function Kbd({ children }: { children: ReactNode }) {
     <span className="rounded border border-black/10 bg-black/[0.05] px-1.5 py-0.5 font-mono text-[10px] text-zinc-500 dark:border-white/10 dark:bg-white/10 dark:text-zinc-300">
       {children}
     </span>
+  );
+}
+
+function ShortcutsDialog({ onClose, open }: { onClose: () => void; open: boolean }) {
+  useEffect(() => {
+    if (!open) return;
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    document.addEventListener("keydown", handleKey);
+    return () => document.removeEventListener("keydown", handleKey);
+  }, [onClose, open]);
+
+  if (!open) return null;
+  const rows: Array<{ keys: string[]; label: string }> = [
+    { keys: ["⌘", "↵"], label: "Gửi tin nhắn" },
+    { keys: ["↵"], label: "Gửi tin nhắn (không có Shift)" },
+    { keys: ["⌘", "N"], label: "Mở cuộc trò chuyện mới" },
+    { keys: ["⌘", "\\"], label: "Ẩn / hiện bảng ngữ cảnh" },
+    { keys: ["⌘", "["], label: "Cuộc trò chuyện trước" },
+    { keys: ["⌘", "]"], label: "Cuộc trò chuyện sau" },
+    { keys: ["/"], label: "Mở danh sách lệnh nhanh" },
+    { keys: ["@"], label: "Mở danh sách gắn thẻ ngữ cảnh" },
+    { keys: ["Esc"], label: "Đóng menu / hộp thoại" },
+  ];
+
+  return (
+    <div
+      className="fixed inset-0 z-[100] grid place-items-center bg-black/40 p-4"
+      onClick={onClose}
+      role="dialog"
+      aria-modal="true"
+    >
+      <div
+        className="w-full max-w-[420px] overflow-hidden rounded-2xl border border-black/10 bg-white shadow-2xl dark:border-white/10 dark:bg-zinc-950"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <header className="flex items-center justify-between border-b border-black/[0.07] px-4 py-3 dark:border-white/10">
+          <div className="flex items-center gap-2">
+            <Keyboard className="text-[#0A66E0]" size={16} />
+            <h3 className="text-[14px] font-extrabold text-zinc-950 dark:text-zinc-50">
+              Phím tắt
+            </h3>
+          </div>
+          <button
+            aria-label="Đóng"
+            className="grid size-7 place-items-center rounded-md text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-white/10"
+            onClick={onClose}
+            type="button"
+          >
+            <X size={14} />
+          </button>
+        </header>
+        <ul className="divide-y divide-black/[0.05] px-4 py-2 dark:divide-white/10">
+          {rows.map((row) => (
+            <li className="flex items-center justify-between gap-3 py-2.5" key={row.label}>
+              <span className="text-[12.5px] text-zinc-700 dark:text-zinc-200">{row.label}</span>
+              <span className="flex items-center gap-1">
+                {row.keys.map((key, index) => (
+                  <Kbd key={`${row.label}-${index}-${key}`}>{key}</Kbd>
+                ))}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </div>
   );
 }
 
@@ -981,6 +1262,162 @@ function ConversationHeader({
   );
 }
 
+type SpeechRecognitionEventLike = {
+  resultIndex: number;
+  results: ArrayLike<{
+    isFinal: boolean;
+    0: { transcript: string };
+  }>;
+};
+
+type SpeechRecognitionLike = {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  onresult: ((event: SpeechRecognitionEventLike) => void) | null;
+  onerror: ((event: { error?: string; message?: string }) => void) | null;
+  onend: (() => void) | null;
+  start: () => void;
+  stop: () => void;
+  abort: () => void;
+};
+
+type SpeechRecognitionCtor = new () => SpeechRecognitionLike;
+
+function getSpeechRecognitionCtor(): SpeechRecognitionCtor | null {
+  if (typeof window === "undefined") return null;
+  const w = window as unknown as {
+    SpeechRecognition?: SpeechRecognitionCtor;
+    webkitSpeechRecognition?: SpeechRecognitionCtor;
+  };
+  return w.SpeechRecognition ?? w.webkitSpeechRecognition ?? null;
+}
+
+function useSpeechRecognition({
+  onFinalText,
+  onError,
+}: {
+  onFinalText: (text: string) => void;
+  onError: (message: string) => void;
+}) {
+  const [listening, setListening] = useState(false);
+  const [interim, setInterim] = useState("");
+  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+
+  const supported = useMemo(() => Boolean(getSpeechRecognitionCtor()), []);
+
+  const stop = useCallback(() => {
+    const recognition = recognitionRef.current;
+    if (!recognition) return;
+    try {
+      recognition.stop();
+    } catch {
+      /* noop */
+    }
+  }, []);
+
+  const start = useCallback(() => {
+    const Ctor = getSpeechRecognitionCtor();
+    if (!Ctor) {
+      onError("Trình duyệt chưa hỗ trợ nhập giọng nói");
+      return;
+    }
+    if (recognitionRef.current) {
+      try {
+        recognitionRef.current.abort();
+      } catch {
+        /* noop */
+      }
+      recognitionRef.current = null;
+    }
+    const recognition = new Ctor();
+    recognition.lang = "vi-VN";
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.onresult = (event) => {
+      let finalChunk = "";
+      let interimChunk = "";
+      for (let index = event.resultIndex; index < event.results.length; index += 1) {
+        const result = event.results[index];
+        const transcript = result[0]?.transcript ?? "";
+        if (result.isFinal) finalChunk += transcript;
+        else interimChunk += transcript;
+      }
+      if (finalChunk.trim()) {
+        onFinalText(finalChunk.trim());
+        setInterim("");
+      } else {
+        setInterim(interimChunk);
+      }
+    };
+    recognition.onerror = (event) => {
+      const code = event.error ?? "unknown";
+      const message =
+        code === "not-allowed" || code === "service-not-allowed"
+          ? "Vui lòng cấp quyền micro cho trình duyệt"
+          : code === "no-speech"
+            ? "Không nghe thấy tiếng nói, hãy thử lại"
+            : code === "network"
+              ? "Mất kết nối mạng khi nhận diện giọng nói"
+              : `Lỗi nhận diện giọng nói: ${code}`;
+      onError(message);
+      setListening(false);
+      setInterim("");
+    };
+    recognition.onend = () => {
+      setListening(false);
+      setInterim("");
+      recognitionRef.current = null;
+    };
+    try {
+      recognition.start();
+      recognitionRef.current = recognition;
+      setListening(true);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Không thể bắt đầu thu âm";
+      onError(message);
+    }
+  }, [onError, onFinalText]);
+
+  useEffect(() => {
+    return () => {
+      const recognition = recognitionRef.current;
+      if (!recognition) return;
+      try {
+        recognition.abort();
+      } catch {
+        /* noop */
+      }
+      recognitionRef.current = null;
+    };
+  }, []);
+
+  return { listening, interim, start, stop, supported };
+}
+
+function MentionMenu({ onPick }: { onPick: (token: string) => void }) {
+  return (
+    <div className="overflow-hidden rounded-xl border border-black/10 bg-white shadow-2xl dark:border-white/10 dark:bg-zinc-950">
+      {mentionShortcuts.map((item) => (
+        <button
+          className="flex w-full items-start gap-3 px-3 py-2.5 text-left transition hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-[#007AFF]/35 dark:hover:bg-white/10"
+          key={item.token}
+          onClick={() => onPick(item.token)}
+          type="button"
+        >
+          <AtSign className="mt-0.5 text-[#0A66E0]" size={14} />
+          <span className="min-w-0 flex-1">
+            <span className="block font-mono text-[12px] font-bold text-zinc-950 dark:text-zinc-50">
+              {item.token}
+            </span>
+            <span className="block text-[11.5px] text-zinc-500">{item.hint}</span>
+          </span>
+        </button>
+      ))}
+    </div>
+  );
+}
+
 function SlashMenu({ onPick, query }: { onPick: (text: string) => void; query: string }) {
   const filtered = slashCommands.filter((command) => {
     const normalized = query.toLowerCase();
@@ -1102,27 +1539,177 @@ function ChatColumn({
   onPinAll: () => void;
   onRegenerate: (turnId: string) => void;
   onRename: (title: string) => void;
-  onSend: (text: string) => Promise<void>;
+  onSend: (text: string, attachments?: ComposerAttachment[]) => Promise<void>;
   onToast: (message: string) => void;
   onTogglePin: () => void;
   readOnly: boolean;
 }) {
   const [input, setInput] = useState("");
   const [slashOpen, setSlashOpen] = useState(false);
+  const [mentionOpen, setMentionOpen] = useState(false);
+  const [attachments, setAttachments] = useState<ComposerAttachment[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const stickToBottomRef = useRef(true);
+
+  useEffect(() => {
+    return () => {
+      attachments.forEach((attachment) => {
+        if (attachment.previewUrl) URL.revokeObjectURL(attachment.previewUrl);
+      });
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const removeAttachment = useCallback((id: string) => {
+    setAttachments((current) => {
+      const target = current.find((item) => item.id === id);
+      if (target?.previewUrl) URL.revokeObjectURL(target.previewUrl);
+      return current.filter((item) => item.id !== id);
+    });
+  }, []);
+
+  const handleFilesPicked = useCallback(
+    async (files: FileList | null) => {
+      if (!files || files.length === 0) return;
+      const existingImageCount = attachments.filter((item) => item.kind === "image").length;
+      let imageBudget = MAX_IMAGE_COUNT - existingImageCount;
+      const accepted: ComposerAttachment[] = [];
+      const rejections: string[] = [];
+      const warnings: string[] = [];
+
+      for (const file of Array.from(files)) {
+        const isImage = file.type.startsWith("image/");
+        if (isImage) {
+          if (!ALLOWED_IMAGE_MIME.has(file.type)) {
+            rejections.push(`${file.name}: chỉ chấp nhận JPG/PNG/WEBP`);
+            continue;
+          }
+          if (file.size > MAX_IMAGE_BYTES) {
+            rejections.push(
+              `${file.name}: ${(file.size / 1024 / 1024).toFixed(1)}MB vượt 5MB`
+            );
+            continue;
+          }
+          if (imageBudget <= 0) {
+            rejections.push(`${file.name}: tối đa ${MAX_IMAGE_COUNT} ảnh/tin nhắn`);
+            continue;
+          }
+          try {
+            const base64 = await readFileAsBase64Stripped(file);
+            accepted.push({
+              id: uid("att"),
+              kind: "image",
+              filename: file.name || "image.jpg",
+              mimeType: file.type,
+              sizeBytes: file.size,
+              previewUrl: URL.createObjectURL(file),
+              base64,
+            });
+            imageBudget -= 1;
+            if (file.size > IMAGE_SIZE_WARN_BYTES) {
+              warnings.push(
+                `${file.name} ${(file.size / 1024 / 1024).toFixed(1)}MB — AI có thể xử lý chậm`
+              );
+            }
+          } catch {
+            rejections.push(`${file.name}: không đọc được`);
+          }
+          continue;
+        }
+        if (file.size > ATTACHMENT_MAX_BYTES) {
+          rejections.push(`${file.name}: > 5MB`);
+          continue;
+        }
+        if (isTextLikeMime(file.type, file.name)) {
+          try {
+            const text = await file.text();
+            accepted.push({
+              id: uid("att"),
+              kind: "file",
+              filename: file.name,
+              mimeType: file.type || "text/plain",
+              sizeBytes: file.size,
+              textContent: text,
+            });
+          } catch {
+            rejections.push(`${file.name}: không đọc được`);
+          }
+          continue;
+        }
+        accepted.push({
+          id: uid("att"),
+          kind: "file",
+          filename: file.name,
+          mimeType: file.type || "application/octet-stream",
+          sizeBytes: file.size,
+        });
+      }
+
+      if (accepted.length > 0) {
+        setAttachments((current) => [...current, ...accepted]);
+        onToast(
+          accepted.length === 1
+            ? `Đã đính kèm ${accepted[0].filename}`
+            : `Đã đính kèm ${accepted.length} tệp`
+        );
+      }
+      if (warnings.length > 0) {
+        onToast(warnings[0]);
+      }
+      if (rejections.length > 0) {
+        onToast(`Bỏ qua: ${rejections.join(", ")}`);
+      }
+    },
+    [attachments, onToast]
+  );
 
   const submit = useCallback(
     async (textOverride?: string) => {
       const trimmed = (textOverride ?? input).trim();
-      if (!trimmed || isBusy || readOnly) return;
+      if ((!trimmed && attachments.length === 0) || isBusy || readOnly) return;
       setInput("");
       setSlashOpen(false);
-      await onSend(trimmed);
+      setMentionOpen(false);
+      const submitted = attachments;
+      const toRevoke = submitted.filter((item) => item.previewUrl);
+      setAttachments([]);
+      window.setTimeout(() => {
+        toRevoke.forEach((item) => {
+          if (item.previewUrl) URL.revokeObjectURL(item.previewUrl);
+        });
+      }, 0);
+      await onSend(trimmed, submitted);
     },
-    [input, isBusy, onSend, readOnly]
+    [attachments, input, isBusy, onSend, readOnly]
   );
+
+  const voice = useSpeechRecognition({
+    onFinalText: (text) => {
+      setInput((current) => {
+        const next = current.trim();
+        return next.length === 0 ? text : `${next} ${text}`;
+      });
+    },
+    onError: (message) => {
+      onToast(message);
+    },
+  });
+
+  const insertMention = useCallback((token: string) => {
+    setInput((current) => {
+      const trimmedEnd = current.replace(/\s+$/, "");
+      const lastAtIdx = trimmedEnd.lastIndexOf("@");
+      if (lastAtIdx >= 0 && /^@[\w-]*$/.test(trimmedEnd.slice(lastAtIdx))) {
+        return `${trimmedEnd.slice(0, lastAtIdx)}${token} `;
+      }
+      if (trimmedEnd.length === 0) return `${token} `;
+      return `${trimmedEnd} ${token} `;
+    });
+    setMentionOpen(false);
+    textareaRef.current?.focus();
+  }, []);
 
   useEffect(() => {
     const onFollowup = (event: Event) => {
@@ -1191,8 +1778,32 @@ function ChatColumn({
           {conversation.turns.map((turn) =>
             turn.role === "user" ? (
               <div className="flex justify-end" key={turn.id}>
-                <div className="max-w-[78%] rounded-[18px] rounded-br-md bg-[linear-gradient(180deg,#2C99FF_0%,#007AFF_100%)] px-3.5 py-2 text-[14px] leading-6 text-white shadow-[0_10px_30px_-22px_rgba(0,122,255,0.95)]">
-                  {turn.text}
+                <div className="flex max-w-[78%] flex-col items-end gap-1">
+                  {turn.text && (
+                    <div className="rounded-[18px] rounded-br-md bg-[linear-gradient(180deg,#2C99FF_0%,#007AFF_100%)] px-3.5 py-2 text-[14px] leading-6 text-white shadow-[0_10px_30px_-22px_rgba(0,122,255,0.95)]">
+                      {turn.text}
+                    </div>
+                  )}
+                  {turn.attachments && turn.attachments.length > 0 && (
+                    <div className="flex flex-wrap justify-end gap-1">
+                      {turn.attachments.map((attachment, index) => (
+                        <span
+                          className="inline-flex items-center gap-1 rounded-full border border-[#007AFF]/25 bg-white px-2 py-0.5 text-[10.5px] font-semibold text-[#0A66E0] dark:border-white/10 dark:bg-zinc-950 dark:text-[#6DB4FF]"
+                          key={`${turn.id}-att-${index}`}
+                        >
+                          {attachment.kind === "image" ? (
+                            <ImageIcon size={11} />
+                          ) : (
+                            <FileText size={11} />
+                          )}
+                          <span className="max-w-[120px] truncate">{attachment.filename}</span>
+                          <span className="font-mono text-[10px] text-zinc-400">
+                            {formatAttachmentSize(attachment.sizeBytes)}
+                          </span>
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             ) : (
@@ -1284,7 +1895,71 @@ function ChatColumn({
                 />
               </div>
             )}
+            {mentionOpen && !readOnly && (
+              <div className="absolute bottom-[calc(100%+8px)] left-0 right-0 z-30">
+                <MentionMenu onPick={insertMention} />
+              </div>
+            )}
+            <input
+              accept="image/jpeg,image/jpg,image/png,image/webp,.txt,.csv,.md,.markdown,.json,.log,.tsv,.yaml,.yml,.xml"
+              aria-hidden="true"
+              className="hidden"
+              multiple
+              onChange={(event) => {
+                void handleFilesPicked(event.currentTarget.files);
+                event.currentTarget.value = "";
+              }}
+              ref={fileInputRef}
+              tabIndex={-1}
+              type="file"
+            />
             <div className="rounded-2xl border border-black/10 bg-white p-2.5 shadow-[0_4px_18px_-6px_rgba(15,23,42,0.18)] dark:border-white/10 dark:bg-zinc-950">
+              {attachments.length > 0 && (
+                <div className="mb-2 flex flex-wrap gap-1.5">
+                  {attachments.map((attachment) => (
+                    <div
+                      className="group flex items-center gap-2 rounded-lg border border-black/10 bg-zinc-50 py-1 pl-1.5 pr-1 text-[11px] text-zinc-700 dark:border-white/10 dark:bg-white/[0.06] dark:text-zinc-200"
+                      key={attachment.id}
+                    >
+                      {attachment.kind === "image" && attachment.previewUrl ? (
+                        <span className="relative size-7 overflow-hidden rounded-md bg-zinc-200 dark:bg-white/10">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            alt={attachment.filename}
+                            className="size-full object-cover"
+                            src={attachment.previewUrl}
+                          />
+                        </span>
+                      ) : (
+                        <span className="grid size-7 place-items-center rounded-md bg-white text-[#0A66E0] dark:bg-zinc-950 dark:text-[#6DB4FF]">
+                          {attachment.kind === "image" ? (
+                            <ImageIcon size={13} />
+                          ) : (
+                            <FileText size={13} />
+                          )}
+                        </span>
+                      )}
+                      <span className="flex max-w-[150px] flex-col leading-tight">
+                        <span className="truncate font-semibold">{attachment.filename}</span>
+                        <span className="font-mono text-[10px] text-zinc-400">
+                          {formatAttachmentSize(attachment.sizeBytes)}
+                          {attachment.kind === "file" && attachment.textContent
+                            ? " · text"
+                            : ""}
+                        </span>
+                      </span>
+                      <button
+                        aria-label={`Bỏ ${attachment.filename}`}
+                        className="grid size-5 place-items-center rounded-md text-zinc-400 transition hover:bg-red-50 hover:text-red-600 focus:outline-none focus:ring-2 focus:ring-red-200 dark:hover:bg-red-500/10"
+                        onClick={() => removeAttachment(attachment.id)}
+                        type="button"
+                      >
+                        <X size={11} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
               <textarea
                 aria-label="Nhập tin nhắn"
                 className="max-h-36 min-h-12 w-full resize-none bg-transparent px-1 py-1 text-[14px] text-zinc-900 outline-none placeholder:text-zinc-400 dark:text-zinc-100"
@@ -1294,6 +1969,7 @@ function ChatColumn({
                   const next = event.currentTarget.value;
                   setInput(next);
                   setSlashOpen(next.startsWith("/"));
+                  setMentionOpen(false);
                 }}
                 onKeyDown={(event) => {
                   if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
@@ -1309,7 +1985,11 @@ function ChatColumn({
                 placeholder={
                   readOnly
                     ? "Chế độ chỉ xem"
-                    : "Hỏi tiếp về sản lượng, xe, orders... gõ / để gọi lệnh"
+                    : voice.listening
+                      ? voice.interim
+                        ? `… ${voice.interim}`
+                        : "Đang nghe... hãy nói tiếng Việt"
+                      : "Hỏi tiếp về sản lượng, xe, orders... gõ / để gọi lệnh"
                 }
                 ref={textareaRef}
                 rows={2}
@@ -1317,40 +1997,66 @@ function ChatColumn({
               />
               <div className="flex items-center gap-1.5">
                 <button
-                  aria-label="Đính kèm"
+                  aria-label="Đính kèm tệp hoặc ảnh"
                   className="composer-tool"
                   disabled={readOnly}
-                  onClick={() => onToast("Đính kèm đang chờ cấu hình")}
+                  onClick={() => fileInputRef.current?.click()}
+                  title="Đính kèm ảnh hoặc tệp (≤ 5MB)"
                   type="button"
                 >
                   <Paperclip size={14} />
                 </button>
                 <button
                   aria-label="Lệnh nhanh"
-                  className="composer-tool"
+                  className={cn("composer-tool", slashOpen && "bg-[#007AFF]/15 text-[#0A66E0]")}
                   disabled={readOnly}
-                  onClick={() => setSlashOpen((open) => !open)}
+                  onClick={() => {
+                    setSlashOpen((open) => !open);
+                    setMentionOpen(false);
+                  }}
+                  title="Lệnh nhanh"
                   type="button"
                 >
                   <Slash size={14} />
                 </button>
                 <button
-                  aria-label="Gắn thẻ"
-                  className="composer-tool"
+                  aria-label="Gắn thẻ ngữ cảnh"
+                  className={cn("composer-tool", mentionOpen && "bg-[#007AFF]/15 text-[#0A66E0]")}
                   disabled={readOnly}
-                  onClick={() => setInput((value) => `${value}@`)}
+                  onClick={() => {
+                    setMentionOpen((open) => !open);
+                    setSlashOpen(false);
+                  }}
+                  title="Gắn thẻ ngữ cảnh"
                   type="button"
                 >
                   <AtSign size={14} />
                 </button>
                 <button
-                  aria-label="Nhập giọng nói"
-                  className="composer-tool"
+                  aria-label={voice.listening ? "Dừng nhập giọng nói" : "Nhập giọng nói"}
+                  className={cn(
+                    "composer-tool",
+                    voice.listening && "bg-[#FF3B30]/15 text-[#C8281D] animate-pulse"
+                  )}
                   disabled={readOnly}
-                  onClick={() => onToast("Nhập giọng nói đang chờ cấu hình")}
+                  onClick={() => {
+                    if (!voice.supported) {
+                      onToast("Trình duyệt chưa hỗ trợ nhập giọng nói");
+                      return;
+                    }
+                    if (voice.listening) voice.stop();
+                    else voice.start();
+                  }}
+                  title={
+                    voice.supported
+                      ? voice.listening
+                        ? "Dừng nhập giọng nói"
+                        : "Nhập giọng nói (tiếng Việt)"
+                      : "Trình duyệt chưa hỗ trợ giọng nói"
+                  }
                   type="button"
                 >
-                  <Mic size={14} />
+                  {voice.listening ? <MicOff size={14} /> : <Mic size={14} />}
                 </button>
                 <span className="ml-auto hidden items-center gap-1 text-[10.5px] text-zinc-400 sm:flex">
                   <Kbd>⌘↵</Kbd> gửi
@@ -1359,7 +2065,7 @@ function ChatColumn({
                   aria-label="Gửi"
                   className="grid size-8 place-items-center rounded-[10px] bg-[linear-gradient(180deg,#2C99FF_0%,#007AFF_100%)] text-white shadow-[0_2px_6px_rgba(0,122,255,0.32)] transition disabled:cursor-not-allowed disabled:grayscale focus:outline-none focus:ring-2 focus:ring-[#007AFF]/40"
                   data-testid="send-button"
-                  disabled={!input.trim() || isBusy || readOnly}
+                  disabled={(!input.trim() && attachments.length === 0) || isBusy || readOnly}
                   onClick={() => void submit()}
                   type="button"
                 >
@@ -1380,84 +2086,65 @@ function ChatColumn({
 
 function Inspector({
   blocks,
+  conversation,
+  onClearMemory,
+  onClose,
+  onCopyConversation,
   onQuickAction,
   onSaveReport,
+  onShowShortcuts,
   readOnly,
   reasoning,
+  reportSaving,
+  savedReports,
 }: {
   blocks: PinnedBlock[];
+  conversation: Conversation;
+  onClearMemory: () => void;
+  onClose: () => void;
+  onCopyConversation: () => void;
   onQuickAction: (message: string) => void;
   onSaveReport: () => void;
+  onShowShortcuts: () => void;
   readOnly: boolean;
   reasoning: ReasoningStep[];
+  reportSaving: boolean;
+  savedReports: AiGeneratedReport[];
 }) {
   const [tab, setTab] = useState<InspectorTab>("tools");
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const handleClickOutside = (event: MouseEvent) => {
+      if (!menuRef.current?.contains(event.target as Node)) setMenuOpen(false);
+    };
+    const handleKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMenuOpen(false);
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleKey);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("keydown", handleKey);
+    };
+  }, [menuOpen]);
+
+  const turnCount = conversation.turns.length;
   const chartBlocks = blocks.filter((block) => inspectorChartTypes.has(block.data.type));
-  const actions = useMemo(
-    () => [
-      {
-        icon: <FileText size={14} />,
-        key: "r",
-        label: "Tạo báo cáo ca hiện tại",
-        run: () => onSaveReport(),
-        shortcut: "R",
-      },
-      {
-        icon: <BarChart3 size={14} />,
-        key: "b",
-        label: "Mở biểu đồ tương tác",
-        run: () => {
-          setTab("charts");
-          onQuickAction("Đã mở tab Biểu đồ");
-        },
-        shortcut: "B",
-      },
-      {
-        icon: <Clipboard size={14} />,
-        key: "c",
-        label: "Sao chép tóm tắt vận hành",
-        run: () => {
-          void copyText(buildBlocksSummary(blocks));
-          onQuickAction("Đã sao chép tóm tắt vận hành");
-        },
-        shortcut: "C",
-      },
-      {
-        icon: <Wrench size={14} />,
-        key: "m",
-        label: "Kiểm tra bảo trì xe ghim",
-        run: () => onQuickAction("Đang kiểm tra bảo trì xe ghim"),
-        shortcut: "M",
-      },
-    ],
-    [blocks, onQuickAction, onSaveReport]
+  const attachments = useMemo(
+    () =>
+      [...savedReports.map(buildReportAttachment), ...blocks.map(buildBlockAttachment)]
+        .filter((item): item is InspectorAttachment => item !== null)
+        .sort((left, right) => right.createdAt.localeCompare(left.createdAt)),
+    [blocks, savedReports]
   );
   const tabs: Array<{ key: InspectorTab; label: string; icon: ReactNode }> = [
     { key: "tools", label: "Công cụ", icon: <Activity size={13} /> },
     { key: "charts", label: "Biểu đồ", icon: <BarChart3 size={13} /> },
-    { key: "actions", label: "Hành động", icon: <Gauge size={13} /> },
+    { key: "actions", label: "Đính kèm", icon: <Paperclip size={13} /> },
   ];
-
-  useEffect(() => {
-    if (tab !== "actions" || readOnly) return undefined;
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (
-        event.altKey ||
-        event.ctrlKey ||
-        event.metaKey ||
-        event.shiftKey ||
-        isEditableTarget(event.target)
-      )
-        return;
-      const action = actions.find((item) => item.key === event.key.toLowerCase());
-      if (!action) return;
-      event.preventDefault();
-      action.run();
-    };
-
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [actions, readOnly, tab]);
 
   return (
     <aside className="fixed inset-x-0 bottom-0 z-50 flex max-h-[52vh] min-w-0 flex-col overflow-hidden rounded-t-2xl border-t border-black/10 bg-white shadow-2xl dark:border-white/10 dark:bg-zinc-950 lg:static lg:max-h-none lg:w-[340px] lg:rounded-none lg:border-l lg:border-t-0 lg:shadow-none">
@@ -1469,10 +2156,92 @@ function Inspector({
               Bảng ngữ cảnh
             </h2>
             <p className="text-[10.5px] text-zinc-400">
-              Công cụ, biểu đồ, hành động cho câu trả lời
+              Công cụ, biểu đồ, tệp đính kèm cho câu trả lời
             </p>
           </div>
-          <MoreHorizontal className="text-zinc-400" size={16} />
+          <div className="relative" ref={menuRef}>
+            <button
+              aria-haspopup="menu"
+              aria-expanded={menuOpen}
+              aria-label="Tùy chọn bảng ngữ cảnh"
+              className="grid size-7 place-items-center rounded-md text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-700 focus:outline-none focus:ring-2 focus:ring-[#007AFF]/35 dark:hover:bg-white/10 dark:hover:text-zinc-200"
+              onClick={() => setMenuOpen((open) => !open)}
+              type="button"
+            >
+              <MoreHorizontal size={16} />
+            </button>
+            {menuOpen && (
+              <div
+                className="absolute right-0 top-[calc(100%+6px)] z-40 w-56 overflow-hidden rounded-xl border border-black/10 bg-white shadow-2xl dark:border-white/10 dark:bg-zinc-950"
+                role="menu"
+              >
+                <button
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-[12px] font-semibold text-zinc-700 transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 dark:text-zinc-200 dark:hover:bg-white/10"
+                  disabled={readOnly || reportSaving || turnCount === 0}
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onSaveReport();
+                  }}
+                  role="menuitem"
+                  type="button"
+                >
+                  <FileText className="text-[#0A66E0]" size={13} />
+                  {reportSaving ? "Đang tạo PDF" : "Tạo báo cáo PDF"}
+                </button>
+                <button
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-[12px] font-semibold text-zinc-700 transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 dark:text-zinc-200 dark:hover:bg-white/10"
+                  disabled={turnCount === 0}
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onCopyConversation();
+                  }}
+                  role="menuitem"
+                  type="button"
+                >
+                  <Copy className="text-zinc-500" size={13} />
+                  Sao chép toàn bộ cuộc trò chuyện
+                </button>
+                <button
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-[12px] font-semibold text-zinc-700 transition hover:bg-zinc-50 disabled:cursor-not-allowed disabled:opacity-50 dark:text-zinc-200 dark:hover:bg-white/10"
+                  disabled={readOnly}
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onClearMemory();
+                  }}
+                  role="menuitem"
+                  type="button"
+                >
+                  <Eraser className="text-[#C8281D]" size={13} />
+                  Xóa bộ nhớ phiên
+                </button>
+                <button
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-[12px] font-semibold text-zinc-700 transition hover:bg-zinc-50 dark:text-zinc-200 dark:hover:bg-white/10"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onShowShortcuts();
+                  }}
+                  role="menuitem"
+                  type="button"
+                >
+                  <Keyboard className="text-zinc-500" size={13} />
+                  Phím tắt
+                </button>
+                <div className="border-t border-black/[0.06] dark:border-white/10" />
+                <button
+                  className="flex w-full items-center gap-2 px-3 py-2 text-left text-[12px] font-semibold text-zinc-700 transition hover:bg-zinc-50 dark:text-zinc-200 dark:hover:bg-white/10"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onClose();
+                  }}
+                  role="menuitem"
+                  type="button"
+                >
+                  <Square className="text-zinc-500" size={13} />
+                  Đóng bảng ngữ cảnh
+                </button>
+              </div>
+            )}
+          </div>
         </div>
         <div className="mt-3 grid grid-cols-3 gap-1 rounded-lg bg-zinc-100 p-1 dark:bg-white/10">
           {tabs.map((item) => (
@@ -1597,45 +2366,92 @@ function Inspector({
         )}
 
         {tab === "actions" && (
-          <div className="space-y-2">
-            <div className="rounded-xl border border-[rgba(0,122,255,0.16)] bg-[rgba(0,122,255,0.05)] px-3 py-2 text-[11px] font-semibold text-zinc-500 dark:border-[rgba(109,180,255,0.20)] dark:bg-[rgba(0,122,255,0.10)] dark:text-zinc-300">
-              Dùng phím <Kbd>R</Kbd> <Kbd>B</Kbd> <Kbd>C</Kbd> <Kbd>M</Kbd> khi tab Hành động đang
-              mở.
-            </div>
-            {actions.map((action) => (
+          <div className="space-y-3">
+            {!readOnly && (
               <button
-                className="group flex w-full items-center gap-2 rounded-xl border border-black/10 bg-zinc-50 p-2.5 text-left text-[12px] font-bold text-zinc-800 transition hover:border-[#007AFF]/40 hover:bg-white focus:outline-none focus:ring-2 focus:ring-[#007AFF]/35 dark:border-white/10 dark:bg-white/[0.04] dark:text-zinc-100 dark:hover:bg-white/[0.08]"
-                disabled={readOnly}
-                key={action.label}
-                onClick={action.run}
+                className="flex w-full items-center gap-2 rounded-md border border-[rgba(0,122,255,0.22)] bg-[rgba(0,122,255,0.06)] p-2.5 text-left text-[12px] font-bold text-[#0A66E0] transition hover:bg-white focus:outline-none focus:ring-2 focus:ring-[#007AFF]/35 disabled:cursor-not-allowed disabled:opacity-60 dark:border-[rgba(109,180,255,0.25)] dark:bg-[rgba(0,122,255,0.12)] dark:text-[#6DB4FF]"
+                disabled={reportSaving}
+                onClick={onSaveReport}
                 type="button"
               >
-                <span className="grid size-7 place-items-center rounded-lg bg-white text-[#0A66E0] dark:bg-zinc-950 dark:text-[#6DB4FF]">
-                  {action.icon}
+                <span className="grid size-7 place-items-center rounded-md bg-white dark:bg-zinc-950">
+                  {reportSaving ? (
+                    <Loader2 className="animate-spin" size={14} />
+                  ) : (
+                    <FileText size={14} />
+                  )}
                 </span>
-                <span className="min-w-0 flex-1">{action.label}</span>
-                <span className="rounded-md border border-black/10 bg-white px-2 py-1 font-mono text-[10px] text-zinc-400 transition group-hover:border-[#007AFF]/25 group-hover:text-[#0A66E0] dark:border-white/10 dark:bg-zinc-950 dark:group-hover:text-[#6DB4FF]">
-                  {action.shortcut}
+                <span className="min-w-0 flex-1">
+                  {reportSaving ? "Đang tạo báo cáo PDF" : "Tạo báo cáo PDF"}
                 </span>
+                <Download size={14} />
               </button>
-            ))}
-            {blocks.length > 0 && (
-              <div className="pt-3">
-                <div className="mb-2 text-[11px] font-extrabold uppercase text-zinc-400">
-                  Render blocks
-                </div>
-                <div className="flex flex-wrap gap-1.5">
-                  {blocks.map((block) => (
-                    <span
-                      className="rounded-full bg-zinc-100 px-2 py-1 font-mono text-[10.5px] text-zinc-500 dark:bg-white/10"
-                      key={block.blockId}
-                    >
-                      {block.data.type}
-                    </span>
-                  ))}
-                </div>
-              </div>
             )}
+
+            <div>
+              <div className="mb-2 flex items-center justify-between gap-2">
+                <span className="text-[12px] font-extrabold text-zinc-900 dark:text-zinc-100">
+                  Tệp đính kèm
+                </span>
+                <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-bold text-zinc-500 dark:bg-white/10">
+                  {attachments.length}
+                </span>
+              </div>
+
+              {attachments.length === 0 && (
+                <div className="rounded-md border border-dashed border-black/10 bg-zinc-50 p-4 text-center text-[12px] text-zinc-400 dark:border-white/10 dark:bg-white/[0.04]">
+                  Chưa có tệp đính kèm. Khi AI xuất ảnh, PDF hoặc bạn tạo báo cáo, file sẽ nằm ở
+                  đây.
+                </div>
+              )}
+
+              <div className="space-y-2">
+                {attachments.map((attachment) => (
+                  <article
+                    className="flex items-center gap-2 rounded-md border border-black/10 bg-zinc-50 p-2.5 dark:border-white/10 dark:bg-white/[0.04]"
+                    key={attachment.id}
+                  >
+                    <span className="grid size-8 shrink-0 place-items-center rounded-md bg-white text-[#0A66E0] dark:bg-zinc-950 dark:text-[#6DB4FF]">
+                      {attachment.kind === "image" ? (
+                        <Paperclip size={14} />
+                      ) : (
+                        <FileText size={14} />
+                      )}
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="line-clamp-1 block text-[12px] font-bold text-zinc-800 dark:text-zinc-100">
+                        {attachment.title}
+                      </span>
+                      <span className="line-clamp-1 block text-[10.5px] text-zinc-400">
+                        {attachment.filename}
+                        {attachment.meta ? ` · ${attachment.meta}` : ""}
+                      </span>
+                    </span>
+                    <span className="flex shrink-0 items-center gap-1">
+                      <a
+                        aria-label={`Mở ${attachment.filename}`}
+                        className="grid size-8 place-items-center rounded-md border border-black/10 bg-white text-zinc-500 transition hover:text-[#0A66E0] focus:outline-none focus:ring-2 focus:ring-[#007AFF]/35 dark:border-white/10 dark:bg-zinc-950 dark:text-zinc-300 dark:hover:text-[#6DB4FF]"
+                        href={attachment.href}
+                        rel="noreferrer"
+                        target="_blank"
+                      >
+                        <ExternalLink size={13} />
+                      </a>
+                      {!readOnly && (
+                        <a
+                          aria-label={`Tải ${attachment.filename}`}
+                          className="grid size-8 place-items-center rounded-md border border-black/10 bg-white text-zinc-500 transition hover:text-[#0A66E0] focus:outline-none focus:ring-2 focus:ring-[#007AFF]/35 dark:border-white/10 dark:bg-zinc-950 dark:text-zinc-300 dark:hover:text-[#6DB4FF]"
+                          download={attachment.filename}
+                          href={attachment.href}
+                        >
+                          <Download size={13} />
+                        </a>
+                      )}
+                    </span>
+                  </article>
+                ))}
+              </div>
+            </div>
           </div>
         )}
       </div>
@@ -1651,6 +2467,7 @@ export function RendererShell() {
   const inspectorOpen = useRendererStore((state) => state.inspectorOpen);
   const activeContext = useRendererStore((state) => state.activeContext);
   const pinnedBlocks = useRendererStore((state) => state.pinnedBlocks);
+  const savedReports = useRendererStore((state) => state.savedReports);
   const appendTurn = useRendererStore((state) => state.appendTurn);
   const createConversation = useRendererStore((state) => state.createConversation);
   const deleteConversation = useRendererStore((state) => state.deleteConversation);
@@ -1665,6 +2482,7 @@ export function RendererShell() {
   const [toast, setToast] = useState<string | null>(null);
   const [reportSaving, setReportSaving] = useState(false);
   const [historyCollapsed, setHistoryCollapsed] = useState(false);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const readOnly =
     searchParams.get("share") === "1" ||
@@ -1746,6 +2564,7 @@ export function RendererShell() {
         id: report.id,
         markdown: report.markdown,
         mimeType: report.mimeType,
+        pdfBase64: report.pdfBase64,
         sizeBytes: report.sizeBytes,
         title: report.title,
         turnCount: report.turnCount,
@@ -1771,16 +2590,27 @@ export function RendererShell() {
   ]);
 
   const sendMessage = useCallback(
-    async (text: string, regenerated = false) => {
+    async (
+      text: string,
+      attachments: ComposerAttachment[] = [],
+      regenerated = false
+    ) => {
       const conversation = currentConversation;
       if (!conversation || isBusy || readOnly) return;
 
       const now = new Date().toISOString();
+      const attachmentLabels = attachments.map((attachment) => ({
+        kind: attachment.kind,
+        filename: attachment.filename,
+        mimeType: attachment.mimeType,
+        sizeBytes: attachment.sizeBytes,
+      }));
       const userTurn: UserTurn = {
         id: uid("user"),
         role: "user",
         text,
         createdAt: now,
+        ...(attachmentLabels.length > 0 ? { attachments: attachmentLabels } : {}),
       };
       const assistantTurn: AssistantTurn = {
         id: uid("assistant"),
@@ -1791,7 +2621,8 @@ export function RendererShell() {
         createdAt: new Date().toISOString(),
         regenerated,
       };
-      const requestMessages = toApiMessages(conversation.turns, text);
+      const nextContent = buildContentBlocks(text, attachments);
+      const requestMessages = toApiMessages(conversation.turns, nextContent);
 
       if (conversation.turns.length === 0 && conversation.title === "Cuộc trò chuyện mới") {
         setConversationTitle(conversation.id, text.slice(0, 72));
@@ -1831,46 +2662,17 @@ export function RendererShell() {
             tool: ToolName;
           }>
         >();
-        let statusCount = 0;
-        let iterationCount = 0;
         let streamError: Error | null = null;
 
         await chatApi.runWithTools(
           requestMessages,
           {
             signal: controller.signal,
-            onIteration: (iteration) => {
-              iterationCount += 1;
-              mergeReasoningStep({
-                event: "reasoning_step",
-                id: `iteration-${assistantTurn.id}-${iterationCount}`,
-                tool: "production_query",
-                status: "done",
-                startedAt: new Date().toISOString(),
-                durationMs: 0,
-                resultSummary: `Vòng xử lý ${iteration}`,
-              });
-            },
-            onStatus: (status) => {
-              const trimmed = status.trim();
-              if (!trimmed) return;
-              statusCount += 1;
-              mergeReasoningStep({
-                event: "reasoning_step",
-                id: `status-${assistantTurn.id}-${statusCount}`,
-                tool: "production_query",
-                status: "done",
-                startedAt: new Date().toISOString(),
-                durationMs: 0,
-                input: { status: trimmed },
-                resultSummary: trimmed,
-              });
-            },
             onToolStart: (name, args) => {
               const tool = mapPopupToolToRendererTool(name);
               const id = uid(`tool-${tool}`);
               const startedAt = new Date().toISOString();
-              const input = { tool: name, args };
+              const input = { tool: name, args: compactToolArgsForReasoning(name, args) };
               const runs = toolRuns.get(name) ?? [];
               runs.push({
                 id,
@@ -1955,7 +2757,7 @@ export function RendererShell() {
         const turn = turns[cursor];
         if (turn.role === "user") {
           showToast("Đang trả lời lại");
-          void sendMessage(turn.text, true);
+          void sendMessage(turn.text, [], true);
           return;
         }
       }
@@ -2102,13 +2904,46 @@ export function RendererShell() {
         {inspectorOpen && (
           <Inspector
             blocks={pinnedBlocks.filter((block) => block.conversationId === currentConversation.id)}
+            conversation={currentConversation}
+            onClearMemory={() => {
+              if (readOnly) {
+                showToast("Link chia sẻ chỉ được xem");
+                return;
+              }
+              if (!window.confirm("Xóa bộ nhớ phiên hiện tại? AI sẽ bắt đầu lại từ đầu.")) return;
+              void chatApi
+                .clearMemory(undefined, currentConversation.id)
+                .then(() => showToast("Đã xóa bộ nhớ phiên"))
+                .catch(() => showToast("Không thể xóa bộ nhớ phiên"));
+            }}
+            onClose={toggleInspector}
+            onCopyConversation={() => {
+              const text = currentConversation.turns
+                .map((turn) => {
+                  const role = turn.role === "user" ? "Bạn" : "Trợ lý AI";
+                  return `${role}:\n${turn.text}`;
+                })
+                .join("\n\n---\n\n");
+              if (!text.trim()) {
+                showToast("Chưa có nội dung để sao chép");
+                return;
+              }
+              void copyText(text);
+              showToast("Đã sao chép cuộc trò chuyện");
+            }}
             onQuickAction={showToast}
             onSaveReport={saveCurrentReport}
+            onShowShortcuts={() => setShortcutsOpen(true)}
             readOnly={readOnly}
             reasoning={latestReasoning}
+            reportSaving={reportSaving}
+            savedReports={savedReports.filter(
+              (report) => report.conversationId === currentConversation.id
+            )}
           />
         )}
       </div>
+      <ShortcutsDialog onClose={() => setShortcutsOpen(false)} open={shortcutsOpen} />
       <Toast message={toast} />
     </div>
   );

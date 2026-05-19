@@ -9,12 +9,20 @@ import {
 
 const renderFencePattern = /:::render\s*([\s\S]*?):::/g;
 
-function pushMarkdownOrLoading(chunks: StreamChunk[], markdown: string): void {
+type ParseStreamOptions = {
+  showPendingLoading?: boolean;
+};
+
+function pushMarkdownOrLoading(
+  chunks: StreamChunk[],
+  markdown: string,
+  showPendingLoading: boolean
+): void {
   const pieces = markdown.split(renderLoadingMarker);
   pieces.forEach((piece, index) => {
     const body = piece.trim();
     if (body) chunks.push({ kind: "md", body });
-    if (index < pieces.length - 1) chunks.push({ kind: "block-loading" });
+    if (showPendingLoading && index < pieces.length - 1) chunks.push({ kind: "block-loading" });
   });
 }
 
@@ -36,9 +44,7 @@ function isShortNoDataFallback(body: string): boolean {
   if (/[|{}[\]<>]|^[-*#]/m.test(body.trim())) return false;
 
   return (
-    /^toi khong tim thay thong tin nay(?: trong du lieu nguyen anh group)?\.?$/.test(
-      normalized
-    ) ||
+    /^toi khong tim thay thong tin nay(?: trong du lieu nguyen anh group)?\.?$/.test(normalized) ||
     /^khong tim thay thong tin nay(?: trong du lieu nguyen anh group)?\.?$/.test(normalized) ||
     /^khong co du lieu(?: phu hop| de hien thi| trong ngay da chon)?\.?$/.test(normalized) ||
     /^du lieu hien co khong co thong tin nay\.?$/.test(normalized)
@@ -55,9 +61,10 @@ function removeContradictoryTrailingFallback(chunks: StreamChunk[]): StreamChunk
   return chunks.slice(0, -1);
 }
 
-export function parseStream(text: string): StreamChunk[] {
+export function parseStream(text: string, options: ParseStreamOptions = {}): StreamChunk[] {
   const chunks: StreamChunk[] = [];
   if (!text) return chunks;
+  const showPendingLoading = options.showPendingLoading ?? true;
   const normalizedText = hideUnresolvedRenderBuffers(normalizeLooseRenderBlocks(text));
 
   let lastIndex = 0;
@@ -67,7 +74,7 @@ export function parseStream(text: string): StreamChunk[] {
   while ((match = renderFencePattern.exec(normalizedText)) !== null) {
     if (match.index > lastIndex) {
       const markdown = normalizedText.slice(lastIndex, match.index).trim();
-      if (markdown) pushMarkdownOrLoading(chunks, markdown);
+      if (markdown) pushMarkdownOrLoading(chunks, markdown, showPendingLoading);
     }
 
     try {
@@ -86,12 +93,12 @@ export function parseStream(text: string): StreamChunk[] {
   const pendingRenderStart = findPendingRenderStart(tail);
   if (pendingRenderStart >= 0) {
     const before = tail.slice(0, pendingRenderStart).trim();
-    if (before) pushMarkdownOrLoading(chunks, before);
-    chunks.push({ kind: "block-loading" });
+    if (before) pushMarkdownOrLoading(chunks, before, showPendingLoading);
+    if (showPendingLoading) chunks.push({ kind: "block-loading" });
     return chunks;
   }
 
   const trailingMarkdown = tail.trim();
-  if (trailingMarkdown) pushMarkdownOrLoading(chunks, trailingMarkdown);
+  if (trailingMarkdown) pushMarkdownOrLoading(chunks, trailingMarkdown, showPendingLoading);
   return removeContradictoryTrailingFallback(chunks);
 }

@@ -6,7 +6,14 @@ export interface ProductionQuery {
   station_id?: number;
   vehicle_id?: number;
   user_id?: number;
-  order_status?: "all" | "pending" | "running" | "collecting" | "transporting" | "completed" | "canceled";
+  order_status?:
+    | "all"
+    | "pending"
+    | "running"
+    | "collecting"
+    | "transporting"
+    | "completed"
+    | "canceled";
 }
 
 export interface ProductionSummary {
@@ -196,7 +203,11 @@ export interface FuelAlert {
   vehicle_name?: string;
   vehicle_license_plate?: string;
   order_id: number | null;
-  alert_type: "high_consumption" | "suspicious_drop" | "long_idle_consumption" | "missing_refuel_pattern";
+  alert_type:
+    | "high_consumption"
+    | "suspicious_drop"
+    | "long_idle_consumption"
+    | "missing_refuel_pattern";
   severity: "low" | "medium" | "high";
   detected_at: string;
   expected_value: number | null;
@@ -256,7 +267,10 @@ export interface VehicleTankStatus {
 
   can_compute_balance?: boolean;
   data_quality?: "ok" | "missing_baseline_for_range";
-  data_quality_reason?: "opening_after_range_start" | "no_opening_no_full_refuel_before_range" | null;
+  data_quality_reason?:
+    | "opening_after_range_start"
+    | "no_opening_no_full_refuel_before_range"
+    | null;
 
   opening_balance_liters: number;
   period_opening_balance_liters?: number;
@@ -278,8 +292,15 @@ export interface VehicleTankStatus {
   variance_liters: number;
   variance_percent: number;
 
-  fuel_estimation_source?: "vtracking_engine_runtime" | "vtracking_motion_runtime" | "order_metrics";
-  idle_estimation_source?: "vtracking_engine_runtime" | "vtracking_motion_runtime" | "order_metrics" | "order_metrics_fallback_for_motion";
+  fuel_estimation_source?:
+    | "vtracking_engine_runtime"
+    | "vtracking_motion_runtime"
+    | "order_metrics";
+  idle_estimation_source?:
+    | "vtracking_engine_runtime"
+    | "vtracking_motion_runtime"
+    | "order_metrics"
+    | "order_metrics_fallback_for_motion";
   idle_fallback_applied?: boolean;
   engine_on_minutes_total?: number;
   engine_on_idle_minutes?: number;
@@ -295,7 +316,10 @@ export interface VehicleTankStatus {
   metrics_from?: string;
   metrics_to?: string;
 
-  distance_estimation_source?: "vtracking_odometer_delta" | "vtracking_geo_distance" | "order_metrics";
+  distance_estimation_source?:
+    | "vtracking_odometer_delta"
+    | "vtracking_geo_distance"
+    | "order_metrics";
   odometer_start_km?: number;
   odometer_end_km?: number;
   odometer_delta_km?: number;
@@ -343,6 +367,7 @@ export interface AiGeneratedReport {
   mimeType: "application/pdf";
   markdown: string;
   html?: string;
+  pdfBase64?: string;
   blockCount: number;
   turnCount: number;
   sizeBytes?: number;

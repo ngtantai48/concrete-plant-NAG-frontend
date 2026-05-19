@@ -78,7 +78,10 @@ function useSmoothStreamText(targetText: string, streaming: boolean): string {
 
 export function StreamView({ text, streaming = false }: { text: string; streaming?: boolean }) {
   const visibleText = useSmoothStreamText(text || "", streaming);
-  const chunks = useMemo(() => parseStream(visibleText), [visibleText]);
+  const chunks = useMemo(
+    () => parseStream(visibleText, { showPendingLoading: streaming }),
+    [streaming, visibleText]
+  );
 
   return (
     <div aria-live="polite" className="flex flex-col gap-2.5">

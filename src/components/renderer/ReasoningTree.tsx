@@ -31,6 +31,23 @@ function shouldShowInput(input: unknown) {
   return true;
 }
 
+function compactInputForDisplay(input: unknown): unknown {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return input;
+  const record = input as Record<string, unknown>;
+  if (record.tool !== "executeCode") return input;
+
+  const args = record.args;
+  if (!args || typeof args !== "object" || Array.isArray(args)) return { tool: "executeCode" };
+  const argsRecord = args as Record<string, unknown>;
+  return {
+    tool: "executeCode",
+    args: {
+      intent: argsRecord.intent,
+      title: argsRecord.title,
+    },
+  };
+}
+
 export function ReasoningTree({ steps, totalMs }: { steps: ReasoningStep[]; totalMs?: number }) {
   const [open, setOpen] = useState(false);
   const detailsId = useId();
@@ -58,7 +75,7 @@ export function ReasoningTree({ steps, totalMs }: { steps: ReasoningStep[]; tota
               ? "bg-[rgba(52,199,89,0.18)] text-[#1F8E47] dark:text-[#63DB82]"
               : errored
                 ? "bg-[rgba(255,59,48,0.14)] text-[#C8281D] dark:text-[#FF7C73]"
-                : "bg-[rgba(0,122,255,0.18)] text-[#0A66E0] dark:text-[#6DB4FF]",
+                : "bg-[rgba(0,122,255,0.18)] text-[#0A66E0] dark:text-[#6DB4FF]"
           )}
         >
           <RenderIcon
@@ -91,7 +108,7 @@ export function ReasoningTree({ steps, totalMs }: { steps: ReasoningStep[]; tota
             )}
             {steps.map((step) => {
               const meta = toneMeta(
-                step.status === "done" ? "good" : step.status === "error" ? "bad" : "info",
+                step.status === "done" ? "good" : step.status === "error" ? "bad" : "info"
               );
               const label = getStepLabel(step);
               return (
@@ -99,7 +116,7 @@ export function ReasoningTree({ steps, totalMs }: { steps: ReasoningStep[]; tota
                   <span
                     className={cn(
                       "z-10 mt-0.5 grid size-[17px] shrink-0 place-items-center rounded-full border-2 bg-white dark:bg-zinc-950",
-                      meta.border,
+                      meta.border
                     )}
                   >
                     {step.status === "done" && (
@@ -125,7 +142,7 @@ export function ReasoningTree({ steps, totalMs }: { steps: ReasoningStep[]; tota
                     </div>
                     {shouldShowInput(step.input) && (
                       <code className="mt-1 block truncate font-mono text-[10.5px] text-zinc-400">
-                        {stringifyValue(step.input).slice(0, 120)}
+                        {stringifyValue(compactInputForDisplay(step.input)).slice(0, 120)}
                       </code>
                     )}
                     {step.error && (

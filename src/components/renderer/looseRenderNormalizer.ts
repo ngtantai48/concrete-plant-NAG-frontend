@@ -798,6 +798,23 @@ function normalizeGanttBlock(data: Record<string, unknown>): Record<string, unkn
   };
 }
 
+function normalizeAssetBlock(
+  type: "image" | "file",
+  data: Record<string, unknown>
+): Record<string, unknown> {
+  const sizeBytes = looseNumber(data.sizeBytes ?? data.size);
+
+  return {
+    ...blockBase(type, data),
+    filename: looseString(data.filename ?? data.name),
+    mimeType: looseString(data.mimeType ?? data.mime),
+    sizeBytes:
+      sizeBytes !== undefined && Number.isInteger(sizeBytes) && sizeBytes >= 0
+        ? sizeBytes
+        : undefined,
+  };
+}
+
 function normalizeStandaloneBlock(type: string, value: unknown): Record<string, unknown> | null {
   const canonical = canonicalRenderType(type);
   if (!canonical) return null;
@@ -810,6 +827,7 @@ function normalizeStandaloneBlock(type: string, value: unknown): Record<string, 
     return normalizeSeriesChartBlock(canonical, data);
   if (canonical === "table") return normalizeTableBlock(data);
   if (canonical === "gantt") return normalizeGanttBlock(data);
+  if (canonical === "image" || canonical === "file") return normalizeAssetBlock(canonical, data);
   if (canonical === "followups" && Array.isArray(value)) {
     return {
       ...blockBase("followups", { title: "Gợi ý hỏi tiếp" }),

@@ -288,6 +288,40 @@ test("table headers/data json normalizes to columns/rows", () => {
   assertValidBlocks([chunk]);
 });
 
+test("executeCode image and file artifacts normalize backend aliases", () => {
+  const chunks = blockChunks(
+    [
+      JSON.stringify({
+        type: "image",
+        id: "nag-artifact-0",
+        url: "/static/nag/artifacts/chart.png",
+        title: "Chart",
+        alt: "Chart preview",
+        width: 1200,
+        height: 700,
+      }),
+      JSON.stringify({
+        type: "file",
+        id: "nag-artifact-1",
+        url: "/static/nag/artifacts/report.pdf",
+        name: "bao-cao.pdf",
+        title: "Báo cáo",
+        mime: "application/pdf",
+        size: 1378,
+      }),
+    ].join("\n\n")
+  );
+
+  assert.deepEqual(
+    chunks.map((chunk) => chunk.data.type),
+    ["image", "file"]
+  );
+  assert.equal(chunks[1].data.filename, "bao-cao.pdf");
+  assert.equal(chunks[1].data.mimeType, "application/pdf");
+  assert.equal(chunks[1].data.sizeBytes, 1378);
+  assertValidBlocks(chunks);
+});
+
 test("gantt matrix json normalizes to hours and rows", () => {
   const text = JSON.stringify({
     type: "gantt",
@@ -341,6 +375,20 @@ test("partial chart fences become loading skeleton instead of raw markdown", () 
     "Fleet summary\n```chart\ntype: bar\ntitle: Top vehicles\nlabels: ['X09'"
   );
   assert.equal(chunks.at(-1).kind, "block-loading");
+  assert.equal(
+    chunks.some((chunk) => chunk.kind === "md" && chunk.body.includes("```chart")),
+    false
+  );
+});
+
+test("completed stream suppresses dangling render skeleton", () => {
+  const chunks = parseStream("Summary\n```chart\ntype: bar\ntitle: Top vehicles", {
+    showPendingLoading: false,
+  });
+  assert.equal(
+    chunks.some((chunk) => chunk.kind === "block-loading"),
+    false
+  );
   assert.equal(
     chunks.some((chunk) => chunk.kind === "md" && chunk.body.includes("```chart")),
     false

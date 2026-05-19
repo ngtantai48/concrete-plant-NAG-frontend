@@ -20,7 +20,10 @@ function envValue(...names: string[]) {
 }
 
 function agentActionUrl() {
-  return envValue("CHAT_AGENT_ACTION_URL") ?? DEFAULT_AGENT_ACTION_URL;
+  return (
+    envValue("CHAT_AGENT_ACTION_URL", "NEXT_PUBLIC_CHAT_AGENT_ACTION_URL") ??
+    DEFAULT_AGENT_ACTION_URL
+  );
 }
 
 function nagConfigHeaders(): HeadersInit {

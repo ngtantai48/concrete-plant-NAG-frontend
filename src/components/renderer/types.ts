@@ -8,6 +8,7 @@ export const toolNames = [
   "maintenance_log",
   "site_lookup",
   "dispatch_action",
+  "executeCode",
 ] as const;
 
 export type ToolName = (typeof toolNames)[number];
