@@ -157,14 +157,14 @@ export default function NotificationList({ notifications, onMarkAsRead, onMarkAl
                   <span
                     className={cn(
                       "text-sm leading-snug",
-                      !item.read ? "font-semibold text-slate-800" : "font-normal text-slate-600"
+                      !item.read ? "font-semibold text-slate-900" : "font-normal text-slate-600"
                     )}
                   >
                     {formatContent(item)}
                   </span>
                   <div className="flex items-center gap-1 mt-0.5">
-                    <Clock className="h-3 w-3 text-slate-400" />
-                    <span className="text-[11px] text-slate-400 font-medium">
+                    <Clock className="h-3 w-3 text-slate-500" />
+                    <span className="text-xs text-slate-500 font-medium">
                       {formatTimestamp(item)}
                     </span>
                   </div>

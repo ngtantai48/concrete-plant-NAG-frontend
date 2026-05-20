@@ -119,13 +119,13 @@ export const navigationConfig: NavItem[] = [
     key: SIDEBAR.AI_ASSISTANT,
     label: "aiAssistant",
     icon: <Bot />,
-    roles: [ROLES.ADMIN],
+    // roles: [ROLES.ADMIN],
   },
   {
     key: "user-manage-group",
     label: "userManagement",
     icon: <UsersRound />,
-    roles: [ROLES.ADMIN],
+    // roles: [ROLES.ADMIN],
     children: [
       {
         key: SIDEBAR.USER_MANAGE,
@@ -142,7 +142,7 @@ export const navigationConfig: NavItem[] = [
         key: SIDEBAR.ROLE_PERMISSIONS,
         label: "rolePermissions",
         icon: <ShieldCheck size={18} />,
-        roles: [ROLES.ADMIN],
+        // roles: [ROLES.ADMIN],
         actions: [
           { key: PERMISSIONS.PERMISSIONS_MANAGE.VIEW, label: "Xem quyền hạn" },
           { key: PERMISSIONS.PERMISSIONS_MANAGE.UPDATE, label: "Chỉnh sửa quyền hạn" },
