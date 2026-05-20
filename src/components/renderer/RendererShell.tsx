@@ -22,7 +22,6 @@ import {
   PanelLeftOpen,
   Pin,
   Plus,
-  RefreshCcw,
   Search,
   Share2,
   Square,
@@ -1476,14 +1475,12 @@ function AssistantToolbar({
   onCopy,
   onFeedback,
   onPinAll,
-  onRegenerate,
   onShare,
 }: {
   feedback?: FeedbackVote;
   onCopy: () => void;
   onFeedback: (vote: FeedbackVote) => void;
   onPinAll: () => void;
-  onRegenerate: () => void;
   onShare: () => void;
 }) {
   return (
@@ -1518,9 +1515,6 @@ function AssistantToolbar({
       >
         <Copy size={13} /> Sao chép
       </button>
-      <button aria-label="Trả lời lại" className="toolbar-btn" onClick={onRegenerate} type="button">
-        <RefreshCcw size={13} /> Trả lời lại
-      </button>
       <button aria-label="Chia sẻ tin nhắn" className="toolbar-btn" onClick={onShare} type="button">
         <Share2 size={13} /> Chia sẻ
       </button>
@@ -1544,7 +1538,6 @@ function ChatColumn({
   onDelete,
   onFeedback,
   onPinTurn,
-  onRegenerate,
   onRename,
   onSend,
   onToast,
@@ -1557,7 +1550,6 @@ function ChatColumn({
   onDelete: () => void;
   onFeedback: (turnId: string, vote: FeedbackVote) => void;
   onPinTurn: (turn: AssistantTurn) => void;
-  onRegenerate: (turnId: string) => void;
   onRename: (title: string) => void;
   onSend: (text: string, attachments?: ComposerAttachment[]) => Promise<void>;
   onToast: (message: string) => void;
@@ -1850,11 +1842,6 @@ function ChatColumn({
                         · {(turn.totalMs / 1000).toFixed(1)}s
                       </span>
                     )}
-                    {turn.regenerated && (
-                      <span className="rounded-full bg-zinc-100 px-1.5 py-0.5 text-[10px] font-semibold text-zinc-600 dark:bg-white/10 dark:text-zinc-300">
-                        Lượt trả lời lại
-                      </span>
-                    )}
                   </div>
                   {turn.reasoning.length > 0 && (
                     <div className="mb-3">
@@ -1879,7 +1866,6 @@ function ChatColumn({
                         }}
                         onFeedback={(vote) => onFeedback(turn.id, vote)}
                         onPinAll={() => onPinTurn(turn)}
-                        onRegenerate={() => onRegenerate(turn.id)}
                         onShare={() => {
                           void copyText(buildShareUrl(conversation.id, turn.id));
                           onToast("Đã sao chép link tới tin nhắn");
@@ -2575,11 +2561,7 @@ export function RendererShell() {
   ]);
 
   const sendMessage = useCallback(
-    async (
-      text: string,
-      attachments: ComposerAttachment[] = [],
-      regenerated = false
-    ) => {
+    async (text: string, attachments: ComposerAttachment[] = []) => {
       const conversation = currentConversation;
       if (!conversation || isBusy || readOnly) return;
 
@@ -2604,7 +2586,6 @@ export function RendererShell() {
         reasoning: [],
         status: "streaming",
         createdAt: new Date().toISOString(),
-        regenerated,
       };
       const nextContent = buildContentBlocks(text, attachments);
       const requestMessages = toApiMessages(conversation.turns, nextContent);
@@ -2731,23 +2712,6 @@ export function RendererShell() {
       }
     },
     [appendTurn, currentConversation, isBusy, readOnly, setConversationTitle, updateAssistantTurn]
-  );
-
-  const regenerateTurn = useCallback(
-    (assistantTurnId: string) => {
-      if (readOnly) return;
-      const turns = currentConversation?.turns ?? [];
-      const index = turns.findIndex((turn) => turn.id === assistantTurnId);
-      for (let cursor = index - 1; cursor >= 0; cursor -= 1) {
-        const turn = turns[cursor];
-        if (turn.role === "user") {
-          showToast("Đang trả lời lại");
-          void sendMessage(turn.text, [], true);
-          return;
-        }
-      }
-    },
-    [currentConversation, readOnly, sendMessage, showToast]
   );
 
   useEffect(() => {
@@ -2903,7 +2867,6 @@ export function RendererShell() {
                 : `Đã ghim ${blocks.length} khối render`
             );
           }}
-          onRegenerate={regenerateTurn}
           onRename={(title) => {
             if (readOnly) return;
             setConversationTitle(currentConversation.id, title);
