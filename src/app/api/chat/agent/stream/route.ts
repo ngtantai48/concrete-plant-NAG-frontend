@@ -20,10 +20,7 @@ function envValue(...names: string[]) {
 }
 
 function agentStreamUrl() {
-  return (
-    envValue("CHAT_AGENT_STREAM_URL", "NEXT_PUBLIC_CHAT_AGENT_STREAM_URL") ??
-    DEFAULT_AGENT_STREAM_URL
-  );
+  return envValue("CHAT_AGENT_STREAM_URL") ?? DEFAULT_AGENT_STREAM_URL;
 }
 
 function nagConfigHeaders(): HeadersInit {

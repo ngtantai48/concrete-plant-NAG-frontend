@@ -5,8 +5,8 @@ export const runtime = "edge";
 export const dynamic = "force-dynamic";
 
 function upstreamUrl(): string {
-  const url = process.env.CHAT_API_URL ?? process.env.NEXT_PUBLIC_CHAT_API_URL;
-  if (!url) throw new Error("CHAT_API_URL/NEXT_PUBLIC_CHAT_API_URL is not configured");
+  const url = process.env.CHAT_API_URL;
+  if (!url) throw new Error("CHAT_API_URL is not configured");
   return url;
 }
 

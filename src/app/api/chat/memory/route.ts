@@ -20,10 +20,7 @@ function envValue(...names: string[]) {
 }
 
 function agentMemoryUrl() {
-  return (
-    envValue("CHAT_AGENT_MEMORY_URL", "NEXT_PUBLIC_CHAT_AGENT_MEMORY_URL") ??
-    DEFAULT_AGENT_MEMORY_URL
-  );
+  return envValue("CHAT_AGENT_MEMORY_URL") ?? DEFAULT_AGENT_MEMORY_URL;
 }
 
 function nagConfigHeaders(): HeadersInit {
