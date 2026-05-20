@@ -3,24 +3,11 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { userApi } from "@/services/user.service";
@@ -87,7 +74,7 @@ export default function UserCreateModal({ open, onClose }: UserCreateModalProps)
       user_address: "",
       username: "",
       password: "",
-      role: "admin",
+      role: "user",
       user_join_date: today(),
       user_work_shift: "",
     },
@@ -223,7 +210,7 @@ export default function UserCreateModal({ open, onClose }: UserCreateModalProps)
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="admin">{tRoles("admin")}</SelectItem>
+                        {/* <SelectItem value="admin">{tRoles("admin")}</SelectItem> */}
                         <SelectItem value="manager">{tRoles("manager")}</SelectItem>
                         <SelectItem value="dispatcher">{tRoles("dispatcher")}</SelectItem>
                         <SelectItem value="driver">{tRoles("driver")}</SelectItem>

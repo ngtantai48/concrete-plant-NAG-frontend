@@ -1,17 +1,16 @@
 "use client";
 
-import { RolePermissions } from "@/hooks/use-permissions";
-import { useTranslations } from "next-intl";
-import { Tree, Tabs } from "antd";
-import { SaveOutlined } from "@ant-design/icons";
-import { useState, useMemo } from "react";
-import { navigationConfig, NavItem } from "@/config/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { toast } from "sonner";
-import permissionApi from "@/services/permission.service";
-import { useEffect } from "react";
+import { navigationConfig, NavItem } from "@/config/navigation";
 import { ROLES } from "@/constants/roles";
+import { RolePermissions } from "@/hooks/use-permissions";
+import permissionApi from "@/services/permission.service";
+import { SaveOutlined } from "@ant-design/icons";
+import { Tabs, Tree } from "antd";
+import { useTranslations } from "next-intl";
+import { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 
 export default function RolePermissionsManager() {
   const t = useTranslations();
@@ -37,7 +36,6 @@ export default function RolePermissionsManager() {
   const handleSave = async () => {
     try {
       const res = await permissionApi.updatePermissions(localPerms);
-      // @ts-ignore
       if (res.data && res.data.data) {
         setLocalPerms(res.data.data);
       }
@@ -131,11 +129,9 @@ export default function RolePermissionsManager() {
           </p>
         </div>
         <Button onClick={handleSave} className="gap-2" disabled={loading}>
-          <SaveOutlined />
-          Lưu thay đổi
+          <SaveOutlined />Lưu thay đổi
         </Button>
       </div>
-
 
       <Card className="flex-1 shadow-sm border-gray-200 dark:border-gray-800 overflow-hidden flex flex-col">
         <CardHeader className="pb-3 border-b border-gray-100 dark:border-gray-800/60 bg-gray-50/50 dark:bg-gray-900/20">

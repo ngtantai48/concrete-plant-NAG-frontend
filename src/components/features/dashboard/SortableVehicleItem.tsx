@@ -188,14 +188,25 @@ function SortableVehicleItemBase({
               </TooltipContent>
             </Tooltip>
             {order.order_init_datetime && (
-              <div className="flex items-center gap-1 text-sm font-bold mx-5" style={{ color: 'var(--dd-text-muted)' }}>
-                {/* <Clock size={14} /> */}
-                <span>
-                  <span className="opacity-85">{t('lastUpdatedAt')}</span>
-                  <span style={{ color: 'var(--dd-text-primary)' }}>
-                    {`${new Date(order.order_init_datetime).getHours()}h${new Date(order.order_init_datetime).getMinutes().toString().padStart(2, '0')}p`}
-                  </span>
-                </span>
+              <div className="flex flex-row text-sm font-extrabold ml-8">
+                {(() => {
+                  const dateObj = new Date(order.order_init_datetime);
+                  const hh = dateObj.getHours();
+                  const mm = dateObj.getMinutes().toString().padStart(2, '0');
+                  const dd = dateObj.getDate().toString().padStart(2, '0');
+                  const MM = (dateObj.getMonth() + 1).toString().padStart(2, '0');
+                  const yyyy = dateObj.getFullYear();
+                  return (
+                    <>
+                      {/* <span className="opacity-85">{t('lastUpdatedAt')}</span> */}
+                      <div className="flex flex-row gap-5 items-center justify-center" >
+                        <span style={{ color: 'var(--dd-text-primary)' }}>{`${hh}h${mm}p`}</span>
+                        <span style={{ color: 'var(--dd-text-muted)' }}>{`${dd}/${MM}/${yyyy}`}</span>
+                      </div>
+                    </>
+
+                  );
+                })()}
               </div>
             )}
           </div>

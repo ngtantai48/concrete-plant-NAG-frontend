@@ -232,14 +232,14 @@ export default function TableUsers() {
       fixed: "right",
       render: (_value, record) => (
         <Space size="middle">
-          {hasActionAccess(SIDEBAR.USER_MANAGE, PERMISSIONS.USER_MANAGE.UPDATE) && (
+          {record.role !== "admin" && hasActionAccess(SIDEBAR.USER_MANAGE, PERMISSIONS.USER_MANAGE.UPDATE) && (
             <Tooltip title={tCommon("edit")}>
               <Button variant="outline" size="iconSquare" onClick={() => setEditingUser(record)}>
                 <PencilLine className="text-blue-600" />
               </Button>
             </Tooltip>
           )}
-          {hasActionAccess(SIDEBAR.USER_MANAGE, PERMISSIONS.USER_MANAGE.DELETE) && (
+          {record.role !== "admin" && hasActionAccess(SIDEBAR.USER_MANAGE, PERMISSIONS.USER_MANAGE.DELETE) && (
             <Popconfirm
               title={tCommon("confirm")}
               description={
