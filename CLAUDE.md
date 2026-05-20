@@ -91,3 +91,9 @@ When adding new strings, add keys to **both** `vi.json` and `en.json`.
 ## Code Style
 
 Prettier config: double quotes, semicolons, trailing commas (es5), 100 char print width, 2-space tabs, LF line endings.
+
+## Commit Rules (BẮT BUỘC)
+
+- **KHÔNG bao giờ thêm `Co-Authored-By:` hay bất kỳ AI tag/trailer nào** vào commit message. Repo này không cho phép xuất hiện tag AI co-author.
+- Commit message chỉ ghi nội dung thay đổi, không tiết lộ AI assistance.
+- Nếu cần xóa trailer khỏi commit cũ: dùng `git filter-branch -f --msg-filter 'grep -v "^Co-Authored-By:" || true' <range>` rồi `git push --force-with-lease`.
