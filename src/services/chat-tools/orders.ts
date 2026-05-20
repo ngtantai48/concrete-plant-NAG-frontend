@@ -14,6 +14,19 @@ const ORDER_STATUSES = [
   "canceled",
 ] as const;
 
+const STATUS_ALIASES: Record<string, ReadonlyArray<(typeof ORDER_STATUSES)[number]>> = {
+  moving: ["running", "transporting", "collecting"],
+  active: ["running", "transporting", "collecting"],
+  processing: ["running", "transporting", "collecting"],
+  in_progress: ["running", "transporting", "collecting"],
+  open: ["init", "pending", "collecting", "running", "transporting"],
+};
+
+const STATUS_OR_ALIAS = [
+  ...ORDER_STATUSES,
+  ...Object.keys(STATUS_ALIASES),
+] as ReadonlyArray<string>;
+
 interface OrderListResponse {
   data?: Order[];
   total?: number;
@@ -65,8 +78,32 @@ const todayOrdersArgs = z.object({
 });
 
 const ordersByStatusArgs = z.object({
-  status: z.enum(ORDER_STATUSES),
+  status: z
+    .string()
+    .refine((value) => STATUS_OR_ALIAS.includes(value), {
+      message: `status must be one of: ${STATUS_OR_ALIAS.join(", ")}`,
+    }),
 });
+
+function resolveStatusList(status: string): ReadonlyArray<(typeof ORDER_STATUSES)[number]> {
+  const alias = STATUS_ALIASES[status as keyof typeof STATUS_ALIASES];
+  if (alias) return alias;
+  return [status as (typeof ORDER_STATUSES)[number]];
+}
+
+function dedupeOrders(lists: Order[][]): Order[] {
+  const seen = new Set<number>();
+  const merged: Order[] = [];
+  for (const list of lists) {
+    for (const order of list) {
+      const id = order.order_id;
+      if (typeof id === "number" && seen.has(id)) continue;
+      if (typeof id === "number") seen.add(id);
+      merged.push(order);
+    }
+  }
+  return merged;
+}
 
 export const getTodayOrdersTool: ToolDefinition<z.infer<typeof todayOrdersArgs>> = {
   name: "getTodayOrders",
@@ -98,24 +135,37 @@ export const getTodayOrdersTool: ToolDefinition<z.infer<typeof todayOrdersArgs>>
 export const getOrdersByStatusTool: ToolDefinition<z.infer<typeof ordersByStatusArgs>> = {
   name: "getOrdersByStatus",
   description:
-    "Lấy danh sách chuyến (đơn hàng) theo trạng thái. Trạng thái hợp lệ: init, pending, collecting, transporting, running, completed, canceled.",
+    'Lấy danh sách chuyến (đơn hàng) theo trạng thái. Trạng thái đơn lẻ: init, pending, collecting, transporting, running, completed, canceled. Alias nhóm: "moving"/"active"/"processing"/"in_progress" (= running+transporting+collecting, dùng cho câu hỏi "đang di chuyển"/"đang xử lý"/"đang chạy"), "open" (= init+pending+collecting+running+transporting). LUÔN dùng alias "moving" khi user hỏi về đơn "đang di chuyển"/"đang chạy", KHÔNG dùng riêng "transporting".',
   schema: ordersByStatusArgs,
   parameters: {
     type: "object",
     properties: {
       status: {
         type: "string",
-        description: "Trạng thái đơn cần lọc.",
-        enum: ORDER_STATUSES,
+        description:
+          'Trạng thái cần lọc. Dùng alias "moving" cho "đang di chuyển/đang chạy", "open" cho "đang mở".',
+        enum: STATUS_OR_ALIAS as unknown as readonly string[],
       },
     },
     required: ["status"],
   },
   execute: async ({ status }) => {
-    const res = await orderApi.getByStatus(status);
-    const orders = unwrapOrders(res?.data ?? res);
+    const targets = resolveStatusList(status);
+    const responses = await Promise.all(
+      targets.map(async (target) => {
+        const res = await orderApi.getByStatus(target);
+        return unwrapOrders(res?.data ?? res);
+      })
+    );
+    const orders = dedupeOrders(responses);
+    orders.sort((left, right) => {
+      const leftTime = left.order_start_datetime ?? left.order_init_datetime ?? "";
+      const rightTime = right.order_start_datetime ?? right.order_init_datetime ?? "";
+      return rightTime.localeCompare(leftTime);
+    });
     return {
       status,
+      resolvedStatuses: targets,
       summary: summarizeOrders(orders),
       orders: orders.slice(0, 50).map(compactOrder),
       truncated: orders.length > 50,

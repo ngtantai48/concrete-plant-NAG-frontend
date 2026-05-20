@@ -28,6 +28,7 @@
   },
   "Sidebar": {
     "dashboard": "Dashboard",
+    "aiAssistant": "AI Assistant",
     "project": "Project",
     "testing": "Testing",
     "equipments": "Equipments",

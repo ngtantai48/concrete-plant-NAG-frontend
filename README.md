@@ -1,79 +1,60 @@
 # Concrete Plant NAG Frontend
 
-Frontend project for the Concrete Plant Management software. Built with modern Next.js architecture, featuring real-time maps and a multilingual administration system.
+Next.js App Router frontend for the NAG concrete plant operations assistant.
 
-## 🚀 Technologies
+## AI Renderer
 
-- **Framework:** [Next.js](https://nextjs.org/) (App Router)
-- **Language:** [TypeScript](https://www.typescriptlang.org/)
-- **UI & CSS:** [Tailwind CSS](https://tailwindcss.com/) with [Ant Design](https://ant.design/) and [Shadcn UI](https://ui.shadcn.com/)
-- **Maps:** [Leaflet](https://leafletjs.com/) & [React-Leaflet](https://react-leaflet.js.org/)
-- **Real-time:** [Socket.io-client](https://socket.io/) (Vehicle/station tracking and status mapping)
-- **Internationalization (i18n):** [Next-Intl](https://next-intl-docs.vercel.app/)
-- **Global State Management:** [Zustand](https://github.com/pmndrs/zustand)
-- **HTTP Client:** [Axios](https://axios-http.com/)
+The production Chat AI renderer is integrated into the admin app at `/admin/ai-assistant`.
 
----
+- `:::render` JSON blocks are parsed by `src/components/renderer/parseStream.ts`.
+- Valid blocks render through `src/components/renderer/RenderBlock.tsx`.
+- Invalid block JSON/schema falls back to `UnknownBlock` without crashing.
+- Full-Page shell from `fullpage-export/option3-fullpage-detailed.jsx` is the active layout: conversation sidebar, chat workspace, and right Inspector.
+- Conversations, pinned render blocks, pinned entities, feedback, Inspector state, and model mode persist in localStorage via Zustand.
+- Chat uses the existing popup flow in `src/services/chat.service.ts`: router completion -> internal tool dispatch -> streamed answer with the render system prompt.
+- Streaming goes through `/api/chat/stream` and `/api/chat/complete`, both proxying `CHAT_API_URL` with `CHAT_API_TOKEN`.
+- The report action posts conversation turns plus render-block JSON to `/api/reports`; the server renders the HTML report template and returns a PDF download.
+- No renderer mock endpoint or fixture tool layer is kept in production source.
+- Legacy/incorrect chart output (`<chart>`, Chart.js JSON, `pie_chart`, mermaid/yaml chart fences) is normalized to the locked 14 render types where possible; unresolved chart buffers render as a blurred loading skeleton instead of leaking raw code.
 
-## 💻 Getting Started
-
-### Prerequisites
-
-- **Node.js:** version > 24
-
-### 1. Install Dependencies
-
-The project supports `npm`, `pnpm`, or `yarn`. Run the following command in the root directory:
+## Environment Variables
 
 ```bash
-npm install
-# or 
+CHAT_API_URL=https://chat.svnagentic.site/v1/nag/chat/stream
+CHAT_API_TOKEN=...
+
+NEXT_PUBLIC_API_URL=https://backend.na.savinatestinghub.com/api/v1/
+```
+
+The live tool layer reuses `src/services/chat-tools/*` from the existing chat popup and calls the backend APIs already used by the admin app. Replace or extend those tool handlers when adding new real backend capabilities.
+
+## Structure
+
+```text
+src/app/api/chat/stream/route.ts Proxy streaming endpoint for CHAT_API_URL
+src/app/api/chat/complete/route.ts Proxy non-stream endpoint for CHAT_API_URL
+src/app/api/chat/action/route.ts dispatch_action validator; returns 501 until a real dispatch endpoint is wired
+src/app/api/reports/route.ts HTML-to-PDF report generator for pinned AI render blocks
+src/app/(dashboard)/admin/ai-assistant/page.tsx Full-page renderer shell entry
+src/components/renderer/         Stream parser, render blocks, shell, reasoning tree
+src/components/charts/           SVG chart primitives
+src/lib/prompts/system.ts        System prompt template
+src/services/chat-tools/         Real tool router/handlers reused from chat popup
+tests/e2e/renderer.spec.ts       Playwright smoke test
+tests/e2e/renderer-buffer.spec.ts Parser regression test for leaked chart buffers
+```
+
+## Run
+
+```bash
 pnpm install
-# or
-yarn install
-```
-
-### 2. Run the Development Server
-
-Start the local server:
-
-```bash
-npm run dev
-# or
 pnpm dev
-# or
-yarn dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the application. The page will automatically hot-reload when you save changes to the files in the `src/` directory.
+Open [http://localhost:3000/admin/ai-assistant](http://localhost:3000/admin/ai-assistant) after logging in as admin.
 
----
-
-## 🌍 Learn More About Next.js
-
-To learn more about Next.js and its features, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
----
-
-## ⚙️ Deployment
-
-### Build for Production
-
-Create an optimized production build:
+## Test
 
 ```bash
-npm run build
+pnpm exec playwright test
 ```
-
-Start the production server:
-
-```bash
-npm start
-```
-
-### Deploy on Vercel
-
-The easiest and most optimized way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme). Check out the documentation on [Next.js deployment](https://nextjs.org/docs/app/building-your-application/deploying) for more details.

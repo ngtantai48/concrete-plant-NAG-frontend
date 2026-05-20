@@ -6,7 +6,14 @@ export interface ProductionQuery {
   station_id?: number;
   vehicle_id?: number;
   user_id?: number;
-  order_status?: "all" | "pending" | "running" | "collecting" | "transporting" | "completed" | "canceled";
+  order_status?:
+    | "all"
+    | "pending"
+    | "running"
+    | "collecting"
+    | "transporting"
+    | "completed"
+    | "canceled";
 }
 
 export interface ProductionSummary {
@@ -64,39 +71,41 @@ export interface ProductionReportResponse {
 }
 
 // ─── Maintenance Forecast ──────────────────────────────────────────────────────
+export type MaintenanceRiskLevel = "normal" | "warning" | "critical";
+
 export interface MaintenanceForecastQuery {
   date?: string;
   days_ahead?: number;
   vehicle_id?: number;
-  risk_level?: "all" | "normal" | "warning" | "critical";
+  risk_level?: "all" | MaintenanceRiskLevel;
   km_to_warning?: number;
   km_to_maintenance?: number;
 }
 
 export interface MaintenanceForecastItem {
   vehicle_id: number;
-  vehicle_name: string;
   vehicle_license_plate: string;
-  vehicle_status: string;
-  last_maintenance_at: string;
-  distance_since_last_maintenance_km: number;
-  estimated_due_km: number;
-  km_until_due: number;
-  risk_level: "normal" | "warning" | "critical";
-  rule_hit: string;
-  note: string;
-  projected_window_days: number;
+  vehicle_name?: string | null;
+  vehicle_status?: string | null;
+  risk_level: MaintenanceRiskLevel;
+  last_maintenance_at?: string | null;
+  distance_since_last_maintenance_km?: number | null;
+  estimated_due_km?: number | null;
+  km_until_due?: number | null;
+  rule_hit?: string | null;
+  note?: string | null;
+  projected_window_days?: number;
 }
 
 export interface MaintenanceForecastResponse {
-  date: string;
-  days_ahead: number;
-  thresholds: {
-    km_to_warning: number;
-    km_to_maintenance: number;
-  };
-  total: number;
-  items: MaintenanceForecastItem[];
+  date?: string;
+  days_ahead?: number;
+  thresholds?: {
+    km_to_warning?: number;
+    km_to_maintenance?: number;
+  } & Record<string, unknown>;
+  total?: number;
+  items?: MaintenanceForecastItem[];
 }
 
 // ─── Fuel Consumption ──────────────────────────────────────────────────────────
@@ -134,7 +143,6 @@ export interface FuelConsumptionResponse {
 }
 
 // ─── Fuel Management System ────────────────────────────────────────────────────
-
 export interface VehicleFuelProfile {
   vehicle_fuel_profile_id: number;
   vehicle_id: number;
@@ -195,7 +203,11 @@ export interface FuelAlert {
   vehicle_name?: string;
   vehicle_license_plate?: string;
   order_id: number | null;
-  alert_type: "high_consumption" | "suspicious_drop" | "long_idle_consumption" | "missing_refuel_pattern";
+  alert_type:
+    | "high_consumption"
+    | "suspicious_drop"
+    | "long_idle_consumption"
+    | "missing_refuel_pattern";
   severity: "low" | "medium" | "high";
   detected_at: string;
   expected_value: number | null;
@@ -221,7 +233,6 @@ export interface FuelDashboardResponse {
     total_refuel_liters: number;
     variance_liters: number;
     fuel_rate_l_per_100km: number;
-    // New breakdown fields
     distance_component_liters: number;
     idle_component_liters: number;
     total_drain_liters: number;
@@ -251,15 +262,18 @@ export interface VehicleTankStatus {
 
   tank_capacity_liters: number;
   configured_opening_fuel_liters?: number;
-  configured_opening_balance_liters?: number; // New field for original baseline
+  configured_opening_balance_liters?: number;
   configured_opening_fuel_at?: string;
 
   can_compute_balance?: boolean;
   data_quality?: "ok" | "missing_baseline_for_range";
-  data_quality_reason?: "opening_after_range_start" | "no_opening_no_full_refuel_before_range" | null;
+  data_quality_reason?:
+    | "opening_after_range_start"
+    | "no_opening_no_full_refuel_before_range"
+    | null;
 
   opening_balance_liters: number;
-  period_opening_balance_liters?: number; // New dynamic opening balance
+  period_opening_balance_liters?: number;
   refuel_in_liters: number;
   drain_out_liters: number;
   net_refuel_liters?: number;
@@ -278,9 +292,15 @@ export interface VehicleTankStatus {
   variance_liters: number;
   variance_percent: number;
 
-  // Fuel estimation source
-  fuel_estimation_source?: "vtracking_engine_runtime" | "vtracking_motion_runtime" | "order_metrics";
-  idle_estimation_source?: "vtracking_engine_runtime" | "vtracking_motion_runtime" | "order_metrics" | "order_metrics_fallback_for_motion";
+  fuel_estimation_source?:
+    | "vtracking_engine_runtime"
+    | "vtracking_motion_runtime"
+    | "order_metrics";
+  idle_estimation_source?:
+    | "vtracking_engine_runtime"
+    | "vtracking_motion_runtime"
+    | "order_metrics"
+    | "order_metrics_fallback_for_motion";
   idle_fallback_applied?: boolean;
   engine_on_minutes_total?: number;
   engine_on_idle_minutes?: number;
@@ -292,15 +312,68 @@ export interface VehicleTankStatus {
   total_idle_minutes: number;
   opening_strategy: string;
 
-  // New scope fields
   metric_scope?: "realtime_from_configured_opening" | "realtime_fallback_today" | "range";
   metrics_from?: string;
   metrics_to?: string;
 
-  // Debug & source info
-  distance_estimation_source?: "vtracking_odometer_delta" | "vtracking_geo_distance" | "order_metrics";
+  distance_estimation_source?:
+    | "vtracking_odometer_delta"
+    | "vtracking_geo_distance"
+    | "order_metrics";
   odometer_start_km?: number;
   odometer_end_km?: number;
   odometer_delta_km?: number;
   odometer_samples?: number;
+}
+
+// ─── AI Report (PDF generation) ───────────────────────────────────────────────
+export type AiReportContext = "fleet" | "production" | "maintenance";
+
+export interface AiReportTurn {
+  id: string;
+  role: "user" | "assistant";
+  text: string;
+  createdAt: string;
+  status?: "streaming" | "done" | "error";
+  totalMs?: number;
+}
+
+export interface AiReportBlock {
+  id: string;
+  type: string;
+  title?: string;
+  createdAt: string;
+  data: unknown;
+}
+
+export interface CreateAiReportPayload {
+  conversationId: string;
+  title: string;
+  createdAt: string;
+  lastMessageAt: string;
+  activeContext: AiReportContext;
+  shareUrl?: string;
+  turns: AiReportTurn[];
+  blocks: AiReportBlock[];
+}
+
+export interface AiGeneratedReport {
+  id: string;
+  conversationId: string;
+  title: string;
+  createdAt: string;
+  filename: string;
+  format: "pdf";
+  mimeType: "application/pdf";
+  markdown: string;
+  html?: string;
+  pdfBase64?: string;
+  blockCount: number;
+  turnCount: number;
+  sizeBytes?: number;
+}
+
+export interface CreateAiReportResponse extends AiGeneratedReport {
+  pdfBase64: string;
+  sizeBytes: number;
 }

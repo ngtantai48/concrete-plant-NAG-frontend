@@ -2,8 +2,8 @@ import { PERMISSIONS } from "@/constants/permissions";
 import { ROLES } from "@/constants/roles";
 import { SIDEBAR } from "@/constants/route";
 import {
-  CalendarCheck, Car, Gauge, Layers, MapPin, Package, UsersRound,
-  Wrench, Settings, ShieldCheck, UserCog, UtensilsCrossed, ClipboardList, ArrowRightLeft
+  ArrowRightLeft, Bot, CalendarCheck, Car, ClipboardList, Gauge, Layers, MapPin,
+  Package, Settings, ShieldCheck, UserCog, UsersRound, UtensilsCrossed, Wrench
 } from "lucide-react";
 import React from "react";
 
@@ -32,6 +32,12 @@ export const navigationConfig: NavItem[] = [
       { key: PERMISSIONS.DASHBOARD.SYNC_SLOTS, label: "Đồng bộ lốt xe" },
       { key: PERMISSIONS.DASHBOARD.MANUAL_CAMERA_FALLBACK, label: "Thao tác thủ công (camera sự cố)" },
     ],
+  },
+  {
+    key: SIDEBAR.AI_ASSISTANT,
+    label: "aiAssistant",
+    icon: <Bot />,
+    roles: [ROLES.ADMIN],
   },
   {
     key: "user-manage-group",

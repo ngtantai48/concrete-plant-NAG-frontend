@@ -98,7 +98,7 @@ export default function Sidebar() {
   }, [pathname, searchParams]);
 
   const baseMenuItems = useMemo(() => {
-    const translateItems = (items: NavItem[]): any[] => {
+    const translateItems = (items: NavItem[]): NavItem[] => {
       return items.map((item) => ({
         ...item,
         label: t(item.label),
@@ -109,21 +109,19 @@ export default function Sidebar() {
   }, [t]);
 
   const menuItems = useMemo(() => {
-    const filterItems = (items: any[]): any[] => {
+    const filterItems = (items: NavItem[]): NavItem[] => {
       return items
-        .map(item => ({ ...item }))
+        .map((item) => ({ ...item }))
         .filter((item) => {
-          // 1. Check if item is restricted to specific roles
           if (item.roles && !item.roles.includes(role || "")) {
             return false;
           }
 
           if (item.children) {
             item.children = filterItems(item.children);
-            // Folder is visible if it has visible children
             return item.children.length > 0;
           }
-          // All items now rely on RBAC check
+
           return hasPageAccess(item.key);
         });
     };
@@ -148,7 +146,7 @@ export default function Sidebar() {
   };
 
   const buildMenuItems = useCallback(
-    (items: any[]): MenuProps["items"] => {
+    (items: NavItem[]): MenuProps["items"] => {
       return items.map((item) => {
         if (item.children) {
           return {
@@ -174,7 +172,7 @@ export default function Sidebar() {
   );
 
   const selectedKey = useMemo(() => {
-    const findMatchedKey = (items: any[]): string | null => {
+    const findMatchedKey = (items: NavItem[]): string | null => {
       for (const item of items) {
         if (item.children) {
           const childMatch = findMatchedKey(item.children);
@@ -215,7 +213,10 @@ export default function Sidebar() {
 
   return (
     <>
-      <Layout.Sider width={270} collapsedWidth={80} collapsed={collapsed}
+      <Layout.Sider
+        width={270}
+        collapsedWidth={80}
+        collapsed={collapsed}
         className="bg-gray-900! text-white! p-0!"
         style={{ position: "fixed", left: 0, top: 0, bottom: 0, zIndex: 100, overflow: "hidden" }}
         trigger={null}

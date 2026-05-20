@@ -18,6 +18,8 @@ export default defineConfig([
       ".vscode/**",
       ".idea/**",
 
+      "renderer-pkg/**",
+
       "*.swp",
       "*.lcov",
       "*.tgz",
