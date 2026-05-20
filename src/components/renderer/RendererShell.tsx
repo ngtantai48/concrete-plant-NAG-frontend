@@ -479,18 +479,23 @@ function compactToolArgsForReasoning(name: string, args: Record<string, unknown>
   };
 }
 
+// Backend đã quản lý short/long-term memory qua X-Chat-Session-Id.
+// Frontend chỉ cần gửi lại bối cảnh gần nhất để giảm token: 3 lượt user + 3 lượt assistant
+// gần nhất (6 turns). Bộ nhớ xa hơn backend tự inject từ session bucket.
+const RECENT_HISTORY_TURN_LIMIT = 6;
+
 function toApiMessages(
   turns: Turn[],
   nextUserContent: string | ChatContentBlock[]
 ): ApiChatMessage[] {
-  const messages = turns
-    .filter((turn) => turn.text.trim().length > 0)
-    .map(
-      (turn): ApiChatMessage => ({
-        role: turn.role === "assistant" ? "assistant" : "user",
-        content: turn.text,
-      })
-    );
+  const nonEmptyTurns = turns.filter((turn) => turn.text.trim().length > 0);
+  const recentTurns = nonEmptyTurns.slice(-RECENT_HISTORY_TURN_LIMIT);
+  const messages = recentTurns.map(
+    (turn): ApiChatMessage => ({
+      role: turn.role === "assistant" ? "assistant" : "user",
+      content: turn.text,
+    })
+  );
   return [...messages, { role: "user", content: nextUserContent }];
 }
 
