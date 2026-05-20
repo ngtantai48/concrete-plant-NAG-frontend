@@ -1822,7 +1822,10 @@ function ChatColumn({
         }}
         ref={scrollRef}
       >
-        <div className="mx-auto flex w-full max-w-[1040px] flex-col gap-3">
+        <div
+          className="mx-auto flex w-full max-w-[1040px] flex-col gap-7"
+          style={{ fontFamily: "var(--font-chat-sans)" }}
+        >
           {conversation.turns.length === 0 && (
             <div className="grid min-h-[48vh] place-items-center text-center">
               <div>
@@ -1852,27 +1855,30 @@ function ChatColumn({
 
           {conversation.turns.map((turn) =>
             turn.role === "user" ? (
-              <div className="flex justify-end" key={turn.id}>
-                <div className="flex max-w-[78%] flex-col items-end gap-1">
+              <div className="group flex justify-end" key={turn.id}>
+                <div className="flex max-w-[78%] flex-col items-end gap-2">
                   {turn.text && (
-                    <div className="rounded-[18px] rounded-br-md bg-[linear-gradient(180deg,#2C99FF_0%,#007AFF_100%)] px-3.5 py-2 text-[14px] leading-6 text-white shadow-[0_10px_30px_-22px_rgba(0,122,255,0.95)]">
-                      {turn.text}
+                    <div className="rounded-3xl bg-zinc-100 px-5 py-3 text-[15px] leading-[1.6] text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100">
+                      <p className="whitespace-pre-wrap break-words">{turn.text}</p>
                     </div>
                   )}
                   {turn.attachments && turn.attachments.length > 0 && (
-                    <div className="flex flex-wrap justify-end gap-1">
+                    <div className="flex flex-wrap justify-end gap-1.5">
                       {turn.attachments.map((attachment, index) => (
                         <span
-                          className="inline-flex items-center gap-1 rounded-full border border-[#007AFF]/25 bg-white px-2 py-0.5 text-[10.5px] font-semibold text-[#0A66E0] dark:border-white/10 dark:bg-zinc-950 dark:text-[#6DB4FF]"
+                          className="inline-flex items-center gap-1.5 rounded-full border border-zinc-200 bg-white px-2.5 py-1 text-[11px] font-medium text-zinc-600 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300"
                           key={`${turn.id}-att-${index}`}
                         >
                           {attachment.kind === "image" ? (
-                            <ImageIcon size={11} />
+                            <ImageIcon size={12} />
                           ) : (
-                            <FileText size={11} />
+                            <FileText size={12} />
                           )}
-                          <span className="max-w-[120px] truncate">{attachment.filename}</span>
-                          <span className="font-mono text-[10px] text-zinc-400">
+                          <span className="max-w-[140px] truncate">{attachment.filename}</span>
+                          <span
+                            className="text-[10px] text-zinc-400"
+                            style={{ fontFamily: "var(--font-chat-mono)" }}
+                          >
                             {formatAttachmentSize(attachment.sizeBytes)}
                           </span>
                         </span>
@@ -1882,8 +1888,8 @@ function ChatColumn({
                 </div>
               </div>
             ) : (
-              <div className="flex items-start gap-2.5" id={turn.id} key={turn.id}>
-                <div className="grid size-7 shrink-0 place-items-center rounded-full border border-[#EE2D2D]/15 bg-white shadow-sm">
+              <div className="group flex items-start gap-3.5" id={turn.id} key={turn.id}>
+                <div className="grid size-8 shrink-0 place-items-center rounded-full border border-[#EE2D2D]/15 bg-white shadow-sm">
                   <Image
                     alt=""
                     aria-hidden
@@ -1894,8 +1900,10 @@ function ChatColumn({
                   />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="mb-2 flex flex-wrap items-center gap-1.5 text-[11px] text-zinc-400">
-                    <span className="font-bold text-zinc-700 dark:text-zinc-200">Trợ lý AI</span>
+                  <div className="mb-2.5 flex flex-wrap items-center gap-1.5 text-[12px] text-zinc-400">
+                    <span className="font-semibold text-zinc-700 dark:text-zinc-200">
+                      Trợ lý AI
+                    </span>
                     <span>·</span>
                     <span>Model nội bộ</span>
                     <span>·</span>
@@ -1906,15 +1914,22 @@ function ChatColumn({
                           ? "Lỗi"
                           : "Đã trả lời"}
                     </span>
-                    {turn.totalMs && <span>· {(turn.totalMs / 1000).toFixed(1)}s</span>}
+                    {turn.totalMs && (
+                      <span
+                        className="text-[11px] text-zinc-400"
+                        style={{ fontFamily: "var(--font-chat-mono)" }}
+                      >
+                        · {(turn.totalMs / 1000).toFixed(1)}s
+                      </span>
+                    )}
                     {turn.regenerated && (
-                      <span className="rounded-full bg-zinc-100 px-1.5 py-0.5 text-[10px] font-bold dark:bg-white/10">
+                      <span className="rounded-full bg-zinc-100 px-1.5 py-0.5 text-[10px] font-semibold text-zinc-600 dark:bg-white/10 dark:text-zinc-300">
                         Lượt trả lời lại
                       </span>
                     )}
                   </div>
                   {turn.reasoning.length > 0 && (
-                    <div className="mb-2">
+                    <div className="mb-3">
                       <ReasoningTree steps={turn.reasoning} totalMs={turn.totalMs} />
                     </div>
                   )}
@@ -1927,20 +1942,22 @@ function ChatColumn({
                     <StreamView text={turn.text} streaming={turn.status === "streaming"} />
                   </div>
                   {turn.status !== "streaming" && !readOnly && (
-                    <AssistantToolbar
-                      feedback={feedback[turn.id]}
-                      onCopy={() => {
-                        void copyText(turn.text);
-                        onToast("Đã sao chép câu trả lời");
-                      }}
-                      onFeedback={(vote) => onFeedback(turn.id, vote)}
-                      onPinAll={onPinAll}
-                      onRegenerate={() => onRegenerate(turn.id)}
-                      onShare={() => {
-                        void copyText(buildShareUrl(conversation.id, turn.id));
-                        onToast("Đã sao chép link tới tin nhắn");
-                      }}
-                    />
+                    <div className="opacity-0 transition-opacity duration-150 group-hover:opacity-100 focus-within:opacity-100">
+                      <AssistantToolbar
+                        feedback={feedback[turn.id]}
+                        onCopy={() => {
+                          void copyText(turn.text);
+                          onToast("Đã sao chép câu trả lời");
+                        }}
+                        onFeedback={(vote) => onFeedback(turn.id, vote)}
+                        onPinAll={onPinAll}
+                        onRegenerate={() => onRegenerate(turn.id)}
+                        onShare={() => {
+                          void copyText(buildShareUrl(conversation.id, turn.id));
+                          onToast("Đã sao chép link tới tin nhắn");
+                        }}
+                      />
+                    </div>
                   )}
                 </div>
               </div>
@@ -2037,7 +2054,8 @@ function ChatColumn({
               )}
               <textarea
                 aria-label="Nhập tin nhắn"
-                className="max-h-36 min-h-12 w-full resize-none bg-transparent px-1 py-1 text-[14px] text-zinc-900 outline-none placeholder:text-zinc-400 dark:text-zinc-100"
+                className="max-h-36 min-h-12 w-full resize-none bg-transparent px-1 py-1 text-[15px] leading-6 text-zinc-900 outline-none placeholder:text-zinc-400 dark:text-zinc-100"
+                style={{ fontFamily: "var(--font-chat-sans)" }}
                 data-testid="chat-input"
                 disabled={isBusy || readOnly}
                 onChange={(event) => {

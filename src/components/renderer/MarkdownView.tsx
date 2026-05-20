@@ -110,60 +110,65 @@ export function prepareMarkdownForRender(body: string, streaming = false): strin
 
 const markdownComponents = {
   p({ children }) {
-    return (
-      <p className="my-1 text-[13px] leading-5 text-zinc-700 dark:text-zinc-250">{children}</p>
-    );
+    return <p className="my-3 first:mt-0 last:mb-0">{children}</p>;
   },
   h1({ children }) {
     return (
-      <h1 className="mb-1.5 mt-2.5 text-[15px] font-extrabold leading-5 text-zinc-950 dark:text-zinc-50">
+      <h1 className="mb-3 mt-6 first:mt-0 text-[1.75em] font-bold leading-[1.3] tracking-tight">
         {children}
       </h1>
     );
   },
   h2({ children }) {
     return (
-      <h2 className="mb-1.5 mt-2.5 text-[14px] font-extrabold leading-5 text-zinc-950 dark:text-zinc-50">
+      <h2 className="mb-3 mt-6 first:mt-0 text-[1.4em] font-bold leading-[1.35] tracking-tight">
         {children}
       </h2>
     );
   },
   h3({ children }) {
     return (
-      <h3 className="mb-1 mt-2 text-[13px] font-extrabold leading-5 text-zinc-950 dark:text-zinc-50">
+      <h3 className="mb-2 mt-5 first:mt-0 text-[1.15em] font-semibold leading-[1.4]">
         {children}
       </h3>
     );
   },
+  h4({ children }) {
+    return <h4 className="mb-2 mt-4 first:mt-0 text-[1em] font-semibold">{children}</h4>;
+  },
   ul({ children }) {
-    return <ul className="my-1.5 ml-0 space-y-1 pl-4 text-[13px] leading-5">{children}</ul>;
+    return <ul className="my-3 ml-0 list-disc space-y-2 pl-6">{children}</ul>;
   },
   ol({ children }) {
-    return (
-      <ol className="my-1.5 ml-0 list-decimal space-y-1 pl-5 text-[13px] leading-5">{children}</ol>
-    );
+    return <ol className="my-3 ml-0 list-decimal space-y-2 pl-6">{children}</ol>;
   },
   li({ children }) {
     return (
-      <li className="pl-0.5 text-zinc-700 marker:text-zinc-400 dark:text-zinc-250 dark:marker:text-zinc-500">
+      <li className="pl-1 marker:text-zinc-400 dark:marker:text-zinc-500 [&>p]:my-1">
         {children}
       </li>
     );
   },
   strong({ children }) {
-    return <strong className="font-extrabold text-zinc-950 dark:text-zinc-50">{children}</strong>;
+    return <strong className="font-semibold text-zinc-950 dark:text-zinc-50">{children}</strong>;
+  },
+  em({ children }) {
+    return <em className="italic">{children}</em>;
   },
   blockquote({ children }) {
     return (
-      <blockquote className="my-2 border-l-2 border-[#007AFF]/35 pl-3 text-[13px] leading-5 text-zinc-600 dark:text-zinc-300">
+      <blockquote className="my-4 border-l-2 border-zinc-300 pl-4 italic text-zinc-600 dark:border-zinc-600 dark:text-zinc-300">
         {children}
       </blockquote>
     );
   },
+  hr() {
+    return <hr className="my-6 border-zinc-200 dark:border-zinc-800" />;
+  },
   table({ children }) {
     return (
-      <div className="my-2 w-full overflow-x-auto rounded-lg border border-black/10 bg-white dark:border-white/10 dark:bg-zinc-950">
-        <table className="w-full min-w-max border-collapse text-left text-[12px] leading-5">
+      <div className="my-4 w-full overflow-x-auto rounded-lg border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
+        <table className="w-full min-w-max border-collapse text-left text-[0.875em] leading-6">
           {children}
         </table>
       </div>
@@ -171,29 +176,34 @@ const markdownComponents = {
   },
   thead({ children }) {
     return (
-      <thead className="bg-zinc-50 text-zinc-950 dark:bg-white/[0.06] dark:text-zinc-100">
+      <thead className="bg-zinc-50 text-zinc-950 dark:bg-zinc-900 dark:text-zinc-100">
         {children}
       </thead>
     );
   },
   th({ children }) {
     return (
-      <th className="whitespace-nowrap border-b border-black/10 px-2.5 py-1.5 align-bottom text-[10.5px] font-extrabold uppercase tracking-[0.04em] text-zinc-500 dark:border-white/10">
+      <th className="whitespace-nowrap border-b border-zinc-200 px-3 py-2 align-bottom text-[0.78em] font-semibold uppercase tracking-[0.04em] text-zinc-500 dark:border-zinc-800">
         {children}
       </th>
     );
   },
   td({ children }) {
     return (
-      <td className="whitespace-nowrap border-b border-black/[0.06] px-2.5 py-1.5 align-top last:border-b-0 dark:border-white/[0.08]">
+      <td className="border-b border-zinc-100 px-3 py-2 align-top last:border-b-0 dark:border-zinc-800/60">
         {children}
       </td>
     );
   },
   pre({ children }) {
     return (
-      <pre className="my-3 max-w-full overflow-x-auto rounded-md border border-black/10 bg-zinc-950 p-3 text-[12px] leading-5 text-zinc-50 dark:border-white/10">
-        <code className="font-mono">{extractCodeChildren(children)}</code>
+      <pre className="my-4 max-w-full overflow-x-auto rounded-lg border border-zinc-200 bg-zinc-950 p-4 text-[0.85em] leading-6 text-zinc-50 dark:border-zinc-800">
+        <code
+          className="font-mono"
+          style={{ fontFamily: "var(--font-chat-mono)" }}
+        >
+          {extractCodeChildren(children)}
+        </code>
       </pre>
     );
   },
@@ -202,11 +212,11 @@ const markdownComponents = {
     return (
       <code
         className={cn(
-          "font-mono",
           isBlock
             ? "bg-transparent p-0 text-inherit"
-            : "rounded bg-zinc-100 px-1.5 py-0.5 text-[0.92em] font-medium text-zinc-800 dark:bg-white/10 dark:text-zinc-100"
+            : "rounded bg-zinc-100 px-1.5 py-0.5 text-[0.875em] font-medium text-rose-700 dark:bg-zinc-800 dark:text-rose-300"
         )}
+        style={{ fontFamily: "var(--font-chat-mono)" }}
       >
         {children}
       </code>
@@ -229,10 +239,15 @@ export function MarkdownView({
   return (
     <div
       className={cn(
-        "renderer-markdown max-w-none overflow-hidden text-[13px] leading-5 text-zinc-700 dark:text-zinc-250 [&_a]:font-semibold [&_a]:text-[#0A66E0] [&_a]:no-underline dark:[&_a]:text-[#6DB4FF] [&_li>p]:my-0 [&_ul]:list-disc",
+        "renderer-markdown prose prose-zinc dark:prose-invert max-w-none",
+        "text-[15px] leading-[1.75] text-zinc-800 dark:text-zinc-200",
+        "prose-headings:text-zinc-950 dark:prose-headings:text-zinc-50",
+        "prose-a:font-medium prose-a:text-[#0A66E0] prose-a:no-underline hover:prose-a:underline dark:prose-a:text-[#6DB4FF]",
+        "prose-img:rounded-lg",
         streaming && "renderer-markdown-streaming",
         className
       )}
+      style={{ fontFamily: "var(--font-chat-sans)" }}
     >
       <ReactMarkdown components={markdownComponents} remarkPlugins={[remarkGfm]}>
         {preparedBody}
