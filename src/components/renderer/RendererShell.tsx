@@ -2705,13 +2705,44 @@ export function RendererShell() {
       } catch (error) {
         if (error instanceof Error && error.name === "AbortError") return;
         const message = error instanceof Error ? error.message : "Không rõ lỗi";
+
+        // Forgiving: nếu đã có content + block render (chart/table/file) → coi như
+        // soft warning (backend emit error sau khi stream done thành công).
+        // Status vẫn done, hiển thị toast cảnh báo để user biết có ngoại lệ.
+        const trimmed = accumulated.trim();
+        if (trimmed.length > 0) {
+          let hasBlock = false;
+          for (const chunk of parseStream(trimmed)) {
+            if (chunk.kind === "block") {
+              hasBlock = true;
+              break;
+            }
+          }
+          if (hasBlock) {
+            updateAssistantTurn(conversation.id, assistantTurn.id, {
+              status: "done",
+              text: accumulated,
+            });
+            showToast(`Lưu ý: ${message.slice(0, 120)}`);
+            return;
+          }
+        }
+
         updateAssistantTurn(conversation.id, assistantTurn.id, {
           status: "error",
           text: accumulated || `Đã xảy ra lỗi: ${message}`,
         });
       }
     },
-    [appendTurn, currentConversation, isBusy, readOnly, setConversationTitle, updateAssistantTurn]
+    [
+      appendTurn,
+      currentConversation,
+      isBusy,
+      readOnly,
+      setConversationTitle,
+      showToast,
+      updateAssistantTurn,
+    ]
   );
 
   useEffect(() => {
