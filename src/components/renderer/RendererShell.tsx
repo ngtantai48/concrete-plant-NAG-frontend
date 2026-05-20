@@ -3,7 +3,6 @@
 import {
   Activity,
   ArrowUp,
-  AtSign,
   BarChart3,
   Copy,
   Download,
@@ -26,7 +25,6 @@ import {
   RefreshCcw,
   Search,
   Share2,
-  Slash,
   Square,
   Star,
   ThumbsDown,
@@ -256,31 +254,6 @@ function buildContentBlocks(
 
   return blocks;
 }
-
-const mentionShortcuts: Array<{ token: string; hint: string }> = [
-  { token: "@san-luong", hint: "Nhắc tới tổng quan sản lượng hôm nay" },
-  { token: "@doi-xe", hint: "Nhắc tới trạng thái đội xe & tài xế" },
-  { token: "@bao-tri", hint: "Nhắc tới lịch bảo trì sắp tới" },
-  { token: "@don-hang", hint: "Nhắc tới đơn hàng đang xử lý" },
-  { token: "@ca-sang", hint: "Bối cảnh ca sáng" },
-  { token: "@ca-chieu", hint: "Bối cảnh ca chiều" },
-];
-
-const slashCommands = [
-  {
-    cmd: "/tong-quan",
-    hint: "Tổng quan sản lượng và đội xe hôm nay",
-    example: "Cho tôi tổng quan sản lượng và đội xe hôm nay",
-  },
-  { cmd: "/xe-ca-chieu", hint: "Xe sẵn sàng ca chiều", example: "Xe nào sẵn sàng ca chiều?" },
-  { cmd: "/bao-tri", hint: "Lịch bảo trì", example: "Lịch bảo trì tuần này có xe nào rủi ro?" },
-  {
-    cmd: "/don-dang-di-chuyen",
-    hint: "Đơn đang di chuyển (running + transporting + collecting)",
-    example:
-      "Liệt kê tất cả đơn đang di chuyển (gồm running, transporting, collecting) và xe phụ trách",
-  },
-];
 
 const suggestedPrompts = [
   "Cho tôi tổng quan sản lượng và đội xe hôm nay",
@@ -763,8 +736,6 @@ function ShortcutsDialog({ onClose, open }: { onClose: () => void; open: boolean
     { keys: ["⌘", "\\"], label: "Ẩn / hiện bảng ngữ cảnh" },
     { keys: ["⌘", "["], label: "Cuộc trò chuyện trước" },
     { keys: ["⌘", "]"], label: "Cuộc trò chuyện sau" },
-    { keys: ["/"], label: "Mở danh sách lệnh nhanh" },
-    { keys: ["@"], label: "Mở danh sách gắn thẻ ngữ cảnh" },
     { keys: ["Esc"], label: "Đóng menu / hộp thoại" },
   ];
 
@@ -1469,63 +1440,6 @@ function useSpeechRecording({
   };
 }
 
-function MentionMenu({ onPick }: { onPick: (token: string) => void }) {
-  return (
-    <div className="overflow-hidden rounded-xl border border-black/10 bg-white shadow-2xl dark:border-white/10 dark:bg-zinc-950">
-      {mentionShortcuts.map((item) => (
-        <button
-          className="flex w-full items-start gap-3 px-3 py-2.5 text-left transition hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-[#007AFF]/35 dark:hover:bg-white/10"
-          key={item.token}
-          onClick={() => onPick(item.token)}
-          type="button"
-        >
-          <AtSign className="mt-0.5 text-[#0A66E0]" size={14} />
-          <span className="min-w-0 flex-1">
-            <span className="block font-mono text-[12px] font-bold text-zinc-950 dark:text-zinc-50">
-              {item.token}
-            </span>
-            <span className="block text-[11.5px] text-zinc-500">{item.hint}</span>
-          </span>
-        </button>
-      ))}
-    </div>
-  );
-}
-
-function SlashMenu({ onPick, query }: { onPick: (text: string) => void; query: string }) {
-  const filtered = slashCommands.filter((command) => {
-    const normalized = query.toLowerCase();
-    return (
-      !normalized ||
-      command.cmd.includes(normalized) ||
-      command.hint.toLowerCase().includes(normalized)
-    );
-  });
-  return (
-    <div className="overflow-hidden rounded-xl border border-black/10 bg-white shadow-2xl dark:border-white/10 dark:bg-zinc-950">
-      {filtered.map((command) => (
-        <button
-          className="flex w-full items-start gap-3 px-3 py-2.5 text-left transition hover:bg-zinc-50 focus:outline-none focus:ring-2 focus:ring-[#007AFF]/35 dark:hover:bg-white/10"
-          key={command.cmd}
-          onClick={() => onPick(command.example)}
-          type="button"
-        >
-          <Slash className="mt-0.5 text-[#0A66E0]" size={14} />
-          <span className="min-w-0 flex-1">
-            <span className="block font-mono text-[12px] font-bold text-zinc-950 dark:text-zinc-50">
-              {command.cmd}
-            </span>
-            <span className="block text-[11.5px] text-zinc-500">{command.hint}</span>
-            <span className="mt-0.5 block truncate font-mono text-[10.5px] text-zinc-400">
-              {command.example}
-            </span>
-          </span>
-        </button>
-      ))}
-    </div>
-  );
-}
-
 function AssistantToolbar({
   feedback,
   onCopy,
@@ -1619,8 +1533,6 @@ function ChatColumn({
   readOnly: boolean;
 }) {
   const [input, setInput] = useState("");
-  const [slashOpen, setSlashOpen] = useState(false);
-  const [mentionOpen, setMentionOpen] = useState(false);
   const [attachments, setAttachments] = useState<ComposerAttachment[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -1744,8 +1656,6 @@ function ChatColumn({
       const trimmed = (textOverride ?? input).trim();
       if ((!trimmed && attachments.length === 0) || isBusy || readOnly) return;
       setInput("");
-      setSlashOpen(false);
-      setMentionOpen(false);
       const submitted = attachments;
       const toRevoke = submitted.filter((item) => item.previewUrl);
       setAttachments([]);
@@ -1771,20 +1681,6 @@ function ChatColumn({
       onToast(message);
     },
   });
-
-  const insertMention = useCallback((token: string) => {
-    setInput((current) => {
-      const trimmedEnd = current.replace(/\s+$/, "");
-      const lastAtIdx = trimmedEnd.lastIndexOf("@");
-      if (lastAtIdx >= 0 && /^@[\w-]*$/.test(trimmedEnd.slice(lastAtIdx))) {
-        return `${trimmedEnd.slice(0, lastAtIdx)}${token} `;
-      }
-      if (trimmedEnd.length === 0) return `${token} `;
-      return `${trimmedEnd} ${token} `;
-    });
-    setMentionOpen(false);
-    textareaRef.current?.focus();
-  }, []);
 
   useEffect(() => {
     const onFollowup = (event: Event) => {
@@ -1975,23 +1871,6 @@ function ChatColumn({
             </div>
           )}
           <div className="relative">
-            {slashOpen && !readOnly && (
-              <div className="absolute bottom-[calc(100%+8px)] left-0 right-0 z-30">
-                <SlashMenu
-                  onPick={(example) => {
-                    setInput(`${example} `);
-                    setSlashOpen(false);
-                    textareaRef.current?.focus();
-                  }}
-                  query={input.startsWith("/") ? input.slice(1) : ""}
-                />
-              </div>
-            )}
-            {mentionOpen && !readOnly && (
-              <div className="absolute bottom-[calc(100%+8px)] left-0 right-0 z-30">
-                <MentionMenu onPick={insertMention} />
-              </div>
-            )}
             <input
               accept="image/jpeg,image/jpg,image/png,image/webp,.txt,.csv,.md,.markdown,.json,.log,.tsv,.yaml,.yml,.xml"
               aria-hidden="true"
@@ -2059,10 +1938,7 @@ function ChatColumn({
                 data-testid="chat-input"
                 disabled={isBusy || readOnly}
                 onChange={(event) => {
-                  const next = event.currentTarget.value;
-                  setInput(next);
-                  setSlashOpen(next.startsWith("/"));
-                  setMentionOpen(false);
+                  setInput(event.currentTarget.value);
                 }}
                 onKeyDown={(event) => {
                   if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
@@ -2082,7 +1958,7 @@ function ChatColumn({
                       ? "Đang ghi âm... bấm Mic để dừng"
                       : voice.processing
                         ? "Đang nhận diện giọng nói..."
-                        : "Hỏi tiếp về sản lượng, xe, orders... gõ / để gọi lệnh"
+                        : "Hỏi về sản lượng, xe, orders..."
                 }
                 ref={textareaRef}
                 rows={2}
@@ -2098,32 +1974,6 @@ function ChatColumn({
                   type="button"
                 >
                   <Paperclip size={14} />
-                </button>
-                <button
-                  aria-label="Lệnh nhanh"
-                  className={cn("composer-tool", slashOpen && "bg-[#007AFF]/15 text-[#0A66E0]")}
-                  disabled={readOnly}
-                  onClick={() => {
-                    setSlashOpen((open) => !open);
-                    setMentionOpen(false);
-                  }}
-                  title="Lệnh nhanh"
-                  type="button"
-                >
-                  <Slash size={14} />
-                </button>
-                <button
-                  aria-label="Gắn thẻ ngữ cảnh"
-                  className={cn("composer-tool", mentionOpen && "bg-[#007AFF]/15 text-[#0A66E0]")}
-                  disabled={readOnly}
-                  onClick={() => {
-                    setMentionOpen((open) => !open);
-                    setSlashOpen(false);
-                  }}
-                  title="Gắn thẻ ngữ cảnh"
-                  type="button"
-                >
-                  <AtSign size={14} />
                 </button>
                 <button
                   aria-label={
