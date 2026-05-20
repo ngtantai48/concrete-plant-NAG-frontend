@@ -2773,7 +2773,17 @@ export function RendererShell() {
           undefined,
           currentConversation?.id
         )
-        .catch(() => undefined);
+        .then((result) => {
+          if (result?.status === "queued" && result.request_id) {
+            showToast(`Đã gửi yêu cầu (${result.request_id})`);
+          } else if (result?.status) {
+            showToast(`Trạng thái action: ${result.status}`);
+          }
+        })
+        .catch((error: unknown) => {
+          const message = error instanceof Error ? error.message : "Không thực hiện được action";
+          showToast(message);
+        });
     };
     window.addEventListener("render:action", onAction);
     return () => window.removeEventListener("render:action", onAction);
@@ -2862,7 +2872,22 @@ export function RendererShell() {
           }}
           onFeedback={(turnId, vote) => {
             if (readOnly) return;
+            const isToggleOff = feedback[turnId] === vote;
             setFeedback(turnId, vote);
+            if (!isToggleOff && currentConversation) {
+              void chatApi
+                .sendFeedback({
+                  turnId,
+                  conversationId: currentConversation.id,
+                  rating: vote,
+                })
+                .then(() => showToast(vote === "up" ? "Đã ghi nhận phản hồi tốt" : "Đã ghi nhận góp ý"))
+                .catch((error: unknown) => {
+                  const message =
+                    error instanceof Error ? error.message : "Không gửi được phản hồi";
+                  showToast(message);
+                });
+            }
           }}
           onPinTurn={(turn) => {
             if (readOnly) return;

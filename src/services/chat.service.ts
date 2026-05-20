@@ -329,7 +329,7 @@ const chatApi = {
     payload: Record<string, unknown>,
     signal?: AbortSignal,
     sessionId?: string
-  ): Promise<void> => {
+  ): Promise<{ status?: string; request_id?: string } | null> => {
     const token = await getValidAccessToken();
     const response = await fetch("/api/chat/action", {
       method: "POST",
@@ -344,8 +344,73 @@ const chatApi = {
     });
 
     if (!response.ok) {
-      const message = await response.text().catch(() => "");
-      throw new Error(message || `Dispatch action failed (${response.status})`);
+      const raw = await response.text().catch(() => "");
+      let friendly: string | undefined;
+      try {
+        const parsed = JSON.parse(raw) as { error?: string; detail?: string };
+        friendly = parsed.error ?? parsed.detail;
+      } catch {
+        /* not JSON */
+      }
+      if (response.status === 401 || response.status === 403) {
+        throw new Error(friendly || "Bạn không có quyền thực hiện action này");
+      }
+      if (response.status === 400) {
+        throw new Error(friendly || "Action không hợp lệ hoặc thiếu tham số");
+      }
+      if (response.status === 501) {
+        throw new Error(friendly || "Action chưa được cấu hình ở backend");
+      }
+      throw new Error(friendly || raw || `Dispatch action failed (${response.status})`);
+    }
+
+    const text = await response.text().catch(() => "");
+    if (!text) return null;
+    try {
+      return JSON.parse(text) as { status?: string; request_id?: string };
+    } catch {
+      return null;
+    }
+  },
+
+  sendFeedback: async (
+    body: {
+      turnId: string;
+      conversationId: string;
+      rating: "up" | "down";
+      comment?: string;
+    },
+    signal?: AbortSignal
+  ): Promise<{ feedback_id?: string } | null> => {
+    const token = await getValidAccessToken();
+    const response = await fetch("/api/chat/feedback", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...nagUserHeaders(),
+        ...chatSessionHeaders(body.conversationId),
+      },
+      body: JSON.stringify({
+        rating: body.rating,
+        turn_id: body.turnId,
+        conversation_id: body.conversationId,
+        comment: body.comment,
+      }),
+      signal,
+    });
+
+    if (!response.ok) {
+      const raw = await response.text().catch(() => "");
+      throw new Error(raw || `Feedback failed (${response.status})`);
+    }
+
+    const text = await response.text().catch(() => "");
+    if (!text) return null;
+    try {
+      return JSON.parse(text) as { feedback_id?: string };
+    } catch {
+      return null;
     }
   },
 };
