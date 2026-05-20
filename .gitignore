@@ -10,11 +10,14 @@
 
 # testing
 /coverage
+/test-results/
 
 # next.js
 /.next/
 /out/
 /vehicle-management-main/
+/renderer-pkg/
+/fullpage-export/
 /.vscode/
 # production
 /build
@@ -28,6 +31,7 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
+.codex-dev.log
 
 # env files
 .env*

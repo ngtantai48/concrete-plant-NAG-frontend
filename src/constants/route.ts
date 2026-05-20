@@ -4,6 +4,7 @@ export const ROUTES = {
 
 export const SIDEBAR = {
   DASHBOARD: "/dashboard",
+  AI_ASSISTANT: "/ai-assistant",
   VEHICLES: "/vehicles",
   VEHICLE_TYPES: "/vehicle-types",
   STATIONS: "/stations",
