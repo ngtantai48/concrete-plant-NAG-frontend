@@ -124,6 +124,7 @@ type RendererStore = {
   createConversation: () => string;
   deleteConversation: (conversationId: string) => void;
   replaceConversationPins: (conversationId: string, blocks: PinnedBlock[]) => void;
+  addConversationPins: (conversationId: string, blocks: PinnedBlock[]) => void;
   saveReport: (report: AiGeneratedReport) => void;
   selectConversation: (conversationId: string) => void;
   setConversationTitle: (conversationId: string, title: string) => void;
@@ -344,6 +345,20 @@ const useRendererStore = create<RendererStore>()(
             ...blocks,
           ],
         })),
+      addConversationPins: (conversationId, blocks) =>
+        set((state) => {
+          const existing = state.pinnedBlocks;
+          const merged = [...existing];
+          for (const incoming of blocks) {
+            const dupIndex = merged.findIndex(
+              (item) =>
+                item.conversationId === conversationId && item.blockId === incoming.blockId
+            );
+            if (dupIndex >= 0) merged[dupIndex] = incoming;
+            else merged.push(incoming);
+          }
+          return { pinnedBlocks: merged };
+        }),
       saveReport: (report) =>
         set((state) => ({
           savedReports: [
@@ -479,20 +494,31 @@ function toApiMessages(
   return [...messages, { role: "user", content: nextUserContent }];
 }
 
+function extractBlocksFromTurn(
+  conversationId: string,
+  turn: AssistantTurn
+): PinnedBlock[] {
+  const blocks = new Map<string, PinnedBlock>();
+  for (const chunk of parseStream(turn.text)) {
+    if (chunk.kind !== "block") continue;
+    const parsed = renderBlockDataSchema.safeParse(chunk.data);
+    if (!parsed.success) continue;
+    blocks.set(parsed.data.id, {
+      blockId: parsed.data.id,
+      conversationId,
+      createdAt: turn.createdAt,
+      data: parsed.data,
+    });
+  }
+  return [...blocks.values()];
+}
+
 function extractPinnedBlocks(conversation: Conversation): PinnedBlock[] {
   const blocks = new Map<string, PinnedBlock>();
   for (const turn of conversation.turns) {
     if (turn.role !== "assistant") continue;
-    for (const chunk of parseStream(turn.text)) {
-      if (chunk.kind !== "block") continue;
-      const parsed = renderBlockDataSchema.safeParse(chunk.data);
-      if (!parsed.success) continue;
-      blocks.set(parsed.data.id, {
-        blockId: parsed.data.id,
-        conversationId: conversation.id,
-        createdAt: turn.createdAt,
-        data: parsed.data,
-      });
+    for (const block of extractBlocksFromTurn(conversation.id, turn)) {
+      blocks.set(block.blockId, block);
     }
   }
   return [...blocks.values()];
@@ -1494,12 +1520,13 @@ function AssistantToolbar({
         <Share2 size={13} /> Chia sẻ
       </button>
       <button
-        aria-label="Ghim tất cả"
+        aria-label="Ghim khung này"
         className="toolbar-btn ml-auto"
         onClick={onPinAll}
+        title="Ghim các biểu đồ/bảng trong câu trả lời này vào Inspector"
         type="button"
       >
-        <Pin size={13} /> Ghim tất cả
+        <Pin size={13} /> Ghim khung này
       </button>
     </div>
   );
@@ -1511,7 +1538,7 @@ function ChatColumn({
   isBusy,
   onDelete,
   onFeedback,
-  onPinAll,
+  onPinTurn,
   onRegenerate,
   onRename,
   onSend,
@@ -1524,7 +1551,7 @@ function ChatColumn({
   isBusy: boolean;
   onDelete: () => void;
   onFeedback: (turnId: string, vote: FeedbackVote) => void;
-  onPinAll: () => void;
+  onPinTurn: (turn: AssistantTurn) => void;
   onRegenerate: (turnId: string) => void;
   onRename: (title: string) => void;
   onSend: (text: string, attachments?: ComposerAttachment[]) => Promise<void>;
@@ -1846,7 +1873,7 @@ function ChatColumn({
                           onToast("Đã sao chép câu trả lời");
                         }}
                         onFeedback={(vote) => onFeedback(turn.id, vote)}
-                        onPinAll={onPinAll}
+                        onPinAll={() => onPinTurn(turn)}
                         onRegenerate={() => onRegenerate(turn.id)}
                         onShare={() => {
                           void copyText(buildShareUrl(conversation.id, turn.id));
@@ -2429,7 +2456,7 @@ export function RendererShell() {
   const appendTurn = useRendererStore((state) => state.appendTurn);
   const createConversation = useRendererStore((state) => state.createConversation);
   const deleteConversation = useRendererStore((state) => state.deleteConversation);
-  const replaceConversationPins = useRendererStore((state) => state.replaceConversationPins);
+  const addConversationPins = useRendererStore((state) => state.addConversationPins);
   const saveReport = useRendererStore((state) => state.saveReport);
   const selectConversation = useRendererStore((state) => state.selectConversation);
   const setConversationTitle = useRendererStore((state) => state.setConversationTitle);
@@ -2485,11 +2512,6 @@ export function RendererShell() {
     }
     return [];
   }, [currentConversation]);
-
-  useEffect(() => {
-    if (!currentConversation || readOnly) return;
-    replaceConversationPins(currentConversation.id, currentPins);
-  }, [currentConversation, currentPins, readOnly, replaceConversationPins]);
 
   const isBusy =
     currentConversation?.turns.some(
@@ -2837,10 +2859,19 @@ export function RendererShell() {
             if (readOnly) return;
             setFeedback(turnId, vote);
           }}
-          onPinAll={() => {
+          onPinTurn={(turn) => {
             if (readOnly) return;
-            replaceConversationPins(currentConversation.id, currentPins);
-            showToast("Đã ghim các khối render");
+            const blocks = extractBlocksFromTurn(currentConversation.id, turn);
+            if (blocks.length === 0) {
+              showToast("Câu trả lời này không có khối render để ghim");
+              return;
+            }
+            addConversationPins(currentConversation.id, blocks);
+            showToast(
+              blocks.length === 1
+                ? "Đã ghim 1 khối render"
+                : `Đã ghim ${blocks.length} khối render`
+            );
           }}
           onRegenerate={regenerateTurn}
           onRename={(title) => {
