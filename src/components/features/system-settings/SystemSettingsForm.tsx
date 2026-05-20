@@ -113,6 +113,8 @@ export default function SystemSettingsForm() {
   if (fetching) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[300px] gap-4 bg-white">
+        <DialogTitle className="sr-only">{t("title")}</DialogTitle>
+        <DialogDescription className="sr-only">Đang tải cấu hình...</DialogDescription>
         <RefreshCw className="h-8 w-8 animate-spin text-indigo-500" />
         <p className="text-sm font-medium text-slate-500">Đang tải cấu hình...</p>
       </div>
@@ -217,20 +219,18 @@ export default function SystemSettingsForm() {
           </div>
         </div>
 
-        {hasActionAccess(SIDEBAR.DASHBOARD, PERMISSIONS.DASHBOARD.SYSTEM_SETTINGS) && (
-          <DialogFooter className="p-6 border-t bg-slate-50/50 sm:justify-between items-center">
-            <div className="hidden sm:flex items-center gap-2 text-slate-400">
-              <Info className="h-4 w-4" />
-              <p className="text-sm font-semibold italic">Thay đổi có hiệu lực ngay sau khi lưu.</p>
-            </div>
-            <div className="flex items-center gap-3 w-full sm:w-auto">
-              <Button type="submit" disabled={loading}  >
-                {loading ? <RefreshCw className="animate-spin" /> : <Save />}
-                Lưu cấu hình
-              </Button>
-            </div>
-          </DialogFooter>
-        )}
+        <DialogFooter className="p-6 border-t bg-slate-50/50 sm:justify-between items-center">
+          <div className="hidden sm:flex items-center gap-2 text-slate-400">
+            <Info className="h-4 w-4" />
+            <p className="text-sm font-semibold italic">Thay đổi có hiệu lực ngay sau khi lưu.</p>
+          </div>
+          <div className="flex items-center gap-3 w-full sm:w-auto">
+            <Button type="submit" disabled={loading}  >
+              {loading ? <RefreshCw className="animate-spin" /> : <Save />}
+              Lưu cấu hình
+            </Button>
+          </div>
+        </DialogFooter>
       </form>
 
       <AlertDialog open={isConfirmDialogOpen} onOpenChange={setIsConfirmDialogOpen}>

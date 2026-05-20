@@ -28,8 +28,11 @@ export const navigationConfig: NavItem[] = [
     icon: <Gauge />,
     actions: [
       { key: PERMISSIONS.DASHBOARD.VIEW, label: "Xem" },
-      { key: PERMISSIONS.DASHBOARD.MANUAL_SORT, label: "Sắp xếp thứ tự lốt xe" },
       { key: PERMISSIONS.DASHBOARD.SYNC_SLOTS, label: "Đồng bộ lốt xe" },
+      { key: PERMISSIONS.DASHBOARD.HISTORY, label: "Lịch sử lốt xe" },
+      { key: PERMISSIONS.DASHBOARD.CHECKLOG, label: "Nhật ký vận hành" },
+      { key: PERMISSIONS.DASHBOARD.MANUAL_SORT, label: "Sắp xếp thứ tự lốt xe" },
+      { key: PERMISSIONS.DASHBOARD.VIEW_MAP, label: "Bản đồ" },
       { key: PERMISSIONS.DASHBOARD.MANUAL_CAMERA_FALLBACK, label: "Thao tác thủ công (camera sự cố)" },
       { key: PERMISSIONS.DASHBOARD.SYSTEM_SETTINGS, label: "Cấu hình vận hành" },
     ],

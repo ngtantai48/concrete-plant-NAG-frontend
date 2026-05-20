@@ -255,7 +255,7 @@ export default function UserEditModal({ open, user, onClose }: UserEditModalProp
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="admin">{tRoles("admin")}</SelectItem>
+                        {/* <SelectItem value="admin">{tRoles("admin")}</SelectItem> */}
                         <SelectItem value="manager">{tRoles("manager")}</SelectItem>
                         <SelectItem value="dispatcher">{tRoles("dispatcher")}</SelectItem>
                         <SelectItem value="driver">{tRoles("driver")}</SelectItem>

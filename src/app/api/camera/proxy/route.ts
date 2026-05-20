@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
+import axios from 'axios';
+import https from 'https';
 
 const getContentType = (value: unknown): string => {
   if (typeof value === 'string' && value.trim()) return value;
@@ -13,15 +15,30 @@ const getContentType = (value: unknown): string => {
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const ip = searchParams.get('ip');
-  let port = searchParams.get('port');
+  const portParam = searchParams.get('port');
+  
+  // Dynamic channel parameter (defaults to '102' for legacy compatibility)
+  const channel = searchParams.get('channel') || '102';
   
   if (!ip) {
     return new NextResponse('Missing IP', { status: 400 });
   }
 
+  // Robustly sanitize and parse the port parameter to handle 'null', 'undefined', empty, or non-numeric strings safely.
+  let port: number = 80;
+  if (portParam && portParam !== 'null' && portParam !== 'undefined') {
+    const parsed = parseInt(portParam, 10);
+    if (!isNaN(parsed)) {
+      port = parsed;
+    }
+  }
+
   // Remove hardcoded mapping. We will try HTTP first, then HTTPS.
-  const protocol = port === '443' ? 'https' : 'http';
-  let targetUrl = `${protocol}://${ip}:${port || 80}/ISAPI/Streaming/channels/102/picture`;
+  const protocol = port === 443 ? 'https' : 'http';
+  
+  // Dynamic path based on channel
+  const targetUri = `/ISAPI/Streaming/channels/${channel}/picture`;
+  const targetUrl = `${protocol}://${ip}:${port}${targetUri}`;
   const user = 'admin';
   const pass = '14526525aA@';
 
@@ -29,8 +46,6 @@ export async function GET(req: NextRequest) {
     // Helper function to fetch with axios to ignore self-signed certs
     const fetchWithAxios = async (url: string, headers: any = {}) => {
       try {
-        const { default: axios } = await import('axios');
-        const https = await import('https');
         const res = await axios.get(url, {
           headers,
           responseType: 'arraybuffer',
@@ -44,20 +59,15 @@ export async function GET(req: NextRequest) {
       }
     };
 
-    let initRes = await fetchWithAxios(targetUrl);
-    
-    // If HTTP connection reset or timeout, and port isn't 80, try HTTPS
-    if (initRes.status === 0 || !initRes.status) {
-       // axios throws on network error, so this might not be reached, but we catch it below.
-    }
+    const initRes = await fetchWithAxios(targetUrl);
 
     if (initRes.status === 200) {
-        return new NextResponse(initRes.data, {
-            headers: {
-              'Content-Type': getContentType(initRes.headers['content-type']),
-              'Cache-Control': 'no-store, max-age=0',
-            }
-        });
+      return new NextResponse(initRes.data, {
+        headers: {
+          'Content-Type': getContentType(initRes.headers['content-type']),
+          'Cache-Control': 'no-store, max-age=0',
+        }
+      });
     }
 
     if (initRes.status === 401) {
@@ -73,7 +83,8 @@ export async function GET(req: NextRequest) {
           const qop = qopMatch ? qopMatch[1] : '';
           
           const method = 'GET';
-          const uri = '/ISAPI/Streaming/channels/102/picture'; // FIXED URI
+          // Use dynamic URI instead of hardcoded 102
+          const uri = targetUri;
           
           const ha1 = crypto.createHash('md5').update(`${user}:${realm}:${pass}`).digest('hex');
           const ha2 = crypto.createHash('md5').update(`${method}:${uri}`).digest('hex');
@@ -83,7 +94,7 @@ export async function GET(req: NextRequest) {
           
           const authHeader = `Digest username="${user}", realm="${realm}", nonce="${nonce}", uri="${uri}", qop=auth, nc=${nc}, cnonce="${cnonce}", response="${response}"`;
           
-          // 2. Second request with Digest auth
+          // Second request with Digest auth
           const authRes = await fetchWithAxios(targetUrl, { 'Authorization': authHeader });
 
           if (authRes.status === 200) {
@@ -118,9 +129,7 @@ export async function GET(req: NextRequest) {
     // If HTTP fails, try HTTPS fallback
     if (!targetUrl.startsWith('https')) {
       try {
-        const httpsUrl = `https://${ip}:${port || 443}/ISAPI/Streaming/channels/102/picture`;
-        const { default: axios } = await import('axios');
-        const https = await import('https');
+        const httpsUrl = `https://${ip}:${port === 80 ? 443 : port}${targetUri}`;
         
         // Try initial HTTPS request to get auth header
         const httpsInitRes = await axios.get(httpsUrl, {
@@ -140,7 +149,8 @@ export async function GET(req: NextRequest) {
                 const realm = realmMatch[1];
                 const nonce = nonceMatch[1];
                 const method = 'GET';
-                const uri = '/ISAPI/Streaming/channels/102/picture';
+                // Use dynamic URI instead of hardcoded 102
+                const uri = targetUri;
                 
                 const ha1 = crypto.createHash('md5').update(`${user}:${realm}:${pass}`).digest('hex');
                 const ha2 = crypto.createHash('md5').update(`${method}:${uri}`).digest('hex');

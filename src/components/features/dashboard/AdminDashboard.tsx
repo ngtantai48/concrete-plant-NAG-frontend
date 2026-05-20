@@ -676,24 +676,26 @@ export default function AdminDashboard() {
               <div className="flex items-center gap-2 border-l border-slate-300 pl-3">
                 <ClockDisplay locale={locale} />
               </div>
-              <div className="px-5">
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button size="sm" variant="outline"
-                      className="bg-indigo-50 text-indigo-500 hover:text-indigo-700 transition-all hover:bg-indigo-100 hover:border-indigo-300"
-                      onClick={() => setIsSystemSettingsDialogOpen(true)}>
-                      <CalendarClock />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent><p>Cấu hình vận hành</p></TooltipContent>
-                </Tooltip>
+              {hasActionAccess(SIDEBAR.DASHBOARD, PERMISSIONS.DASHBOARD.SYSTEM_SETTINGS) && (
+                <div className="px-5">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button size="sm" variant="outline"
+                        className="bg-indigo-50 text-indigo-500 hover:text-indigo-700 transition-all hover:bg-indigo-100 hover:border-indigo-300"
+                        onClick={() => setIsSystemSettingsDialogOpen(true)}>
+                        <CalendarClock />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent><p>Cấu hình vận hành</p></TooltipContent>
+                  </Tooltip>
 
-                <Dialog open={isSystemSettingsDialogOpen} onOpenChange={setIsSystemSettingsDialogOpen}>
-                  <DialogContent className="sm:max-w-2xl p-0 overflow-hidden">
-                    <SystemSettingsForm />
-                  </DialogContent>
-                </Dialog>
-              </div>
+                  <Dialog open={isSystemSettingsDialogOpen} onOpenChange={setIsSystemSettingsDialogOpen}>
+                    <DialogContent className="sm:max-w-2xl p-0 overflow-hidden">
+                      <SystemSettingsForm />
+                    </DialogContent>
+                  </Dialog>
+                </div>
+              )}
             </div>
 
             {/* Right Controls */}
@@ -805,34 +807,35 @@ export default function AdminDashboard() {
 
               {/* Sync Shift Button (replaces hidden Chốt ca button) */}
               <div className="border-l border-slate-200 pl-2 flex items-center gap-2">
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button size="sm" variant="outline"
-                      onClick={() => setIsEndOfDayModalOpen(true)}
-                      className="uppercase border-sky-200 text-sky-700 hover:bg-sky-50"
-                    >
-                      <Save />
-                      Check log
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Check log {format(new Date(selectedDate), "dd/MM/yyyy")}</p>
-                  </TooltipContent>
-                </Tooltip>
+                {hasActionAccess(SIDEBAR.DASHBOARD, PERMISSIONS.DASHBOARD.CHECKLOG) && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button size="sm" variant="outline"
+                        onClick={() => setIsEndOfDayModalOpen(true)}
+                        className="uppercase border-sky-200 text-sky-700 hover:bg-sky-50"
+                      >
+                        <Save /> Nhật ký vận hành
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent><p>Nhật ký vận hành {format(new Date(selectedDate), "dd/MM/yyyy")}</p></TooltipContent>
+                  </Tooltip>
+                )}
 
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button size="sm" variant="outline"
-                      onClick={handleOpenQueueHistory}
-                      className="uppercase border-indigo-200 text-indigo-700 hover:bg-indigo-50"
-                    >
-                      <History />Lịch sử lốt xe
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Xem thứ tự lốt theo ngày</p>
-                  </TooltipContent>
-                </Tooltip>
+                {hasActionAccess(SIDEBAR.DASHBOARD, PERMISSIONS.DASHBOARD.HISTORY) && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button size="sm" variant="outline"
+                        onClick={handleOpenQueueHistory}
+                        className="uppercase border-indigo-200 text-indigo-700 hover:bg-indigo-50"
+                      >
+                        <History />Lịch sử
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Xem thứ tự lốt xe theo ngày</p>
+                    </TooltipContent>
+                  </Tooltip>
+                )}
 
                 {!isPastDate && hasUnclosedShift && (
                   <>
@@ -1136,7 +1139,16 @@ export default function AdminDashboard() {
 
               {/* ═══ SYSTEM TELEMETRY ═══ */}
               <div className="shrink-0">
-                <StationStatusPanel stations={stations} orders={orders} deviceStationStatusMap={stationStatusMap} onStationUpdated={fetchAll} pendingOrders={activeFlowOrders} hasManualFallbackAccess={hasActionAccess(SIDEBAR.DASHBOARD, PERMISSIONS.DASHBOARD.MANUAL_CAMERA_FALLBACK)} yardOrders={yardOrders} isPastDate={isPastDate} />
+                <StationStatusPanel
+                  stations={stations}
+                  orders={orders}
+                  deviceStationStatusMap={stationStatusMap}
+                  onStationUpdated={fetchAll}
+                  pendingOrders={activeFlowOrders}
+                  hasManualFallbackAccess={hasActionAccess(SIDEBAR.DASHBOARD, PERMISSIONS.DASHBOARD.MANUAL_CAMERA_FALLBACK)}
+                  yardOrders={yardOrders}
+                  isPastDate={isPastDate}
+                />
               </div>
 
               {/* Vehicles + Dispatch side by side */}
@@ -1296,15 +1308,17 @@ export default function AdminDashboard() {
                           MANUAL
                         </Button>
                       )}
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setShowMap(true)}
-                        className="h-5 px-2 text-[10px] font-bold uppercase text-slate-500 border border-transparent hover:text-slate-700 hover:bg-slate-100"
-                      >
-                        <MapIcon className="h-3 w-3 shrink-0" />
-                        MAP
-                      </Button>
+
+                      {hasActionAccess(SIDEBAR.DASHBOARD, PERMISSIONS.DASHBOARD.VIEW_MAP) && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setShowMap(true)}
+                          className="h-5 px-2 text-[10px] font-bold uppercase text-slate-500 border border-transparent hover:text-slate-700 hover:bg-slate-100"
+                        >
+                          <MapIcon className="shrink-0" />MAP
+                        </Button>
+                      )}
                     </div>
                   </div>
 
