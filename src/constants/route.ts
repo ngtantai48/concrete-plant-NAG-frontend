@@ -4,7 +4,6 @@ export const ROUTES = {
 
 export const SIDEBAR = {
   DASHBOARD: "/dashboard",
-  AI_ASSISTANT: "/ai-assistant",
   VEHICLES: "/vehicles",
   VEHICLE_MAINTENANCES: "/vehicle-maintenances",
   VEHICLE_TYPES: "/vehicle-types",
@@ -14,6 +13,7 @@ export const SIDEBAR = {
   REPORT_FUEL: "/reports/fuel",
   MEAL_CHECK: "/meal-check",
   ATTENDANCE: "/attendance",
+  AI_ASSISTANT: "/ai-assistant",
   USER_MANAGE: "/user-manage",
   ROLE_PERMISSIONS: "/role-permissions",
 };

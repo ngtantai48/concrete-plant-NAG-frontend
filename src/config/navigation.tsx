@@ -38,41 +38,6 @@ export const navigationConfig: NavItem[] = [
     ],
   },
   {
-    key: SIDEBAR.AI_ASSISTANT,
-    label: "aiAssistant",
-    icon: <Bot />,
-    roles: [ROLES.ADMIN],
-  },
-  {
-    key: "user-manage-group",
-    label: "userManagement",
-    icon: <UsersRound />,
-    roles: [ROLES.ADMIN],
-    children: [
-      {
-        key: SIDEBAR.USER_MANAGE,
-        label: "allUsers",
-        icon: <UserCog size={18} />,
-        actions: [
-          { key: PERMISSIONS.USER_MANAGE.VIEW, label: "Xem danh sách người dùng" },
-          { key: PERMISSIONS.USER_MANAGE.CREATE, label: "Thêm người dùng" },
-          { key: PERMISSIONS.USER_MANAGE.UPDATE, label: "Sửa người dùng" },
-          { key: PERMISSIONS.USER_MANAGE.DELETE, label: "Xóa người dùng" },
-        ],
-      },
-      {
-        key: SIDEBAR.ROLE_PERMISSIONS,
-        label: "rolePermissions",
-        icon: <ShieldCheck size={18} />,
-        roles: [ROLES.ADMIN],
-        actions: [
-          { key: PERMISSIONS.PERMISSIONS_MANAGE.VIEW, label: "Xem quyền hạn" },
-          { key: PERMISSIONS.PERMISSIONS_MANAGE.UPDATE, label: "Chỉnh sửa quyền hạn" },
-        ],
-      },
-    ],
-  },
-  {
     key: SIDEBAR.VEHICLES,
     label: "vehicles",
     icon: <Car />,
@@ -147,6 +112,41 @@ export const navigationConfig: NavItem[] = [
         key: SIDEBAR.ATTENDANCE,
         label: "attendance",
         icon: <CalendarCheck size={18} />,
+      },
+    ],
+  },
+  {
+    key: SIDEBAR.AI_ASSISTANT,
+    label: "aiAssistant",
+    icon: <Bot />,
+    roles: [ROLES.ADMIN],
+  },
+  {
+    key: "user-manage-group",
+    label: "userManagement",
+    icon: <UsersRound />,
+    roles: [ROLES.ADMIN],
+    children: [
+      {
+        key: SIDEBAR.USER_MANAGE,
+        label: "allUsers",
+        icon: <UserCog size={18} />,
+        actions: [
+          { key: PERMISSIONS.USER_MANAGE.VIEW, label: "Xem danh sách người dùng" },
+          { key: PERMISSIONS.USER_MANAGE.CREATE, label: "Thêm người dùng" },
+          { key: PERMISSIONS.USER_MANAGE.UPDATE, label: "Sửa người dùng" },
+          { key: PERMISSIONS.USER_MANAGE.DELETE, label: "Xóa người dùng" },
+        ],
+      },
+      {
+        key: SIDEBAR.ROLE_PERMISSIONS,
+        label: "rolePermissions",
+        icon: <ShieldCheck size={18} />,
+        roles: [ROLES.ADMIN],
+        actions: [
+          { key: PERMISSIONS.PERMISSIONS_MANAGE.VIEW, label: "Xem quyền hạn" },
+          { key: PERMISSIONS.PERMISSIONS_MANAGE.UPDATE, label: "Chỉnh sửa quyền hạn" },
+        ],
       },
     ],
   },
