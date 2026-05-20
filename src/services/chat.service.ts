@@ -17,6 +17,15 @@ export interface ChatStreamHandlers {
   signal?: AbortSignal;
 }
 
+export interface ChatStreamOptions {
+  sessionId?: string;
+}
+
+export interface ChatCompleteOptions {
+  sessionId?: string;
+  signal?: AbortSignal;
+}
+
 export interface RunWithToolsHandlers {
   onStatus?: (status: string) => void;
   onContent?: (chunk: string) => void;
@@ -90,15 +99,22 @@ interface CompletionsResponse {
 const chatApi = {
   sendStream: async (
     request: ChatCompletionRequest,
-    handlers: ChatStreamHandlers = {}
+    handlers: ChatStreamHandlers = {},
+    options: ChatStreamOptions = {}
   ): Promise<void> => {
     const { onStatus, onReasoning, onContent, onEvent, onDone, onError, signal } = handlers;
     const payload: ChatCompletionRequest = { ...defaultRequest, ...request };
 
     try {
+      const token = await getValidAccessToken();
       const response = await fetch(STREAM_ENDPOINT, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...nagUserHeaders(),
+          ...chatSessionHeaders(options.sessionId),
+        },
         body: JSON.stringify(payload),
         signal,
       });
@@ -163,13 +179,24 @@ const chatApi = {
     }
   },
 
-  sendComplete: async (request: ChatCompletionRequest, signal?: AbortSignal): Promise<string> => {
+  sendComplete: async (
+    request: ChatCompletionRequest,
+    options: ChatCompleteOptions | AbortSignal = {}
+  ): Promise<string> => {
+    const normalized: ChatCompleteOptions =
+      options instanceof AbortSignal ? { signal: options } : options;
     const payload: ChatCompletionRequest = { ...routerRequest, ...request, stream: false };
+    const token = await getValidAccessToken();
     const response = await fetch(COMPLETE_ENDPOINT, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...nagUserHeaders(),
+        ...chatSessionHeaders(normalized.sessionId),
+      },
       body: JSON.stringify(payload),
-      signal,
+      signal: normalized.signal,
     });
 
     if (!response.ok) {
