@@ -417,16 +417,42 @@ const chatApi = {
 
   /**
    * Voice-to-voice round-trip: upload audio file, backend xử lý STT + AI + TTS,
-   * trả về audio binary để phát trực tiếp.
+   * trả về audio binary (audio/wav) để phát trực tiếp.
+   *
+   * Backend schema (POST /v1/nag/voice/chat):
+   * - Body multipart: audio (file), language (default vi), audio_format (BẮT BUỘC: wav)
+   * - Response headers: x-transcript, x-response-text (cả 2 URL-encoded)
+   * - Response body: WAV audio binary
+   * - Error 4xx/5xx body: { error, stage: "stt"|"tts"|"llm", upstream_status, upstream_body }
+   * - MIME allowlist: wav,mpeg,mp3,mp4,m4a,webm,ogg,flac. Size ≤ 25MB.
    */
   voiceChat: async (
     file: File,
-    options: { sessionId?: string; signal?: AbortSignal } = {}
-  ): Promise<{ audio: Blob; transcribedText?: string }> => {
+    options: {
+      sessionId?: string;
+      signal?: AbortSignal;
+      language?: string;
+      audioFormat?: string;
+      voice?: string;
+      temperature?: number;
+      documentId?: string;
+    } = {}
+  ): Promise<{
+    audio: Blob;
+    transcript?: string;
+    responseText?: string;
+  }> => {
     const token = await getValidAccessToken();
     const formData = new FormData();
-    // Backend yêu cầu field name `audio` (xem /v1/nag/voice/chat schema)
+    // KHÔNG set Content-Type ở headers — để browser tự sinh boundary multipart
     formData.append("audio", file);
+    formData.append("language", options.language ?? "vi");
+    formData.append("audio_format", options.audioFormat ?? "wav");
+    if (options.voice) formData.append("voice", options.voice);
+    if (typeof options.temperature === "number") {
+      formData.append("temperature", String(options.temperature));
+    }
+    if (options.documentId) formData.append("document_id", options.documentId);
 
     const response = await fetch(VOICE_ENDPOINT, {
       method: "POST",
@@ -440,17 +466,29 @@ const chatApi = {
     });
 
     if (!response.ok) {
-      const text = await response.text().catch(() => "");
-      throw new Error(text || `Voice chat failed (${response.status})`);
+      // Backend trả JSON {error, stage, upstream_status, upstream_body} — expose
+      // stage cho UI debug ("stt"/"llm"/"tts").
+      const errorJson = await response.json().catch(() => null);
+      const stage = errorJson?.stage ? ` [stage=${errorJson.stage}]` : "";
+      const detail = errorJson?.error || errorJson?.upstream_body || "";
+      throw new Error(
+        `Voice chat failed (${response.status})${stage}${detail ? `: ${detail}` : ""}`
+      );
     }
 
     const audio = await response.blob();
-    const transcribedHeader = response.headers.get("x-transcribed-text") ?? undefined;
+    const decode = (header: string | null): string | undefined => {
+      if (!header) return undefined;
+      try {
+        return decodeURIComponent(header).trim() || undefined;
+      } catch {
+        return header.trim() || undefined;
+      }
+    };
     return {
       audio,
-      transcribedText: transcribedHeader
-        ? decodeURIComponent(transcribedHeader).trim() || undefined
-        : undefined,
+      transcript: decode(response.headers.get("x-transcript")),
+      responseText: decode(response.headers.get("x-response-text")),
     };
   },
 };

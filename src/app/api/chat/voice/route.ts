@@ -69,7 +69,14 @@ export async function POST(request: Request) {
   const contentType = upstream.headers.get("content-type") ?? "audio/wav";
   headers.set("Content-Type", contentType);
   headers.set("Cache-Control", "no-cache, no-transform");
-  const passThrough = ["content-length", "content-disposition", "x-transcribed-text"];
+  // Backend trả về 2 header text (URL-encoded): x-transcript (câu user nói),
+  // x-response-text (câu AI trả lời). Cùng forward content-length/disposition.
+  const passThrough = [
+    "content-length",
+    "content-disposition",
+    "x-transcript",
+    "x-response-text",
+  ];
   for (const name of passThrough) {
     const value = upstream.headers.get(name);
     if (value) headers.set(name, value);
