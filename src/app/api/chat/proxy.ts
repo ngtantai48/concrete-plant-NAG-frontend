@@ -1,5 +1,13 @@
 const DEFAULT_CONTENT_TYPE = "application/json";
 const STREAM_MAX_TOKENS = 32_768;
+const USER_CONTEXT_HEADERS = [
+  "x-nag-user-id",
+  "x-nag-role",
+  "x-nag-role-id",
+  "x-nag-permissions",
+  "x-nag-user-context",
+  "x-chat-session-id",
+] as const;
 
 export const runtime = "edge";
 export const dynamic = "force-dynamic";
@@ -10,8 +18,14 @@ function upstreamUrl(): string {
   return url;
 }
 
-function upstreamHeaders(contentType: string): HeadersInit {
+function upstreamHeaders(contentType: string, request: Request): HeadersInit {
   const token = process.env.CHAT_API_TOKEN;
+  const userAuthorization = request.headers.get("authorization");
+  const contextHeaders: Record<string, string> = {};
+  USER_CONTEXT_HEADERS.forEach((name) => {
+    const value = request.headers.get(name);
+    if (value) contextHeaders[name] = value;
+  });
   return {
     "Content-Type": contentType,
     ...(token
@@ -19,7 +33,11 @@ function upstreamHeaders(contentType: string): HeadersInit {
           Authorization: `Bearer ${token}`,
           "X-API-Token": token,
         }
-      : {}),
+      : userAuthorization
+        ? { Authorization: userAuthorization }
+        : {}),
+    ...(userAuthorization ? { "X-User-Authorization": userAuthorization } : {}),
+    ...contextHeaders,
   };
 }
 
@@ -38,7 +56,7 @@ export async function proxyChatRequest(request: Request, forceStream: boolean) {
 
   const upstream = await fetch(upstreamUrl(), {
     method: "POST",
-    headers: upstreamHeaders(contentType),
+    headers: upstreamHeaders(contentType, request),
     body,
   });
 

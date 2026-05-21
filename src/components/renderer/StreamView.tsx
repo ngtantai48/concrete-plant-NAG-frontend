@@ -90,9 +90,13 @@ export function StreamView({ text, streaming = false }: { text: string; streamin
           return <MarkdownView body={chunk.body} key={`md-${index}`} streaming={streaming} />;
         }
         if (chunk.kind === "block") {
+          const data = chunk.data as { id?: unknown } | null | undefined;
+          const blockId = typeof data?.id === "string" ? data.id : undefined;
           return (
             <div
-              className="animate-[fade-up_0.28s_cubic-bezier(0.16,1,0.3,1)_both]"
+              className="animate-[fade-up_0.28s_cubic-bezier(0.16,1,0.3,1)_both] scroll-mt-24 transition-shadow duration-300"
+              data-block-id={blockId}
+              id={blockId ? `pinned-block-${blockId}` : undefined}
               key={`block-${index}`}
             >
               <RenderBlock data={chunk.data} />

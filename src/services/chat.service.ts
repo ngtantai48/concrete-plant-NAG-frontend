@@ -5,6 +5,7 @@ const STREAM_ENDPOINT = "/api/chat/stream";
 const COMPLETE_ENDPOINT = "/api/chat/complete";
 const AGENT_STREAM_ENDPOINT = "/api/chat/agent/stream";
 const MEMORY_ENDPOINT = "/api/chat/nag/memory";
+const VOICE_ENDPOINT = "/api/chat/voice";
 const AI_GENERATION_MAX_TOKENS = 32_768;
 
 export interface ChatStreamHandlers {
@@ -14,6 +15,15 @@ export interface ChatStreamHandlers {
   onEvent?: (event: ChatStreamEvent) => void;
   onDone?: () => void;
   onError?: (err: Error) => void;
+  signal?: AbortSignal;
+}
+
+export interface ChatStreamOptions {
+  sessionId?: string;
+}
+
+export interface ChatCompleteOptions {
+  sessionId?: string;
   signal?: AbortSignal;
 }
 
@@ -90,15 +100,22 @@ interface CompletionsResponse {
 const chatApi = {
   sendStream: async (
     request: ChatCompletionRequest,
-    handlers: ChatStreamHandlers = {}
+    handlers: ChatStreamHandlers = {},
+    options: ChatStreamOptions = {}
   ): Promise<void> => {
     const { onStatus, onReasoning, onContent, onEvent, onDone, onError, signal } = handlers;
     const payload: ChatCompletionRequest = { ...defaultRequest, ...request };
 
     try {
+      const token = await getValidAccessToken();
       const response = await fetch(STREAM_ENDPOINT, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...nagUserHeaders(),
+          ...chatSessionHeaders(options.sessionId),
+        },
         body: JSON.stringify(payload),
         signal,
       });
@@ -163,13 +180,24 @@ const chatApi = {
     }
   },
 
-  sendComplete: async (request: ChatCompletionRequest, signal?: AbortSignal): Promise<string> => {
+  sendComplete: async (
+    request: ChatCompletionRequest,
+    options: ChatCompleteOptions | AbortSignal = {}
+  ): Promise<string> => {
+    const normalized: ChatCompleteOptions =
+      options instanceof AbortSignal ? { signal: options } : options;
     const payload: ChatCompletionRequest = { ...routerRequest, ...request, stream: false };
+    const token = await getValidAccessToken();
     const response = await fetch(COMPLETE_ENDPOINT, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...nagUserHeaders(),
+        ...chatSessionHeaders(normalized.sessionId),
+      },
       body: JSON.stringify(payload),
-      signal,
+      signal: normalized.signal,
     });
 
     if (!response.ok) {
@@ -302,7 +330,7 @@ const chatApi = {
     payload: Record<string, unknown>,
     signal?: AbortSignal,
     sessionId?: string
-  ): Promise<void> => {
+  ): Promise<{ status?: string; request_id?: string } | null> => {
     const token = await getValidAccessToken();
     const response = await fetch("/api/chat/action", {
       method: "POST",
@@ -317,9 +345,151 @@ const chatApi = {
     });
 
     if (!response.ok) {
-      const message = await response.text().catch(() => "");
-      throw new Error(message || `Dispatch action failed (${response.status})`);
+      const raw = await response.text().catch(() => "");
+      let friendly: string | undefined;
+      try {
+        const parsed = JSON.parse(raw) as { error?: string; detail?: string };
+        friendly = parsed.error ?? parsed.detail;
+      } catch {
+        /* not JSON */
+      }
+      if (response.status === 401 || response.status === 403) {
+        throw new Error(friendly || "Bạn không có quyền thực hiện action này");
+      }
+      if (response.status === 400) {
+        throw new Error(friendly || "Action không hợp lệ hoặc thiếu tham số");
+      }
+      if (response.status === 501) {
+        throw new Error(friendly || "Action chưa được cấu hình ở backend");
+      }
+      throw new Error(friendly || raw || `Dispatch action failed (${response.status})`);
     }
+
+    const text = await response.text().catch(() => "");
+    if (!text) return null;
+    try {
+      return JSON.parse(text) as { status?: string; request_id?: string };
+    } catch {
+      return null;
+    }
+  },
+
+  sendFeedback: async (
+    body: {
+      turnId: string;
+      conversationId: string;
+      rating: "up" | "down";
+      comment?: string;
+    },
+    signal?: AbortSignal
+  ): Promise<{ feedback_id?: string } | null> => {
+    const token = await getValidAccessToken();
+    const response = await fetch("/api/chat/feedback", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...nagUserHeaders(),
+        ...chatSessionHeaders(body.conversationId),
+      },
+      body: JSON.stringify({
+        rating: body.rating,
+        turn_id: body.turnId,
+        conversation_id: body.conversationId,
+        comment: body.comment,
+      }),
+      signal,
+    });
+
+    if (!response.ok) {
+      const raw = await response.text().catch(() => "");
+      throw new Error(raw || `Feedback failed (${response.status})`);
+    }
+
+    const text = await response.text().catch(() => "");
+    if (!text) return null;
+    try {
+      return JSON.parse(text) as { feedback_id?: string };
+    } catch {
+      return null;
+    }
+  },
+
+  /**
+   * Voice-to-voice round-trip: upload audio file, backend xử lý STT + AI + TTS,
+   * trả về audio binary (audio/wav) để phát trực tiếp.
+   *
+   * Backend schema (POST /v1/nag/voice/chat):
+   * - Body multipart: audio (file), language (default vi), audio_format (BẮT BUỘC: wav)
+   * - Response headers: x-transcript, x-response-text (cả 2 URL-encoded)
+   * - Response body: WAV audio binary
+   * - Error 4xx/5xx body: { error, stage: "stt"|"tts"|"llm", upstream_status, upstream_body }
+   * - MIME allowlist: wav,mpeg,mp3,mp4,m4a,webm,ogg,flac. Size ≤ 25MB.
+   */
+  voiceChat: async (
+    file: File,
+    options: {
+      sessionId?: string;
+      signal?: AbortSignal;
+      language?: string;
+      audioFormat?: string;
+      voice?: string;
+      temperature?: number;
+      documentId?: string;
+    } = {}
+  ): Promise<{
+    audio: Blob;
+    transcript?: string;
+    responseText?: string;
+  }> => {
+    const token = await getValidAccessToken();
+    const formData = new FormData();
+    // KHÔNG set Content-Type ở headers — để browser tự sinh boundary multipart
+    formData.append("audio", file);
+    formData.append("language", options.language ?? "vi");
+    formData.append("audio_format", options.audioFormat ?? "wav");
+    if (options.voice) formData.append("voice", options.voice);
+    if (typeof options.temperature === "number") {
+      formData.append("temperature", String(options.temperature));
+    }
+    if (options.documentId) formData.append("document_id", options.documentId);
+
+    const response = await fetch(VOICE_ENDPOINT, {
+      method: "POST",
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...nagUserHeaders(),
+        ...chatSessionHeaders(options.sessionId),
+      },
+      body: formData,
+      signal: options.signal,
+    });
+
+    if (!response.ok) {
+      // Backend trả JSON {error, stage, upstream_status, upstream_body} — expose
+      // stage cho UI debug ("stt"/"llm"/"tts").
+      const errorJson = await response.json().catch(() => null);
+      const stage = errorJson?.stage ? ` [stage=${errorJson.stage}]` : "";
+      const detail = errorJson?.error || errorJson?.upstream_body || "";
+      throw new Error(
+        `Voice chat failed (${response.status})${stage}${detail ? `: ${detail}` : ""}`
+      );
+    }
+
+    const audio = await response.blob();
+    const decode = (header: string | null): string | undefined => {
+      if (!header) return undefined;
+      try {
+        return decodeURIComponent(header).trim() || undefined;
+      } catch {
+        return header.trim() || undefined;
+      }
+    };
+    return {
+      audio,
+      transcript: decode(response.headers.get("x-transcript")),
+      responseText: decode(response.headers.get("x-response-text")),
+    };
   },
 };
 
