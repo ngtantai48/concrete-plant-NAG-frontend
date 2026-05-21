@@ -1,9 +1,13 @@
 export const PERMISSIONS = {
     DASHBOARD: {
         VIEW: 'view',
-        MANUAL_SORT: 'manual_sort',
         SYNC_SLOTS: 'sync_slots',
+        HISTORY: 'history',
+        CHECKLOG: 'checklog',
+        MANUAL_SORT: 'manual_sort',
         MANUAL_CAMERA_FALLBACK: 'manual_camera_fallback',
+        VIEW_MAP: 'view_map',
+        SYSTEM_SETTINGS: 'system_settings',
     },
 
     USER_MANAGE: {
@@ -48,11 +52,6 @@ export const PERMISSIONS = {
     // ATTENDANCE: {
     //     VIEW: 'view',
     // },
-
-    SYSTEM_SETTINGS: {
-        VIEW: 'view',
-        UPDATE: 'update',
-    },
 
     PERMISSIONS_MANAGE: {
         VIEW: 'view',

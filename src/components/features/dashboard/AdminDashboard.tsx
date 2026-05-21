@@ -12,8 +12,6 @@ import {
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-
-
 import { useDeviceHeartbeat } from "@/hooks/useDeviceHeartbeat";
 import { useNearbyVehicles } from "@/hooks/useNearbyVehicles";
 import { useRealtimeUpdates } from "@/hooks/useRealtimeUpdates";
@@ -28,7 +26,7 @@ import type { Station } from "@/types/station";
 import type { Vehicle } from "@/types/vehicle";
 import { format } from "date-fns";
 import {
-  ArrowRight, Calendar as CalendarIcon, CheckCircle2, Clock, Ellipsis, FileSpreadsheet,
+  ArrowRight, Calendar as CalendarIcon, CalendarClock, CheckCircle2, Clock, Ellipsis, FileSpreadsheet,
   Eye, EyeOff, LayoutGrid, History, Map as MapIcon, MapPin, Radio, RefreshCw, Route, Search, Timer, Truck, X, Save
 } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
@@ -42,6 +40,7 @@ import StationStatusPanel from "./StationStatusPanel";
 import { computeTripStats, formatDuration } from "./trip-stats";
 import VehicleStatusChange from "./VehicleStatusChange";
 import EndOfDayModal from "./EndOfDayModal";
+import SystemSettingsForm from "../system-settings/SystemSettingsForm";
 import { SIDEBAR } from "@/constants/route";
 import { PERMISSIONS } from "@/constants/permissions";
 
@@ -324,8 +323,10 @@ export default function AdminDashboard() {
 
   const [isSyncingShift, setIsSyncingShift] = useState(false);
   const [isSyncShiftDialogOpen, setIsSyncShiftDialogOpen] = useState(false);
+  const [isSystemSettingsDialogOpen, setIsSystemSettingsDialogOpen] = useState(false);
   const [isQueueHistoryDialogOpen, setIsQueueHistoryDialogOpen] = useState(false);
   const [queueHistoryDate, setQueueHistoryDate] = useState(() => getYesterdayDate());
+  const [isQueueHistoryDatePickerOpen, setIsQueueHistoryDatePickerOpen] = useState(false);
   const [queueHistoryLoading, setQueueHistoryLoading] = useState(false);
   const [queueHistoryItems, setQueueHistoryItems] = useState<TankerQueueSnapshotItem[]>([]);
   const queueHistoryDateLabel = useMemo(() => {
@@ -675,6 +676,26 @@ export default function AdminDashboard() {
               <div className="flex items-center gap-2 border-l border-slate-300 pl-3">
                 <ClockDisplay locale={locale} />
               </div>
+              {hasActionAccess(SIDEBAR.DASHBOARD, PERMISSIONS.DASHBOARD.SYSTEM_SETTINGS) && (
+                <div className="px-5">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button size="sm" variant="outline"
+                        className="bg-indigo-50 text-indigo-500 hover:text-indigo-700 transition-all hover:bg-indigo-100 hover:border-indigo-300"
+                        onClick={() => setIsSystemSettingsDialogOpen(true)}>
+                        <CalendarClock />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent><p>Cấu hình vận hành</p></TooltipContent>
+                  </Tooltip>
+
+                  <Dialog open={isSystemSettingsDialogOpen} onOpenChange={setIsSystemSettingsDialogOpen}>
+                    <DialogContent className="sm:max-w-2xl p-0 overflow-hidden">
+                      <SystemSettingsForm />
+                    </DialogContent>
+                  </Dialog>
+                </div>
+              )}
             </div>
 
             {/* Right Controls */}
@@ -756,10 +777,10 @@ export default function AdminDashboard() {
               {/* Date Picker */}
               <Popover open={isDatePickerOpen} onOpenChange={setIsDatePickerOpen}>
                 <PopoverTrigger asChild>
-                  <Button
+                  <Button size="sm"
                     variant="outline"
                     className={cn(
-                      "h-8 w-37.5 px-2 text-sm font-bold justify-start text-left border-slate-200 bg-white/80 transition-all shadow-none hover:bg-white hover:border-sky-400 focus-visible:ring-1 focus-visible:ring-sky-500",
+                      "font-bold justify-start text-left border-slate-200 bg-white/80 transition-all hover:bg-white hover:border-sky-400 focus-visible:ring-1 focus-visible:ring-sky-500",
                       !selectedDate && "text-muted-foreground"
                     )}
                   >
@@ -786,34 +807,35 @@ export default function AdminDashboard() {
 
               {/* Sync Shift Button (replaces hidden Chốt ca button) */}
               <div className="border-l border-slate-200 pl-2 flex items-center gap-2">
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button size="sm" variant="outline"
-                      onClick={() => setIsEndOfDayModalOpen(true)}
-                      className="uppercase border-sky-200 text-sky-700 hover:bg-sky-50"
-                    >
-                      <Save />
-                      Check log
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Check log {format(new Date(selectedDate), "dd/MM/yyyy")}</p>
-                  </TooltipContent>
-                </Tooltip>
+                {hasActionAccess(SIDEBAR.DASHBOARD, PERMISSIONS.DASHBOARD.CHECKLOG) && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button size="sm" variant="outline"
+                        onClick={() => setIsEndOfDayModalOpen(true)}
+                        className="uppercase border-sky-200 text-sky-700 hover:bg-sky-50"
+                      >
+                        <Save /> Nhật ký vận hành
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent><p>Nhật ký vận hành {format(new Date(selectedDate), "dd/MM/yyyy")}</p></TooltipContent>
+                  </Tooltip>
+                )}
 
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button size="sm" variant="outline"
-                      onClick={handleOpenQueueHistory}
-                      className="uppercase border-indigo-200 text-indigo-700 hover:bg-indigo-50"
-                    >
-                      <History />Lịch sử lốt xe
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Xem thứ tự lốt theo ngày</p>
-                  </TooltipContent>
-                </Tooltip>
+                {hasActionAccess(SIDEBAR.DASHBOARD, PERMISSIONS.DASHBOARD.HISTORY) && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button size="sm" variant="outline"
+                        onClick={handleOpenQueueHistory}
+                        className="uppercase border-indigo-200 text-indigo-700 hover:bg-indigo-50"
+                      >
+                        <History />Lịch sử
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Xem thứ tự lốt xe theo ngày</p>
+                    </TooltipContent>
+                  </Tooltip>
+                )}
 
                 {!isPastDate && hasUnclosedShift && (
                   <>
@@ -858,14 +880,9 @@ export default function AdminDashboard() {
                     <Tooltip>
                       <TooltipTrigger asChild>
                         {hasActionAccess(SIDEBAR.DASHBOARD, PERMISSIONS.DASHBOARD.SYNC_SLOTS) && (
-                          <Button
-                            size="sm"
-                            variant="primary"
-                            onClick={() => setIsSyncShiftDialogOpen(true)}
+                          <Button className="uppercase" size="sm" variant="primary" onClick={() => setIsSyncShiftDialogOpen(true)}
                             disabled={isSyncingShift}
-                            className="uppercase"
                           >
-                            {isSyncingShift ? <RefreshCw className="animate-spin" /> : <FileSpreadsheet />}
                             {t('syncShiftAction')}
                           </Button>
                         )}
@@ -968,7 +985,6 @@ export default function AdminDashboard() {
                           </div>
                         </div>
 
-
                         <DialogFooter className="sm:justify-between gap-2">
                           <Button
                             variant="outline"
@@ -983,22 +999,11 @@ export default function AdminDashboard() {
                               onClick={handleApplyToEnd}
                               disabled={isApplyingToEnd || selectedSyncOrderIds.length === 0}
                             >
-                              {isApplyingToEnd ? (
-                                <RefreshCw className="animate-spin h-4 w-4" />
-                              ) : null}
+                              {isApplyingToEnd ? <RefreshCw className="animate-spin" /> : null}
                               {t('syncShiftApplyToEndAction', { count: selectedSyncOrderIds.length })}
                             </Button>
                             {hasActionAccess(SIDEBAR.DASHBOARD, PERMISSIONS.DASHBOARD.SYNC_SLOTS) && (
-                              <Button
-                                variant="primary"
-                                onClick={handleSyncShift}
-                                disabled={isSyncingShift || isApplyingToEnd}
-                              >
-                                {isSyncingShift ? (
-                                  <RefreshCw className="animate-spin h-4 w-4" />
-                                ) : (
-                                  <FileSpreadsheet className="h-4 w-4" />
-                                )}
+                              <Button variant="primary" onClick={handleSyncShift} disabled={isSyncingShift || isApplyingToEnd}>
                                 {t('syncShiftAction')}
                               </Button>
                             )}
@@ -1010,14 +1015,14 @@ export default function AdminDashboard() {
                 )}
 
                 <Dialog open={isQueueHistoryDialogOpen} onOpenChange={setIsQueueHistoryDialogOpen}>
-                  <DialogContent className="sm:max-w-2xl max-h-[85vh] flex flex-col p-0 overflow-hidden">
+                  <DialogContent className="sm:max-w-xl max-h-[85vh] flex flex-col p-0 overflow-hidden">
                     <DialogHeader className="px-5 pt-5 pb-2 border-b bg-white">
                       <div className="flex items-start gap-3">
                         <div className="h-10 w-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
                           <CalendarIcon className="h-5 w-5" />
                         </div>
                         <div>
-                          <DlgTitle className="text-2xl font-black">Lịch sử lốt xe</DlgTitle>
+                          <DlgTitle className="text-2xl font-bold">Lịch sử lốt xe</DlgTitle>
                           <DialogDescription className="mt-1">
                             Chọn ngày để xem lịch sử thứ tự lốt xe cuối ngày.
                           </DialogDescription>
@@ -1025,61 +1030,71 @@ export default function AdminDashboard() {
                       </div>
                     </DialogHeader>
 
-                    <div className="px-5 py-1">
-                      <div className="rounded-xl border bg-white p-3 space-y-2">
-                        <div className="text-xs font-bold text-slate-500">Chọn ngày</div>
-                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-                          <Input
-                            type="date"
-                            value={queueHistoryDate}
-                            onChange={(event) => setQueueHistoryDate(event.target.value)}
-                            className="w-[180px] bg-white"
-                          />
-                          <Button
-                            variant="primary"
-                            onClick={() => fetchQueueHistory(queueHistoryDate)}
-                            disabled={queueHistoryLoading || !queueHistoryDate}
-                            className="sm:min-w-[130px]"
-                          >
-                            {queueHistoryLoading ? <RefreshCw className="animate-spin h-4 w-4" /> : <Search className="h-4 w-4" />}
+                    <div className="px-5 space-y-3">
+                      <div className="rounded-xl border bg-slate-100 p-3">
+                        <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
+                          <div className="text-sm font-bold">Chọn ngày</div>
+                          <Popover open={isQueueHistoryDatePickerOpen} onOpenChange={setIsQueueHistoryDatePickerOpen}>
+                            <PopoverTrigger asChild>
+                              <Button variant="outline"
+                                className={cn(
+                                  "text-sm font-bold justify-start text-left border-slate-200 transition-all shadow-none hover:bg-white hover:border-sky-400 focus-visible:ring-1 focus-visible:ring-sky-500",
+                                  !queueHistoryDate && "text-muted-foreground"
+                                )}
+                              >
+                                <CalendarIcon className="text-sky-500" />
+                                {queueHistoryDate ? format(new Date(queueHistoryDate), "dd/MM/yyyy") : <span>Chọn ngày</span>}
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-auto p-0" align="start">
+                              <Calendar
+                                mode="single"
+                                selected={queueHistoryDate ? new Date(queueHistoryDate) : undefined}
+                                onSelect={(date) => {
+                                  if (date) {
+                                    setQueueHistoryDate(format(date, "yyyy-MM-dd"));
+                                    setIsQueueHistoryDatePickerOpen(false);
+                                  }
+                                }}
+                                initialFocus
+                              />
+                            </PopoverContent>
+                          </Popover>
+                          <Button variant="primary" onClick={() => fetchQueueHistory(queueHistoryDate)} disabled={queueHistoryLoading || !queueHistoryDate}>
+                            {queueHistoryLoading ? <RefreshCw className="animate-spin" /> : <Search />}
                             Xem lịch sử
                           </Button>
                         </div>
                       </div>
-                    </div>
-
-                    <div className="px-5 py-3 flex-1 min-h-0 overflow-hidden bg-slate-50/40">
-                      <div className="h-[50vh] max-h-[50vh] overflow-y-auto p-2 space-y-1 rounded-xl border border-slate-200 bg-white">
-                        {queueHistoryItems.map((item) => (
-                          <div
-                            key={`${item.order_id}-${item.position}`}
-                            className="flex items-center gap-4 px-4 py-3 rounded-lg border border-transparent bg-white hover:border-slate-200 hover:bg-slate-50 transition-all shadow-sm"
-                          >
-                            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-sm font-black text-indigo-600">
-                              {item.position}
-                            </span>
-
-                            <div className="flex-1 min-w-0">
-                              <div className="font-extrabold text-slate-800 truncate">
-                                {item.vehicle_name}
-                              </div>
-                              <div className="inline-flex items-center rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 font-mono text-[10px] font-semibold text-slate-700">
-                                {item.vehicle_license_plate}
+                      <div className="flex-1 min-h-0 overflow-hidden bg-slate-50/40">
+                        <div className="h-[50vh] max-h-[50vh] overflow-y-auto space-y-2">
+                          {queueHistoryItems.map((item) => (
+                            <div
+                              key={`${item.order_id}-${item.position}`}
+                              className="flex items-center gap-8 px-6 py-3 rounded-xl border hover:border-slate-200 hover:bg-slate-100 transition-all shadow-sm"
+                            >
+                              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-200 text-base font-bold">
+                                {item.position}
+                              </span>
+                              <div className="font-bold text-slate-800 truncate">
+                                {item.vehicle_license_plate} | {item.vehicle_name}
                               </div>
                             </div>
-                          </div>
-                        ))}
+                          ))}
 
-                        {!queueHistoryLoading && queueHistoryItems.length === 0 && (
-                          <div className="flex flex-col items-center justify-center py-20 text-slate-400 space-y-2">
-                            <CalendarIcon className="h-8 w-8 opacity-20" />
-                            <p className="text-sm italic">
-                              Chưa có lịch sử lốt xe ngày {queueHistoryDateLabel}
-                            </p>
-                          </div>
-                        )}
+                          {!queueHistoryLoading && queueHistoryItems.length === 0 && (
+                            <div className="flex flex-col items-center justify-center py-20 text-slate-400 space-y-2">
+                              <CalendarIcon className="h-8 w-8 opacity-20" />
+                              <p className="text-sm italic">
+                                Chưa có lịch sử lốt xe ngày {queueHistoryDateLabel}
+                              </p>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
+
+
 
 
                     <DialogFooter className="border-t bg-white px-5 py-3 sm:justify-between">
@@ -1124,7 +1139,16 @@ export default function AdminDashboard() {
 
               {/* ═══ SYSTEM TELEMETRY ═══ */}
               <div className="shrink-0">
-                <StationStatusPanel stations={stations} orders={orders} deviceStationStatusMap={stationStatusMap} onStationUpdated={fetchAll} pendingOrders={activeFlowOrders} hasManualFallbackAccess={hasActionAccess(SIDEBAR.DASHBOARD, PERMISSIONS.DASHBOARD.MANUAL_CAMERA_FALLBACK)} yardOrders={yardOrders} isPastDate={isPastDate} />
+                <StationStatusPanel
+                  stations={stations}
+                  orders={orders}
+                  deviceStationStatusMap={stationStatusMap}
+                  onStationUpdated={fetchAll}
+                  pendingOrders={activeFlowOrders}
+                  hasManualFallbackAccess={hasActionAccess(SIDEBAR.DASHBOARD, PERMISSIONS.DASHBOARD.MANUAL_CAMERA_FALLBACK)}
+                  yardOrders={yardOrders}
+                  isPastDate={isPastDate}
+                />
               </div>
 
               {/* Vehicles + Dispatch side by side */}
@@ -1284,15 +1308,17 @@ export default function AdminDashboard() {
                           MANUAL
                         </Button>
                       )}
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setShowMap(true)}
-                        className="h-5 px-2 text-[10px] font-bold uppercase text-slate-500 border border-transparent hover:text-slate-700 hover:bg-slate-100"
-                      >
-                        <MapIcon className="h-3 w-3 shrink-0" />
-                        MAP
-                      </Button>
+
+                      {hasActionAccess(SIDEBAR.DASHBOARD, PERMISSIONS.DASHBOARD.VIEW_MAP) && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setShowMap(true)}
+                          className="h-5 px-2 text-[10px] font-bold uppercase text-slate-500 border border-transparent hover:text-slate-700 hover:bg-slate-100"
+                        >
+                          <MapIcon className="shrink-0" />MAP
+                        </Button>
+                      )}
                     </div>
                   </div>
 

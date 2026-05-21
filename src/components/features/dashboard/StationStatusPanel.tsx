@@ -1,11 +1,11 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Textarea } from "@/components/ui/textarea";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { DeviceStationStatus } from "@/hooks/useDeviceHeartbeat";
-import transportApi from "@/services/transport.service";
 import stationApi from "@/services/station.service";
+import transportApi from "@/services/transport.service";
 import type { Order } from "@/types/order";
 import type { Station } from "@/types/station";
 import { LogIn, LogOut, RotateCw, Video, Wrench } from "lucide-react";
@@ -25,6 +25,46 @@ interface StationStatusPanelProps {
 }
 
 const EMPTY_DEVICE_STATION_STATUS_MAP: Record<string, DeviceStationStatus> = {};
+
+interface CameraFeedConfig {
+  name: string;       // Nhãn hiển thị, ví dụ: "Hướng xe vào (Cổng A)"
+  port: string;       // Cổng NAT được ánh xạ
+  channel?: string;   // Kênh Hikvision (mặc định '102')
+}
+
+// Cấu hình linh hoạt camera cho các trạm (STATION_CAMERAS_CONFIG)
+const STATION_CAMERAS_CONFIG: Record<number, CameraFeedConfig[]> = {
+  1: [
+    {
+      name: "Trạm C (Hướng chính)",
+      port: "81",
+      channel: "102"
+    },
+    {
+      name: "Trạm C (Hướng phụ)",
+      port: "83",
+      channel: "102"
+    }
+  ]
+};
+
+// Hàm phân giải danh sách camera động cho từng trạm
+const getStationCameras = (station: Station): CameraFeedConfig[] => {
+  const configured = STATION_CAMERAS_CONFIG[station.station_id];
+  if (configured && configured.length > 0) {
+    return configured;
+  }
+
+  // Phân giải cổng mặc định (fallback) cho các trạm thông thường khác
+  const defaultPort = station.station_id === 2 ? "82" : "80";
+  return [
+    {
+      name: `Camera ${station.station_name}`,
+      port: defaultPort,
+      channel: "102"
+    }
+  ];
+};
 
 const StationStatusPanel = ({
   stations,
@@ -56,6 +96,11 @@ const StationStatusPanel = ({
   const [stationToPause, setStationToPause] = useState<Station | null>(null);
   const [viewingCameraStation, setViewingCameraStation] = useState<Station | null>(null);
   const [cameraKey, setCameraKey] = useState(() => Date.now());
+
+  const activeCameras = useMemo(() => {
+    if (!viewingCameraStation) return [];
+    return getStationCameras(viewingCameraStation);
+  }, [viewingCameraStation]);
 
   // Manual camera fallback states
   const [manualEntryStation, setManualEntryStation] = useState<Station | null>(null);
@@ -664,37 +709,37 @@ const StationStatusPanel = ({
         open={!!viewingCameraStation}
         onOpenChange={(isOpen) => !isOpen && setViewingCameraStation(null)}
       >
-        <DialogContent className="flex max-h-[90vh] flex-col bg-white/95 p-4 backdrop-blur-md sm:max-w-3xl">
+        <DialogContent className={`flex max-h-[90vh] flex-col bg-white/95 p-4 backdrop-blur-md transition-all duration-300 ${activeCameras.length > 1 ? "sm:max-w-6xl" : "sm:max-w-3xl"}`}>
           <DialogHeader className="flex-none">
             <DialogTitle className="flex items-center gap-2 text-xl font-black text-slate-800">
               <Video className="h-5 w-5 text-indigo-500" />
               Camera Giám Sát - {viewingCameraStation?.station_name}
             </DialogTitle>
             <DialogDescription className="text-sm font-medium text-slate-500">
-              IP: {viewingCameraStation?.station_ip_address || "Chưa cấu hình"} | Port:{" "}
-              {viewingCameraStation?.station_port || "Chưa cấu hình"}
+              IP: {viewingCameraStation?.station_ip_address || "Chưa cấu hình"}
+              {activeCameras.length === 1 && ` | Port: ${activeCameras[0].port}`}
             </DialogDescription>
           </DialogHeader>
-          <div className="relative flex aspect-video w-full items-center justify-center overflow-hidden rounded-md border border-slate-200 bg-black shadow-inner">
-            {viewingCameraStation?.station_ip_address ? (
-              <img
-                src={`/api/camera/proxy?ip=${viewingCameraStation.station_ip_address}&port=${viewingCameraStation.station_id === 1
-                  ? "81"
-                  : viewingCameraStation.station_id === 2
-                    ? "82"
-                    : viewingCameraStation.station_id === 3
-                      ? "80"
-                      : "80"
-                  }&t=${cameraKey}`}
-                className="h-full w-full bg-black object-contain"
-                alt={`Camera ${viewingCameraStation.station_name}`}
-              />
-            ) : (
-              <div className="flex h-full w-full items-center justify-center font-medium text-slate-400">
-                Vui lòng cấu hình IP và Port cho camera của trạm này trong phần quản lý trạm.
-              </div>
-            )}
-          </div>
+
+          {viewingCameraStation?.station_ip_address ? (
+            <div className={`grid w-full gap-4 ${activeCameras.length > 1 ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1"}`}>
+              {activeCameras.map((cam, idx) => (
+                <div key={idx} className="relative flex aspect-video w-full flex-col items-center justify-center overflow-hidden rounded-md border border-slate-200 bg-black shadow-inner">
+                  {/* Nhãn Tên Camera Đẹp Mắt */}
+                  <div className="absolute left-3 top-3 z-10 rounded bg-black/60 px-2 py-0.5 text-xs font-bold text-white backdrop-blur-sm">
+                    {cam.name}
+                  </div>
+                  <img className="h-full w-full bg-black object-contain" alt={cam.name} loading="eager" decoding="async"
+                    src={`/api/camera/proxy?ip=${viewingCameraStation.station_ip_address}&port=${cam.port}&channel=${cam.channel || "102"}&t=${cameraKey}`}
+                  />
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="flex h-40 w-full items-center justify-center font-medium text-slate-400 bg-black/5 rounded-md border border-dashed">
+              Vui lòng cấu hình IP cho camera của trạm này trong phần quản lý trạm.
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </>
