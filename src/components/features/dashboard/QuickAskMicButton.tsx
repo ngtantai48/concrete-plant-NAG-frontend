@@ -152,7 +152,7 @@ export default function QuickAskMicButton({ className }: { className?: string })
           signal: controller.signal,
         });
         if (controller.signal.aborted) return;
-        if (result.transcribedText) setTranscribedText(result.transcribedText);
+        if (result.transcript) setTranscribedText(result.transcript);
         setPhase("ready");
         void playAudio(result.audio);
       } catch (error) {
