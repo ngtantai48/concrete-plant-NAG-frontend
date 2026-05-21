@@ -5,6 +5,7 @@ const STREAM_ENDPOINT = "/api/chat/stream";
 const COMPLETE_ENDPOINT = "/api/chat/complete";
 const AGENT_STREAM_ENDPOINT = "/api/chat/agent/stream";
 const MEMORY_ENDPOINT = "/api/chat/nag/memory";
+const VOICE_ENDPOINT = "/api/chat/voice";
 const AI_GENERATION_MAX_TOKENS = 32_768;
 
 export interface ChatStreamHandlers {
@@ -412,6 +413,44 @@ const chatApi = {
     } catch {
       return null;
     }
+  },
+
+  /**
+   * Voice-to-voice round-trip: upload audio file, backend xử lý STT + AI + TTS,
+   * trả về audio binary để phát trực tiếp.
+   */
+  voiceChat: async (
+    file: File,
+    options: { sessionId?: string; signal?: AbortSignal } = {}
+  ): Promise<{ audio: Blob; transcribedText?: string }> => {
+    const token = await getValidAccessToken();
+    const formData = new FormData();
+    formData.append("file", file);
+
+    const response = await fetch(VOICE_ENDPOINT, {
+      method: "POST",
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...nagUserHeaders(),
+        ...chatSessionHeaders(options.sessionId),
+      },
+      body: formData,
+      signal: options.signal,
+    });
+
+    if (!response.ok) {
+      const text = await response.text().catch(() => "");
+      throw new Error(text || `Voice chat failed (${response.status})`);
+    }
+
+    const audio = await response.blob();
+    const transcribedHeader = response.headers.get("x-transcribed-text") ?? undefined;
+    return {
+      audio,
+      transcribedText: transcribedHeader
+        ? decodeURIComponent(transcribedHeader).trim() || undefined
+        : undefined,
+    };
   },
 };
 
