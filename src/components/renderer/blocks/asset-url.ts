@@ -8,12 +8,29 @@ type LocalAsset = {
   mimeType?: string;
 };
 
+// Backend đôi khi trả URL absolute kèm domain frontend (vd https://nguyenanhdonghoi.com/static/nag/artifacts/xxx.png)
+// — tức là backend dùng request.base_url để build URL. Domain này KHÔNG host file artifact,
+// chỉ backend `chat.svnagentic.site` mới có. Rewrite về relative path để Next.js proxy
+// `src/app/static/nag/artifacts/[...path]/route.ts` forward đúng upstream.
+function normalizeArtifactUrl(value: string): string {
+  try {
+    const url = new URL(value, "https://placeholder.invalid/");
+    if (url.pathname.startsWith("/static/nag/artifacts/")) {
+      return `${url.pathname}${url.search}`;
+    }
+  } catch {
+    /* noop */
+  }
+  return value;
+}
+
 function safeUrl(value: string): string | null {
-  if (value.startsWith("/") || value.startsWith("#")) return value;
+  const normalized = normalizeArtifactUrl(value);
+  if (normalized.startsWith("/") || normalized.startsWith("#")) return normalized;
 
   try {
-    const url = new URL(value);
-    if (["http:", "https:", "blob:", "data:"].includes(url.protocol)) return value;
+    const url = new URL(normalized);
+    if (["http:", "https:", "blob:", "data:"].includes(url.protocol)) return normalized;
   } catch {
     return null;
   }
