@@ -39,7 +39,14 @@ function agentHeaders(request: Request): HeadersInit {
     if (value) contextHeaders[name] = value;
   });
 
+  // CRITICAL: forward Content-Type (multipart/form-data; boundary=...) từ request
+  // gốc — nếu không, upstream không parse được FormData → 422 "audio field missing"
+  const incomingContentType = request.headers.get("content-type");
+  const incomingContentLength = request.headers.get("content-length");
+
   return {
+    ...(incomingContentType ? { "Content-Type": incomingContentType } : {}),
+    ...(incomingContentLength ? { "Content-Length": incomingContentLength } : {}),
     "X-Request-Id": requestId,
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
     ...(userAuthorization ? { "X-User-Authorization": userAuthorization } : {}),
