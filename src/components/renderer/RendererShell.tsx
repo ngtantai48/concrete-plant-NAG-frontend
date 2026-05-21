@@ -27,6 +27,8 @@ import {
   Share2,
   Square,
   Star,
+  Volume2,
+  VolumeX,
   ThumbsDown,
   ThumbsUp,
   Trash2,
@@ -1689,13 +1691,19 @@ function AssistantToolbar({
   onFeedback,
   onPinAll,
   onShare,
+  onToggleSpeak,
+  speakState,
 }: {
   feedback?: FeedbackVote;
   onCopy: () => void;
   onFeedback: (vote: FeedbackVote) => void;
   onPinAll: () => void;
   onShare: () => void;
+  onToggleSpeak: () => void;
+  speakState: "idle" | "loading" | "playing";
 }) {
+  const speakLabel =
+    speakState === "playing" ? "Dừng đọc" : speakState === "loading" ? "Đang tải" : "Nghe đọc";
   return (
     <div className="mt-2 flex flex-wrap items-center gap-1">
       <button
@@ -1728,6 +1736,25 @@ function AssistantToolbar({
       >
         <Copy size={13} /> Sao chép
       </button>
+      <button
+        aria-label={speakLabel}
+        className={cn(
+          "toolbar-btn",
+          speakState === "playing" && "border-[#007AFF]/40 bg-[#007AFF]/10 text-[#0A66E0]"
+        )}
+        disabled={speakState === "loading"}
+        onClick={onToggleSpeak}
+        type="button"
+      >
+        {speakState === "loading" ? (
+          <Loader2 className="animate-spin" size={13} />
+        ) : speakState === "playing" ? (
+          <VolumeX size={13} />
+        ) : (
+          <Volume2 size={13} />
+        )}
+        {speakLabel}
+      </button>
       <button aria-label="Chia sẻ tin nhắn" className="toolbar-btn" onClick={onShare} type="button">
         <Share2 size={13} /> Chia sẻ
       </button>
@@ -1754,8 +1781,11 @@ function ChatColumn({
   onRename,
   onSend,
   onToast,
+  onToggleSpeakTurn,
   onTogglePin,
   readOnly,
+  speakingTurnId,
+  speakLoadingTurnId,
 }: {
   conversation: Conversation;
   feedback: Record<string, FeedbackVote>;
@@ -1766,7 +1796,10 @@ function ChatColumn({
   onRename: (title: string) => void;
   onSend: (text: string, attachments?: ComposerAttachment[]) => Promise<void>;
   onToast: (message: string) => void;
+  onToggleSpeakTurn: (turnId: string, text: string) => void;
   onTogglePin: () => void;
+  speakingTurnId: string | null;
+  speakLoadingTurnId: string | null;
   readOnly: boolean;
 }) {
   const [input, setInput] = useState("");
@@ -2070,7 +2103,14 @@ function ChatColumn({
                     <StreamView text={turn.text} streaming={turn.status === "streaming"} />
                   </div>
                   {turn.status !== "streaming" && !readOnly && (
-                    <div className="opacity-0 transition-opacity duration-150 group-hover:opacity-100 focus-within:opacity-100">
+                    <div
+                      className={cn(
+                        "transition-opacity duration-150 focus-within:opacity-100 group-hover:opacity-100",
+                        speakingTurnId === turn.id || speakLoadingTurnId === turn.id
+                          ? "opacity-100"
+                          : "opacity-0"
+                      )}
+                    >
                       <AssistantToolbar
                         feedback={feedback[turn.id]}
                         onCopy={() => {
@@ -2083,6 +2123,14 @@ function ChatColumn({
                           void copyText(buildShareUrl(conversation.id, turn.id));
                           onToast("Đã sao chép link tới tin nhắn");
                         }}
+                        onToggleSpeak={() => onToggleSpeakTurn(turn.id, turn.text)}
+                        speakState={
+                          speakLoadingTurnId === turn.id
+                            ? "loading"
+                            : speakingTurnId === turn.id
+                              ? "playing"
+                              : "idle"
+                        }
                       />
                     </div>
                   )}
@@ -2651,7 +2699,12 @@ export function RendererShell() {
   const [reportSaving, setReportSaving] = useState(false);
   const [historyCollapsed, setHistoryCollapsed] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [speakingTurnId, setSpeakingTurnId] = useState<string | null>(null);
+  const [speakLoadingTurnId, setSpeakLoadingTurnId] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const speechAbortRef = useRef<AbortController | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const autoPlayPendingRef = useRef<boolean>(false);
   const readOnly =
     searchParams.get("share") === "1" ||
     searchParams.get("readonly") === "1" ||
@@ -2953,6 +3006,7 @@ export function RendererShell() {
     const ask = searchParams.get("ask");
     if (!ask || askHandledRef.current === ask || !currentConversation || isBusy) return;
     askHandledRef.current = ask;
+    autoPlayPendingRef.current = true;
     void sendMessage(ask);
     if (typeof window !== "undefined") {
       const url = new URL(window.location.href);
@@ -2960,6 +3014,105 @@ export function RendererShell() {
       window.history.replaceState({}, "", url.toString());
     }
   }, [currentConversation, isBusy, readOnly, searchParams, sendMessage]);
+
+  const stopSpeech = useCallback(() => {
+    speechAbortRef.current?.abort();
+    speechAbortRef.current = null;
+    const audio = audioRef.current;
+    if (audio) {
+      audio.pause();
+      audio.removeAttribute("src");
+      audio.load();
+    }
+    audioRef.current = null;
+    setSpeakingTurnId(null);
+    setSpeakLoadingTurnId(null);
+  }, []);
+
+  const playTurnSpeech = useCallback(
+    async (turnId: string, rawText: string) => {
+      // Toggle: nếu turn đang phát thì dừng
+      if (speakingTurnId === turnId || speakLoadingTurnId === turnId) {
+        stopSpeech();
+        return;
+      }
+      // Strip render block JSON, chỉ lấy markdown text để đọc
+      const spokenParts: string[] = [];
+      for (const chunk of parseStream(rawText)) {
+        if (chunk.kind === "md") spokenParts.push(chunk.body);
+      }
+      const speakable = spokenParts
+        .join(" ")
+        .replace(/```[\s\S]*?```/g, " ")
+        .replace(/[*_`#>|]/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+      if (!speakable) {
+        showToast("Không có nội dung để đọc");
+        return;
+      }
+
+      stopSpeech();
+      const controller = new AbortController();
+      speechAbortRef.current = controller;
+      setSpeakLoadingTurnId(turnId);
+      try {
+        const result = await speechApi.synthesize(speakable, {
+          speed: 1.1,
+          seed: 42,
+          signal: controller.signal,
+        });
+        if (controller.signal.aborted) return;
+        const audio = new Audio(result.url);
+        audioRef.current = audio;
+        audio.onended = () => {
+          if (audioRef.current === audio) {
+            audioRef.current = null;
+            setSpeakingTurnId(null);
+          }
+        };
+        audio.onerror = () => {
+          if (audioRef.current === audio) {
+            audioRef.current = null;
+            setSpeakingTurnId(null);
+          }
+          showToast("Không phát được audio");
+        };
+        await audio.play();
+        if (!controller.signal.aborted) {
+          setSpeakLoadingTurnId(null);
+          setSpeakingTurnId(turnId);
+        }
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        const message = error instanceof Error ? error.message : "Lỗi đọc giọng nói";
+        showToast(message);
+        setSpeakLoadingTurnId(null);
+        setSpeakingTurnId(null);
+      }
+    },
+    [showToast, speakLoadingTurnId, speakingTurnId, stopSpeech]
+  );
+
+  // Auto-play TTS lần đầu khi navigate từ Quick Ask (?ask=)
+  useEffect(() => {
+    if (!autoPlayPendingRef.current || readOnly) return;
+    const turns = currentConversation?.turns ?? [];
+    for (let cursor = turns.length - 1; cursor >= 0; cursor -= 1) {
+      const turn = turns[cursor];
+      if (turn.role !== "assistant") continue;
+      if (turn.status === "done" && turn.text.trim()) {
+        autoPlayPendingRef.current = false;
+        void playTurnSpeech(turn.id, turn.text);
+      } else if (turn.status === "error") {
+        autoPlayPendingRef.current = false;
+      }
+      break;
+    }
+  }, [currentConversation?.turns, playTurnSpeech, readOnly]);
+
+  // Stop speech khi đổi conversation hoặc unmount
+  useEffect(() => stopSpeech, [stopSpeech, currentConversationId]);
 
   useEffect(() => {
     const onAction = (event: Event) => {
@@ -3128,7 +3281,12 @@ export function RendererShell() {
               currentConversation.pinned ? "Đã bỏ ghim cuộc trò chuyện" : "Đã ghim cuộc trò chuyện"
             );
           }}
+          onToggleSpeakTurn={(turnId, text) => {
+            void playTurnSpeech(turnId, text);
+          }}
           readOnly={readOnly}
+          speakingTurnId={speakingTurnId}
+          speakLoadingTurnId={speakLoadingTurnId}
         />
         {inspectorOpen && (
           <Inspector
