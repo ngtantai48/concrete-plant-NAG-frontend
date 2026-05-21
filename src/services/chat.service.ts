@@ -425,7 +425,8 @@ const chatApi = {
   ): Promise<{ audio: Blob; transcribedText?: string }> => {
     const token = await getValidAccessToken();
     const formData = new FormData();
-    formData.append("file", file);
+    // Backend yêu cầu field name `audio` (xem /v1/nag/voice/chat schema)
+    formData.append("audio", file);
 
     const response = await fetch(VOICE_ENDPOINT, {
       method: "POST",
