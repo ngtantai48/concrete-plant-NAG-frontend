@@ -1,7 +1,7 @@
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const DEFAULT_AGENT_VOICE_URL = "https://chat.svnagentic.site/api/chat/nag/voice/chat";
+const DEFAULT_AGENT_VOICE_URL = "https://chat.svnagentic.site/v1/nag/voice/chat";
 const USER_CONTEXT_HEADERS = [
   "x-nag-user-id",
   "x-nag-role",
