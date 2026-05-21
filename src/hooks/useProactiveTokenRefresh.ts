@@ -3,7 +3,7 @@ import { useAppSelector } from "@/hooks/use-app-selector";
 import { jwtDecode } from "jwt-decode";
 import authApi from "@/services/auth.service";
 import { getStore } from "@/lib/http";
-import { logoutSuccess } from "@/store/slices/authSlice";
+import { loginSuccess, logoutSuccess } from "@/store/slices/authSlice";
 
 /**
  * Proactive Token Refresh Hook
@@ -90,6 +90,16 @@ export function useProactiveTokenRefresh() {
       .then((res) => {
         const newToken = res.data.accessToken;
         const store = getStore();
+        // store?.dispatch(
+        //   loginSuccess({
+        //     user_id: res.data.user_id,
+        //     role: res.data.role,
+        //     role_id: res.data.role_id,
+        //     accessToken: newToken,
+        //     user_full_name: res.data.user_full_name,
+        //     permissions: res.data.permissions || [],
+        //   })
+        // );
         store?.dispatch({
           type: "auth/login/fulfilled",
           payload: {
@@ -98,6 +108,7 @@ export function useProactiveTokenRefresh() {
             role_id: res.data.role_id,
             accessToken: newToken,
             user_full_name: res.data.user_full_name,
+            permissions: res.data.permissions || [],
           },
         });
         // console.log("[ProactiveTokenRefresh] ✅ Token đã được refresh thành công");
