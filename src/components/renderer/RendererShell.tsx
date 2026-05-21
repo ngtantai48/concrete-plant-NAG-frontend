@@ -4,6 +4,7 @@ import {
   Activity,
   ArrowUp,
   BarChart3,
+  ChevronDown,
   Copy,
   Download,
   Edit3,
@@ -22,11 +23,12 @@ import {
   PanelLeftOpen,
   Pin,
   Plus,
-  RefreshCcw,
   Search,
   Share2,
   Square,
   Star,
+  Volume2,
+  VolumeX,
   ThumbsDown,
   ThumbsUp,
   Trash2,
@@ -479,18 +481,23 @@ function compactToolArgsForReasoning(name: string, args: Record<string, unknown>
   };
 }
 
+// Backend đã quản lý short/long-term memory qua X-Chat-Session-Id.
+// Frontend chỉ cần gửi lại bối cảnh gần nhất để giảm token: 3 lượt user + 3 lượt assistant
+// gần nhất (6 turns). Bộ nhớ xa hơn backend tự inject từ session bucket.
+const RECENT_HISTORY_TURN_LIMIT = 6;
+
 function toApiMessages(
   turns: Turn[],
   nextUserContent: string | ChatContentBlock[]
 ): ApiChatMessage[] {
-  const messages = turns
-    .filter((turn) => turn.text.trim().length > 0)
-    .map(
-      (turn): ApiChatMessage => ({
-        role: turn.role === "assistant" ? "assistant" : "user",
-        content: turn.text,
-      })
-    );
+  const nonEmptyTurns = turns.filter((turn) => turn.text.trim().length > 0);
+  const recentTurns = nonEmptyTurns.slice(-RECENT_HISTORY_TURN_LIMIT);
+  const messages = recentTurns.map(
+    (turn): ApiChatMessage => ({
+      role: turn.role === "assistant" ? "assistant" : "user",
+      content: turn.text,
+    })
+  );
   return [...messages, { role: "user", content: nextUserContent }];
 }
 
@@ -639,34 +646,6 @@ function joinAttachmentMeta(parts: Array<string | undefined>) {
   return parts.filter((part): part is string => Boolean(part)).join(" · ");
 }
 
-function buildBlockAttachment(block: PinnedBlock): InspectorAttachment | null {
-  const { data } = block;
-  if (data.type !== "file" && data.type !== "image") return null;
-
-  const fallbackName =
-    data.type === "image" ? `ai-image-${block.blockId}.png` : `ai-file-${block.blockId}`;
-  const filename = data.filename ?? fallbackName;
-  const title = data.title ?? filename;
-  const kindLabel = data.type === "image" ? "Ảnh do AI tạo" : "Tệp do AI tạo";
-  const href = assetHref(data, { download: true });
-
-  if (!href) return null;
-
-  return {
-    id: block.blockId,
-    kind: data.type,
-    title,
-    filename,
-    href,
-    meta: joinAttachmentMeta([
-      kindLabel,
-      data.mimeType,
-      formatBytes(data.sizeBytes),
-      relativeTime(block.createdAt),
-    ]),
-    createdAt: block.createdAt,
-  };
-}
 
 function buildReportAttachment(report: AiGeneratedReport): InspectorAttachment | null {
   const href = assetHref(
@@ -741,6 +720,246 @@ function Kbd({ children }: { children: ReactNode }) {
     <span className="rounded border border-black/10 bg-black/[0.05] px-1.5 py-0.5 font-mono text-[10px] text-zinc-500 dark:border-white/10 dark:bg-white/10 dark:text-zinc-300">
       {children}
     </span>
+  );
+}
+
+function scrollToPinnedBlock(blockId: string) {
+  if (typeof document === "undefined") return;
+  const node = document.getElementById(`pinned-block-${blockId}`);
+  if (!node) return;
+  node.scrollIntoView({ behavior: "smooth", block: "center" });
+  node.classList.add("ring-2", "ring-[#007AFF]/60", "ring-offset-2", "ring-offset-[#F7F7F8]");
+  window.setTimeout(() => {
+    node.classList.remove(
+      "ring-2",
+      "ring-[#007AFF]/60",
+      "ring-offset-2",
+      "ring-offset-[#F7F7F8]"
+    );
+  }, 1500);
+}
+
+function getPinnedBlockLabel(block: PinnedBlock): string {
+  const data = block.data;
+  if ("title" in data && typeof data.title === "string" && data.title.trim()) {
+    return data.title.trim();
+  }
+  if (data.type === "file" && "filename" in data && typeof data.filename === "string") {
+    return data.filename;
+  }
+  if (data.type === "image") return "Ảnh do AI tạo";
+  return data.type.replace(/_/g, " ");
+}
+
+function getPinnedBlockTypeLabel(type: RenderBlockData["type"]): string {
+  switch (type) {
+    case "kpi_grid":
+      return "KPI";
+    case "line_chart":
+      return "Line";
+    case "bar_chart":
+      return "Bar";
+    case "donut_chart":
+      return "Donut";
+    case "area_chart":
+      return "Area";
+    case "gantt":
+      return "Gantt";
+    case "map_view":
+      return "Map";
+    case "table":
+      return "Table";
+    case "timeline":
+      return "Timeline";
+    case "image":
+      return "Image";
+    case "file":
+      return "File";
+    case "alert":
+      return "Alert";
+    case "action_proposal":
+      return "Action";
+    case "source_chips":
+      return "Sources";
+    case "followups":
+      return "Follow-ups";
+    default:
+      return type.replace(/_/g, " ");
+  }
+}
+
+function getPinnedBlockIcon(type: RenderBlockData["type"]) {
+  if (type === "kpi_grid") return <Activity size={12} />;
+  if (
+    type === "line_chart" ||
+    type === "bar_chart" ||
+    type === "area_chart" ||
+    type === "donut_chart"
+  )
+    return <BarChart3 size={12} />;
+  if (type === "gantt" || type === "timeline") return <Activity size={12} />;
+  if (type === "image") return <Paperclip size={12} />;
+  if (type === "file") return <FileText size={12} />;
+  return <Activity size={12} />;
+}
+
+type PinnedBlockGroup = {
+  key: string;
+  createdAt: string;
+  question: string | undefined;
+  blocks: PinnedBlock[];
+};
+
+function groupPinnedBlocksByTurn(
+  blocks: PinnedBlock[],
+  conversation: Conversation
+): PinnedBlockGroup[] {
+  const turns = conversation.turns;
+  const questionByTimestamp = new Map<string, string | undefined>();
+  for (let index = 0; index < turns.length; index += 1) {
+    const turn = turns[index];
+    if (turn.role !== "assistant") continue;
+    let question: string | undefined;
+    for (let cursor = index - 1; cursor >= 0; cursor -= 1) {
+      const previous = turns[cursor];
+      if (previous.role === "user") {
+        question = previous.text.trim().slice(0, 100) || undefined;
+        break;
+      }
+    }
+    questionByTimestamp.set(turn.createdAt, question);
+  }
+
+  const map = new Map<string, PinnedBlock[]>();
+  for (const block of blocks) {
+    const list = map.get(block.createdAt) ?? [];
+    list.push(block);
+    map.set(block.createdAt, list);
+  }
+
+  return [...map.entries()]
+    .map(([key, group]) => ({
+      key,
+      createdAt: key,
+      question: questionByTimestamp.get(key),
+      blocks: group,
+    }))
+    .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+}
+
+function PinnedBlockTree({
+  blocks,
+  conversation,
+  emptyMessage,
+  renderBlock,
+  totalLabel,
+}: {
+  blocks: PinnedBlock[];
+  conversation: Conversation;
+  emptyMessage: string;
+  totalLabel: string;
+  renderBlock?: (block: PinnedBlock) => ReactNode;
+}) {
+  const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  const groups = useMemo(
+    () => groupPinnedBlocksByTurn(blocks, conversation),
+    [blocks, conversation]
+  );
+
+  if (groups.length === 0) {
+    return (
+      <div className="rounded-xl border border-dashed border-black/10 bg-zinc-50 p-4 text-center text-[12px] text-zinc-400 dark:border-white/10 dark:bg-white/[0.04]">
+        {emptyMessage}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2">
+        <span className="text-[12px] font-extrabold text-zinc-900 dark:text-zinc-100">
+          {totalLabel}
+        </span>
+        <span className="rounded-full bg-[rgba(0,122,255,0.10)] px-2 py-0.5 text-[10px] font-bold text-[#0A66E0]">
+          {blocks.length}
+        </span>
+      </div>
+      {groups.map((group) => {
+        const isCollapsed = collapsed.has(group.key);
+        return (
+          <div
+            className="overflow-hidden rounded-lg border border-black/[0.06] bg-zinc-50 dark:border-white/10 dark:bg-white/[0.04]"
+            key={group.key}
+          >
+            <button
+              aria-expanded={!isCollapsed}
+              className="flex w-full items-center gap-2 px-2.5 py-2 text-left transition hover:bg-zinc-100 focus:outline-none focus:ring-2 focus:ring-[#007AFF]/35 dark:hover:bg-white/[0.08]"
+              onClick={() => {
+                setCollapsed((set) => {
+                  const next = new Set(set);
+                  if (next.has(group.key)) next.delete(group.key);
+                  else next.add(group.key);
+                  return next;
+                });
+              }}
+              type="button"
+            >
+              <ChevronDown
+                className={cn(
+                  "shrink-0 text-zinc-400 transition-transform",
+                  isCollapsed && "-rotate-90"
+                )}
+                size={12}
+              />
+              <span
+                className="font-mono text-[10.5px] font-bold text-zinc-500 dark:text-zinc-400"
+                style={{ fontFamily: "var(--font-chat-mono)" }}
+              >
+                {relativeTime(group.createdAt)}
+              </span>
+              <span className="rounded-full bg-white px-1.5 py-0.5 text-[10px] font-bold text-zinc-500 dark:bg-zinc-950 dark:text-zinc-400">
+                {group.blocks.length}
+              </span>
+              {group.question && (
+                <span className="line-clamp-1 flex-1 text-[11.5px] text-zinc-600 dark:text-zinc-300">
+                  {group.question}
+                </span>
+              )}
+            </button>
+            {!isCollapsed && (
+              <ul className="space-y-0.5 border-t border-black/[0.06] p-1.5 dark:border-white/10">
+                {group.blocks.map((block) => (
+                  <li key={block.blockId}>
+                    {renderBlock ? (
+                      renderBlock(block)
+                    ) : (
+                      <button
+                        className="flex w-full items-center gap-2 rounded-md bg-white px-2 py-1.5 text-left transition hover:bg-[rgba(0,122,255,0.06)] focus:outline-none focus:ring-2 focus:ring-[#007AFF]/35 dark:bg-zinc-950 dark:hover:bg-white/[0.08]"
+                        onClick={() => scrollToPinnedBlock(block.blockId)}
+                        title="Cuộn tới khối trong cuộc trò chuyện"
+                        type="button"
+                      >
+                        <span className="grid size-7 shrink-0 place-items-center rounded-md bg-zinc-50 text-[#0A66E0] dark:bg-white/10 dark:text-[#6DB4FF]">
+                          {getPinnedBlockIcon(block.data.type)}
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="line-clamp-1 block text-[12px] font-semibold text-zinc-800 dark:text-zinc-100">
+                            {getPinnedBlockLabel(block)}
+                          </span>
+                          <span className="block font-mono text-[10px] text-zinc-400">
+                            {getPinnedBlockTypeLabel(block.data.type)}
+                          </span>
+                        </span>
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        );
+      })}
+    </div>
   );
 }
 
@@ -1471,16 +1690,20 @@ function AssistantToolbar({
   onCopy,
   onFeedback,
   onPinAll,
-  onRegenerate,
   onShare,
+  onToggleSpeak,
+  speakState,
 }: {
   feedback?: FeedbackVote;
   onCopy: () => void;
   onFeedback: (vote: FeedbackVote) => void;
   onPinAll: () => void;
-  onRegenerate: () => void;
   onShare: () => void;
+  onToggleSpeak: () => void;
+  speakState: "idle" | "loading" | "playing";
 }) {
+  const speakLabel =
+    speakState === "playing" ? "Dừng đọc" : speakState === "loading" ? "Đang tải" : "Nghe đọc";
   return (
     <div className="mt-2 flex flex-wrap items-center gap-1">
       <button
@@ -1513,8 +1736,24 @@ function AssistantToolbar({
       >
         <Copy size={13} /> Sao chép
       </button>
-      <button aria-label="Trả lời lại" className="toolbar-btn" onClick={onRegenerate} type="button">
-        <RefreshCcw size={13} /> Trả lời lại
+      <button
+        aria-label={speakLabel}
+        className={cn(
+          "toolbar-btn",
+          speakState === "playing" && "border-[#007AFF]/40 bg-[#007AFF]/10 text-[#0A66E0]"
+        )}
+        disabled={speakState === "loading"}
+        onClick={onToggleSpeak}
+        type="button"
+      >
+        {speakState === "loading" ? (
+          <Loader2 className="animate-spin" size={13} />
+        ) : speakState === "playing" ? (
+          <VolumeX size={13} />
+        ) : (
+          <Volume2 size={13} />
+        )}
+        {speakLabel}
       </button>
       <button aria-label="Chia sẻ tin nhắn" className="toolbar-btn" onClick={onShare} type="button">
         <Share2 size={13} /> Chia sẻ
@@ -1539,12 +1778,14 @@ function ChatColumn({
   onDelete,
   onFeedback,
   onPinTurn,
-  onRegenerate,
   onRename,
   onSend,
   onToast,
+  onToggleSpeakTurn,
   onTogglePin,
   readOnly,
+  speakingTurnId,
+  speakLoadingTurnId,
 }: {
   conversation: Conversation;
   feedback: Record<string, FeedbackVote>;
@@ -1552,11 +1793,13 @@ function ChatColumn({
   onDelete: () => void;
   onFeedback: (turnId: string, vote: FeedbackVote) => void;
   onPinTurn: (turn: AssistantTurn) => void;
-  onRegenerate: (turnId: string) => void;
   onRename: (title: string) => void;
   onSend: (text: string, attachments?: ComposerAttachment[]) => Promise<void>;
   onToast: (message: string) => void;
+  onToggleSpeakTurn: (turnId: string, text: string) => void;
   onTogglePin: () => void;
+  speakingTurnId: string | null;
+  speakLoadingTurnId: string | null;
   readOnly: boolean;
 }) {
   const [input, setInput] = useState("");
@@ -1845,11 +2088,6 @@ function ChatColumn({
                         · {(turn.totalMs / 1000).toFixed(1)}s
                       </span>
                     )}
-                    {turn.regenerated && (
-                      <span className="rounded-full bg-zinc-100 px-1.5 py-0.5 text-[10px] font-semibold text-zinc-600 dark:bg-white/10 dark:text-zinc-300">
-                        Lượt trả lời lại
-                      </span>
-                    )}
                   </div>
                   {turn.reasoning.length > 0 && (
                     <div className="mb-3">
@@ -1865,7 +2103,14 @@ function ChatColumn({
                     <StreamView text={turn.text} streaming={turn.status === "streaming"} />
                   </div>
                   {turn.status !== "streaming" && !readOnly && (
-                    <div className="opacity-0 transition-opacity duration-150 group-hover:opacity-100 focus-within:opacity-100">
+                    <div
+                      className={cn(
+                        "transition-opacity duration-150 focus-within:opacity-100 group-hover:opacity-100",
+                        speakingTurnId === turn.id || speakLoadingTurnId === turn.id
+                          ? "opacity-100"
+                          : "opacity-0"
+                      )}
+                    >
                       <AssistantToolbar
                         feedback={feedback[turn.id]}
                         onCopy={() => {
@@ -1874,11 +2119,18 @@ function ChatColumn({
                         }}
                         onFeedback={(vote) => onFeedback(turn.id, vote)}
                         onPinAll={() => onPinTurn(turn)}
-                        onRegenerate={() => onRegenerate(turn.id)}
                         onShare={() => {
                           void copyText(buildShareUrl(conversation.id, turn.id));
                           onToast("Đã sao chép link tới tin nhắn");
                         }}
+                        onToggleSpeak={() => onToggleSpeakTurn(turn.id, turn.text)}
+                        speakState={
+                          speakLoadingTurnId === turn.id
+                            ? "loading"
+                            : speakingTurnId === turn.id
+                              ? "playing"
+                              : "idle"
+                        }
                       />
                     </div>
                   )}
@@ -2099,6 +2351,18 @@ function Inspector({
   const [tab, setTab] = useState<InspectorTab>("tools");
   const [menuOpen, setMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const fileImageBlocks = useMemo(
+    () => blocks.filter((block) => block.data.type === "file" || block.data.type === "image"),
+    [blocks]
+  );
+  const reportAttachments = useMemo(
+    () =>
+      savedReports
+        .map(buildReportAttachment)
+        .filter((item): item is InspectorAttachment => item !== null)
+        .sort((left, right) => right.createdAt.localeCompare(left.createdAt)),
+    [savedReports]
+  );
 
   useEffect(() => {
     if (!menuOpen) return;
@@ -2118,13 +2382,6 @@ function Inspector({
 
   const turnCount = conversation.turns.length;
   const chartBlocks = blocks.filter((block) => inspectorChartTypes.has(block.data.type));
-  const attachments = useMemo(
-    () =>
-      [...savedReports.map(buildReportAttachment), ...blocks.map(buildBlockAttachment)]
-        .filter((item): item is InspectorAttachment => item !== null)
-        .sort((left, right) => right.createdAt.localeCompare(left.createdAt)),
-    [blocks, savedReports]
-  );
   const tabs: Array<{ key: InspectorTab; label: string; icon: ReactNode }> = [
     { key: "tools", label: "Công cụ", icon: <Activity size={13} /> },
     { key: "charts", label: "Biểu đồ", icon: <BarChart3 size={13} /> },
@@ -2319,39 +2576,16 @@ function Inspector({
         )}
 
         {tab === "charts" && (
-          <div>
-            <div className="mb-2 flex items-center gap-2">
-              <span className="text-[12px] font-extrabold text-zinc-900 dark:text-zinc-100">
-                Biểu đồ đã render
-              </span>
-              <span className="rounded-full bg-[rgba(0,122,255,0.10)] px-2 py-0.5 text-[10px] font-bold text-[#0A66E0]">
-                {chartBlocks.length}
-              </span>
-            </div>
-            <div className="space-y-3">
-              {chartBlocks.length === 0 && (
-                <div className="rounded-xl border border-dashed border-black/10 bg-zinc-50 p-4 text-center text-[12px] text-zinc-400 dark:border-white/10 dark:bg-white/[0.04]">
-                  Biểu đồ sẽ xuất hiện ở đây sau khi AI render.
-                </div>
-              )}
-              {chartBlocks.map((block) => (
-                <section
-                  aria-label={block.data.title ?? block.data.type}
-                  className={cn(
-                    "min-w-0 rounded-xl focus-within:ring-2 focus-within:ring-[#007AFF]/35",
-                    readOnly && "pointer-events-none select-text"
-                  )}
-                  key={block.blockId}
-                >
-                  <RenderBlock data={block.data} />
-                </section>
-              ))}
-            </div>
-          </div>
+          <PinnedBlockTree
+            blocks={chartBlocks}
+            conversation={conversation}
+            emptyMessage="Biểu đồ sẽ xuất hiện ở đây sau khi AI render."
+            totalLabel="Biểu đồ đã ghim"
+          />
         )}
 
         {tab === "actions" && (
-          <div className="space-y-3">
+          <div className="space-y-4">
             {!readOnly && (
               <button
                 className="flex w-full items-center gap-2 rounded-md border border-[rgba(0,122,255,0.22)] bg-[rgba(0,122,255,0.06)] p-2.5 text-left text-[12px] font-bold text-[#0A66E0] transition hover:bg-white focus:outline-none focus:ring-2 focus:ring-[#007AFF]/35 disabled:cursor-not-allowed disabled:opacity-60 dark:border-[rgba(109,180,255,0.25)] dark:bg-[rgba(0,122,255,0.12)] dark:text-[#6DB4FF]"
@@ -2373,70 +2607,67 @@ function Inspector({
               </button>
             )}
 
-            <div>
-              <div className="mb-2 flex items-center justify-between gap-2">
-                <span className="text-[12px] font-extrabold text-zinc-900 dark:text-zinc-100">
-                  Tệp đính kèm
-                </span>
-                <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-bold text-zinc-500 dark:bg-white/10">
-                  {attachments.length}
-                </span>
-              </div>
-
-              {attachments.length === 0 && (
-                <div className="rounded-md border border-dashed border-black/10 bg-zinc-50 p-4 text-center text-[12px] text-zinc-400 dark:border-white/10 dark:bg-white/[0.04]">
-                  Chưa có tệp đính kèm. Khi AI xuất ảnh, PDF hoặc bạn tạo báo cáo, file sẽ nằm ở
-                  đây.
+            {reportAttachments.length > 0 && (
+              <div>
+                <div className="mb-2 flex items-center justify-between gap-2">
+                  <span className="text-[12px] font-extrabold text-zinc-900 dark:text-zinc-100">
+                    Báo cáo đã tạo
+                  </span>
+                  <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-[10px] font-bold text-zinc-500 dark:bg-white/10">
+                    {reportAttachments.length}
+                  </span>
                 </div>
-              )}
-
-              <div className="space-y-2">
-                {attachments.map((attachment) => (
-                  <article
-                    className="flex items-center gap-2 rounded-md border border-black/10 bg-zinc-50 p-2.5 dark:border-white/10 dark:bg-white/[0.04]"
-                    key={attachment.id}
-                  >
-                    <span className="grid size-8 shrink-0 place-items-center rounded-md bg-white text-[#0A66E0] dark:bg-zinc-950 dark:text-[#6DB4FF]">
-                      {attachment.kind === "image" ? (
-                        <Paperclip size={14} />
-                      ) : (
+                <div className="space-y-2">
+                  {reportAttachments.map((attachment) => (
+                    <article
+                      className="flex items-center gap-2 rounded-md border border-black/10 bg-zinc-50 p-2.5 dark:border-white/10 dark:bg-white/[0.04]"
+                      key={attachment.id}
+                    >
+                      <span className="grid size-8 shrink-0 place-items-center rounded-md bg-white text-[#0A66E0] dark:bg-zinc-950 dark:text-[#6DB4FF]">
                         <FileText size={14} />
-                      )}
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="line-clamp-1 block text-[12px] font-bold text-zinc-800 dark:text-zinc-100">
-                        {attachment.title}
                       </span>
-                      <span className="line-clamp-1 block text-[10.5px] text-zinc-400">
-                        {attachment.filename}
-                        {attachment.meta ? ` · ${attachment.meta}` : ""}
+                      <span className="min-w-0 flex-1">
+                        <span className="line-clamp-1 block text-[12px] font-bold text-zinc-800 dark:text-zinc-100">
+                          {attachment.title}
+                        </span>
+                        <span className="line-clamp-1 block text-[10.5px] text-zinc-400">
+                          {attachment.filename}
+                          {attachment.meta ? ` · ${attachment.meta}` : ""}
+                        </span>
                       </span>
-                    </span>
-                    <span className="flex shrink-0 items-center gap-1">
-                      <a
-                        aria-label={`Mở ${attachment.filename}`}
-                        className="grid size-8 place-items-center rounded-md border border-black/10 bg-white text-zinc-500 transition hover:text-[#0A66E0] focus:outline-none focus:ring-2 focus:ring-[#007AFF]/35 dark:border-white/10 dark:bg-zinc-950 dark:text-zinc-300 dark:hover:text-[#6DB4FF]"
-                        href={attachment.href}
-                        rel="noreferrer"
-                        target="_blank"
-                      >
-                        <ExternalLink size={13} />
-                      </a>
-                      {!readOnly && (
+                      <span className="flex shrink-0 items-center gap-1">
                         <a
-                          aria-label={`Tải ${attachment.filename}`}
+                          aria-label={`Mở ${attachment.filename}`}
                           className="grid size-8 place-items-center rounded-md border border-black/10 bg-white text-zinc-500 transition hover:text-[#0A66E0] focus:outline-none focus:ring-2 focus:ring-[#007AFF]/35 dark:border-white/10 dark:bg-zinc-950 dark:text-zinc-300 dark:hover:text-[#6DB4FF]"
-                          download={attachment.filename}
                           href={attachment.href}
+                          rel="noreferrer"
+                          target="_blank"
                         >
-                          <Download size={13} />
+                          <ExternalLink size={13} />
                         </a>
-                      )}
-                    </span>
-                  </article>
-                ))}
+                        {!readOnly && (
+                          <a
+                            aria-label={`Tải ${attachment.filename}`}
+                            className="grid size-8 place-items-center rounded-md border border-black/10 bg-white text-zinc-500 transition hover:text-[#0A66E0] focus:outline-none focus:ring-2 focus:ring-[#007AFF]/35 dark:border-white/10 dark:bg-zinc-950 dark:text-zinc-300 dark:hover:text-[#6DB4FF]"
+                            download={attachment.filename}
+                            href={attachment.href}
+                          >
+                            <Download size={13} />
+                          </a>
+                        )}
+                      </span>
+                    </article>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
+
+            <PinnedBlockTree
+              blocks={fileImageBlocks}
+              conversation={conversation}
+              emptyMessage="Chưa có tệp đính kèm. Khi AI xuất ảnh hoặc file, chúng sẽ nằm ở đây."
+              totalLabel="Tệp đính kèm đã ghim"
+            />
           </div>
         )}
       </div>
@@ -2468,7 +2699,12 @@ export function RendererShell() {
   const [reportSaving, setReportSaving] = useState(false);
   const [historyCollapsed, setHistoryCollapsed] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  const [speakingTurnId, setSpeakingTurnId] = useState<string | null>(null);
+  const [speakLoadingTurnId, setSpeakLoadingTurnId] = useState<string | null>(null);
   const abortRef = useRef<AbortController | null>(null);
+  const speechAbortRef = useRef<AbortController | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const autoPlayPendingRef = useRef<boolean>(false);
   const readOnly =
     searchParams.get("share") === "1" ||
     searchParams.get("readonly") === "1" ||
@@ -2498,6 +2734,14 @@ export function RendererShell() {
     () => (currentConversation ? extractPinnedBlocks(currentConversation) : []),
     [currentConversation]
   );
+
+  // Auto-pin: mỗi khi conversation có thêm block render, merge vào pinnedBlocks
+  // (không thay thế — addConversationPins dedupe theo blockId).
+  // Người dùng vẫn có thể bấm "Ghim khung này" để force re-pin một turn cụ thể.
+  useEffect(() => {
+    if (!currentConversation || readOnly || currentPins.length === 0) return;
+    addConversationPins(currentConversation.id, currentPins);
+  }, [addConversationPins, currentConversation, currentPins, readOnly]);
 
   const shareUrl = useMemo(
     () => (currentConversation ? buildShareUrl(currentConversation.id) : ""),
@@ -2570,11 +2814,7 @@ export function RendererShell() {
   ]);
 
   const sendMessage = useCallback(
-    async (
-      text: string,
-      attachments: ComposerAttachment[] = [],
-      regenerated = false
-    ) => {
+    async (text: string, attachments: ComposerAttachment[] = []) => {
       const conversation = currentConversation;
       if (!conversation || isBusy || readOnly) return;
 
@@ -2599,7 +2839,6 @@ export function RendererShell() {
         reasoning: [],
         status: "streaming",
         createdAt: new Date().toISOString(),
-        regenerated,
       };
       const nextContent = buildContentBlocks(text, attachments);
       const requestMessages = toApiMessages(conversation.turns, nextContent);
@@ -2719,31 +2958,161 @@ export function RendererShell() {
       } catch (error) {
         if (error instanceof Error && error.name === "AbortError") return;
         const message = error instanceof Error ? error.message : "Không rõ lỗi";
+
+        // Forgiving: nếu đã có content + block render (chart/table/file) → coi như
+        // soft warning (backend emit error sau khi stream done thành công).
+        // Status vẫn done, hiển thị toast cảnh báo để user biết có ngoại lệ.
+        const trimmed = accumulated.trim();
+        if (trimmed.length > 0) {
+          let hasBlock = false;
+          for (const chunk of parseStream(trimmed)) {
+            if (chunk.kind === "block") {
+              hasBlock = true;
+              break;
+            }
+          }
+          if (hasBlock) {
+            updateAssistantTurn(conversation.id, assistantTurn.id, {
+              status: "done",
+              text: accumulated,
+            });
+            showToast(`Lưu ý: ${message.slice(0, 120)}`);
+            return;
+          }
+        }
+
         updateAssistantTurn(conversation.id, assistantTurn.id, {
           status: "error",
           text: accumulated || `Đã xảy ra lỗi: ${message}`,
         });
       }
     },
-    [appendTurn, currentConversation, isBusy, readOnly, setConversationTitle, updateAssistantTurn]
+    [
+      appendTurn,
+      currentConversation,
+      isBusy,
+      readOnly,
+      setConversationTitle,
+      showToast,
+      updateAssistantTurn,
+    ]
   );
 
-  const regenerateTurn = useCallback(
-    (assistantTurnId: string) => {
-      if (readOnly) return;
-      const turns = currentConversation?.turns ?? [];
-      const index = turns.findIndex((turn) => turn.id === assistantTurnId);
-      for (let cursor = index - 1; cursor >= 0; cursor -= 1) {
-        const turn = turns[cursor];
-        if (turn.role === "user") {
-          showToast("Đang trả lời lại");
-          void sendMessage(turn.text, [], true);
-          return;
+  // Auto-submit khi điều hướng đến /ai-assistant?ask=<text> (từ QuickAskMicButton
+  // trên dashboard). Đã xử lý => xóa search param để tránh re-submit khi refresh.
+  const askHandledRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (readOnly) return;
+    const ask = searchParams.get("ask");
+    if (!ask || askHandledRef.current === ask || !currentConversation || isBusy) return;
+    askHandledRef.current = ask;
+    autoPlayPendingRef.current = true;
+    void sendMessage(ask);
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("ask");
+      window.history.replaceState({}, "", url.toString());
+    }
+  }, [currentConversation, isBusy, readOnly, searchParams, sendMessage]);
+
+  const stopSpeech = useCallback(() => {
+    speechAbortRef.current?.abort();
+    speechAbortRef.current = null;
+    const audio = audioRef.current;
+    if (audio) {
+      audio.pause();
+      audio.removeAttribute("src");
+      audio.load();
+    }
+    audioRef.current = null;
+    setSpeakingTurnId(null);
+    setSpeakLoadingTurnId(null);
+  }, []);
+
+  const playTurnSpeech = useCallback(
+    async (turnId: string, rawText: string) => {
+      // Toggle: nếu turn đang phát thì dừng
+      if (speakingTurnId === turnId || speakLoadingTurnId === turnId) {
+        stopSpeech();
+        return;
+      }
+      // Strip render block JSON, chỉ lấy markdown text để đọc
+      const spokenParts: string[] = [];
+      for (const chunk of parseStream(rawText)) {
+        if (chunk.kind === "md") spokenParts.push(chunk.body);
+      }
+      const speakable = spokenParts
+        .join(" ")
+        .replace(/```[\s\S]*?```/g, " ")
+        .replace(/[*_`#>|]/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
+      if (!speakable) {
+        showToast("Không có nội dung để đọc");
+        return;
+      }
+
+      stopSpeech();
+      const controller = new AbortController();
+      speechAbortRef.current = controller;
+      setSpeakLoadingTurnId(turnId);
+      try {
+        const result = await speechApi.synthesize(speakable, {
+          speed: 1.1,
+          seed: 42,
+          signal: controller.signal,
+        });
+        if (controller.signal.aborted) return;
+        const audio = new Audio(result.url);
+        audioRef.current = audio;
+        audio.onended = () => {
+          if (audioRef.current === audio) {
+            audioRef.current = null;
+            setSpeakingTurnId(null);
+          }
+        };
+        audio.onerror = () => {
+          if (audioRef.current === audio) {
+            audioRef.current = null;
+            setSpeakingTurnId(null);
+          }
+          showToast("Không phát được audio");
+        };
+        await audio.play();
+        if (!controller.signal.aborted) {
+          setSpeakLoadingTurnId(null);
+          setSpeakingTurnId(turnId);
         }
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        const message = error instanceof Error ? error.message : "Lỗi đọc giọng nói";
+        showToast(message);
+        setSpeakLoadingTurnId(null);
+        setSpeakingTurnId(null);
       }
     },
-    [currentConversation, readOnly, sendMessage, showToast]
+    [showToast, speakLoadingTurnId, speakingTurnId, stopSpeech]
   );
+
+  // Auto-play TTS lần đầu khi navigate từ Quick Ask (?ask=)
+  useEffect(() => {
+    if (!autoPlayPendingRef.current || readOnly) return;
+    const turns = currentConversation?.turns ?? [];
+    for (let cursor = turns.length - 1; cursor >= 0; cursor -= 1) {
+      const turn = turns[cursor];
+      if (turn.role !== "assistant") continue;
+      if (turn.status === "done" && turn.text.trim()) {
+        autoPlayPendingRef.current = false;
+        void playTurnSpeech(turn.id, turn.text);
+      } else if (turn.status === "error") {
+        autoPlayPendingRef.current = false;
+      }
+      break;
+    }
+  }, [currentConversation?.turns, playTurnSpeech, readOnly]);
+
+  // Stop speech khi đổi conversation hoặc unmount
+  useEffect(() => stopSpeech, [stopSpeech, currentConversationId]);
 
   useEffect(() => {
     const onAction = (event: Event) => {
@@ -2768,7 +3137,17 @@ export function RendererShell() {
           undefined,
           currentConversation?.id
         )
-        .catch(() => undefined);
+        .then((result) => {
+          if (result?.status === "queued" && result.request_id) {
+            showToast(`Đã gửi yêu cầu (${result.request_id})`);
+          } else if (result?.status) {
+            showToast(`Trạng thái action: ${result.status}`);
+          }
+        })
+        .catch((error: unknown) => {
+          const message = error instanceof Error ? error.message : "Không thực hiện được action";
+          showToast(message);
+        });
     };
     window.addEventListener("render:action", onAction);
     return () => window.removeEventListener("render:action", onAction);
@@ -2857,7 +3236,22 @@ export function RendererShell() {
           }}
           onFeedback={(turnId, vote) => {
             if (readOnly) return;
+            const isToggleOff = feedback[turnId] === vote;
             setFeedback(turnId, vote);
+            if (!isToggleOff && currentConversation) {
+              void chatApi
+                .sendFeedback({
+                  turnId,
+                  conversationId: currentConversation.id,
+                  rating: vote,
+                })
+                .then(() => showToast(vote === "up" ? "Đã ghi nhận phản hồi tốt" : "Đã ghi nhận góp ý"))
+                .catch((error: unknown) => {
+                  const message =
+                    error instanceof Error ? error.message : "Không gửi được phản hồi";
+                  showToast(message);
+                });
+            }
           }}
           onPinTurn={(turn) => {
             if (readOnly) return;
@@ -2873,7 +3267,6 @@ export function RendererShell() {
                 : `Đã ghim ${blocks.length} khối render`
             );
           }}
-          onRegenerate={regenerateTurn}
           onRename={(title) => {
             if (readOnly) return;
             setConversationTitle(currentConversation.id, title);
@@ -2888,7 +3281,12 @@ export function RendererShell() {
               currentConversation.pinned ? "Đã bỏ ghim cuộc trò chuyện" : "Đã ghim cuộc trò chuyện"
             );
           }}
+          onToggleSpeakTurn={(turnId, text) => {
+            void playTurnSpeech(turnId, text);
+          }}
           readOnly={readOnly}
+          speakingTurnId={speakingTurnId}
+          speakLoadingTurnId={speakLoadingTurnId}
         />
         {inspectorOpen && (
           <Inspector
