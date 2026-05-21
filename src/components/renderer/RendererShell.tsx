@@ -2945,6 +2945,22 @@ export function RendererShell() {
     ]
   );
 
+  // Auto-submit khi điều hướng đến /ai-assistant?ask=<text> (từ QuickAskMicButton
+  // trên dashboard). Đã xử lý => xóa search param để tránh re-submit khi refresh.
+  const askHandledRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (readOnly) return;
+    const ask = searchParams.get("ask");
+    if (!ask || askHandledRef.current === ask || !currentConversation || isBusy) return;
+    askHandledRef.current = ask;
+    void sendMessage(ask);
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      url.searchParams.delete("ask");
+      window.history.replaceState({}, "", url.toString());
+    }
+  }, [currentConversation, isBusy, readOnly, searchParams, sendMessage]);
+
   useEffect(() => {
     const onAction = (event: Event) => {
       const detail = (event as CustomEvent<{ intent?: string; payload?: unknown; id?: string }>)
