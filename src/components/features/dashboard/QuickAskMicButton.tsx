@@ -117,9 +117,14 @@ export default function QuickAskMicButton({ className }: { className?: string })
         }, 800);
       };
       audio.onerror = () => {
-        if (audioRef.current === audio) {
-          setIsPlaying(false);
-        }
+        if (audioRef.current !== audio) return;
+        setIsPlaying(false);
+        // Cũng auto-close khi audio lỗi để không kẹt phase 'ready'
+        clearAutoCloseTimer();
+        autoCloseTimerRef.current = window.setTimeout(() => {
+          autoCloseTimerRef.current = null;
+          closeOverlayRef.current?.();
+        }, 800);
       };
       try {
         await audio.play();
@@ -175,7 +180,9 @@ export default function QuickAskMicButton({ className }: { className?: string })
   }, [clearAutoCloseTimer, isPlaying]);
 
   const startRecording = useCallback(async () => {
-    if (phase !== "idle") return;
+    // Phase check bị bỏ — caller (pointer down) đã resetAll khi cần,
+    // và button đã disabled khi phase='sending'. Cho phép press lần 2/3
+    // restart ngay không bị kẹt closure phase cũ.
     try {
       chunksRef.current = [];
       if (!navigator.mediaDevices?.getUserMedia) {
@@ -244,7 +251,7 @@ export default function QuickAskMicButton({ className }: { className?: string })
             : "Không thể truy cập microphone";
       toast.error(msg);
     }
-  }, [cleanupRecording, phase, sendVoice, stopTracks]);
+  }, [cleanupRecording, sendVoice, stopTracks]);
 
   const stopRecordingButton = useCallback(() => {
     const recorder = mediaRecorderRef.current;
@@ -295,7 +302,11 @@ export default function QuickAskMicButton({ className }: { className?: string })
           }}
           onPointerDown={(event) => {
             event.preventDefault();
-            if (phase !== "idle") return;
+            // Nếu lần trước còn dư state (ready/error/playing audio), reset trước
+            // để cho phép press lần 2 ghi câu hỏi mới ngay lập tức.
+            if (phase !== "idle") {
+              resetAll();
+            }
             pendingStopRef.current = false;
             (event.target as HTMLElement).setPointerCapture(event.pointerId);
             void startRecording();
