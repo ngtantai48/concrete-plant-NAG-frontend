@@ -32,8 +32,17 @@ export default function QuickAskMicButton({ className }: { className?: string })
   const voiceAbortRef = useRef<AbortController | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const audioUrlRef = useRef<string | null>(null);
+  const autoCloseTimerRef = useRef<number | null>(null);
+
+  const clearAutoCloseTimer = useCallback(() => {
+    if (autoCloseTimerRef.current !== null) {
+      window.clearTimeout(autoCloseTimerRef.current);
+      autoCloseTimerRef.current = null;
+    }
+  }, []);
 
   const releaseAudio = useCallback(() => {
+    clearAutoCloseTimer();
     const audio = audioRef.current;
     if (audio) {
       audio.pause();
@@ -46,7 +55,7 @@ export default function QuickAskMicButton({ className }: { className?: string })
       audioUrlRef.current = null;
     }
     setIsPlaying(false);
-  }, []);
+  }, [clearAutoCloseTimer]);
 
   const stopTracks = useCallback(() => {
     streamRef.current?.getTracks().forEach((track) => track.stop());
@@ -84,6 +93,12 @@ export default function QuickAskMicButton({ className }: { className?: string })
     resetAll();
   }, [resetAll]);
 
+  // Ref để playAudio.onended có thể gọi closeOverlay mà không tạo circular dep
+  const closeOverlayRef = useRef(closeOverlay);
+  useEffect(() => {
+    closeOverlayRef.current = closeOverlay;
+  }, [closeOverlay]);
+
   const playAudio = useCallback(
     async (blob: Blob) => {
       releaseAudio();
@@ -92,9 +107,14 @@ export default function QuickAskMicButton({ className }: { className?: string })
       const audio = new Audio(url);
       audioRef.current = audio;
       audio.onended = () => {
-        if (audioRef.current === audio) {
-          setIsPlaying(false);
-        }
+        if (audioRef.current !== audio) return;
+        setIsPlaying(false);
+        // Auto-đóng overlay 800ms sau khi audio phát xong (cho user thấy state idle)
+        clearAutoCloseTimer();
+        autoCloseTimerRef.current = window.setTimeout(() => {
+          autoCloseTimerRef.current = null;
+          closeOverlayRef.current?.();
+        }, 800);
       };
       audio.onerror = () => {
         if (audioRef.current === audio) {
@@ -110,7 +130,7 @@ export default function QuickAskMicButton({ className }: { className?: string })
         toast.error(message);
       }
     },
-    [releaseAudio]
+    [clearAutoCloseTimer, releaseAudio]
   );
 
   const sendVoice = useCallback(
@@ -144,6 +164,7 @@ export default function QuickAskMicButton({ className }: { className?: string })
   const toggleReplay = useCallback(() => {
     const audio = audioRef.current;
     if (!audio) return;
+    clearAutoCloseTimer();
     if (isPlaying) {
       audio.pause();
       setIsPlaying(false);
@@ -151,7 +172,7 @@ export default function QuickAskMicButton({ className }: { className?: string })
       audio.currentTime = 0;
       void audio.play().then(() => setIsPlaying(true));
     }
-  }, [isPlaying]);
+  }, [clearAutoCloseTimer, isPlaying]);
 
   const startRecording = useCallback(async () => {
     if (phase !== "idle") return;
@@ -320,21 +341,12 @@ export default function QuickAskMicButton({ className }: { className?: string })
             className="relative w-full max-w-md overflow-hidden rounded-3xl bg-white shadow-2xl dark:bg-zinc-900"
             onClick={(event) => event.stopPropagation()}
           >
-            <button
-              aria-label="Đóng"
-              className="absolute right-3 top-3 z-10 grid size-8 place-items-center rounded-full text-zinc-400 transition hover:bg-zinc-100 hover:text-zinc-700 dark:hover:bg-white/10 dark:hover:text-zinc-200"
-              onClick={closeOverlay}
-              type="button"
-            >
-              <X size={16} />
-            </button>
-
             <header className="border-b border-black/[0.06] px-5 py-3 dark:border-white/10">
               <h2 className="text-[13px] font-extrabold text-zinc-950 dark:text-zinc-50">
                 Hỏi nhanh AI
               </h2>
               <p className="text-[11px] text-zinc-400">
-                Voice in → voice out, phiên độc lập
+                Voice in → voice out · tự đóng khi xong
               </p>
             </header>
 
@@ -386,20 +398,13 @@ export default function QuickAskMicButton({ className }: { className?: string })
                     </button>
                     <div className="text-[12px] text-zinc-600 dark:text-zinc-300">
                       <p className="font-semibold">
-                        {isPlaying ? "Đang phát câu trả lời..." : "Đã có câu trả lời"}
+                        {isPlaying ? "Đang phát câu trả lời..." : "Đã phát xong"}
                       </p>
                       <p className="text-[11px] text-zinc-400">
-                        Bấm để {isPlaying ? "dừng" : "phát lại"}
+                        {isPlaying ? "Bấm để dừng" : "Tự đóng sau giây lát · hoặc bấm để nghe lại"}
                       </p>
                     </div>
                   </div>
-                  <button
-                    className="w-full rounded-full border border-black/10 bg-white px-3 py-2 text-[12px] font-semibold text-zinc-600 transition hover:bg-zinc-50 dark:border-white/10 dark:bg-zinc-950 dark:text-zinc-300 dark:hover:bg-white/10"
-                    onClick={closeOverlay}
-                    type="button"
-                  >
-                    Đóng
-                  </button>
                 </div>
               )}
 
