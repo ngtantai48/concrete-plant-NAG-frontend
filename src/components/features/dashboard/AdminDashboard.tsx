@@ -157,6 +157,7 @@ export default function AdminDashboard() {
       if (results[0].status === 'fulfilled') {
         const sRes = results[0].value;
         const fetchedStations = sRes.data?.data || sRes.data || [];
+        // console.log('[AdminDashboard] Fetched stations list:', fetchedStations.map((s: any) => ({ id: s.station_id, name: s.station_name, type: s.station_types?.station_type_id, status: s.station_status })));
         setStations(fetchedStations);
         setGeofenceStation(fetchedStations.find((s: Station) => s.station_gps_longitude != null && s.station_gps_latitude != null) || fetchedStations[0] || null);
       } else {
@@ -215,6 +216,14 @@ export default function AdminDashboard() {
 
   const { stationStatusMap, isLedConnected } = useDeviceHeartbeat();
   const { isConnected: socketConnected, lastSignalTime } = useRealtimeUpdates(fetchAll);
+
+  // useEffect(() => {
+  //   console.log("[AdminDashboard] Socket/LED connection state updated:", {
+  //     socketConnected,
+  //     isLedConnected,
+  //     stationStatusMap
+  //   });
+  // }, [socketConnected, isLedConnected, stationStatusMap]);
 
   const vehicleTimeFormatter = useMemo(
     () => new Intl.DateTimeFormat(locale === 'vi' ? 'vi-VN' : 'en-US', {
