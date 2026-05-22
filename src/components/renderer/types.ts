@@ -230,6 +230,18 @@ export const imageBlockSchema = baseBlockSchema.extend({
   height: z.number().positive().optional(),
 });
 
+// Generic chart block — backend pre-renders chart thành PNG/SVG trên S3 hoặc local
+// artifact rồi gửi shape gọn `{type:"chart", url}` thay vì sinh JSON chi tiết cho
+// từng kiểu (line/bar/donut). Tránh lỗi schema khi backend đổi format chart mới.
+export const chartBlockSchema = baseBlockSchema.extend({
+  type: z.literal("chart"),
+  ...localAssetSchema,
+  alt: z.string().optional(),
+  caption: z.string().optional(),
+  width: z.number().positive().optional(),
+  height: z.number().positive().optional(),
+});
+
 export const fileBlockSchema = baseBlockSchema.extend({
   type: z.literal("file"),
   ...localAssetSchema,
@@ -294,6 +306,7 @@ export const renderBlockDataSchema = z.discriminatedUnion("type", [
   tableBlockSchema,
   mapViewBlockSchema,
   imageBlockSchema,
+  chartBlockSchema,
   fileBlockSchema,
   alertBlockSchema,
   actionProposalBlockSchema,
@@ -312,6 +325,7 @@ export type TimelineBlock = z.infer<typeof timelineBlockSchema>;
 export type TableBlock = z.infer<typeof tableBlockSchema>;
 export type MapViewBlock = z.infer<typeof mapViewBlockSchema>;
 export type ImageBlock = z.infer<typeof imageBlockSchema>;
+export type ChartBlock = z.infer<typeof chartBlockSchema>;
 export type FileBlock = z.infer<typeof fileBlockSchema>;
 export type AlertBlock = z.infer<typeof alertBlockSchema>;
 export type ActionProposalBlock = z.infer<typeof actionProposalBlockSchema>;
@@ -330,6 +344,7 @@ export type RenderBlockData =
   | TableBlock
   | MapViewBlock
   | ImageBlock
+  | ChartBlock
   | FileBlock
   | AlertBlock
   | ActionProposalBlock

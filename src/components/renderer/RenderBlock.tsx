@@ -4,6 +4,7 @@ import { ActionProposalBlockComponent } from "./blocks/ActionProposalBlock";
 import { AlertBlockComponent } from "./blocks/AlertBlock";
 import { AreaChartBlockComponent } from "./blocks/AreaChartBlock";
 import { BarChartBlockComponent } from "./blocks/BarChartBlock";
+import { ChartBlockComponent } from "./blocks/ChartBlock";
 import { DonutChartBlockComponent } from "./blocks/DonutChartBlock";
 import { FileBlockComponent } from "./blocks/FileBlock";
 import { FollowupsBlockComponent } from "./blocks/FollowupsBlock";
@@ -44,6 +45,8 @@ export function RenderBlock({ data }: { data: unknown }) {
       return <MapViewBlockComponent data={parsed.data} />;
     case "image":
       return <ImageBlockComponent data={parsed.data} />;
+    case "chart":
+      return <ChartBlockComponent data={parsed.data} />;
     case "file":
       return <FileBlockComponent data={parsed.data} />;
     case "alert":
