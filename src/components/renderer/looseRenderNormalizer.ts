@@ -10,6 +10,7 @@ const knownRenderTypes = new Set([
   "table",
   "map_view",
   "image",
+  "chart",
   "file",
   "alert",
   "action_proposal",
@@ -20,16 +21,16 @@ const knownRenderTypes = new Set([
 ]);
 
 const standaloneRenderKeyPattern =
-  /{\s*["'](?:kpi_grid|line_chart|bar_chart|donut_chart|area_chart|gantt|timeline|table|map_view|image|file|alert|action_proposal|markdown|source_chips|followups|pie_chart)["']\s*:/i;
+  /{\s*["'](?:kpi_grid|line_chart|bar_chart|donut_chart|area_chart|gantt|timeline|table|map_view|image|chart|file|alert|action_proposal|markdown|source_chips|followups|pie_chart)["']\s*:/i;
 
 const standaloneRenderKeyGlobalPattern =
-  /{\s*["'](?:kpi_grid|line_chart|bar_chart|donut_chart|area_chart|gantt|timeline|table|map_view|image|file|alert|action_proposal|markdown|source_chips|followups|pie_chart)["']\s*:/gi;
+  /{\s*["'](?:kpi_grid|line_chart|bar_chart|donut_chart|area_chart|gantt|timeline|table|map_view|image|chart|file|alert|action_proposal|markdown|source_chips|followups|pie_chart)["']\s*:/gi;
 
 const typedRenderObjectPattern =
-  /{\s*["']type["']\s*:\s*["'](?:kpi_grid|line_chart|bar_chart|donut_chart|area_chart|gantt|timeline|table|map_view|image|file|alert|action_proposal|markdown|source_chips|followups|pie_chart|bar|donut|pie|doughnut|line|area)["']/i;
+  /{\s*["']type["']\s*:\s*["'](?:kpi_grid|line_chart|bar_chart|donut_chart|area_chart|gantt|timeline|table|map_view|image|chart|file|alert|action_proposal|markdown|source_chips|followups|pie_chart|bar|donut|pie|doughnut|line|area)["']/i;
 
 const typedRenderObjectGlobalPattern =
-  /{\s*["']type["']\s*:\s*["'](?:kpi_grid|line_chart|bar_chart|donut_chart|area_chart|gantt|timeline|table|map_view|image|file|alert|action_proposal|markdown|source_chips|followups|pie_chart|bar|donut|pie|doughnut|line|area)["']/gi;
+  /{\s*["']type["']\s*:\s*["'](?:kpi_grid|line_chart|bar_chart|donut_chart|area_chart|gantt|timeline|table|map_view|image|chart|file|alert|action_proposal|markdown|source_chips|followups|pie_chart|bar|donut|pie|doughnut|line|area)["']/gi;
 
 const renderTypeOrder = [
   "kpi_grid",
@@ -42,6 +43,7 @@ const renderTypeOrder = [
   "table",
   "map_view",
   "image",
+  "chart",
   "file",
   "alert",
   "action_proposal",
