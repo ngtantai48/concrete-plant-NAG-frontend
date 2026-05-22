@@ -1,19 +1,23 @@
 "use client";
 
-import { isValidElement, type ReactNode } from "react";
+import { isValidElement, useMemo, type ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 import type { Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
 
 import { cn } from "@/lib/utils";
+import { MermaidBlock } from "./MermaidBlock";
 
+// `mermaid` cố ý KHÔNG nằm trong set này vì các fence ```mermaid``` sẽ được render
+// trực tiếp bằng <MermaidBlock> trong `markdownComponents.pre` thay vì bị strip.
+// Các fence dưới đây là payload JSON/YAML render block, ReactMarkdown không cần
+// hiển thị (looseRenderNormalizer đã extract sang :::render rồi).
 const renderCodeFenceLanguages = new Set([
   "chart",
   "render",
   "yaml",
   "yml",
   "json",
-  "mermaid",
   "gantt",
 ]);
 
@@ -108,7 +112,8 @@ export function prepareMarkdownForRender(body: string, streaming = false): strin
   return stabilizeTrailingTable(stabilizeOpenCodeFence(withoutRenderNoise)).trim();
 }
 
-const markdownComponents = {
+function buildMarkdownComponents(streaming: boolean): Components {
+  return {
   p({ children }) {
     return <p className="my-3 first:mt-0 last:mb-0">{children}</p>;
   },
@@ -196,6 +201,18 @@ const markdownComponents = {
     );
   },
   pre({ children }) {
+    // Nếu là ```mermaid``` fence → render qua MermaidBlock thay vì <pre><code>.
+    // ReactMarkdown wrap code block: <pre><code className="language-xxx">...</code></pre>
+    // nên ở đây ta peek vào props của child để detect.
+    const child = Array.isArray(children) ? children[0] : children;
+    if (isValidElement<{ className?: string; children?: ReactNode }>(child)) {
+      const className = child.props.className ?? "";
+      if (typeof className === "string" && /\blanguage-mermaid\b/.test(className)) {
+        const raw = extractCodeChildren(child);
+        const code = typeof raw === "string" ? raw : String(raw ?? "");
+        return <MermaidBlock chart={code.replace(/\n+$/, "")} streaming={streaming} />;
+      }
+    }
     return (
       <pre className="my-4 max-w-full overflow-x-auto rounded-lg border border-zinc-200 bg-zinc-950 p-4 text-[0.85em] leading-6 text-zinc-50 dark:border-zinc-800">
         <code
@@ -222,7 +239,8 @@ const markdownComponents = {
       </code>
     );
   },
-} satisfies Components;
+  };
+}
 
 export function MarkdownView({
   body,
@@ -234,6 +252,7 @@ export function MarkdownView({
   streaming?: boolean;
 }) {
   const preparedBody = prepareMarkdownForRender(body, streaming);
+  const markdownComponents = useMemo(() => buildMarkdownComponents(streaming), [streaming]);
   if (!preparedBody) return null;
 
   return (
