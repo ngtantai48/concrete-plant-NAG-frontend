@@ -38,6 +38,7 @@ import ActivityFlow, { type DispatchMode } from "./ActivityFlow";
 import ClockDisplay from "./ClockDisplay";
 import StationStatusPanel from "./StationStatusPanel";
 import { computeTripStats, formatDuration } from "./trip-stats";
+import VehicleLocationDialog from "./VehicleLocationDialog";
 import VehicleStatusChange from "./VehicleStatusChange";
 import EndOfDayModal from "./EndOfDayModal";
 import SystemSettingsForm from "../system-settings/SystemSettingsForm";
@@ -483,6 +484,7 @@ export default function AdminDashboard() {
   const [focusVehicleId, setFocusVehicleId] = useState<string | null>(null);
   const [mapStatusFilter, setMapStatusFilter] = useState<'all' | 'run' | 'park' | 'offline'>('all');
   const [selectedVehicleTrips, setSelectedVehicleTrips] = useState<{ vehicle: Vehicle; orders: Order[] } | null>(null);
+  const [showVehicleLocation, setShowVehicleLocation] = useState(false);
   const [isOtherVehiclesInYardDialogOpen, setIsOtherVehiclesInYardDialogOpen] = useState(false);
 
   const vehicleTripMap = useMemo(() => {
@@ -1549,7 +1551,12 @@ export default function AdminDashboard() {
       </div>
 
       {/* ═══ TRIP DETAIL DIALOG ═══ */}
-      <Dialog open={!!selectedVehicleTrips} onOpenChange={(open) => { if (!open) setSelectedVehicleTrips(null); }}>
+      <Dialog open={!!selectedVehicleTrips} onOpenChange={(open) => {
+        if (!open) {
+          setSelectedVehicleTrips(null);
+          setShowVehicleLocation(false);
+        }
+      }}>
         <DialogContent className="sm:max-w-4xl max-h-[80vh] p-0 gap-0 overflow-hidden flex flex-col" showCloseButton={false}>
           {selectedVehicleTrips && (() => {
             const { vehicle, orders: tripOrders } = selectedVehicleTrips;
@@ -1562,8 +1569,11 @@ export default function AdminDashboard() {
                 {/* Header */}
                 <div className="bg-slate-300 px-4 py-3 shrink-0 border-b">
                   <div className="flex items-center justify-between">
-                    <DlgTitle className="flex items-center gap-2 text-base font-bold uppercase">
-                      {t('tripDetail')} — {vehicle.vehicle_license_plate}{vehicle.vehicle_name ? ` | ${vehicle.vehicle_name}` : ''}
+                    <DlgTitle className="flex items-center gap-6 font-bold uppercase">
+                      {vehicle.vehicle_license_plate}{vehicle.vehicle_name ? ` | ${vehicle.vehicle_name}` : ''}
+                      <Button size="sm" variant="primary" onClick={() => setShowVehicleLocation(true)}>
+                        {t('viewLocation')}
+                      </Button>
                     </DlgTitle>
                     <div className="flex items-center gap-10 ms-2">
                       <VehicleStatusChange
@@ -1639,11 +1649,18 @@ export default function AdminDashboard() {
                                       {o.stations?.station_name || t('unassigned')}
                                     </span>
                                   </div>
-                                  <Badge variant="secondary"
-                                    className={`${isTripActive ? 'bg-sky-100 text-sky-600 hover:bg-sky-200' : 'bg-emerald-100 text-emerald-600 hover:bg-emerald-200'} text-sm px-2 py-0.5 font-semibold border-transparent shadow-none`}
-                                  >
-                                    {o.order_status === 'running' ? t('moving') : o.order_status === 'transporting' ? t('collected') : t('completed')}
-                                  </Badge>
+                                  <div className="flex items-center">
+                                    {/* {o.order_status === 'running' && (
+                                      <Button size="sm" variant="primary" onClick={() => setShowVehicleLocation(true)}>
+                                        {t('viewLocation')}
+                                      </Button>
+                                    )} */}
+                                    <Badge variant="secondary"
+                                      className={`${isTripActive ? 'bg-sky-100 text-sky-600 hover:bg-sky-200' : 'bg-emerald-100 text-emerald-600 hover:bg-emerald-200'} text-sm px-2 py-0.5 font-semibold border-transparent shadow-none`}
+                                    >
+                                      {o.order_status === 'running' ? t('moving') : o.order_status === 'transporting' ? t('collected') : t('completed')}
+                                    </Badge>
+                                  </div>
                                 </div>
                                 {/* Time row */}
                                 <div className="flex items-center gap-4 text-sm text-slate-500">
@@ -1917,6 +1934,18 @@ export default function AdminDashboard() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {selectedVehicleTrips && (
+        <VehicleLocationDialog
+          open={showVehicleLocation}
+          onOpenChange={setShowVehicleLocation}
+          vehicleLicensePlate={selectedVehicleTrips.vehicle.vehicle_license_plate}
+          vehicleName={selectedVehicleTrips.vehicle.vehicle_name}
+          cachedVehicles={vtrackingVehicles}
+          t={t}
+        />
+      )}
+
       <EndOfDayModal
         open={isEndOfDayModalOpen}
         onCancel={() => setIsEndOfDayModalOpen(false)}
