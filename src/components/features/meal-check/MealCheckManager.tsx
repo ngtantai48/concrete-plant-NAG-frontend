@@ -1,32 +1,15 @@
 "use client";
 
 import vtrackingApi from "@/services/vtracking.service";
-import {
-  Button,
-  DatePicker,
-  InputNumber,
-  message,
-  Progress,
-  Select,
-  Table,
-  Tag,
-} from "antd";
+import { Button, DatePicker, InputNumber, message, Progress, Select, Table, Tag } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import dayjs, { type Dayjs } from "dayjs";
 import ExcelJS from "exceljs";
 import { saveAs } from "file-saver";
 import { toPng } from "html-to-image";
 import {
-  CheckCircle,
-  ChevronDown,
-  ChevronUp,
-  Download,
-  ExternalLink,
-  ImageDown,
-  MapPin,
-  RefreshCw,
-  Search,
-  UtensilsCrossed,
+  CheckCircle, ChevronDown, ChevronUp, Download, ExternalLink,
+  ImageDown, MapPin, RefreshCw, Search, UtensilsCrossed,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCallback, useMemo, useRef, useState } from "react";
@@ -51,8 +34,8 @@ interface MealSlot {
 }
 
 const MEAL_SLOTS: MealSlot[] = [
-  { key: "sang", label: "Sáng", fromH: 11, fromM: 30, toH: 13, toM: 0 },
-  { key: "trua", label: "Trưa", fromH: 19, fromM: 0, toH: 22, toM: 0 },
+  { key: "sang", label: "Trưa", fromH: 11, fromM: 30, toH: 13, toM: 0 },
+  { key: "trua", label: "Chiều", fromH: 19, fromM: 0, toH: 22, toM: 0 },
   { key: "toi", label: "Tối", fromH: 22, fromM: 0, toH: 23, toM: 59 },
 ];
 
