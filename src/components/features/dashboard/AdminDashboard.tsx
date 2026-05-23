@@ -1569,8 +1569,11 @@ export default function AdminDashboard() {
                 {/* Header */}
                 <div className="bg-slate-300 px-4 py-3 shrink-0 border-b">
                   <div className="flex items-center justify-between">
-                    <DlgTitle className="flex items-center gap-2 text-base font-bold uppercase">
-                      {t('tripDetail')} — {vehicle.vehicle_license_plate}{vehicle.vehicle_name ? ` | ${vehicle.vehicle_name}` : ''}
+                    <DlgTitle className="flex items-center gap-6 font-bold uppercase">
+                      {vehicle.vehicle_license_plate}{vehicle.vehicle_name ? ` | ${vehicle.vehicle_name}` : ''}
+                      <Button size="sm" variant="primary" onClick={() => setShowVehicleLocation(true)}>
+                        {t('viewLocation')}
+                      </Button>
                     </DlgTitle>
                     <div className="flex items-center gap-10 ms-2">
                       <VehicleStatusChange
@@ -1646,12 +1649,12 @@ export default function AdminDashboard() {
                                       {o.stations?.station_name || t('unassigned')}
                                     </span>
                                   </div>
-                                  <div className="flex items-center gap-7">
-                                    {o.order_status === 'running' && (
+                                  <div className="flex items-center">
+                                    {/* {o.order_status === 'running' && (
                                       <Button size="sm" variant="primary" onClick={() => setShowVehicleLocation(true)}>
                                         {t('viewLocation')}
                                       </Button>
-                                    )}
+                                    )} */}
                                     <Badge variant="secondary"
                                       className={`${isTripActive ? 'bg-sky-100 text-sky-600 hover:bg-sky-200' : 'bg-emerald-100 text-emerald-600 hover:bg-emerald-200'} text-sm px-2 py-0.5 font-semibold border-transparent shadow-none`}
                                     >

@@ -10,18 +10,17 @@ import { MapPin, RefreshCw } from "lucide-react";
 
 const OFFLINE_THRESHOLD_MS = 10 * 60 * 1000;
 
-function normalizeVtrackingStatus(status: string, timestamp?: number): "run" | "park" | "offline" {
+function normalizeVtrackingStatus(status: string, timestamp?: number): "run" | "stop" | "park" | "offline" {
   if (timestamp && Date.now() - timestamp > OFFLINE_THRESHOLD_MS) {
     return "offline";
   }
 
   const normalizedStatus = (status || "").toLowerCase();
   if (normalizedStatus === "run" || normalizedStatus === "running") return "run";
-  if (normalizedStatus === "stop" || normalizedStatus === "park" || normalizedStatus === "idle" || normalizedStatus === "parking" || normalizedStatus === "stopped") {
-    return "park";
-  }
+  if (normalizedStatus === "stop" || normalizedStatus === "idle" || normalizedStatus === "stopped") return "stop";
+  if (normalizedStatus === "park" || normalizedStatus === "parking") return "park";
 
-  return "offline";
+  return "park";
 }
 
 const VehicleLeafletMap = dynamic(() => import("./VehicleLeafletMap"), {
@@ -145,15 +144,20 @@ export default function VehicleLocationDialog({
       className: "border-sky-200 bg-sky-100 text-sky-700",
       dotClassName: "bg-sky-500",
     },
-    park: {
-      label: t("stopped") || "Đang dừng",
+    stop: {
+      label: t("stopped") || "Dừng",
       className: "border-amber-200 bg-amber-100 text-amber-700",
       dotClassName: "bg-amber-500",
     },
-    offline: {
-      label: t("disconnected") || "Mất kết nối",
+    park: {
+      label: t("parking") || "Đỗ",
       className: "border-slate-200 bg-slate-100 text-slate-600",
       dotClassName: "bg-slate-400",
+    },
+    offline: {
+      label: t("disconnected") || "Mất kết nối",
+      className: "border-red-200 bg-red-100 text-red-700",
+      dotClassName: "bg-red-500",
     },
   }[displayStatus];
 
@@ -192,14 +196,12 @@ export default function VehicleLocationDialog({
                       <MapPin className="h-4 w-4 text-slate-400" />
                       <span>{t("gpsSpeed")}: {speed}</span>
                     </div>
-                    <span className={`inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-[11px] font-semibold ${statusMeta.className}`}>
+                    <span className={`inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-sm font-semibold ${statusMeta.className}`}>
                       <span className={`h-2 w-2 rounded-full ${statusMeta.dotClassName}`} />
                       {statusMeta.label}
                     </span>
                     {mapsUrl && (
-                      <a
-                        className="ml-auto font-bold text-sky-600 hover:underline"
-                        href={mapsUrl}
+                      <a className="ml-auto font-bold text-sky-600 hover:underline" href={mapsUrl}
                         target="_blank"
                         rel="noreferrer"
                       >

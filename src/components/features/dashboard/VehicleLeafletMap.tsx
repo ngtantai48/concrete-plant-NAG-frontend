@@ -43,11 +43,11 @@ function getIconFilter(status: DisplayStatus): string {
     case "run":
       return ""; // default blue
     case "stop":
-      return "filter:hue-rotate(165deg) saturate(1.7) brightness(1.05);"; // orange
+      return "filter:hue-rotate(-180deg) saturate(1.7) brightness(1.05);"; // yellow
     case "park":
       return "filter:grayscale(100%) brightness(1.05);"; // gray
     case "offline":
-      return "filter:hue-rotate(-90deg) saturate(2) brightness(1.05);"; // red
+      return "filter:hue-rotate(120deg) saturate(2) brightness(1.05);"; // red
     default:
       return "";
   }
