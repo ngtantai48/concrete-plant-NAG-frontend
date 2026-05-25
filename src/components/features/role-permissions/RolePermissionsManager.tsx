@@ -74,6 +74,21 @@ export default function RolePermissionsManager() {
       }
     });
 
+    // Bỏ qua các nút cha (group, menu gốc), chỉ lưu các nút lá (leaf nodes) vào payload
+    const getLeafKeys = (nodes: any[]): string[] => {
+      let leaves: string[] = [];
+      for (const node of nodes) {
+        if (node.children && node.children.length > 0) {
+          leaves = leaves.concat(getLeafKeys(node.children));
+        } else {
+          leaves.push(node.key);
+        }
+      }
+      return leaves;
+    };
+    const leafKeys = getLeafKeys(treeData);
+    finalCheckedKeys = finalCheckedKeys.filter((k) => leafKeys.includes(k));
+
     setLocalPerms({
       ...localPerms,
       [activeTab]: Array.from(new Set(finalCheckedKeys)),
