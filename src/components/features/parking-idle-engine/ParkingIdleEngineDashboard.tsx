@@ -1,9 +1,9 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { Table, Tag, Spin, Empty, Switch, Tooltip, Badge, DatePicker, Select, Drawer } from "antd";
+import { Table, Tag, Spin, Empty, Switch, Badge, DatePicker, Select, Drawer } from "antd";
 import dayjs from "dayjs";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip } from "recharts";
 import type { ColumnsType } from "antd/es/table";
 import {
   AlertTriangle,
@@ -499,8 +499,8 @@ export default function ParkingIdleEngineDashboard() {
               <h2 className="text-base font-black text-slate-800 m-0 tracking-tight">
                 Danh sách xe đang trong bãi
               </h2>
-              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mt-1">
-                {filteredAndSortedItems.length} XE · Click để xem lịch sử nổ máy của xe trong bãi
+              <span className="text-[11px] font-bold text-slate-400 tracking-widest mt-1">
+                Chọn xe để xem chi tiết lịch sử nổ máy
               </span>
             </div>
           </div>
