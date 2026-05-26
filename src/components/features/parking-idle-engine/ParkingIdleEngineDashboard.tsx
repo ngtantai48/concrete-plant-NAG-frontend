@@ -357,12 +357,12 @@ export default function ParkingIdleEngineDashboard() {
       width: 200,
       render: (_, r) => (
         <div className="flex items-center gap-4 pl-2">
-          <div className="w-10 h-10 rounded-full bg-indigo-50/50 flex items-center justify-center text-indigo-500 border border-indigo-100/50">
-            <Car size={18} />
+          <div className="w-11 h-11 rounded-full bg-indigo-50/50 flex items-center justify-center text-indigo-500 border border-indigo-100/50">
+            <Car size={20} />
           </div>
           <div className="flex flex-col">
-            <span className="font-bold text-[13px] text-slate-800">{r.vehicle_name}</span>
-            <span className="text-[11px] font-medium text-slate-500 mt-0.5">{r.vehicle_license_plate}</span>
+            <span className="font-bold text-[15px] text-slate-800">{r.vehicle_name}</span>
+            <span className="text-xs font-semibold text-slate-500 mt-0.5">{r.vehicle_license_plate}</span>
           </div>
         </div>
       ),
@@ -444,7 +444,7 @@ export default function ParkingIdleEngineDashboard() {
     <div className="flex flex-col gap-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-xl font-bold text-slate-800 tracking-tight">
+          <h1 className="text-2xl font-black text-slate-800 tracking-tight">
             Giám sát nổ máy trong bãi
           </h1>
         </div>
@@ -466,17 +466,24 @@ export default function ParkingIdleEngineDashboard() {
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-5">
+      <div className="grid grid-cols-3 gap-6">
         {kpis.map((k) => (
-          <div key={k.label} className="bg-white rounded-[20px] border border-slate-100/60 shadow-sm px-6 py-5 flex flex-col justify-center gap-3 relative overflow-hidden">
-            <div className="flex items-center flex-col justify-center absolute left-6 top-1/2 -translate-y-1/2">
-              <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ background: k.bg, color: k.color }}>{k.icon}</div>
+          <div key={k.label} className="bg-white rounded-[24px] border border-slate-100 shadow-sm p-6 flex items-center justify-between relative overflow-hidden group">
+            {/* Background Watermark */}
+            <div className="absolute -right-4 -bottom-4 opacity-[0.03] transform group-hover:scale-110 transition-transform duration-500 pointer-events-none" style={{ color: k.color }}>
+              {React.cloneElement(k.icon as React.ReactElement, { size: 120 })}
             </div>
-            <div className="flex flex-col ml-16 pl-4 border-l border-slate-100">
-              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1">{k.label}</div>
-              <div className="flex items-baseline gap-2">
-                <div className="text-3xl font-black tabular-nums tracking-tighter leading-none" style={{ color: k.color }}>{k.value}</div>
-                <div className="text-[11px] font-bold text-slate-400">{k.subtitle}</div>
+            
+            <div className="flex items-center gap-5 relative z-10">
+              <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-sm" style={{ background: k.bg, color: k.color }}>
+                {React.cloneElement(k.icon as React.ReactElement, { size: 28 })}
+              </div>
+              <div className="flex flex-col">
+                <div className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">{k.label}</div>
+                <div className="flex items-baseline gap-2">
+                  <div className="text-5xl font-black tabular-nums tracking-tighter leading-none" style={{ color: k.color }}>{k.value}</div>
+                  <div className="text-sm font-bold text-slate-400">{k.subtitle}</div>
+                </div>
               </div>
             </div>
           </div>
@@ -486,15 +493,15 @@ export default function ParkingIdleEngineDashboard() {
       {/* ═══ TABLE DATA ═══ */}
       <div className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden p-2 mt-2">
         <div className="px-4 py-3 flex items-center justify-between mb-2 border-b border-slate-100">
-          <div className="flex items-center gap-3">
-            <div className="p-2 bg-indigo-50 rounded-lg text-indigo-600">
-              <Fuel size={16} />
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-indigo-50 rounded-xl text-indigo-600">
+              <Fuel size={20} />
             </div>
             <div className="flex flex-col">
-              <h2 className="text-[13px] font-bold text-slate-800 m-0">
+              <h2 className="text-base font-black text-slate-800 m-0 tracking-tight">
                 Danh sách xe đang trong bãi
               </h2>
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-0.5">
+              <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mt-1">
                 {filteredAndSortedItems.length} XE · CLICK ĐỂ XEM LỊCH SỬ NỔ MÁY
               </span>
             </div>
