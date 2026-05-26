@@ -65,4 +65,9 @@ export const PERMISSIONS = {
     END_OF_DAY: {
         VIEW: 'view',
     },
+
+    PARKING_IDLE_ENGINE: {
+        VIEW: 'view',
+        SETTINGS: 'settings',
+    },
 };
