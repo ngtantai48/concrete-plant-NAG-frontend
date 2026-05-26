@@ -137,9 +137,8 @@ function LiveElapsedTimer({
         className={isWarning ? "text-red-500" : "text-slate-400"}
       />
       <span
-        className={`font-black text-sm tabular-nums tracking-tight ${
-          isWarning ? "text-red-500" : "text-slate-500"
-        }`}
+        className={`font-black text-sm tabular-nums tracking-tight ${isWarning ? "text-red-500" : "text-slate-500"
+          }`}
       >
         {display}
       </span>
@@ -155,7 +154,7 @@ export default function ParkingIdleEngineDashboard() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsLoading, setSettingsLoading] = useState(false);
   const [settingsSaving, setSettingsSaving] = useState(false);
-  
+
   // Vehicle Detail Drawer State
   const [selectedVehicle, setSelectedVehicle] = useState<ParkingIdleEngineAlert | null>(null);
   const [historyData, setHistoryData] = useState<ParkingIdleEngineHistoryResponse | null>(null);
@@ -331,8 +330,8 @@ export default function ParkingIdleEngineDashboard() {
 
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
-      items = items.filter(i => 
-        (i.vehicle_name && i.vehicle_name.toLowerCase().includes(q)) || 
+      items = items.filter(i =>
+        (i.vehicle_name && i.vehicle_name.toLowerCase().includes(q)) ||
         (i.vehicle_license_plate && i.vehicle_license_plate.toLowerCase().includes(q))
       );
     }
@@ -341,7 +340,7 @@ export default function ParkingIdleEngineDashboard() {
       // 1. Engine ON > Engine OFF
       if (a.engine_state === "on" && b.engine_state !== "on") return -1;
       if (a.engine_state !== "on" && b.engine_state === "on") return 1;
-      
+
       // 2. Sort by elapsed minutes (descending)
       return (b.elapsed_minutes || 0) - (a.elapsed_minutes || 0);
     });
@@ -374,9 +373,8 @@ export default function ParkingIdleEngineDashboard() {
       align: "left",
       render: (_, r) => (
         <div className="flex items-center justify-start">
-          <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-bold ${
-            r.engine_state === "on" ? "bg-orange-50 text-orange-500" : "bg-slate-50 text-slate-400"
-          }`}>
+          <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-bold ${r.engine_state === "on" ? "bg-orange-50 text-orange-500" : "bg-slate-50 text-slate-400"
+            }`}>
             <Zap size={12} className={r.engine_state === "on" ? "fill-orange-500" : ""} />
             {r.engine_state === "on" ? "Đang nổ máy" : "Tắt máy"}
           </span>
@@ -471,12 +469,12 @@ export default function ParkingIdleEngineDashboard() {
           <div key={k.label} className="bg-white rounded-[24px] border border-slate-100 shadow-sm p-6 flex items-center justify-between relative overflow-hidden group">
             {/* Background Watermark */}
             <div className="absolute -right-4 -bottom-4 opacity-[0.03] transform group-hover:scale-110 transition-transform duration-500 pointer-events-none" style={{ color: k.color }}>
-              {React.cloneElement(k.icon as React.ReactElement, { size: 120 })}
+              {React.cloneElement(k.icon as React.ReactElement, { size: 120 } as any)}
             </div>
-            
+
             <div className="flex items-center gap-5 relative z-10">
               <div className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-sm" style={{ background: k.bg, color: k.color }}>
-                {React.cloneElement(k.icon as React.ReactElement, { size: 28 })}
+                {React.cloneElement(k.icon as React.ReactElement, { size: 28 } as any)}
               </div>
               <div className="flex flex-col">
                 <div className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">{k.label}</div>
@@ -502,14 +500,14 @@ export default function ParkingIdleEngineDashboard() {
                 Danh sách xe đang trong bãi
               </h2>
               <span className="text-[11px] font-bold text-slate-400 uppercase tracking-widest mt-1">
-                {filteredAndSortedItems.length} XE · CLICK ĐỂ XEM LỊCH SỬ NỔ MÁY
+                {filteredAndSortedItems.length} XE · Click để xem lịch sử nổ máy của xe trong bãi
               </span>
             </div>
           </div>
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={14} />
-            <Input 
-              placeholder="Tìm kiếm xe..." 
+            <Input
+              placeholder="Tìm kiếm xe..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="h-8 pl-9 w-64 text-xs rounded-full bg-slate-50 border-slate-200"
@@ -580,22 +578,21 @@ export default function ParkingIdleEngineDashboard() {
                 <ResponsiveContainer width="100%" height="100%">
                   <BarChart data={historyData.items.slice().reverse()} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                    <XAxis 
-                      dataKey="idle_started_at" 
-                      tickFormatter={(v) => dayjs(v).format("DD/MM")} 
+                    <XAxis
+                      dataKey="idle_started_at"
+                      tickFormatter={(v) => dayjs(v).format("DD/MM")}
                       axisLine={false}
                       tickLine={false}
                       tick={{ fill: '#64748b', fontSize: 10 }}
                       dy={10}
                     />
-                    <YAxis 
+                    <YAxis
                       axisLine={false}
                       tickLine={false}
                       tick={{ fill: '#64748b', fontSize: 10 }}
                     />
-                    <Tooltip 
-                      cursor={{ fill: '#f8fafc' }}
-                      content={({ active, payload }) => {
+                    <Tooltip
+                      content={({ active, payload }: any) => {
                         if (active && payload && payload.length) {
                           const data = payload[0].payload as ParkingIdleEngineHistoryItem;
                           return (
@@ -636,7 +633,7 @@ export default function ParkingIdleEngineDashboard() {
                 />
               </div>
             </div>
-            
+
             <Table<ParkingIdleEngineHistoryItem>
               dataSource={historyData?.items ?? []}
               columns={historyColumns}
