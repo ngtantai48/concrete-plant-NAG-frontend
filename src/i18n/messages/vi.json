@@ -66,6 +66,7 @@
     "reports": "Báo cáo phân tích",
     "reportProduction": "Sản lượng",
     "reportFuel": "Tiêu hao nhiên liệu",
+    "parkingIdleEngine": "Giám sát nổ máy",
     "role": {
       "admin": "Quản trị viên",
       "manager": "Quản lý",
@@ -93,7 +94,9 @@
     "station_check_in": "Xe {vehicle} đang nhận hàng trong {station}",
     "station_check_out": "Xe {vehicle} đã rời {station}",
     "vehicle_check_in": "Xe {vehicle} đã rời khỏi bãi",
-    "vehicle_check_out": "Xe {vehicle} đã vào bãi"
+    "vehicle_check_out": "Xe {vehicle} đã vào bãi",
+    "parking_idle_engine_warning": "Cảnh báo xe {vehicle} nổ máy trong bãi đã {elapsed_minutes} phút",
+    "parking_idle_engine_warning_resolved": "Xe {vehicle} đã tắt máy trong bãi"
   },
   "Dashboard": {
     "title": "Bảng điều khiển",

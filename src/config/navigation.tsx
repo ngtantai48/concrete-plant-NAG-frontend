@@ -2,7 +2,7 @@ import { PERMISSIONS } from "@/constants/permissions";
 import { ROLES } from "@/constants/roles";
 import { SIDEBAR } from "@/constants/route";
 import {
-  ArrowRightLeft, Bot, CalendarCheck, Car, CalendarClock, ClipboardList, Gauge, Layers, MapPin,
+  ArrowRightLeft, Bot, CalendarCheck, Car, CalendarClock, ClipboardList, Fuel, Gauge, Layers, MapPin,
   Package, Settings, ShieldCheck, UserCog, UsersRound, UtensilsCrossed, Wrench
 } from "lucide-react";
 import React from "react";
@@ -96,6 +96,15 @@ export const navigationConfig: NavItem[] = [
         label: "reportFuel",
         icon: <ArrowRightLeft size={18} />,
       },
+    ],
+  },
+  {
+    key: SIDEBAR.PARKING_IDLE_ENGINE,
+    label: "parkingIdleEngine",
+    icon: <Fuel />,
+    actions: [
+      { key: PERMISSIONS.PARKING_IDLE_ENGINE.VIEW, label: "Xem giám sát nổ máy trong bãi" },
+      { key: PERMISSIONS.PARKING_IDLE_ENGINE.SETTINGS, label: "Cấu hình cảnh báo nổ máy" },
     ],
   },
   {

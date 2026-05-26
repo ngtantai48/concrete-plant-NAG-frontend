@@ -65,6 +65,7 @@
     "reports": "Reports & Analytics",
     "reportProduction": "Output",
     "reportFuel": "Fuel Consumption",
+    "parkingIdleEngine": "Idle Engine Monitor",
     "role": {
       "admin": "Administrator",
       "manager": "Manager",
@@ -92,7 +93,9 @@
     "station_check_in": "Vehicle {vehicle} is receiving goods in {station}",
     "station_check_out": "Vehicle {vehicle} has left {station}",
     "vehicle_check_in": "Vehicle {vehicle} has entered the yard",
-    "vehicle_check_out": "Vehicle {vehicle} has left the yard"
+    "vehicle_check_out": "Vehicle {vehicle} has left the yard",
+    "parking_idle_engine_warning": "Warning: Vehicle {vehicle} has been idling for {elapsed_minutes} minutes",
+    "parking_idle_engine_warning_resolved": "Vehicle {vehicle} engine turned off in the yard"
   },
   "Dashboard": {
     "title": "Dashboard",

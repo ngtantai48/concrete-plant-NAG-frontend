@@ -16,6 +16,7 @@ export const SIDEBAR = {
   AI_ASSISTANT: "/ai-assistant",
   USER_MANAGE: "/user-manage",
   ROLE_PERMISSIONS: "/role-permissions",
+  PARKING_IDLE_ENGINE: "/parking-idle-engine",
 };
 
 export const SHARE = {
