@@ -12,12 +12,14 @@ import {
   Droplets,
   Eye,
   Fuel,
+  MapPin,
   Power,
   RefreshCw,
   Settings2,
   Shield,
   Signal,
   SignalZero,
+  Truck,
   Zap,
   BarChart2,
   Search,
@@ -297,10 +299,18 @@ export default function ParkingIdleEngineDashboard() {
   const kpis = useMemo(
     () => [
       {
+        label: "TỔNG XE BỒN",
+        value: data?.total_vehicles ?? 0,
+        subtitle: "Xe",
+        icon: <Truck size={24} />,
+        color: "#6366f1",
+        bg: "#eef2ff",
+      },
+      {
         label: "XE TRONG BÃI",
-        value: data?.total ?? 0,
-        subtitle: "Tổng số xe",
-        icon: <Car size={24} />,
+        value: data?.in_yard_count ?? 0,
+        subtitle: "Xe",
+        icon: <MapPin size={24} />,
         color: "#3b82f6",
         bg: "#eff6ff",
       },
@@ -337,11 +347,15 @@ export default function ParkingIdleEngineDashboard() {
     }
 
     items.sort((a, b) => {
-      // 1. Engine ON > Engine OFF
+      // 1. In yard > Not in yard
+      if (a.in_yard && !b.in_yard) return -1;
+      if (!a.in_yard && b.in_yard) return 1;
+
+      // 2. Engine ON > Engine OFF (within same yard status)
       if (a.engine_state === "on" && b.engine_state !== "on") return -1;
       if (a.engine_state !== "on" && b.engine_state === "on") return 1;
 
-      // 2. Sort by elapsed minutes (descending)
+      // 3. Sort by elapsed minutes (descending)
       return (b.elapsed_minutes || 0) - (a.elapsed_minutes || 0);
     });
 
@@ -355,13 +369,24 @@ export default function ParkingIdleEngineDashboard() {
       key: "vehicle",
       width: 200,
       render: (_, r) => (
-        <div className="flex items-center gap-4 pl-2">
-          <div className="w-11 h-11 rounded-full bg-indigo-50/50 flex items-center justify-center text-indigo-500 border border-indigo-100/50">
+        <div className={`flex items-center gap-4 pl-2 ${!r.in_yard ? 'opacity-50' : ''}`}>
+          <div className={`w-11 h-11 rounded-full flex items-center justify-center border ${r.in_yard ? 'bg-indigo-50/50 text-indigo-500 border-indigo-100/50' : 'bg-slate-50 text-slate-400 border-slate-100'}`}>
             <Car size={20} />
           </div>
           <div className="flex flex-col">
             <span className="font-bold text-[15px] text-slate-800">{r.vehicle_name}</span>
-            <span className="text-xs font-semibold text-slate-500 mt-0.5">{r.vehicle_license_plate}</span>
+            <div className="flex items-center gap-2 mt-0.5">
+              <span className="text-xs font-semibold text-slate-500">{r.vehicle_license_plate}</span>
+              {r.in_yard ? (
+                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-600 bg-emerald-50 rounded px-1.5 py-0.5">
+                  <MapPin size={9} /> Trong bãi
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-slate-400 bg-slate-50 rounded px-1.5 py-0.5">
+                  Ngoài bãi
+                </span>
+              )}
+            </div>
           </div>
         </div>
       ),
@@ -373,11 +398,17 @@ export default function ParkingIdleEngineDashboard() {
       align: "left",
       render: (_, r) => (
         <div className="flex items-center justify-start">
-          <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-bold ${r.engine_state === "on" ? "bg-orange-50 text-orange-500" : "bg-slate-50 text-slate-400"
-            }`}>
-            <Zap size={12} className={r.engine_state === "on" ? "fill-orange-500" : ""} />
-            {r.engine_state === "on" ? "Đang nổ máy" : "Tắt máy"}
-          </span>
+          {!r.in_yard ? (
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-bold bg-slate-50 text-slate-300">
+              —
+            </span>
+          ) : (
+            <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-bold ${r.engine_state === "on" ? "bg-orange-50 text-orange-500" : "bg-slate-50 text-slate-400"
+              }`}>
+              <Zap size={12} className={r.engine_state === "on" ? "fill-orange-500" : ""} />
+              {r.engine_state === "on" ? "Đang nổ máy" : "Tắt máy"}
+            </span>
+          )}
         </div>
       ),
     },
@@ -388,11 +419,15 @@ export default function ParkingIdleEngineDashboard() {
       align: "left",
       render: (_, r) => (
         <div className="flex items-center justify-start">
-          <LiveElapsedTimer
-            idleStartedAt={r.idle_started_at}
-            fallbackMinutes={r.elapsed_minutes}
-            isWarning={r.warning_active}
-          />
+          {!r.in_yard ? (
+            <span className="text-sm font-bold text-slate-300">—</span>
+          ) : (
+            <LiveElapsedTimer
+              idleStartedAt={r.idle_started_at}
+              fallbackMinutes={r.elapsed_minutes}
+              isWarning={r.warning_active}
+            />
+          )}
         </div>
       ),
     },
@@ -403,7 +438,11 @@ export default function ParkingIdleEngineDashboard() {
       align: "left",
       render: (_, r) => (
         <div className="flex items-center justify-start">
-          {r.warning_active ? (
+          {!r.in_yard ? (
+            <span className="inline-flex items-center gap-1.5 bg-slate-50 text-slate-400 rounded-md font-bold px-2.5 py-1 text-[11px] uppercase tracking-wide">
+              —
+            </span>
+          ) : r.warning_active ? (
             <span className="inline-flex items-center gap-1.5 bg-red-50 text-red-500 rounded-md font-bold px-2.5 py-1 text-[11px] uppercase tracking-wide">
               <AlertTriangle size={12} />
               CẢNH BÁO
@@ -464,7 +503,7 @@ export default function ParkingIdleEngineDashboard() {
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-6">
+      <div className="grid grid-cols-4 gap-5">
         {kpis.map((k) => (
           <div key={k.label} className="bg-white rounded-[24px] border border-slate-100 shadow-sm p-6 flex items-center justify-between relative overflow-hidden group">
             {/* Background Watermark */}
@@ -497,10 +536,10 @@ export default function ParkingIdleEngineDashboard() {
             </div>
             <div className="flex flex-col">
               <h2 className="text-base font-black text-slate-800 m-0 tracking-tight">
-                Danh sách xe đang trong bãi
+                Danh sách xe bồn
               </h2>
               <span className="text-[11px] font-bold text-slate-400 tracking-widest mt-1">
-                Chọn xe để xem chi tiết lịch sử nổ máy
+                {filteredAndSortedItems.length} xe · Click để xem lịch sử nổ máy
               </span>
             </div>
           </div>

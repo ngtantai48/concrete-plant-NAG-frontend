@@ -29,6 +29,8 @@ export interface ParkingIdleEngineAlert {
   order_status: string | null;
   is_collecting_at_station: boolean;
 
+  in_yard: boolean;
+
   engine_on: boolean;
   warning_active: boolean;
 
@@ -58,7 +60,8 @@ export interface ParkingIdleEngineAlert {
 
 export interface ParkingIdleEngineAlertsResponse {
   settings: ParkingIdleEngineSettings;
-  total: number;
+  total_vehicles: number;
+  in_yard_count: number;
   warning_count: number;
   engine_on_count: number;
   estimated_idle_fuel_liters: number;
