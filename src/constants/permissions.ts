@@ -1,6 +1,7 @@
 export const PERMISSIONS = {
     DASHBOARD: {
         VIEW: 'view',
+        ORDER_DETAIL: 'order_detail',
         SYNC_SLOTS: 'sync_slots',
         HISTORY: 'history',
         CHECKLOG: 'checklog',

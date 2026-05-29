@@ -94,6 +94,7 @@ export function useProactiveTokenRefresh() {
         //   loginSuccess({
         //     user_id: res.data.user_id,
         //     role: res.data.role,
+        //     role_label: res.data.role_label,
         //     role_id: res.data.role_id,
         //     accessToken: newToken,
         //     user_full_name: res.data.user_full_name,
@@ -105,6 +106,7 @@ export function useProactiveTokenRefresh() {
           payload: {
             user_id: res.data.user_id,
             role: res.data.role,
+            role_label: res.data.role_label,
             role_id: res.data.role_id,
             accessToken: newToken,
             user_full_name: res.data.user_full_name,

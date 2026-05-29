@@ -1,5 +1,5 @@
 import http from "@/lib/http";
-import type { CreateUserPayload, UpdateUserPayload, User, UserRole } from "@/types/user";
+import type { CreateUserPayload, UpdateUserPayload, User } from "@/types/user";
 
 export interface ListUsersParams {
   page?: number;
@@ -8,7 +8,7 @@ export interface ListUsersParams {
   username?: string;
   user_phone_number?: string;
   user_email?: string;
-  role?: UserRole | UserRole[];
+  role?: string;
 }
 
 export interface ListUsers {

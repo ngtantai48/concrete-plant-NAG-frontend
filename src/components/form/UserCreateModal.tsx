@@ -3,20 +3,35 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { useRoles } from "@/hooks/use-roles";
 import { cn } from "@/lib/utils";
 import { userApi } from "@/services/user.service";
 import type { AppDispatch } from "@/store";
 import { addUser } from "@/store/slices/userSlice";
-import type { CreateUserPayload, UserRole } from "@/types/user";
+import type { CreateUserPayload } from "@/types/user";
 import { format, isValid, parse } from "date-fns";
-import { Calendar as CalendarIcon, Loader2, UserPlus, X } from "lucide-react";
+import { Calendar as CalendarIcon, Eye, EyeOff, Loader2, UserPlus, X } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { useEffect, useMemo, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { useDispatch } from "react-redux";
 import { toast } from "sonner";
@@ -42,29 +57,50 @@ const parseDateValue = (value?: string) => {
 const createUserSchema = z.object({
   user_full_name: z.string().trim().min(1, "Vui lòng nhập họ tên"),
   user_email: z.string().trim().email("Email không hợp lệ"),
-  user_phone_number: z.string().trim().min(1, "Vui lòng nhập số điện thoại").max(20, "Số điện thoại quá dài"),
+  user_phone_number: z
+    .string()
+    .trim()
+    .min(1, "Vui lòng nhập số điện thoại")
+    .max(20, "Số điện thoại quá dài"),
   user_address: z.string().trim().optional(),
-  username: z.string().trim().min(3, "Username phải có ít nhất 3 ký tự").max(100, "Username quá dài"),
+  username: z
+    .string()
+    .trim()
+    .min(3, "Username phải có ít nhất 3 ký tự")
+    .max(100, "Username quá dài"),
   password: z.string().min(6, "Mật khẩu phải có ít nhất 6 ký tự").max(100, "Mật khẩu quá dài"),
-  role: z.enum(["admin", "manager", "dispatcher", "driver", "user"]),
+  role: z.string().trim().min(1, "Vui lòng chọn vai trò"),
   user_join_date: joinDateSchema,
   user_work_shift: z.string().trim(),
 });
 
 type CreateUserFormValues = z.infer<typeof createUserSchema>;
 
+const requiredMark = <span className="text-red-500">*</span>;
+
 export default function UserCreateModal({ open, onClose }: UserCreateModalProps) {
   const t = useTranslations("UserManage");
   const tCommon = useTranslations("Common");
-  const tRoles = useTranslations("Sidebar.role");
+  const { roles, loading: rolesLoading } = useRoles();
   const dispatch = useDispatch<AppDispatch>();
+  const [showPassword, setShowPassword] = useState(false);
+  const defaultRole = useMemo(
+    () =>
+      roles.find((role) => role.role === "user")?.role ||
+      roles.find((role) => role.role !== "admin")?.role ||
+      roles[0]?.role ||
+      "user",
+    [roles]
+  );
 
   const {
     control,
     formState: { errors, isSubmitting },
+    getValues,
     handleSubmit,
     register,
     reset,
+    setValue,
   } = useForm<CreateUserFormValues>({
     resolver: zodResolver(createUserSchema),
     defaultValues: {
@@ -80,8 +116,18 @@ export default function UserCreateModal({ open, onClose }: UserCreateModalProps)
     },
   });
 
+  useEffect(() => {
+    if (!open || roles.length === 0) return;
+
+    const currentRole = getValues("role");
+    if (!roles.some((role) => role.role === currentRole)) {
+      setValue("role", defaultRole, { shouldValidate: true });
+    }
+  }, [defaultRole, getValues, open, roles, setValue]);
+
   const handleOpenChange = (nextOpen: boolean) => {
     if (!nextOpen && !isSubmitting) {
+      setShowPassword(false);
       reset();
       onClose();
     }
@@ -97,13 +143,12 @@ export default function UserCreateModal({ open, onClose }: UserCreateModalProps)
       const newUser = await userApi.create(payload);
       dispatch(addUser(newUser));
       toast.success(t("createSuccess", { name: newUser.user_full_name }));
+      setShowPassword(false);
       reset();
       onClose();
     } catch (error) {
       const message =
-        (error as any)?.response?.data?.message ||
-        (error as Error)?.message ||
-        t("createFailed");
+        (error as any)?.response?.data?.message || (error as Error)?.message || t("createFailed");
       toast.error(t("failed"), { description: message });
     }
   };
@@ -113,7 +158,6 @@ export default function UserCreateModal({ open, onClose }: UserCreateModalProps)
       {message || " "}
     </p>
   );
-  const requiredMark = <span className="text-red-500">*</span>;
   const optionalLabel = (
     <span className="text-xs font-normal text-slate-500">({tCommon("optional")})</span>
   );
@@ -141,7 +185,11 @@ export default function UserCreateModal({ open, onClose }: UserCreateModalProps)
                 {t("full_name")}
                 {requiredMark}
               </Label>
-              <Input id="create-user-full-name" {...register("user_full_name")} placeholder="VD: Nguyễn Văn A" />
+              <Input
+                id="create-user-full-name"
+                {...register("user_full_name")}
+                placeholder="VD: Nguyễn Văn A"
+              />
               {errorText(errors.user_full_name?.message)}
             </div>
 
@@ -151,7 +199,12 @@ export default function UserCreateModal({ open, onClose }: UserCreateModalProps)
                   {t("email")}
                   {requiredMark}
                 </Label>
-                <Input id="create-user-email" type="email" {...register("user_email")} placeholder="example@email.com" />
+                <Input
+                  id="create-user-email"
+                  type="email"
+                  {...register("user_email")}
+                  placeholder="example@email.com"
+                />
                 {errorText(errors.user_email?.message)}
               </div>
               <div className="space-y-1">
@@ -159,7 +212,11 @@ export default function UserCreateModal({ open, onClose }: UserCreateModalProps)
                   {t("phone_number")}
                   {requiredMark}
                 </Label>
-                <Input id="create-user-phone" {...register("user_phone_number")} placeholder="0123456789" />
+                <Input
+                  id="create-user-phone"
+                  {...register("user_phone_number")}
+                  placeholder="0123456789"
+                />
                 {errorText(errors.user_phone_number?.message)}
               </div>
             </div>
@@ -169,7 +226,11 @@ export default function UserCreateModal({ open, onClose }: UserCreateModalProps)
                 {t("address")}
                 {optionalLabel}
               </Label>
-              <Textarea id="create-user-address" {...register("user_address")} placeholder="VD: 123 Đường ABC, Quận 1, TP.HCM" />
+              <Textarea
+                id="create-user-address"
+                {...register("user_address")}
+                placeholder="VD: 123 Đường ABC, Quận 1, TP.HCM"
+              />
               {errorText(errors.user_address?.message)}
             </div>
           </section>
@@ -182,7 +243,11 @@ export default function UserCreateModal({ open, onClose }: UserCreateModalProps)
                   {t("username")}
                   {requiredMark}
                 </Label>
-                <Input id="create-username" {...register("username")} placeholder="VD: nguyenvana" />
+                <Input
+                  id="create-username"
+                  {...register("username")}
+                  placeholder="VD: nguyenvana"
+                />
                 {errorText(errors.username?.message)}
               </div>
               <div className="space-y-1">
@@ -190,7 +255,23 @@ export default function UserCreateModal({ open, onClose }: UserCreateModalProps)
                   {t("password")}
                   {requiredMark}
                 </Label>
-                <Input id="create-password" type="password" {...register("password")} placeholder="******" />
+                <div className="relative">
+                  <Input
+                    id="create-password"
+                    type={showPassword ? "text" : "password"}
+                    {...register("password")}
+                    placeholder="******"
+                    className="pr-10"
+                  />
+                  <button
+                    type="button"
+                    aria-label={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+                    onClick={() => setShowPassword((value) => !value)}
+                    className="absolute right-2 top-1/2 rounded-md p-1 text-slate-500 transition hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring -translate-y-1/2"
+                  >
+                    {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                  </button>
+                </div>
                 {errorText(errors.password?.message)}
               </div>
             </div>
@@ -205,16 +286,19 @@ export default function UserCreateModal({ open, onClose }: UserCreateModalProps)
                   control={control}
                   name="role"
                   render={({ field }) => (
-                    <Select value={field.value} onValueChange={(value: UserRole) => field.onChange(value)}>
+                    <Select value={field.value} onValueChange={field.onChange} disabled={rolesLoading}>
                       <SelectTrigger className="w-full bg-white">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {/* <SelectItem value="admin">{tRoles("admin")}</SelectItem> */}
-                        <SelectItem value="manager">{tRoles("manager")}</SelectItem>
-                        <SelectItem value="dispatcher">{tRoles("dispatcher")}</SelectItem>
-                        <SelectItem value="driver">{tRoles("driver")}</SelectItem>
-                        <SelectItem value="user">{tRoles("user")}</SelectItem>
+                        {roles.length > 0 ? (
+                          // roles.map((role) => (
+                          roles.filter((role) => role.role !== 'admin').map((role) => (
+                            <SelectItem key={role.id} value={role.role}>{role.role_label}</SelectItem>
+                          ))
+                        ) : (
+                          <SelectItem value="user" disabled>Chưa có vai trò</SelectItem>
+                        )}
                       </SelectContent>
                     </Select>
                   )}
@@ -243,7 +327,9 @@ export default function UserCreateModal({ open, onClose }: UserCreateModalProps)
                               !selectedDate && "text-muted-foreground"
                             )}
                           >
-                            {selectedDate ? format(selectedDate, "dd/MM/yyyy") : tCommon("selectDate")}
+                            {selectedDate
+                              ? format(selectedDate, "dd/MM/yyyy")
+                              : tCommon("selectDate")}
                             <CalendarIcon className="ml-2 size-4 opacity-50" />
                           </Button>
                         </PopoverTrigger>
@@ -251,7 +337,9 @@ export default function UserCreateModal({ open, onClose }: UserCreateModalProps)
                           <Calendar
                             mode="single"
                             selected={selectedDate}
-                            onSelect={(date) => field.onChange(date ? format(date, "yyyy-MM-dd") : "")}
+                            onSelect={(date) =>
+                              field.onChange(date ? format(date, "yyyy-MM-dd") : "")
+                            }
                             initialFocus
                           />
                         </PopoverContent>
@@ -268,18 +356,35 @@ export default function UserCreateModal({ open, onClose }: UserCreateModalProps)
                 {t("work_shift")}
                 {optionalLabel}
               </Label>
-              <Input id="create-work-shift" {...register("user_work_shift")} placeholder={t("workShiftPlaceholder")} />
+              <Input
+                id="create-work-shift"
+                {...register("user_work_shift")}
+                placeholder={t("workShiftPlaceholder")}
+              />
               {errorText(errors.user_work_shift?.message)}
             </div>
           </section>
 
           <DialogFooter className="border-t border-slate-100 pt-4">
-            <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => handleOpenChange(false)}
+              disabled={isSubmitting}
+            >
               <X className="size-4" />
               {tCommon("cancel")}
             </Button>
-            <Button type="submit" disabled={isSubmitting} className="bg-blue-600 text-white hover:bg-blue-700">
-              {isSubmitting ? <Loader2 className="size-4 animate-spin" /> : <UserPlus className="size-4" />}
+            <Button
+              type="submit"
+              disabled={isSubmitting}
+              className="bg-blue-600 text-white hover:bg-blue-700"
+            >
+              {isSubmitting ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <UserPlus className="size-4" />
+              )}
               {isSubmitting ? t("saving") : t("add")}
             </Button>
           </DialogFooter>

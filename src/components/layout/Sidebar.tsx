@@ -2,8 +2,14 @@
 
 import Logo from "@/assets/images/logo.png";
 import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { navigationConfig, NavItem } from "@/config/navigation";
 import { useAppSelector } from "@/hooks/use-app-selector";
@@ -20,22 +26,17 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import reportApi from "@/services/report.service";
 
-const UserProfile = ({ collapsed, userName, userRole, isLoading }: {
+const UserProfile = ({
+  collapsed,
+  userName,
+  roleLabel,
+  isLoading,
+}: {
   collapsed: boolean;
   userName?: string;
-  userRole?: string;
+  roleLabel?: string;
   isLoading?: boolean;
 }) => {
-  const t = useTranslations("Sidebar");
-
-  const roleMap: Record<string, string> = {
-    admin: t("role.admin"),
-    manager: t("role.manager"),
-    dispatcher: t("role.dispatcher"),
-    driver: t("role.driver"),
-    user: t("role.user"),
-  };
-
   return (
     <div className="flex items-center border-t border-gray-700 p-3 bg-gray-900 min-h-17.5">
       <div className="flex items-center gap-4 w-full px-3">
@@ -51,15 +52,17 @@ const UserProfile = ({ collapsed, userName, userRole, isLoading }: {
           </>
         ) : (
           <>
-            <Avatar className="shrink-0" icon={<User size={20} />} style={{ backgroundColor: "#722ed1" }} />
+            <Avatar
+              className="shrink-0"
+              icon={<User size={20} />}
+              style={{ backgroundColor: "#722ed1" }}
+            />
             {!collapsed && (
               <div className="flex-1 min-w-0">
                 <p className="text-white font-semibold text-sm truncate m-0">
                   {userName || "User"}
                 </p>
-                <p className="text-gray-400 text-xs truncate m-0">
-                  {userRole ? roleMap[userRole] || userRole : t("role.user")}
-                </p>
+                <p className="text-gray-400 text-xs truncate m-0">{roleLabel}</p>
               </div>
             )}
           </>
@@ -85,12 +88,13 @@ export default function Sidebar() {
     (state: any) => state.auth,
     (auth) => ({
       role: auth.user?.role,
+      roleLabel: auth.user?.role_label,
       fullName: auth.user?.fullName,
       authLoading: auth.loading,
     })
   );
 
-  const { role, fullName, authLoading } = useAppSelector(selectAuth);
+  const { role, roleLabel, fullName, authLoading } = useAppSelector(selectAuth);
 
   const fullPath = useMemo(() => {
     const query = searchParams.toString();
@@ -225,7 +229,10 @@ export default function Sidebar() {
           <div className="shrink-0">
             <div className="flex items-center justify-between p-4 border-b border-gray-700 bg-gray-900">
               {!collapsed && (
-                <div className="flex items-center justify-center m-3" style={{ width: 140, height: 40 }}>
+                <div
+                  className="flex items-center justify-center m-3"
+                  style={{ width: 140, height: 40 }}
+                >
                   <Image className="object-contain" src={Logo} alt="SAVINA Logo" priority />
                 </div>
               )}
@@ -263,7 +270,7 @@ export default function Sidebar() {
             <UserProfile
               collapsed={collapsed}
               userName={fullName}
-              userRole={role}
+              roleLabel={roleLabel}
               isLoading={authLoading && !fullName}
             />
           </div>
