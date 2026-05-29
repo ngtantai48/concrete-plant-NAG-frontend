@@ -1358,7 +1358,7 @@ export default function AdminDashboard() {
 
 
           {/* Right: Today's Trips by Vehicle (30%) */}
-          {!isPastDate && (
+          {hasActionAccess(SIDEBAR.DASHBOARD, PERMISSIONS.DASHBOARD.ORDER_DETAIL) && !isPastDate && (
             <div className="flex flex-col gap-1.5 h-full min-h-0 animate-fade-up" style={{ flex: '3 1 0%', animationDelay: '0.6s' }}>
 
               {/* Section 1: Mixer Vehicles (Xe bồn) */}

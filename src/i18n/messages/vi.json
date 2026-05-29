@@ -141,6 +141,7 @@
     "refreshData": "Tải lại dữ liệu",
     "optional": "tùy chọn",
     "selectDate": "Chọn ngày",
+    "duplicateRoleError": "Tên vai trò này đã tồn tại",
     "messages": {
       "commonError": "Đã xảy ra lỗi. Vui lòng thử lại sau."
     },
@@ -683,10 +684,7 @@
     "fromDate": "Ngày bắt đầu",
     "toDate": "Ngày kết thúc",
     "dateRange": "Thời gian bảo trì",
-    "dateRangePlaceholder": [
-      "Từ ngày",
-      "Đến ngày"
-    ],
+    "dateRangePlaceholder": ["Từ ngày", "Đến ngày"],
     "distanceCovered": "Số km đã chạy",
     "distancePlaceholder": "VD: 15000",
     "description": "Mô tả công việc",

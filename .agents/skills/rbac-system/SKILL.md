@@ -26,16 +26,34 @@ export const COMMON = {
 
 ### 3. The Hook (`src/hooks/use-permissions.ts`)
 This hook provides the runtime methods to check if the current user has access to a specific page or action.
-- Permissions are currently persisted in `localStorage` (key: `RBAC_PERMISSIONS`).
+- Permissions are retrieved directly from the Redux auth state (`user.permissions`), which is synced from the Backend.
 - The `admin` role is hard-coded to bypass all checks (`return true`).
 
 ### 4. The Route Guard (`src/guards/AuthGuard.tsx`)
 Every page transition is intercepted here. It checks `hasPageAccess(pathname)`. If the user does not have permission, they are automatically signed out silently and redirected to the login page to prevent unauthorized access.
 
-### 5. Admin UI (`src/components/features/admin/role-permissions/RolePermissionsManager.tsx`)
-A dedicated UI for the `admin` to assign permissions to non-admin roles (`manager`, `dispatcher`, `driver`, `user`).
+### 5. Admin UI (`src/components/features/role-permissions/RolePermissionsManager.tsx`)
+A dedicated UI for the `admin` to assign permissions to non-admin roles.
+- Roles are loaded dynamically from the Backend via `src/hooks/use-roles.ts`; do not hardcode role tabs such as `manager`, `dispatcher`, `driver`, or `user`.
+- The `admin` role is intentionally hidden from the permission management tabs because admin always has all permissions through the bypass in `use-permissions.ts`.
+- Role tabs support create, edit label, soft-delete, and manual drag sorting. Sorting is UI-only and persisted in local storage with `nag-role-permissions-tab-order`.
+- Add/edit/delete role popups use shadcn `Dialog` + Tailwind. Keep Ant Design for `Tabs` and `Tree`.
+- When closing the add/edit role dialog, do **not** immediately reset `editingRole` or `roleLabel`. Radix Dialog close animation can still render the old content; resetting those fields during close makes the visible dialog text jump from edit mode to create mode. Reset these fields only when opening create/edit dialogs.
 - Uses Ant Design's `Tree` for the complex parent-child check logic.
 - Enforces strict logic: You cannot check `add`/`edit`/`delete` without also checking `view`. If you uncheck `view`, all other actions are automatically unchecked.
+- **Payload format to BE**: Sends a JSON object of type `Record<string, string[]>` mapping roles to their assigned permission keys.
+- **Cross-Platform Consistency (Leaf-node only logic)**: The payload is strictly filtered to only send **leaf node keys** (e.g., `/dashboard__view` or individual page keys with no actions) and completely strips out parent/group keys (e.g., `/dashboard` or `tools-group`). This prevents cross-platform data synchronization bugs (especially with mobile apps that only manage leaf nodes). The Ant Design `Tree` component is smart enough to automatically display parent nodes as "Fully Checked" on the UI when all their leaf nodes are provided, even if the parent key itself is missing from the payload.
+  ```json
+  {
+    "manager": [
+      "/system-settings__view",
+      "/system-settings__edit"
+    ],
+    "dispatcher": [
+      "/orders__view"
+    ]
+  }
+  ```
 
 ### 6. Dynamic Redirection (`src/components/auth/RoleRedirect.tsx`)
 Upon successful login, the system avoids hardcoded redirect maps. Instead, it uses `getDefaultRoute()` from the `usePermissions` hook to scan the `navigationConfig` and automatically redirect the user to the **first page they have permission to view**. This prevents infinite redirect loops and 403 errors for users who do not have access to the standard dashboard.
