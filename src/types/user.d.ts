@@ -1,5 +1,3 @@
-export type UserRole = "admin" | "manager" | "dispatcher" | "driver" | "user";
-
 export interface BaseUser {
     user_full_name: string;
     user_email: string;
@@ -12,7 +10,8 @@ export interface BaseUser {
 export interface User extends BaseUser {
     user_id: number;
     username: string;
-    role: UserRole | string;
+    role: string;
+    role_label: string;
     user_status?: string | null;
     delete_flag?: boolean;
     created_at?: string;

@@ -33,7 +33,12 @@ This hook provides the runtime methods to check if the current user has access t
 Every page transition is intercepted here. It checks `hasPageAccess(pathname)`. If the user does not have permission, they are automatically signed out silently and redirected to the login page to prevent unauthorized access.
 
 ### 5. Admin UI (`src/components/features/role-permissions/RolePermissionsManager.tsx`)
-A dedicated UI for the `admin` to assign permissions to non-admin roles (`manager`, `dispatcher`, `driver`, `user`).
+A dedicated UI for the `admin` to assign permissions to non-admin roles.
+- Roles are loaded dynamically from the Backend via `src/hooks/use-roles.ts`; do not hardcode role tabs such as `manager`, `dispatcher`, `driver`, or `user`.
+- The `admin` role is intentionally hidden from the permission management tabs because admin always has all permissions through the bypass in `use-permissions.ts`.
+- Role tabs support create, edit label, soft-delete, and manual drag sorting. Sorting is UI-only and persisted in local storage with `nag-role-permissions-tab-order`.
+- Add/edit/delete role popups use shadcn `Dialog` + Tailwind. Keep Ant Design for `Tabs` and `Tree`.
+- When closing the add/edit role dialog, do **not** immediately reset `editingRole` or `roleLabel`. Radix Dialog close animation can still render the old content; resetting those fields during close makes the visible dialog text jump from edit mode to create mode. Reset these fields only when opening create/edit dialogs.
 - Uses Ant Design's `Tree` for the complex parent-child check logic.
 - Enforces strict logic: You cannot check `add`/`edit`/`delete` without also checking `view`. If you uncheck `view`, all other actions are automatically unchecked.
 - **Payload format to BE**: Sends a JSON object of type `Record<string, string[]>` mapping roles to their assigned permission keys.

@@ -119,6 +119,7 @@
     "refreshData": "Refresh Data",
     "optional": "optional",
     "selectDate": "Select date",
+    "duplicateRoleError": "This role name already exists",
     "messages": {
       "commonError": "An error has occurred. Please try again later."
     },
@@ -398,7 +399,7 @@
     "openGoogleMaps": "Open Google Maps",
     "retry": "Retry",
     "close": "Close",
-    "totalDistance": "Total Distance", 
+    "totalDistance": "Total Distance",
     "totalTime": "Total Time",
     "startTime": "Start",
     "endTime": "End",
@@ -661,10 +662,7 @@
     "fromDate": "Start Date",
     "toDate": "End Date",
     "dateRange": "Maintenance Period",
-    "dateRangePlaceholder": [
-      "From date",
-      "To date"
-    ],
+    "dateRangePlaceholder": ["From date", "To date"],
     "distanceCovered": "Distance Covered (km)",
     "distancePlaceholder": "e.g. 15000",
     "description": "Work Description",
