@@ -14,6 +14,9 @@ export const SIDEBAR = {
   MEAL_CHECK: "/meal-check",
   ATTENDANCE: "/attendance",
   AI_ASSISTANT: "/ai-assistant",
+  DEPARTMENTS: "/configuration/departments",
+  SKILLS: "/configuration/skills",
+  USER_ASSIGNMENTS: "/configuration/user-assignments",
   USER_MANAGE: "/user-manage",
   ROLE_PERMISSIONS: "/role-permissions",
 };

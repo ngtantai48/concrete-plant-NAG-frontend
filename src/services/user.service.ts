@@ -5,6 +5,7 @@ export interface ListUsersParams {
   page?: number;
   limit?: number;
   user_full_name?: string;
+  user_short_name?: string;
   username?: string;
   user_phone_number?: string;
   user_email?: string;

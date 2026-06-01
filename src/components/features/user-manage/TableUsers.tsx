@@ -21,7 +21,7 @@ import { clearUsers, deleteUser, fetchUsers, setPagination } from "@/store/slice
 import type { User } from "@/types/user";
 import { Popconfirm, Space, Table, Tooltip } from "antd";
 import type { ColumnType } from "antd/es/table";
-import { CalendarDays, Loader, PencilLine, RefreshCw, Trash, UserPlus } from "lucide-react";
+import { CalendarDays, Loader, PencilLine, Trash, UserPlus } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -59,6 +59,7 @@ export default function TableUsers() {
   const searchFieldLabels: Record<UserSearchField, string> = useMemo(
     () => ({
       user_full_name: t("full_name"),
+      user_short_name: t("short_name"),
       username: t("username"),
       user_phone_number: t("phone_number"),
       user_email: t("email"),
@@ -134,9 +135,7 @@ export default function TableUsers() {
       );
     } catch (error) {
       const message =
-        (error as any)?.response?.data?.message ||
-        (error as Error)?.message ||
-        t("deleteFailed");
+        (error as any)?.response?.data?.message || (error as Error)?.message || t("deleteFailed");
       toast.error(t("failed"), { description: message });
     }
   };
@@ -170,6 +169,12 @@ export default function TableUsers() {
       dataIndex: "user_full_name",
       key: "user_full_name",
       render: (value: string) => <span className="font-semibold text-slate-800">{value}</span>,
+    },
+    {
+      title: t("short_name"),
+      dataIndex: "user_short_name",
+      key: "user_short_name",
+      render: (value: string | null) => value || <span className="text-slate-400">-</span>,
     },
     {
       title: t("username"),
@@ -232,34 +237,36 @@ export default function TableUsers() {
       fixed: "right",
       render: (_value, record) => (
         <Space size="middle">
-          {record.role !== "admin" && hasActionAccess(SIDEBAR.USER_MANAGE, PERMISSIONS.USER_MANAGE.UPDATE) && (
-            <Tooltip title={tCommon("edit")}>
-              <Button variant="outline" size="iconSquare" onClick={() => setEditingUser(record)}>
-                <PencilLine className="text-blue-600" />
-              </Button>
-            </Tooltip>
-          )}
-          {record.role !== "admin" && hasActionAccess(SIDEBAR.USER_MANAGE, PERMISSIONS.USER_MANAGE.DELETE) && (
-            <Popconfirm
-              title={tCommon("confirm")}
-              description={
-                <span>
-                  {t("confirmDelete")} <b>{record.user_full_name}</b>?
-                </span>
-              }
-              okText={tCommon("delete")}
-              cancelText={tCommon("cancel")}
-              placement="leftBottom"
-              okButtonProps={{ danger: true }}
-              onConfirm={() => handleDeleteUser(record)}
-            >
-              <Tooltip title={tCommon("delete")}>
-                <Button variant="outline" size="iconSquare">
-                  <Trash className="text-red-600" />
+          {record.role !== "admin" &&
+            hasActionAccess(SIDEBAR.USER_MANAGE, PERMISSIONS.USER_MANAGE.UPDATE) && (
+              <Tooltip title={tCommon("edit")}>
+                <Button variant="outline" size="iconSquare" onClick={() => setEditingUser(record)}>
+                  <PencilLine className="text-blue-600" />
                 </Button>
               </Tooltip>
-            </Popconfirm>
-          )}
+            )}
+          {record.role !== "admin" &&
+            hasActionAccess(SIDEBAR.USER_MANAGE, PERMISSIONS.USER_MANAGE.DELETE) && (
+              <Popconfirm
+                title={tCommon("confirm")}
+                description={
+                  <span>
+                    {t("confirmDelete")} <b>{record.user_full_name}</b>?
+                  </span>
+                }
+                okText={tCommon("delete")}
+                cancelText={tCommon("cancel")}
+                placement="leftBottom"
+                okButtonProps={{ danger: true }}
+                onConfirm={() => handleDeleteUser(record)}
+              >
+                <Tooltip title={tCommon("delete")}>
+                  <Button variant="outline" size="iconSquare">
+                    <Trash className="text-red-600" />
+                  </Button>
+                </Tooltip>
+              </Popconfirm>
+            )}
         </Space>
       ),
     },
@@ -287,14 +294,18 @@ export default function TableUsers() {
             )}
 
             <Tooltip title={tCommon("refreshData")}>
-              <Button variant="outline" disabled={refreshDisabled > 0}
+              <Button
+                variant="outline"
+                disabled={refreshDisabled > 0}
                 className="hover:bg-slate-100 transition-smooth"
                 onClick={handleRefresh}
               >
                 <div className="flex items-center gap-2">
                   <Loader className={`${refreshDisabled > 0 ? "animate-spin" : ""}`} />
                   <span>
-                    {refreshDisabled > 0 ? `${tCommon("refresh")} (${refreshDisabled}s)` : tCommon("refresh")}
+                    {refreshDisabled > 0
+                      ? `${tCommon("refresh")} (${refreshDisabled}s)`
+                      : tCommon("refresh")}
                   </span>
                 </div>
               </Button>
@@ -378,7 +389,11 @@ export default function TableUsers() {
                     }
 
                     if (Math.abs(pageNumber - page) === 2) {
-                      return <span key={`ellipsis-${pageNumber}`} className="px-2">...</span>;
+                      return (
+                        <span key={`ellipsis-${pageNumber}`} className="px-2">
+                          ...
+                        </span>
+                      );
                     }
 
                     return null;

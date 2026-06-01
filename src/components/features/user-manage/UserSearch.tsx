@@ -14,7 +14,13 @@ import { useTranslations } from "next-intl";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 
-const SEARCH_FIELDS = ["user_full_name", "username", "user_phone_number", "user_email"] as const;
+const SEARCH_FIELDS = [
+  "user_full_name",
+  "user_short_name",
+  "username",
+  "user_phone_number",
+  "user_email",
+] as const;
 
 export type UserSearchField = (typeof SEARCH_FIELDS)[number];
 
@@ -25,12 +31,14 @@ export default function UserSearch() {
   const pathname = usePathname();
   const { replace } = useRouter();
 
-  const currentSearchField = (searchParams.get("searchField") || "user_full_name") as UserSearchField;
+  const currentSearchField = (searchParams.get("searchField") ||
+    "user_full_name") as UserSearchField;
   const currentQuery = searchParams.get("query") || "";
   const [searchValue, setSearchValue] = useState(currentQuery);
 
   const searchFields: Record<UserSearchField, string> = {
     user_full_name: t("full_name"),
+    user_short_name: t("short_name"),
     username: t("username"),
     user_phone_number: t("phone_number"),
     user_email: t("email"),
@@ -38,6 +46,7 @@ export default function UserSearch() {
 
   const searchPlaceholders: Record<UserSearchField, string> = {
     user_full_name: t("searchByName"),
+    user_short_name: t("searchByShortName"),
     username: t("searchByUsername"),
     user_phone_number: t("searchByPhone"),
     user_email: t("searchByEmail"),

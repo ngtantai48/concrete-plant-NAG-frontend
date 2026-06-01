@@ -68,6 +68,7 @@ export default function TableVehicleTypes() {
     setEditingType(record);
     form.setFieldsValue({
       vehicle_type_name: record.vehicle_type_name,
+      vehicle_type_symbol: record.vehicle_type_symbol || "",
       vehicle_type_description: record.vehicle_type_description,
     });
     setIsModalVisible(true);
@@ -82,11 +83,17 @@ export default function TableVehicleTypes() {
   const handleSave = async () => {
     try {
       const values = await form.validateFields();
+      const payload = {
+        ...values,
+        vehicle_type_name: values.vehicle_type_name.trim(),
+        vehicle_type_symbol: values.vehicle_type_symbol.trim().toUpperCase(),
+        vehicle_type_description: values.vehicle_type_description?.trim() || null,
+      };
       setSaving(true);
       if (editingType) {
-        await vehicleTypeApi.update(editingType.vehicle_type_id, values);
+        await vehicleTypeApi.update(editingType.vehicle_type_id, payload);
       } else {
-        await vehicleTypeApi.create(values);
+        await vehicleTypeApi.create(payload);
       }
       setIsModalVisible(false);
       form.resetFields();
@@ -139,6 +146,21 @@ export default function TableVehicleTypes() {
       dataIndex: "vehicle_type_name",
       key: "vehicle_type_name",
       render: (text: string) => <span className="font-semibold text-slate-800">{text}</span>,
+    },
+    {
+      title: t("symbol"),
+      dataIndex: "vehicle_type_symbol",
+      key: "vehicle_type_symbol",
+      width: 140,
+      align: "center" as const,
+      render: (val: string | null) =>
+        val ? (
+          <span className="inline-flex min-w-12 items-center justify-center rounded border border-slate-300 bg-slate-100 px-2 py-1 text-sm font-bold uppercase tracking-wider text-slate-800">
+            {val}
+          </span>
+        ) : (
+          <span className="text-slate-400 italic">-</span>
+        ),
     },
     {
       title: t("typeDescription"),
@@ -329,6 +351,28 @@ export default function TableVehicleTypes() {
               rules={[{ required: true, message: t("requiredName") }]}
             >
               <Input placeholder={t("namePlaceholder")} size="large" className="rounded-lg" />
+            </Form.Item>
+
+            <Form.Item
+              label={<span className="font-medium text-slate-700">{t("symbol")}</span>}
+              name="vehicle_type_symbol"
+              rules={[
+                { required: true, message: t("requiredSymbol") },
+                {
+                  validator: (_, value?: string) => {
+                    const normalized = value?.trim() || "";
+                    if (!normalized) return Promise.reject(t("requiredSymbol"));
+                    if (/\d/.test(normalized)) return Promise.reject(t("invalidSymbol"));
+                    return Promise.resolve();
+                  },
+                },
+              ]}
+            >
+              <Input
+                placeholder={t("symbolPlaceholder")}
+                size="large"
+                className="rounded-lg font-semibold uppercase tracking-wider"
+              />
             </Form.Item>
 
             <Form.Item

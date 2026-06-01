@@ -1,6 +1,5 @@
 "use client";
 
-import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import {
@@ -27,14 +26,15 @@ import { userApi } from "@/services/user.service";
 import type { AppDispatch } from "@/store";
 import { updateUser } from "@/store/slices/userSlice";
 import type { UpdateUserPayload, User, UserRole } from "@/types/user";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { format, isValid, parse } from "date-fns";
 import { Calendar as CalendarIcon, Loader2, Save, UserCog, X } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { useEffect } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { useDispatch } from "react-redux";
 import { toast } from "sonner";
 import { z } from "zod";
-import { useEffect } from "react";
 
 interface UserEditModalProps {
   open: boolean;
@@ -49,11 +49,24 @@ const joinDateSchema = z
 
 const editUserSchema = z.object({
   user_full_name: z.string().trim().min(1, "Vui lòng nhập họ tên"),
+  user_short_name: z.string().trim().optional(),
   user_email: z.string().trim().email("Email không hợp lệ"),
-  user_phone_number: z.string().trim().min(1, "Vui lòng nhập số điện thoại").max(20, "Số điện thoại quá dài"),
+  user_phone_number: z
+    .string()
+    .trim()
+    .min(1, "Vui lòng nhập số điện thoại")
+    .max(20, "Số điện thoại quá dài"),
   user_address: z.string().trim().optional(),
-  username: z.string().trim().min(3, "Username phải có ít nhất 3 ký tự").max(100, "Username quá dài"),
-  password: z.string().max(100, "Mật khẩu quá dài").optional().refine((value) => !value || value.length >= 6, "Mật khẩu phải có ít nhất 6 ký tự"),
+  username: z
+    .string()
+    .trim()
+    .min(3, "Username phải có ít nhất 3 ký tự")
+    .max(100, "Username quá dài"),
+  password: z
+    .string()
+    .max(100, "Mật khẩu quá dài")
+    .optional()
+    .refine((value) => !value || value.length >= 6, "Mật khẩu phải có ít nhất 6 ký tự"),
   role: z.enum(["admin", "manager", "dispatcher", "driver", "user"]),
   user_join_date: joinDateSchema,
   user_work_shift: z.string().trim(),
@@ -93,6 +106,7 @@ export default function UserEditModal({ open, user, onClose }: UserEditModalProp
     resolver: zodResolver(editUserSchema),
     defaultValues: {
       user_full_name: "",
+      user_short_name: "",
       user_email: "",
       user_phone_number: "",
       user_address: "",
@@ -109,6 +123,7 @@ export default function UserEditModal({ open, user, onClose }: UserEditModalProp
 
     reset({
       user_full_name: user.user_full_name || "",
+      user_short_name: user.user_short_name || "",
       user_email: user.user_email || "",
       user_phone_number: user.user_phone_number || "",
       user_address: user.user_address || "",
@@ -132,6 +147,7 @@ export default function UserEditModal({ open, user, onClose }: UserEditModalProp
     try {
       const payload: UpdateUserPayload = {
         user_full_name: values.user_full_name,
+        user_short_name: values.user_short_name || "",
         user_email: values.user_email,
         user_phone_number: values.user_phone_number,
         user_address: values.user_address || "",
@@ -148,9 +164,7 @@ export default function UserEditModal({ open, user, onClose }: UserEditModalProp
       onClose();
     } catch (error) {
       const message =
-        (error as any)?.response?.data?.message ||
-        (error as Error)?.message ||
-        t("updateFailed");
+        (error as any)?.response?.data?.message || (error as Error)?.message || t("updateFailed");
       toast.error(t("failed"), { description: message });
     }
   };
@@ -161,7 +175,9 @@ export default function UserEditModal({ open, user, onClose }: UserEditModalProp
     </p>
   );
   const requiredMark = <span className="text-red-500">*</span>;
-  const optionalLabel = (<span className="text-xs font-normal text-slate-500">({tCommon("optional")})</span>);
+  const optionalLabel = (
+    <span className="text-xs font-normal text-slate-500">({tCommon("optional")})</span>
+  );
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -181,13 +197,24 @@ export default function UserEditModal({ open, user, onClose }: UserEditModalProp
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 px-4">
           <section className="space-y-2">
             <h3 className="text-sm font-semibold text-slate-700">{t("personalInfo")}</h3>
-            <div className="space-y-1">
-              <Label htmlFor="edit-user-full-name">
-                {t("full_name")}
-                {requiredMark}
-              </Label>
-              <Input id="edit-user-full-name" {...register("user_full_name")} />
-              {errorText(errors.user_full_name?.message)}
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="space-y-1">
+                <Label htmlFor="edit-user-full-name">
+                  {t("full_name")}
+                  {requiredMark}
+                </Label>
+                <Input id="edit-user-full-name" {...register("user_full_name")} />
+                {errorText(errors.user_full_name?.message)}
+              </div>
+
+              <div className="space-y-1">
+                <Label htmlFor="edit-user-short-name">
+                  {t("short_name")}
+                  {optionalLabel}
+                </Label>
+                <Input id="edit-user-short-name" {...register("user_short_name")} />
+                {errorText(errors.user_short_name?.message)}
+              </div>
             </div>
 
             <div className="grid gap-3 md:grid-cols-2">
@@ -227,7 +254,12 @@ export default function UserEditModal({ open, user, onClose }: UserEditModalProp
                   {t("username")}
                   {requiredMark}
                 </Label>
-                <Input id="edit-username" {...register("username")} className="bg-slate-50" disabled />
+                <Input
+                  id="edit-username"
+                  {...register("username")}
+                  className="bg-slate-50"
+                  disabled
+                />
                 {errorText(errors.username?.message)}
               </div>
               <div className="space-y-1">
@@ -235,7 +267,12 @@ export default function UserEditModal({ open, user, onClose }: UserEditModalProp
                   {t("newPassword")}
                   {optionalLabel}
                 </Label>
-                <Input id="edit-password" type="password" {...register("password")} placeholder={t("passwordOptional")} />
+                <Input
+                  id="edit-password"
+                  type="password"
+                  {...register("password")}
+                  placeholder={t("passwordOptional")}
+                />
                 {errorText(errors.password?.message)}
               </div>
             </div>
@@ -250,12 +287,14 @@ export default function UserEditModal({ open, user, onClose }: UserEditModalProp
                   control={control}
                   name="role"
                   render={({ field }) => (
-                    <Select value={field.value} onValueChange={(value: UserRole) => field.onChange(value)}>
+                    <Select
+                      value={field.value}
+                      onValueChange={(value: UserRole) => field.onChange(value)}
+                    >
                       <SelectTrigger className="w-full bg-white">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {/* <SelectItem value="admin">{tRoles("admin")}</SelectItem> */}
                         <SelectItem value="manager">{tRoles("manager")}</SelectItem>
                         <SelectItem value="dispatcher">{tRoles("dispatcher")}</SelectItem>
                         <SelectItem value="driver">{tRoles("driver")}</SelectItem>
@@ -266,6 +305,9 @@ export default function UserEditModal({ open, user, onClose }: UserEditModalProp
                 />
                 {errorText(errors.role?.message)}
               </div>
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-2">
               <div className="space-y-1">
                 <Label htmlFor="edit-join-date">
                   {t("join_date")}
@@ -288,15 +330,19 @@ export default function UserEditModal({ open, user, onClose }: UserEditModalProp
                               !selectedDate && "text-muted-foreground"
                             )}
                           >
-                            {selectedDate ? format(selectedDate, "dd/MM/yyyy") : tCommon("selectDate")}
+                            {selectedDate
+                              ? format(selectedDate, "dd/MM/yyyy")
+                              : tCommon("selectDate")}
                             <CalendarIcon className="ml-2 size-4 opacity-50" />
                           </Button>
                         </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0 z-[300]" align="start">
+                        <PopoverContent className="z-[300] w-auto p-0" align="start">
                           <Calendar
                             mode="single"
                             selected={selectedDate}
-                            onSelect={(date) => field.onChange(date ? format(date, "yyyy-MM-dd") : "")}
+                            onSelect={(date) =>
+                              field.onChange(date ? format(date, "yyyy-MM-dd") : "")
+                            }
                             initialFocus
                           />
                         </PopoverContent>
@@ -306,15 +352,19 @@ export default function UserEditModal({ open, user, onClose }: UserEditModalProp
                 />
                 {errorText(errors.user_join_date?.message)}
               </div>
-            </div>
 
-            <div className="space-y-1">
-              <Label htmlFor="edit-work-shift">
-                {t("work_shift")}
-                {optionalLabel}
-              </Label>
-              <Input id="edit-work-shift" {...register("user_work_shift")} placeholder={t("workShiftPlaceholder")} />
-              {errorText(errors.user_work_shift?.message)}
+              <div className="space-y-1">
+                <Label htmlFor="edit-work-shift">
+                  {t("work_shift")}
+                  {optionalLabel}
+                </Label>
+                <Input
+                  id="edit-work-shift"
+                  {...register("user_work_shift")}
+                  placeholder={t("workShiftPlaceholder")}
+                />
+                {errorText(errors.user_work_shift?.message)}
+              </div>
             </div>
           </section>
 
@@ -323,8 +373,16 @@ export default function UserEditModal({ open, user, onClose }: UserEditModalProp
               <X className="size-4" />
               {tCommon("cancel")}
             </Button>
-            <Button type="submit" disabled={isSubmitting} className="bg-amber-600 text-white hover:bg-amber-700">
-              {isSubmitting ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+            <Button
+              type="submit"
+              disabled={isSubmitting}
+              className="bg-amber-600 text-white hover:bg-amber-700"
+            >
+              {isSubmitting ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <Save className="size-4" />
+              )}
               {isSubmitting ? t("saving") : tCommon("save")}
             </Button>
           </DialogFooter>

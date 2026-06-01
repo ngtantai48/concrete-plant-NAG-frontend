@@ -1,19 +1,32 @@
 "use client";
 
-import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { userApi } from "@/services/user.service";
 import type { AppDispatch } from "@/store";
 import { addUser } from "@/store/slices/userSlice";
 import type { CreateUserPayload, UserRole } from "@/types/user";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { format, isValid, parse } from "date-fns";
 import { Calendar as CalendarIcon, Loader2, UserPlus, X } from "lucide-react";
 import { useTranslations } from "next-intl";
@@ -41,10 +54,19 @@ const parseDateValue = (value?: string) => {
 
 const createUserSchema = z.object({
   user_full_name: z.string().trim().min(1, "Vui lòng nhập họ tên"),
+  user_short_name: z.string().trim().optional(),
   user_email: z.string().trim().email("Email không hợp lệ"),
-  user_phone_number: z.string().trim().min(1, "Vui lòng nhập số điện thoại").max(20, "Số điện thoại quá dài"),
+  user_phone_number: z
+    .string()
+    .trim()
+    .min(1, "Vui lòng nhập số điện thoại")
+    .max(20, "Số điện thoại quá dài"),
   user_address: z.string().trim().optional(),
-  username: z.string().trim().min(3, "Username phải có ít nhất 3 ký tự").max(100, "Username quá dài"),
+  username: z
+    .string()
+    .trim()
+    .min(3, "Username phải có ít nhất 3 ký tự")
+    .max(100, "Username quá dài"),
   password: z.string().min(6, "Mật khẩu phải có ít nhất 6 ký tự").max(100, "Mật khẩu quá dài"),
   role: z.enum(["admin", "manager", "dispatcher", "driver", "user"]),
   user_join_date: joinDateSchema,
@@ -69,6 +91,7 @@ export default function UserCreateModal({ open, onClose }: UserCreateModalProps)
     resolver: zodResolver(createUserSchema),
     defaultValues: {
       user_full_name: "",
+      user_short_name: "",
       user_email: "",
       user_phone_number: "",
       user_address: "",
@@ -91,6 +114,7 @@ export default function UserCreateModal({ open, onClose }: UserCreateModalProps)
     try {
       const payload: CreateUserPayload = {
         ...values,
+        user_short_name: values.user_short_name || "",
         user_address: values.user_address || "",
         user_work_shift: values.user_work_shift || "",
       };
@@ -101,9 +125,7 @@ export default function UserCreateModal({ open, onClose }: UserCreateModalProps)
       onClose();
     } catch (error) {
       const message =
-        (error as any)?.response?.data?.message ||
-        (error as Error)?.message ||
-        t("createFailed");
+        (error as any)?.response?.data?.message || (error as Error)?.message || t("createFailed");
       toast.error(t("failed"), { description: message });
     }
   };
@@ -136,13 +158,32 @@ export default function UserCreateModal({ open, onClose }: UserCreateModalProps)
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 px-4">
           <section className="space-y-2">
             <h3 className="text-sm font-semibold text-slate-700">{t("personalInfo")}</h3>
-            <div className="space-y-1">
-              <Label htmlFor="create-user-full-name">
-                {t("full_name")}
-                {requiredMark}
-              </Label>
-              <Input id="create-user-full-name" {...register("user_full_name")} placeholder="VD: Nguyễn Văn A" />
-              {errorText(errors.user_full_name?.message)}
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="space-y-1">
+                <Label htmlFor="create-user-full-name">
+                  {t("full_name")}
+                  {requiredMark}
+                </Label>
+                <Input
+                  id="create-user-full-name"
+                  {...register("user_full_name")}
+                  placeholder="VD: Nguyễn Văn A"
+                />
+                {errorText(errors.user_full_name?.message)}
+              </div>
+
+              <div className="space-y-1">
+                <Label htmlFor="create-user-short-name">
+                  {t("short_name")}
+                  {optionalLabel}
+                </Label>
+                <Input
+                  id="create-user-short-name"
+                  {...register("user_short_name")}
+                  placeholder="VD: A, Văn A"
+                />
+                {errorText(errors.user_short_name?.message)}
+              </div>
             </div>
 
             <div className="grid gap-3 md:grid-cols-2">
@@ -151,7 +192,12 @@ export default function UserCreateModal({ open, onClose }: UserCreateModalProps)
                   {t("email")}
                   {requiredMark}
                 </Label>
-                <Input id="create-user-email" type="email" {...register("user_email")} placeholder="example@email.com" />
+                <Input
+                  id="create-user-email"
+                  type="email"
+                  {...register("user_email")}
+                  placeholder="example@email.com"
+                />
                 {errorText(errors.user_email?.message)}
               </div>
               <div className="space-y-1">
@@ -159,7 +205,11 @@ export default function UserCreateModal({ open, onClose }: UserCreateModalProps)
                   {t("phone_number")}
                   {requiredMark}
                 </Label>
-                <Input id="create-user-phone" {...register("user_phone_number")} placeholder="0123456789" />
+                <Input
+                  id="create-user-phone"
+                  {...register("user_phone_number")}
+                  placeholder="0123456789"
+                />
                 {errorText(errors.user_phone_number?.message)}
               </div>
             </div>
@@ -169,7 +219,11 @@ export default function UserCreateModal({ open, onClose }: UserCreateModalProps)
                 {t("address")}
                 {optionalLabel}
               </Label>
-              <Textarea id="create-user-address" {...register("user_address")} placeholder="VD: 123 Đường ABC, Quận 1, TP.HCM" />
+              <Textarea
+                id="create-user-address"
+                {...register("user_address")}
+                placeholder="VD: 123 Đường ABC, Quận 1, TP.HCM"
+              />
               {errorText(errors.user_address?.message)}
             </div>
           </section>
@@ -182,7 +236,11 @@ export default function UserCreateModal({ open, onClose }: UserCreateModalProps)
                   {t("username")}
                   {requiredMark}
                 </Label>
-                <Input id="create-username" {...register("username")} placeholder="VD: nguyenvana" />
+                <Input
+                  id="create-username"
+                  {...register("username")}
+                  placeholder="VD: nguyenvana"
+                />
                 {errorText(errors.username?.message)}
               </div>
               <div className="space-y-1">
@@ -190,7 +248,12 @@ export default function UserCreateModal({ open, onClose }: UserCreateModalProps)
                   {t("password")}
                   {requiredMark}
                 </Label>
-                <Input id="create-password" type="password" {...register("password")} placeholder="******" />
+                <Input
+                  id="create-password"
+                  type="password"
+                  {...register("password")}
+                  placeholder="******"
+                />
                 {errorText(errors.password?.message)}
               </div>
             </div>
@@ -205,12 +268,14 @@ export default function UserCreateModal({ open, onClose }: UserCreateModalProps)
                   control={control}
                   name="role"
                   render={({ field }) => (
-                    <Select value={field.value} onValueChange={(value: UserRole) => field.onChange(value)}>
+                    <Select
+                      value={field.value}
+                      onValueChange={(value: UserRole) => field.onChange(value)}
+                    >
                       <SelectTrigger className="w-full bg-white">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {/* <SelectItem value="admin">{tRoles("admin")}</SelectItem> */}
                         <SelectItem value="manager">{tRoles("manager")}</SelectItem>
                         <SelectItem value="dispatcher">{tRoles("dispatcher")}</SelectItem>
                         <SelectItem value="driver">{tRoles("driver")}</SelectItem>
@@ -221,6 +286,9 @@ export default function UserCreateModal({ open, onClose }: UserCreateModalProps)
                 />
                 {errorText(errors.role?.message)}
               </div>
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-2">
               <div className="space-y-1">
                 <Label htmlFor="create-join-date">
                   {t("join_date")}
@@ -243,15 +311,19 @@ export default function UserCreateModal({ open, onClose }: UserCreateModalProps)
                               !selectedDate && "text-muted-foreground"
                             )}
                           >
-                            {selectedDate ? format(selectedDate, "dd/MM/yyyy") : tCommon("selectDate")}
+                            {selectedDate
+                              ? format(selectedDate, "dd/MM/yyyy")
+                              : tCommon("selectDate")}
                             <CalendarIcon className="ml-2 size-4 opacity-50" />
                           </Button>
                         </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0 z-[300]" align="start">
+                        <PopoverContent className="z-[300] w-auto p-0" align="start">
                           <Calendar
                             mode="single"
                             selected={selectedDate}
-                            onSelect={(date) => field.onChange(date ? format(date, "yyyy-MM-dd") : "")}
+                            onSelect={(date) =>
+                              field.onChange(date ? format(date, "yyyy-MM-dd") : "")
+                            }
                             initialFocus
                           />
                         </PopoverContent>
@@ -261,25 +333,42 @@ export default function UserCreateModal({ open, onClose }: UserCreateModalProps)
                 />
                 {errorText(errors.user_join_date?.message)}
               </div>
-            </div>
 
-            <div className="space-y-1">
-              <Label htmlFor="create-work-shift">
-                {t("work_shift")}
-                {optionalLabel}
-              </Label>
-              <Input id="create-work-shift" {...register("user_work_shift")} placeholder={t("workShiftPlaceholder")} />
-              {errorText(errors.user_work_shift?.message)}
+              <div className="space-y-1">
+                <Label htmlFor="create-work-shift">
+                  {t("work_shift")}
+                  {optionalLabel}
+                </Label>
+                <Input
+                  id="create-work-shift"
+                  {...register("user_work_shift")}
+                  placeholder={t("workShiftPlaceholder")}
+                />
+                {errorText(errors.user_work_shift?.message)}
+              </div>
             </div>
           </section>
 
           <DialogFooter className="border-t border-slate-100 pt-4">
-            <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => handleOpenChange(false)}
+              disabled={isSubmitting}
+            >
               <X className="size-4" />
               {tCommon("cancel")}
             </Button>
-            <Button type="submit" disabled={isSubmitting} className="bg-blue-600 text-white hover:bg-blue-700">
-              {isSubmitting ? <Loader2 className="size-4 animate-spin" /> : <UserPlus className="size-4" />}
+            <Button
+              type="submit"
+              disabled={isSubmitting}
+              className="bg-blue-600 text-white hover:bg-blue-700"
+            >
+              {isSubmitting ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <UserPlus className="size-4" />
+              )}
               {isSubmitting ? t("saving") : t("add")}
             </Button>
           </DialogFooter>

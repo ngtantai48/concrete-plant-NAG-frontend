@@ -417,3 +417,20 @@ test("invalid render fence is contained and does not crash", () => {
   const chunks = parseStream(":::render\n{ invalid json\n:::");
   assert.deepEqual(chunks, [{ kind: "md", body: "_(invalid render block)_" }]);
 });
+
+test("alert level aliases normalize to canonical alert tones", () => {
+  const chunks = blockChunks(
+    renderFence({
+      type: "alert",
+      id: "alert-warning-alias",
+      level: "warning",
+      title: "Nhiều xe khớp truy vấn",
+      body: "Vui lòng chọn đúng xe.",
+    })
+  );
+
+  assert.equal(chunks.length, 1);
+  const parsed = renderBlockDataSchema.safeParse(chunks[0].data);
+  assert.equal(parsed.success, true);
+  assert.equal(parsed.success ? parsed.data.level : undefined, "warn");
+});

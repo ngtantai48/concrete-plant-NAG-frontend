@@ -19,6 +19,7 @@ export interface Vehicle {
 export interface VehicleType {
   vehicle_type_id: number;
   vehicle_type_name: string;
+  vehicle_type_symbol?: string | null;
   vehicle_type_description: string | null;
   updated_at?: string;
   updated_by?: number;

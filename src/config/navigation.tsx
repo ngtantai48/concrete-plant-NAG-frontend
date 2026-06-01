@@ -2,8 +2,26 @@ import { PERMISSIONS } from "@/constants/permissions";
 import { ROLES } from "@/constants/roles";
 import { SIDEBAR } from "@/constants/route";
 import {
-  ArrowRightLeft, Bot, CalendarCheck, Car, CalendarClock, ClipboardList, Gauge, Layers, MapPin,
-  Package, Settings, ShieldCheck, UserCog, UsersRound, UtensilsCrossed, Wrench
+  ArrowRightLeft,
+  Award,
+  Bot,
+  Building2,
+  CalendarCheck,
+  Car,
+  CalendarClock,
+  ClipboardList,
+  Gauge,
+  Layers,
+  Link2,
+  MapPin,
+  Package,
+  Settings,
+  Settings2,
+  ShieldCheck,
+  UserCog,
+  UsersRound,
+  UtensilsCrossed,
+  Wrench,
 } from "lucide-react";
 import React from "react";
 
@@ -33,7 +51,10 @@ export const navigationConfig: NavItem[] = [
       { key: PERMISSIONS.DASHBOARD.CHECKLOG, label: "Nhật ký vận hành" },
       { key: PERMISSIONS.DASHBOARD.MANUAL_SORT, label: "Sắp xếp thứ tự lốt xe" },
       { key: PERMISSIONS.DASHBOARD.VIEW_MAP, label: "Bản đồ" },
-      { key: PERMISSIONS.DASHBOARD.MANUAL_CAMERA_FALLBACK, label: "Thao tác thủ công (camera sự cố)" },
+      {
+        key: PERMISSIONS.DASHBOARD.MANUAL_CAMERA_FALLBACK,
+        label: "Thao tác thủ công (camera sự cố)",
+      },
       { key: PERMISSIONS.DASHBOARD.SYSTEM_SETTINGS, label: "Cấu hình vận hành" },
     ],
   },
@@ -57,17 +78,6 @@ export const navigationConfig: NavItem[] = [
       { key: PERMISSIONS.VEHICLE_MAINTENANCES.CREATE, label: "Thêm bảo trì" },
       { key: PERMISSIONS.VEHICLE_MAINTENANCES.UPDATE, label: "Sửa bảo trì" },
       { key: PERMISSIONS.VEHICLE_MAINTENANCES.DELETE, label: "Xóa bảo trì" },
-    ],
-  },
-  {
-    key: SIDEBAR.VEHICLE_TYPES,
-    label: "vehicleTypes",
-    icon: <Layers />,
-    actions: [
-      { key: PERMISSIONS.VEHICLE_TYPES.VIEW, label: "Xem danh sách loại phương tiện" },
-      { key: PERMISSIONS.VEHICLE_TYPES.CREATE, label: "Thêm loại phương tiện" },
-      { key: PERMISSIONS.VEHICLE_TYPES.UPDATE, label: "Sửa loại phương tiện" },
-      { key: PERMISSIONS.VEHICLE_TYPES.DELETE, label: "Xóa loại phương tiện" },
     ],
   },
   {
@@ -120,6 +130,58 @@ export const navigationConfig: NavItem[] = [
     label: "aiAssistant",
     icon: <Bot />,
     // roles: [ROLES.ADMIN],
+  },
+  {
+    key: "category-group",
+    label: "category",
+    icon: <Settings2 />,
+    children: [
+      {
+        key: SIDEBAR.VEHICLE_TYPES,
+        label: "vehicleTypes",
+        icon: <Layers size={18} />,
+        actions: [
+          { key: PERMISSIONS.VEHICLE_TYPES.VIEW, label: "Xem danh sách loại phương tiện" },
+          { key: PERMISSIONS.VEHICLE_TYPES.CREATE, label: "Thêm loại phương tiện" },
+          { key: PERMISSIONS.VEHICLE_TYPES.UPDATE, label: "Sửa loại phương tiện" },
+          { key: PERMISSIONS.VEHICLE_TYPES.DELETE, label: "Xóa loại phương tiện" },
+        ],
+      },
+      {
+        key: SIDEBAR.DEPARTMENTS,
+        label: "departments",
+        icon: <Building2 size={18} />,
+        actions: [
+          { key: PERMISSIONS.DEPARTMENTS.VIEW, label: "Xem danh sách bộ phận" },
+          { key: PERMISSIONS.DEPARTMENTS.CREATE, label: "Thêm bộ phận" },
+          { key: PERMISSIONS.DEPARTMENTS.UPDATE, label: "Sửa bộ phận" },
+          { key: PERMISSIONS.DEPARTMENTS.ASSIGN_USERS, label: "Gán nhân sự vào bộ phận" },
+          { key: PERMISSIONS.DEPARTMENTS.DELETE, label: "Xóa bộ phận" },
+        ],
+      },
+      {
+        key: SIDEBAR.SKILLS,
+        label: "skills",
+        icon: <Award size={18} />,
+        actions: [
+          { key: PERMISSIONS.SKILLS.VIEW, label: "Xem danh sách tay nghề" },
+          { key: PERMISSIONS.SKILLS.CREATE, label: "Thêm tay nghề" },
+          { key: PERMISSIONS.SKILLS.UPDATE, label: "Sửa tay nghề" },
+          { key: PERMISSIONS.SKILLS.DELETE, label: "Xóa tay nghề" },
+        ],
+      },
+      {
+        key: SIDEBAR.USER_ASSIGNMENTS,
+        label: "userAssignments",
+        icon: <Link2 size={18} />,
+        actions: [
+          { key: PERMISSIONS.USER_ASSIGNMENTS.VIEW, label: "Xem danh mục nhân sự" },
+          { key: PERMISSIONS.USER_ASSIGNMENTS.CREATE, label: "Thêm nhân sự" },
+          { key: PERMISSIONS.USER_ASSIGNMENTS.UPDATE, label: "Sửa nhân sự" },
+          { key: PERMISSIONS.USER_ASSIGNMENTS.DELETE, label: "Xóa nhân sự" },
+        ],
+      },
+    ],
   },
   {
     key: "user-manage-group",
