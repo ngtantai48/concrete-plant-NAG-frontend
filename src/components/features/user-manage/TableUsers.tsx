@@ -35,7 +35,6 @@ const normalizeDate = (date?: string | null) => {
 export default function TableUsers() {
   const t = useTranslations("UserManage");
   const tCommon = useTranslations("Common");
-  const tRoles = useTranslations("Sidebar.role");
   const { hasActionAccess } = usePermissions();
   const dispatch = useAppDispatch();
   const searchParams = useSearchParams();
@@ -140,17 +139,6 @@ export default function TableUsers() {
     }
   };
 
-  const getRoleDisplay = (role: string) => {
-    const roleLabels: Record<string, string> = {
-      admin: tRoles("admin"),
-      manager: tRoles("manager"),
-      dispatcher: tRoles("dispatcher"),
-      driver: tRoles("driver"),
-      user: tRoles("user"),
-    };
-    return roleLabels[role] || role || "-";
-  };
-
   const currentData = query.trim() ? searchUsers : pages[page] || [];
   const currentTotal = query.trim() ? searchTotal : total;
   const currentLoading = query.trim() ? searchLoading : loading;
@@ -206,9 +194,9 @@ export default function TableUsers() {
       dataIndex: "role",
       key: "role",
       align: "center",
-      render: (value: string) => (
+      render: (_value: string, record) => (
         <span className="inline-flex items-center rounded-md border border-blue-100 bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">
-          {getRoleDisplay(value)}
+          {record.role_label}
         </span>
       ),
     },
@@ -237,36 +225,44 @@ export default function TableUsers() {
       fixed: "right",
       render: (_value, record) => (
         <Space size="middle">
-          {record.role !== "admin" &&
-            hasActionAccess(SIDEBAR.USER_MANAGE, PERMISSIONS.USER_MANAGE.UPDATE) && (
-              <Tooltip title={tCommon("edit")}>
-                <Button variant="outline" size="iconSquare" onClick={() => setEditingUser(record)}>
-                  <PencilLine className="text-blue-600" />
-                </Button>
-              </Tooltip>
-            )}
-          {record.role !== "admin" &&
-            hasActionAccess(SIDEBAR.USER_MANAGE, PERMISSIONS.USER_MANAGE.DELETE) && (
-              <Popconfirm
-                title={tCommon("confirm")}
-                description={
-                  <span>
-                    {t("confirmDelete")} <b>{record.user_full_name}</b>?
-                  </span>
-                }
-                okText={tCommon("delete")}
-                cancelText={tCommon("cancel")}
-                placement="leftBottom"
-                okButtonProps={{ danger: true }}
-                onConfirm={() => handleDeleteUser(record)}
-              >
-                <Tooltip title={tCommon("delete")}>
-                  <Button variant="outline" size="iconSquare">
-                    <Trash className="text-red-600" />
+          {record.role !== "admin" && (
+            <>
+              {hasActionAccess(SIDEBAR.USER_MANAGE, PERMISSIONS.USER_MANAGE.UPDATE) && (
+                <Tooltip title={tCommon("edit")}>
+                  <Button
+                    variant="outline"
+                    size="iconSquare"
+                    onClick={() => setEditingUser(record)}
+                  >
+                    <PencilLine className="text-blue-600" />
                   </Button>
                 </Tooltip>
-              </Popconfirm>
-            )}
+              )}
+
+              {hasActionAccess(SIDEBAR.USER_MANAGE, PERMISSIONS.USER_MANAGE.DELETE) && (
+                <Popconfirm
+                  title={tCommon("confirm")}
+                  description={
+                    <span>
+                      {" "}
+                      {t("confirmDelete")} <b>{record.user_full_name}</b>?
+                    </span>
+                  }
+                  okText={tCommon("delete")}
+                  cancelText={tCommon("cancel")}
+                  placement="leftBottom"
+                  okButtonProps={{ danger: true }}
+                  onConfirm={() => handleDeleteUser(record)}
+                >
+                  <Tooltip title={tCommon("delete")}>
+                    <Button variant="outline" size="iconSquare">
+                      <Trash className="text-red-600" />
+                    </Button>
+                  </Tooltip>
+                </Popconfirm>
+              )}
+            </>
+          )}
         </Space>
       ),
     },

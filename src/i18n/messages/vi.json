@@ -101,7 +101,9 @@
     "station_check_in": "Xe {vehicle} đang nhận hàng trong {station}",
     "station_check_out": "Xe {vehicle} đã rời {station}",
     "vehicle_check_in": "Xe {vehicle} đã rời khỏi bãi",
-    "vehicle_check_out": "Xe {vehicle} đã vào bãi"
+    "vehicle_check_out": "Xe {vehicle} đã vào bãi",
+    "parking_idle_engine_warning": "Cảnh báo xe {vehicle} nổ máy trong bãi đã {elapsed_minutes} phút",
+    "parking_idle_engine_warning_resolved": "Xe {vehicle} đã tắt máy trong bãi"
   },
   "Dashboard": {
     "title": "Bảng điều khiển",
@@ -146,6 +148,7 @@
     "refreshData": "Tải lại dữ liệu",
     "optional": "tùy chọn",
     "selectDate": "Chọn ngày",
+    "duplicateRoleError": "Tên vai trò này đã tồn tại",
     "messages": {
       "commonError": "Đã xảy ra lỗi. Vui lòng thử lại sau."
     },
@@ -599,6 +602,7 @@
     "stoppedMaintenance": "Sự cố / Bảo trì / Việc khác",
     "empty": "Trống",
     "stopped": "Tạm dừng",
+    "parking": "Đỗ",
     "outsideStation": "Lưu thông / Ngoài trạm",
     "completedToday": "Các chuyến trong ngày",
     "noCompletedToday": "Chưa có chuyến nào",
@@ -608,6 +612,15 @@
     "tripCount": "{count} chuyến",
     "noTrips": "Chưa có chuyến",
     "tripDetail": "Chi tiết chuyến",
+    "viewLocation": "Xem vị trí",
+    "vehicleLocationTitle": "Vị trí xe",
+    "gpsNotFound": "Không tìm thấy tọa độ GPS của xe này (chưa có tín hiệu hoặc không khớp biển số trên VTracking).",
+    "gpsLoadFailed": "Không thể tải dữ liệu GPS từ VTracking.",
+    "gpsLastSeen": "Lần cuối",
+    "gpsSpeed": "Tốc độ",
+    "openGoogleMaps": "Mở Google Maps",
+    "retry": "Thử lại",
+    "close": "Đóng",
     "totalDistance": "Tổng quãng đường",
     "totalTime": "Tổng thời gian",
     "startTime": "Bắt đầu",

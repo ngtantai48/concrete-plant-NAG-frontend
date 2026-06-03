@@ -100,7 +100,9 @@
     "station_check_in": "Vehicle {vehicle} is receiving goods in {station}",
     "station_check_out": "Vehicle {vehicle} has left {station}",
     "vehicle_check_in": "Vehicle {vehicle} has entered the yard",
-    "vehicle_check_out": "Vehicle {vehicle} has left the yard"
+    "vehicle_check_out": "Vehicle {vehicle} has left the yard",
+    "parking_idle_engine_warning": "Warning: Vehicle {vehicle} has been idling for {elapsed_minutes} minutes",
+    "parking_idle_engine_warning_resolved": "Vehicle {vehicle} engine turned off in the yard"
   },
   "Dashboard": {
     "title": "Dashboard",
@@ -124,6 +126,7 @@
     "refreshData": "Refresh Data",
     "optional": "optional",
     "selectDate": "Select date",
+    "duplicateRoleError": "This role name already exists",
     "messages": {
       "commonError": "An error has occurred. Please try again later."
     },
@@ -577,6 +580,7 @@
     "stoppedMaintenance": "Problem / Maintenance / Other",
     "empty": "Empty",
     "stopped": "Stopped",
+    "parking": "Parked",
     "outsideStation": "Transit / Outside Station",
     "completedToday": "Today's trips",
     "noCompletedToday": "No trips yet",
@@ -586,6 +590,15 @@
     "tripCount": "{count} trips",
     "noTrips": "No trips",
     "tripDetail": "Trip Details",
+    "viewLocation": "View location",
+    "vehicleLocationTitle": "Vehicle location",
+    "gpsNotFound": "No GPS coordinates found for this vehicle (no signal yet or license plate mismatch on VTracking).",
+    "gpsLoadFailed": "Failed to load GPS data from VTracking.",
+    "gpsLastSeen": "Last seen",
+    "gpsSpeed": "Speed",
+    "openGoogleMaps": "Open Google Maps",
+    "retry": "Retry",
+    "close": "Close",
     "totalDistance": "Total Distance",
     "totalTime": "Total Time",
     "startTime": "Start",

@@ -13,13 +13,11 @@
     "esModuleInterop": true,
     "module": "esnext",
     "moduleResolution": "bundler",
-    "ignoreDeprecations": "6.0",
     "resolveJsonModule": true,
     "isolatedModules": true,
     "allowSyntheticDefaultImports": true,
     "jsx": "react-jsx",
     "incremental": true,
-    "baseUrl": "src",
     "plugins": [
       {
         "name": "next"
@@ -27,7 +25,7 @@
     ],
     "paths": {
       "@/*": [
-        "*"
+        "./src/*"
       ]
     }
   },
@@ -36,7 +34,6 @@
     "**/*.ts",
     "**/*.tsx",
     ".next/types/**/*.ts",
-    "**/*.css",
     ".next/dev/types/**/*.ts"
   ],
   "exclude": [

@@ -29,24 +29,14 @@ import reportApi from "@/services/report.service";
 const UserProfile = ({
   collapsed,
   userName,
-  userRole,
+  roleLabel,
   isLoading,
 }: {
   collapsed: boolean;
   userName?: string;
-  userRole?: string;
+  roleLabel?: string;
   isLoading?: boolean;
 }) => {
-  const t = useTranslations("Sidebar");
-
-  const roleMap: Record<string, string> = {
-    admin: t("role.admin"),
-    manager: t("role.manager"),
-    dispatcher: t("role.dispatcher"),
-    driver: t("role.driver"),
-    user: t("role.user"),
-  };
-
   return (
     <div className="flex items-center border-t border-gray-700 p-3 bg-gray-900 min-h-17.5">
       <div className="flex items-center gap-4 w-full px-3">
@@ -72,9 +62,7 @@ const UserProfile = ({
                 <p className="text-white font-semibold text-sm truncate m-0">
                   {userName || "User"}
                 </p>
-                <p className="text-gray-400 text-xs truncate m-0">
-                  {userRole ? roleMap[userRole] || userRole : t("role.user")}
-                </p>
+                <p className="text-gray-400 text-xs truncate m-0">{roleLabel}</p>
               </div>
             )}
           </>
@@ -100,12 +88,13 @@ export default function Sidebar() {
     (state: any) => state.auth,
     (auth) => ({
       role: auth.user?.role,
+      roleLabel: auth.user?.role_label,
       fullName: auth.user?.fullName,
       authLoading: auth.loading,
     })
   );
 
-  const { role, fullName, authLoading } = useAppSelector(selectAuth);
+  const { role, roleLabel, fullName, authLoading } = useAppSelector(selectAuth);
 
   const fullPath = useMemo(() => {
     const query = searchParams.toString();
@@ -288,7 +277,7 @@ export default function Sidebar() {
             <UserProfile
               collapsed={collapsed}
               userName={fullName}
-              userRole={role}
+              roleLabel={roleLabel}
               isLoading={authLoading && !fullName}
             />
           </div>

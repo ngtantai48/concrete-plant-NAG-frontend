@@ -20,6 +20,7 @@ type NotificationLike = {
   warning_threshold_minutes?: unknown;
   timeout_threshold_minutes?: unknown;
   elapsed_minutes?: unknown;
+  license_plate?: unknown;
 };
 
 const NOTIFICATION_TEXT_TEMPLATES: Record<NotificationLocale, Record<string, string>> = {
@@ -30,6 +31,8 @@ const NOTIFICATION_TEXT_TEMPLATES: Record<NotificationLocale, Record<string, str
     [NOTIFICATION_EVENTS.VEHICLE_CHECK_OUT]: "Xe {vehicle} đã vào bãi",
     [NOTIFICATION_EVENTS.STATION_CHECKOUT_VEHICLE_CHECKIN_WARNING]: "Cảnh báo xe {vehicle} đã ở bãi {elapsed_minutes} phút kể từ khi lấy hàng thành công,  làm mới lốt xe sau {remaining_minutes} phút nữa",
     [NOTIFICATION_EVENTS.STATION_CHECKOUT_VEHICLE_CHECKIN_TIMEOUT_RESET]: "Đã làm mới lốt xe của xe {vehicle}",
+    [NOTIFICATION_EVENTS.PARKING_IDLE_ENGINE_WARNING]: "Cảnh báo xe {vehicle} nổ máy trong bãi đã {elapsed_minutes} phút",
+    [NOTIFICATION_EVENTS.PARKING_IDLE_ENGINE_WARNING_RESOLVED]: "Xe {vehicle} đã tắt máy trong bãi",
   },
   en: {
     [NOTIFICATION_EVENTS.STATION_CHECK_IN]: "Vehicle {vehicle} checked in at {station}",
@@ -38,6 +41,8 @@ const NOTIFICATION_TEXT_TEMPLATES: Record<NotificationLocale, Record<string, str
     [NOTIFICATION_EVENTS.VEHICLE_CHECK_OUT]: "Vehicle {vehicle} checked out from the yard",
     [NOTIFICATION_EVENTS.STATION_CHECKOUT_VEHICLE_CHECKIN_WARNING]: "Warning: Vehicle {vehicle} has been at the yard for {elapsed_minutes} minutes since successful pickup",
     [NOTIFICATION_EVENTS.STATION_CHECKOUT_VEHICLE_CHECKIN_TIMEOUT_RESET]: "Vehicle {vehicle} slot has been reset",
+    [NOTIFICATION_EVENTS.PARKING_IDLE_ENGINE_WARNING]: "Warning: Vehicle {vehicle} has been idling in the yard for {elapsed_minutes} minutes",
+    [NOTIFICATION_EVENTS.PARKING_IDLE_ENGINE_WARNING_RESOLVED]: "Vehicle {vehicle} engine has been turned off in the yard",
   },
 };
 
@@ -62,12 +67,17 @@ function getStringValue(value: unknown, fallback = ""): string {
 }
 
 function getVehicleDisplayValue(notification: NotificationLike): string {
-  const licensePlate = getStringValue(notification.vehicle_license_plate);
+  const licensePlate = getStringValue(notification.vehicle_license_plate) || getStringValue(notification.license_plate);
   if (licensePlate) {
     return licensePlate.slice(-3);
   }
 
-  return getStringValue(notification.vehicle_name, "-");
+  const name = getStringValue(notification.vehicle_name);
+  if (name) {
+    return name.slice(-3);
+  }
+  
+  return "-";
 }
 
 function fillTemplate(template: string, values: Record<string, string>): string {

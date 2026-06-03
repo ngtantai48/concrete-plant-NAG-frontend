@@ -45,6 +45,7 @@ export function useDeviceHeartbeat(): DeviceHeartbeatState {
     managerRef.current = manager;
 
     const unsubscribeConnection = manager.onConnectionChange((connected) => {
+      // console.log("[DeviceHeartbeat] Socket Connection Changed:", connected);
       setIsSocketConnected(connected);
     });
 
@@ -81,6 +82,7 @@ export function useDeviceHeartbeat(): DeviceHeartbeatState {
 
     const handleHeartbeat = (rawPayload: unknown) => {
       const payload = validateDevicePayload(rawPayload);
+      // console.log("[DeviceHeartbeat] handleHeartbeat - rawPayload:", rawPayload, "validatedPayload:", payload, "isStationHeartbeat:", isStationHeartbeat(payload));
 
       if (!isStationHeartbeat(payload)) {
         return;
@@ -88,6 +90,7 @@ export function useDeviceHeartbeat(): DeviceHeartbeatState {
 
       const stationId = String(payload!.station_id);
       const deviceStatus = normalizeConnectionStatus(payload!.device_status);
+      // console.log(`[DeviceHeartbeat] Station ID: ${stationId}, Device Status: ${deviceStatus}, Raw Status: ${payload!.device_status}`);
       if (!deviceStatus) return;
 
       const updateType = payload!.update_type;
@@ -166,12 +169,14 @@ export function useDeviceHeartbeat(): DeviceHeartbeatState {
 
     unsubscribes.push(
       manager.on('camera-status', (payload: unknown) => {
+        // console.log("[DeviceHeartbeat] Received camera-status:", payload);
         handleCameraStatus(payload);
       })
     );
 
     unsubscribes.push(
       manager.onAny((eventName, payload) => {
+        // console.log(`[DeviceHeartbeat] onAny - Event: "${eventName}"`, "Payload:", payload);
         if (eventName === 'camera-status') {
           return;
         }
@@ -193,7 +198,13 @@ export function useDeviceHeartbeat(): DeviceHeartbeatState {
   }, []);
 
   const isLedConnected = useMemo(() => {
-    return stationStatusMap["4"]?.ledStatus === "connected";
+    const station4Status = stationStatusMap["4"];
+    // ledStatus is set when update_type is "led_checks"/"led"/"led_status".
+    // If the LED board's heartbeat arrives via camera-status event instead,
+    // only deviceStatus/cameraStatus are populated, so fall back to deviceStatus.
+    const ledConnected = station4Status?.ledStatus ?? station4Status?.deviceStatus;
+    // console.log("[DeviceHeartbeat] isLedConnected check — station4:", station4Status, "=> ledStatus:", station4Status?.ledStatus, "deviceStatus:", station4Status?.deviceStatus, "result:", ledConnected === "connected");
+    return ledConnected === "connected";
   }, [stationStatusMap]);
 
   return useMemo(

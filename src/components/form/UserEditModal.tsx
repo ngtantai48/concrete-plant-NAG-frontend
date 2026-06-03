@@ -21,16 +21,17 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { useRoles } from "@/hooks/use-roles";
 import { cn } from "@/lib/utils";
 import { userApi } from "@/services/user.service";
 import type { AppDispatch } from "@/store";
 import { updateUser } from "@/store/slices/userSlice";
-import type { UpdateUserPayload, User, UserRole } from "@/types/user";
+import type { UpdateUserPayload, User } from "@/types/user";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { format, isValid, parse } from "date-fns";
-import { Calendar as CalendarIcon, Loader2, Save, UserCog, X } from "lucide-react";
+import { Calendar as CalendarIcon, Eye, EyeOff, Loader2, Save, UserCog, X } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { useDispatch } from "react-redux";
 import { toast } from "sonner";
@@ -67,7 +68,7 @@ const editUserSchema = z.object({
     .max(100, "Mật khẩu quá dài")
     .optional()
     .refine((value) => !value || value.length >= 6, "Mật khẩu phải có ít nhất 6 ký tự"),
-  role: z.enum(["admin", "manager", "dispatcher", "driver", "user"]),
+  role: z.string().trim().min(1, "Vui lòng chọn vai trò"),
   user_join_date: joinDateSchema,
   user_work_shift: z.string().trim(),
 });
@@ -85,16 +86,26 @@ const parseDateValue = (value?: string) => {
   return isValid(parsed) ? parsed : undefined;
 };
 
-const normalizeRole = (role?: string): UserRole => {
-  const allowedRoles: UserRole[] = ["admin", "manager", "dispatcher", "driver", "user"];
-  return allowedRoles.includes(role as UserRole) ? (role as UserRole) : "user";
-};
+const requiredMark = <span className="text-red-500">*</span>;
 
 export default function UserEditModal({ open, user, onClose }: UserEditModalProps) {
   const t = useTranslations("UserManage");
   const tCommon = useTranslations("Common");
-  const tRoles = useTranslations("Sidebar.role");
+  const { roles, loading: rolesLoading } = useRoles();
   const dispatch = useDispatch<AppDispatch>();
+  const [showPassword, setShowPassword] = useState(false);
+  const roleOptions = useMemo(() => {
+    if (!user?.role || roles.some((role) => role.role === user.role)) return roles;
+
+    return [
+      {
+        id: 0,
+        role: user.role,
+        role_label: user.role_label,
+      },
+      ...roles,
+    ];
+  }, [roles, user?.role, user?.role_label]);
 
   const {
     control,
@@ -129,7 +140,7 @@ export default function UserEditModal({ open, user, onClose }: UserEditModalProp
       user_address: user.user_address || "",
       username: user.username || "",
       password: "",
-      role: normalizeRole(user.role),
+      role: user.role || "user",
       user_join_date: normalizeDate(user.user_join_date),
       user_work_shift: user.user_work_shift || "",
     });
@@ -137,6 +148,7 @@ export default function UserEditModal({ open, user, onClose }: UserEditModalProp
 
   const handleOpenChange = (nextOpen: boolean) => {
     if (!nextOpen && !isSubmitting) {
+      setShowPassword(false);
       onClose();
     }
   };
@@ -161,6 +173,7 @@ export default function UserEditModal({ open, user, onClose }: UserEditModalProp
       const updatedUser = await userApi.update(user.user_id, payload);
       dispatch(updateUser(updatedUser));
       toast.success(t("updateSuccess", { name: updatedUser.user_full_name }));
+      setShowPassword(false);
       onClose();
     } catch (error) {
       const message =
@@ -174,7 +187,6 @@ export default function UserEditModal({ open, user, onClose }: UserEditModalProp
       {message || " "}
     </p>
   );
-  const requiredMark = <span className="text-red-500">*</span>;
   const optionalLabel = (
     <span className="text-xs font-normal text-slate-500">({tCommon("optional")})</span>
   );
@@ -267,12 +279,23 @@ export default function UserEditModal({ open, user, onClose }: UserEditModalProp
                   {t("newPassword")}
                   {optionalLabel}
                 </Label>
-                <Input
-                  id="edit-password"
-                  type="password"
-                  {...register("password")}
-                  placeholder={t("passwordOptional")}
-                />
+                <div className="relative">
+                  <Input
+                    id="edit-password"
+                    type={showPassword ? "text" : "password"}
+                    {...register("password")}
+                    placeholder={t("passwordOptional")}
+                    className="pr-10"
+                  />
+                  <button
+                    type="button"
+                    aria-label={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+                    onClick={() => setShowPassword((value) => !value)}
+                    className="absolute right-2 top-1/2 rounded-md p-1 text-slate-500 transition hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring -translate-y-1/2"
+                  >
+                    {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                  </button>
+                </div>
                 {errorText(errors.password?.message)}
               </div>
             </div>
@@ -289,16 +312,26 @@ export default function UserEditModal({ open, user, onClose }: UserEditModalProp
                   render={({ field }) => (
                     <Select
                       value={field.value}
-                      onValueChange={(value: UserRole) => field.onChange(value)}
+                      onValueChange={field.onChange}
+                      disabled={rolesLoading}
                     >
                       <SelectTrigger className="w-full bg-white">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="manager">{tRoles("manager")}</SelectItem>
-                        <SelectItem value="dispatcher">{tRoles("dispatcher")}</SelectItem>
-                        <SelectItem value="driver">{tRoles("driver")}</SelectItem>
-                        <SelectItem value="user">{tRoles("user")}</SelectItem>
+                        {roleOptions.length > 0 ? (
+                          roleOptions
+                            .filter((role) => role.role !== "admin")
+                            .map((role) => (
+                              <SelectItem key={`${role.id}-${role.role}`} value={role.role}>
+                                {role.role_label}
+                              </SelectItem>
+                            ))
+                        ) : (
+                          <SelectItem value="user" disabled>
+                            Chưa có vai trò
+                          </SelectItem>
+                        )}
                       </SelectContent>
                     </Select>
                   )}
@@ -369,7 +402,12 @@ export default function UserEditModal({ open, user, onClose }: UserEditModalProp
           </section>
 
           <DialogFooter className="border-t border-slate-100 pt-4">
-            <Button type="button" variant="outline" onClick={onClose} disabled={isSubmitting}>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => handleOpenChange(false)}
+              disabled={isSubmitting}
+            >
               <X className="size-4" />
               {tCommon("cancel")}
             </Button>

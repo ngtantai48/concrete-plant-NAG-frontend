@@ -21,15 +21,17 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { useRoles } from "@/hooks/use-roles";
 import { cn } from "@/lib/utils";
 import { userApi } from "@/services/user.service";
 import type { AppDispatch } from "@/store";
 import { addUser } from "@/store/slices/userSlice";
-import type { CreateUserPayload, UserRole } from "@/types/user";
+import type { CreateUserPayload } from "@/types/user";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { format, isValid, parse } from "date-fns";
-import { Calendar as CalendarIcon, Loader2, UserPlus, X } from "lucide-react";
+import { Calendar as CalendarIcon, Eye, EyeOff, Loader2, UserPlus, X } from "lucide-react";
 import { useTranslations } from "next-intl";
+import { useEffect, useMemo, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { useDispatch } from "react-redux";
 import { toast } from "sonner";
@@ -68,25 +70,38 @@ const createUserSchema = z.object({
     .min(3, "Username phải có ít nhất 3 ký tự")
     .max(100, "Username quá dài"),
   password: z.string().min(6, "Mật khẩu phải có ít nhất 6 ký tự").max(100, "Mật khẩu quá dài"),
-  role: z.enum(["admin", "manager", "dispatcher", "driver", "user"]),
+  role: z.string().trim().min(1, "Vui lòng chọn vai trò"),
   user_join_date: joinDateSchema,
   user_work_shift: z.string().trim(),
 });
 
 type CreateUserFormValues = z.infer<typeof createUserSchema>;
 
+const requiredMark = <span className="text-red-500">*</span>;
+
 export default function UserCreateModal({ open, onClose }: UserCreateModalProps) {
   const t = useTranslations("UserManage");
   const tCommon = useTranslations("Common");
-  const tRoles = useTranslations("Sidebar.role");
+  const { roles, loading: rolesLoading } = useRoles();
   const dispatch = useDispatch<AppDispatch>();
+  const [showPassword, setShowPassword] = useState(false);
+  const defaultRole = useMemo(
+    () =>
+      roles.find((role) => role.role === "user")?.role ||
+      roles.find((role) => role.role !== "admin")?.role ||
+      roles[0]?.role ||
+      "user",
+    [roles]
+  );
 
   const {
     control,
     formState: { errors, isSubmitting },
+    getValues,
     handleSubmit,
     register,
     reset,
+    setValue,
   } = useForm<CreateUserFormValues>({
     resolver: zodResolver(createUserSchema),
     defaultValues: {
@@ -103,8 +118,18 @@ export default function UserCreateModal({ open, onClose }: UserCreateModalProps)
     },
   });
 
+  useEffect(() => {
+    if (!open || roles.length === 0) return;
+
+    const currentRole = getValues("role");
+    if (!roles.some((role) => role.role === currentRole)) {
+      setValue("role", defaultRole, { shouldValidate: true });
+    }
+  }, [defaultRole, getValues, open, roles, setValue]);
+
   const handleOpenChange = (nextOpen: boolean) => {
     if (!nextOpen && !isSubmitting) {
+      setShowPassword(false);
       reset();
       onClose();
     }
@@ -121,6 +146,7 @@ export default function UserCreateModal({ open, onClose }: UserCreateModalProps)
       const newUser = await userApi.create(payload);
       dispatch(addUser(newUser));
       toast.success(t("createSuccess", { name: newUser.user_full_name }));
+      setShowPassword(false);
       reset();
       onClose();
     } catch (error) {
@@ -135,7 +161,6 @@ export default function UserCreateModal({ open, onClose }: UserCreateModalProps)
       {message || " "}
     </p>
   );
-  const requiredMark = <span className="text-red-500">*</span>;
   const optionalLabel = (
     <span className="text-xs font-normal text-slate-500">({tCommon("optional")})</span>
   );
@@ -248,12 +273,23 @@ export default function UserCreateModal({ open, onClose }: UserCreateModalProps)
                   {t("password")}
                   {requiredMark}
                 </Label>
-                <Input
-                  id="create-password"
-                  type="password"
-                  {...register("password")}
-                  placeholder="******"
-                />
+                <div className="relative">
+                  <Input
+                    id="create-password"
+                    type={showPassword ? "text" : "password"}
+                    {...register("password")}
+                    placeholder="******"
+                    className="pr-10"
+                  />
+                  <button
+                    type="button"
+                    aria-label={showPassword ? "Ẩn mật khẩu" : "Hiện mật khẩu"}
+                    onClick={() => setShowPassword((value) => !value)}
+                    className="absolute right-2 top-1/2 rounded-md p-1 text-slate-500 transition hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring -translate-y-1/2"
+                  >
+                    {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                  </button>
+                </div>
                 {errorText(errors.password?.message)}
               </div>
             </div>
@@ -270,16 +306,27 @@ export default function UserCreateModal({ open, onClose }: UserCreateModalProps)
                   render={({ field }) => (
                     <Select
                       value={field.value}
-                      onValueChange={(value: UserRole) => field.onChange(value)}
+                      onValueChange={field.onChange}
+                      disabled={rolesLoading}
                     >
                       <SelectTrigger className="w-full bg-white">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="manager">{tRoles("manager")}</SelectItem>
-                        <SelectItem value="dispatcher">{tRoles("dispatcher")}</SelectItem>
-                        <SelectItem value="driver">{tRoles("driver")}</SelectItem>
-                        <SelectItem value="user">{tRoles("user")}</SelectItem>
+                        {roles.length > 0 ? (
+                          // roles.map((role) => (
+                          roles
+                            .filter((role) => role.role !== "admin")
+                            .map((role) => (
+                              <SelectItem key={role.id} value={role.role}>
+                                {role.role_label}
+                              </SelectItem>
+                            ))
+                        ) : (
+                          <SelectItem value="user" disabled>
+                            Chưa có vai trò
+                          </SelectItem>
+                        )}
                       </SelectContent>
                     </Select>
                   )}
