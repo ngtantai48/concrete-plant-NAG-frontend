@@ -2,8 +2,14 @@
 
 import Logo from "@/assets/images/logo.png";
 import {
-  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
-  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { navigationConfig, NavItem } from "@/config/navigation";
 import { useAppSelector } from "@/hooks/use-app-selector";
@@ -20,7 +26,12 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import reportApi from "@/services/report.service";
 
-const UserProfile = ({ collapsed, userName, userRole, isLoading }: {
+const UserProfile = ({
+  collapsed,
+  userName,
+  userRole,
+  isLoading,
+}: {
   collapsed: boolean;
   userName?: string;
   userRole?: string;
@@ -51,7 +62,11 @@ const UserProfile = ({ collapsed, userName, userRole, isLoading }: {
           </>
         ) : (
           <>
-            <Avatar className="shrink-0" icon={<User size={20} />} style={{ backgroundColor: "#722ed1" }} />
+            <Avatar
+              className="shrink-0"
+              icon={<User size={20} />}
+              style={{ backgroundColor: "#722ed1" }}
+            />
             {!collapsed && (
               <div className="flex-1 min-w-0">
                 <p className="text-white font-semibold text-sm truncate m-0">
@@ -113,6 +128,10 @@ export default function Sidebar() {
       return items
         .map((item) => ({ ...item }))
         .filter((item) => {
+          if (item.hideInSidebar) {
+            return false;
+          }
+
           if (item.roles && !item.roles.includes(role || "")) {
             return false;
           }
@@ -122,7 +141,10 @@ export default function Sidebar() {
             return item.children.length > 0;
           }
 
-          return hasPageAccess(item.key);
+          return (
+            hasPageAccess(item.key) ||
+            (item.extraAccessKeys?.some((key) => hasPageAccess(key)) ?? false)
+          );
         });
     };
     return filterItems(baseMenuItems);
@@ -225,7 +247,10 @@ export default function Sidebar() {
           <div className="shrink-0">
             <div className="flex items-center justify-between p-4 border-b border-gray-700 bg-gray-900">
               {!collapsed && (
-                <div className="flex items-center justify-center m-3" style={{ width: 140, height: 40 }}>
+                <div
+                  className="flex items-center justify-center m-3"
+                  style={{ width: 140, height: 40 }}
+                >
                   <Image className="object-contain" src={Logo} alt="SAVINA Logo" priority />
                 </div>
               )}

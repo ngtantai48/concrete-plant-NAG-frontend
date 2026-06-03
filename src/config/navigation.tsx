@@ -1,21 +1,21 @@
 import { PERMISSIONS } from "@/constants/permissions";
-import { ROLES } from "@/constants/roles";
 import { SIDEBAR } from "@/constants/route";
 import {
   ArrowRightLeft,
   Award,
   Bot,
+  Briefcase,
+  BriefcaseBusiness,
   Building2,
-  CalendarCheck,
+  CalendarDays,
   Car,
-  CalendarClock,
   ClipboardList,
+  Fuel,
   Gauge,
   Layers,
   Link2,
   MapPin,
   Package,
-  Settings,
   Settings2,
   ShieldCheck,
   UserCog,
@@ -32,11 +32,15 @@ export interface PageFunc {
 
 export interface NavItem {
   key: string;
-  label: string; // Translation key in 'Sidebar' namespace
+  label: string;
   icon?: React.ReactNode;
   actions?: PageFunc[];
   children?: NavItem[];
-  roles?: string[]; // Optional: restrict this item to specific roles (e.g., ['admin', 'dispatcher'])
+  roles?: string[];
+  /** Ẩn khỏi menu sidebar nhưng vẫn giữ trong config (vẫn sinh cây phân quyền + vẫn là route hợp lệ). */
+  hideInSidebar?: boolean;
+  /** Các route key khác cũng cho phép hiện mục này (vd trang gộp mở được bằng 1 trong 2 quyền). */
+  extraAccessKeys?: string[];
 }
 
 export const navigationConfig: NavItem[] = [
@@ -45,7 +49,8 @@ export const navigationConfig: NavItem[] = [
     label: "dashboard",
     icon: <Gauge />,
     actions: [
-      { key: PERMISSIONS.DASHBOARD.VIEW, label: "Xem" },
+      { key: PERMISSIONS.DASHBOARD.VIEW, label: "Xem thông tin chung" },
+      { key: PERMISSIONS.DASHBOARD.ORDER_DETAIL, label: "Xem chi tiết các chuyến xe" },
       { key: PERMISSIONS.DASHBOARD.SYNC_SLOTS, label: "Đồng bộ lốt xe" },
       { key: PERMISSIONS.DASHBOARD.HISTORY, label: "Lịch sử lốt xe" },
       { key: PERMISSIONS.DASHBOARD.CHECKLOG, label: "Nhật ký vận hành" },
@@ -53,7 +58,7 @@ export const navigationConfig: NavItem[] = [
       { key: PERMISSIONS.DASHBOARD.VIEW_MAP, label: "Bản đồ" },
       {
         key: PERMISSIONS.DASHBOARD.MANUAL_CAMERA_FALLBACK,
-        label: "Thao tác thủ công (camera sự cố)",
+        label: "Thao tác thủ công khi camera sự cố",
       },
       { key: PERMISSIONS.DASHBOARD.SYSTEM_SETTINGS, label: "Cấu hình vận hành" },
     ],
@@ -109,6 +114,15 @@ export const navigationConfig: NavItem[] = [
     ],
   },
   {
+    key: SIDEBAR.PARKING_IDLE_ENGINE,
+    label: "parkingIdleEngine",
+    icon: <Fuel />,
+    actions: [
+      { key: PERMISSIONS.PARKING_IDLE_ENGINE.VIEW, label: "Xem giám sát nổ máy trong bãi" },
+      { key: PERMISSIONS.PARKING_IDLE_ENGINE.SETTINGS, label: "Cấu hình cảnh báo nổ máy" },
+    ],
+  },
+  {
     key: "tools-group",
     label: "tools",
     icon: <Package />,
@@ -119,9 +133,26 @@ export const navigationConfig: NavItem[] = [
         icon: <UtensilsCrossed size={18} />,
       },
       {
-        key: SIDEBAR.ATTENDANCE,
-        label: "attendance",
-        icon: <CalendarCheck size={18} />,
+        key: SIDEBAR.WORK_ATTENDANCE,
+        label: "workAttendance",
+        icon: <CalendarDays size={18} />,
+        // Gộp vào "Bố trí công việc": ẩn khỏi menu nhưng giữ trong config để bảng phân quyền vẫn cấp được quyền chấm công.
+        hideInSidebar: true,
+        actions: [
+          { key: PERMISSIONS.WORK_ATTENDANCE.VIEW, label: "Xem bảng công" },
+          { key: PERMISSIONS.WORK_ATTENDANCE.UPDATE, label: "Cập nhật nghỉ nửa ngày" },
+        ],
+      },
+      {
+        key: SIDEBAR.WORK_ARRANGEMENTS,
+        label: "workArrangements",
+        icon: <BriefcaseBusiness size={18} />,
+        // Trang "Bố trí công việc" gộp 2 tab (Phân công + Chấm công); hiện ở menu nếu có 1 trong 2 quyền.
+        extraAccessKeys: [SIDEBAR.WORK_ATTENDANCE],
+        actions: [
+          { key: PERMISSIONS.WORK_ARRANGEMENTS.VIEW, label: "Xem phân công" },
+          { key: PERMISSIONS.WORK_ARRANGEMENTS.UPDATE, label: "Cập nhật phân công" },
+        ],
       },
     ],
   },
@@ -179,6 +210,17 @@ export const navigationConfig: NavItem[] = [
           { key: PERMISSIONS.USER_ASSIGNMENTS.CREATE, label: "Thêm nhân sự" },
           { key: PERMISSIONS.USER_ASSIGNMENTS.UPDATE, label: "Sửa nhân sự" },
           { key: PERMISSIONS.USER_ASSIGNMENTS.DELETE, label: "Xóa nhân sự" },
+        ],
+      },
+      {
+        key: SIDEBAR.WORKS,
+        label: "works",
+        icon: <Briefcase size={18} />,
+        actions: [
+          { key: PERMISSIONS.WORKS.VIEW, label: "Xem danh sách công việc" },
+          { key: PERMISSIONS.WORKS.CREATE, label: "Thêm công việc" },
+          { key: PERMISSIONS.WORKS.UPDATE, label: "Sửa công việc" },
+          { key: PERMISSIONS.WORKS.DELETE, label: "Xóa công việc" },
         ],
       },
     ],

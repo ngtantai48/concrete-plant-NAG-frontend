@@ -1,6 +1,7 @@
 export const PERMISSIONS = {
   DASHBOARD: {
     VIEW: "view",
+    ORDER_DETAIL: "order_detail",
     SYNC_SLOTS: "sync_slots",
     HISTORY: "history",
     CHECKLOG: "checklog",
@@ -67,13 +68,22 @@ export const PERMISSIONS = {
     DELETE: "delete",
   },
 
-  // MEAL_CHECK: {
-  //     VIEW: 'view',
-  // },
+  WORKS: {
+    VIEW: "view",
+    CREATE: "create",
+    UPDATE: "update",
+    DELETE: "delete",
+  },
 
-  // ATTENDANCE: {
-  //     VIEW: 'view',
-  // },
+  WORK_ATTENDANCE: {
+    VIEW: "view",
+    UPDATE: "update",
+  },
+
+  WORK_ARRANGEMENTS: {
+    VIEW: "view",
+    UPDATE: "update",
+  },
 
   PERMISSIONS_MANAGE: {
     VIEW: "view",
@@ -86,5 +96,10 @@ export const PERMISSIONS = {
 
   END_OF_DAY: {
     VIEW: "view",
+  },
+
+  PARKING_IDLE_ENGINE: {
+    VIEW: "view",
+    SETTINGS: "settings",
   },
 };
