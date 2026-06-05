@@ -44,6 +44,7 @@
     "allUsers": "All Users",
     "staffManagement": "Staff management",
     "tools": "Tools",
+    "calendar": "Calendar",
     "AdvancedManagement": "Advanced management",
     "settings": "Settings",
     "configuration": "Configuration",
@@ -80,6 +81,29 @@
       "driver": "Driver",
       "user": "User"
     }
+  },
+  "CalendarToolPage": {
+    "title": "Calendar",
+    "subtitle": "View the solar and lunar calendar by month.",
+    "previousMonth": "Previous month",
+    "nextMonth": "Next month",
+    "monthPicker": "Select month",
+    "today": "Today",
+    "monthHelp": "Select a day to view solar and lunar details.",
+    "solarShort": "Solar",
+    "lunarShort": "Lunar",
+    "selectedDate": "Selected date",
+    "solarCalendar": "Solar",
+    "lunarCalendar": "Lunar",
+    "solarDate": "Solar date",
+    "lunarDate": "Lunar date",
+    "weekday": "Weekday",
+    "month": "Month",
+    "lunarMonth": "Lunar month",
+    "lunarYear": "Lunar year",
+    "leapMonth": "Leap month",
+    "isLeapMonth": "Yes",
+    "notLeapMonth": "No"
   },
   "Header": {
     "statusText": "TESTING CENTER",

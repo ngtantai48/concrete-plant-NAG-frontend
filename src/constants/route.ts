@@ -11,6 +11,7 @@ export const SIDEBAR = {
   // DRIVER_DISPLAY: "/driver-display",
   REPORT_PRODUCTION: "/reports/production",
   REPORT_FUEL: "/reports/fuel",
+  CALENDAR: "/calendar",
   MEAL_CHECK: "/meal-check",
   ATTENDANCE: "/attendance",
   WORK_ATTENDANCE: "/work-attendance",

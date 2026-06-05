@@ -128,6 +128,12 @@ export const navigationConfig: NavItem[] = [
     icon: <Package />,
     children: [
       {
+        key: SIDEBAR.CALENDAR,
+        label: "calendar",
+        icon: <CalendarDays size={18} />,
+        actions: [{ key: PERMISSIONS.CALENDAR.VIEW, label: "Xem lịch âm/dương" }],
+      },
+      {
         key: SIDEBAR.MEAL_CHECK,
         label: "mealCheck",
         icon: <UtensilsCrossed size={18} />,

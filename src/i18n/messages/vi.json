@@ -44,6 +44,7 @@
     "allUsers": "Tất cả người dùng",
     "staffManagement": "Quản lý nhân viên",
     "tools": "Công cụ",
+    "calendar": "Lịch",
     "AdvancedManagement": "Nâng cao",
     "settings": "Cài đặt",
     "configuration": "Cấu hình",
@@ -81,6 +82,29 @@
       "driver": "Tài xế",
       "user": "Người dùng"
     }
+  },
+  "CalendarToolPage": {
+    "title": "Lịch",
+    "subtitle": "Xem lịch dương và lịch âm theo từng tháng.",
+    "previousMonth": "Tháng trước",
+    "nextMonth": "Tháng sau",
+    "monthPicker": "Chọn tháng",
+    "today": "Hôm nay",
+    "monthHelp": "Chọn một ngày để xem chi tiết dương lịch và âm lịch.",
+    "solarShort": "Dương lịch",
+    "lunarShort": "Âm lịch",
+    "selectedDate": "Ngày đang chọn",
+    "solarCalendar": "Lịch dương",
+    "lunarCalendar": "Lịch âm",
+    "solarDate": "Ngày dương",
+    "lunarDate": "Ngày âm",
+    "weekday": "Thứ",
+    "month": "Tháng",
+    "lunarMonth": "Tháng âm",
+    "lunarYear": "Năm âm",
+    "leapMonth": "Tháng nhuận",
+    "isLeapMonth": "Có",
+    "notLeapMonth": "Không"
   },
   "Header": {
     "statusText": "QUẢN LÝ ĐIỀU PHỐI XE",
