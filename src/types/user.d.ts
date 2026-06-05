@@ -1,5 +1,6 @@
 export interface BaseUser {
     user_full_name: string;
+    user_short_name?: string | null;
     user_email: string;
     user_phone_number: string;
     user_address?: string | null;

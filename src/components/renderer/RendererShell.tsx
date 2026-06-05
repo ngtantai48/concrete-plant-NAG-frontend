@@ -2998,8 +2998,9 @@ export function RendererShell() {
     ]
   );
 
-  // Auto-submit khi điều hướng đến /ai-assistant?ask=<text> (từ QuickAskMicButton
-  // trên dashboard). Đã xử lý => xóa search param để tránh re-submit khi refresh.
+  // Auto-submit khi điều hướng đến /ai-assistant?ask=<text> (legacy entry point).
+  // QuickAskMicButton trên dashboard giờ chạy trong popup riêng, không navigate
+  // sang đây nữa — nhưng giữ effect để hỗ trợ share link sâu/dashboard widget khác.
   const askHandledRef = useRef<string | null>(null);
   useEffect(() => {
     if (readOnly) return;

@@ -21,7 +21,7 @@ import { clearUsers, deleteUser, fetchUsers, setPagination } from "@/store/slice
 import type { User } from "@/types/user";
 import { Popconfirm, Space, Table, Tooltip } from "antd";
 import type { ColumnType } from "antd/es/table";
-import { CalendarDays, Loader, PencilLine, RefreshCw, Trash, UserPlus } from "lucide-react";
+import { CalendarDays, Loader, PencilLine, Trash, UserPlus } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -58,6 +58,7 @@ export default function TableUsers() {
   const searchFieldLabels: Record<UserSearchField, string> = useMemo(
     () => ({
       user_full_name: t("full_name"),
+      user_short_name: t("short_name"),
       username: t("username"),
       user_phone_number: t("phone_number"),
       user_email: t("email"),
@@ -156,6 +157,12 @@ export default function TableUsers() {
       dataIndex: "user_full_name",
       key: "user_full_name",
       render: (value: string) => <span className="font-semibold text-slate-800">{value}</span>,
+    },
+    {
+      title: t("short_name"),
+      dataIndex: "user_short_name",
+      key: "user_short_name",
+      render: (value: string | null) => value || <span className="text-slate-400">-</span>,
     },
     {
       title: t("username"),

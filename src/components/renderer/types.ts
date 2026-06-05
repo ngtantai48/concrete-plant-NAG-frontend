@@ -38,6 +38,17 @@ const baseBlockSchema = z.object({
 
 const unknownRecordSchema = z.record(z.string(), z.unknown());
 const toneSchema = z.enum(renderTones);
+const alertLevelSchema = z.preprocess(
+  (value) => {
+    if (typeof value !== "string") return value;
+    const level = value.trim().toLowerCase();
+    if (level === "warning" || level === "caution") return "warn";
+    if (level === "error" || level === "danger" || level === "critical") return "bad";
+    if (level === "success" || level === "good") return "info";
+    return level;
+  },
+  z.enum(["info", "warn", "bad"])
+);
 
 export const kpiGridBlockSchema = baseBlockSchema.extend({
   type: z.literal("kpi_grid"),
@@ -250,17 +261,19 @@ export const fileBlockSchema = baseBlockSchema.extend({
 
 export const alertBlockSchema = baseBlockSchema.extend({
   type: z.literal("alert"),
-  level: z.enum(["info", "warn", "bad"]),
+  level: alertLevelSchema,
   title: z.string(),
-  items: z.array(z.string()).optional(),
-  body: z.string().optional(),
+  // LLM thường emit `null` thay cho `undefined` khi field rỗng → dùng nullish() để
+  // accept cả 2. Component đã check truthy nên không cần đổi UI code.
+  items: z.array(z.string()).nullish(),
+  body: z.string().nullish(),
   action: z
     .object({
       label: z.string(),
       intent: z.string(),
       payload: z.unknown().optional(),
     })
-    .optional(),
+    .nullish(),
 });
 
 export const actionProposalBlockSchema = baseBlockSchema.extend({
@@ -295,25 +308,50 @@ export const followupsBlockSchema = baseBlockSchema.extend({
   items: z.array(z.string()),
 });
 
-export const renderBlockDataSchema = z.discriminatedUnion("type", [
-  kpiGridBlockSchema,
-  lineChartBlockSchema,
-  barChartBlockSchema,
-  donutChartBlockSchema,
-  areaChartBlockSchema,
-  ganttBlockSchema,
-  timelineBlockSchema,
-  tableBlockSchema,
-  mapViewBlockSchema,
-  imageBlockSchema,
-  chartBlockSchema,
-  fileBlockSchema,
-  alertBlockSchema,
-  actionProposalBlockSchema,
-  markdownBlockSchema,
-  sourceChipsBlockSchema,
-  followupsBlockSchema,
-]);
+// LLM (backend) thường emit `null` cho field "không có giá trị" thay vì omit hẳn
+// (vì JSON dễ sinh hơn). Zod `.optional()` chỉ chấp nhận `undefined`, nên `items: null`
+// sẽ fail với "Invalid input: expected array, received null" → block bị reject thành
+// UnknownBlock. Đây là root cause hàng loạt lỗi render trong quá khứ (alert.items=null,
+// table.rows=null, sparkline=null…).
+//
+// Giải pháp: trước khi validate, đệ quy xoá key có value `null` khỏi object. Schema
+// sau đó thấy field "missing" và `.optional()` match bình thường.
+function stripNullsForLlm(value: unknown): unknown {
+  if (value === null) return undefined;
+  if (Array.isArray(value)) return value.map(stripNullsForLlm);
+  if (value && typeof value === "object") {
+    const cleaned: Record<string, unknown> = {};
+    for (const [key, raw] of Object.entries(value as Record<string, unknown>)) {
+      const next = stripNullsForLlm(raw);
+      if (next !== undefined) cleaned[key] = next;
+    }
+    return cleaned;
+  }
+  return value;
+}
+
+export const renderBlockDataSchema = z.preprocess(
+  stripNullsForLlm,
+  z.discriminatedUnion("type", [
+    kpiGridBlockSchema,
+    lineChartBlockSchema,
+    barChartBlockSchema,
+    donutChartBlockSchema,
+    areaChartBlockSchema,
+    ganttBlockSchema,
+    timelineBlockSchema,
+    tableBlockSchema,
+    mapViewBlockSchema,
+    imageBlockSchema,
+    chartBlockSchema,
+    fileBlockSchema,
+    alertBlockSchema,
+    actionProposalBlockSchema,
+    markdownBlockSchema,
+    sourceChipsBlockSchema,
+    followupsBlockSchema,
+  ])
+);
 
 export type KpiGridBlock = z.infer<typeof kpiGridBlockSchema>;
 export type LineChartBlock = z.infer<typeof lineChartBlockSchema>;

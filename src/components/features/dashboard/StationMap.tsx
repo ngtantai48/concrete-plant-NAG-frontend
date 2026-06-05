@@ -1,8 +1,9 @@
 import "leaflet/dist/leaflet.css";
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from "react-leaflet";
+import { MapContainer, TileLayer, Marker, Popup, Circle, useMap, LayersControl } from "react-leaflet";
 import L from "leaflet";
 import type { NearbyVehicle } from "@/hooks/useNearbyVehicles";
+import { useReverseGeocode } from "@/hooks/useReverseGeocode";
 
 // Default marker icon fix for leaflet + webpack
 const iconDefault = L.icon({
@@ -239,10 +240,26 @@ const StationMap = ({ stationLongitude, stationLatitude, radius, vehicles, focus
         scrollWheelZoom={true}
         style={{ width: '100%', height: '100%' }}
       >
-        <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>'
-          url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
-        />
+        <LayersControl position="topright">
+          <LayersControl.BaseLayer checked name="Bản đồ Google">
+            <TileLayer
+              attribution='&copy; <a href="https://www.google.com/maps">Google Maps</a>'
+              url="https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}"
+            />
+          </LayersControl.BaseLayer>
+          <LayersControl.BaseLayer name="Vệ tinh Google">
+            <TileLayer
+              attribution='&copy; <a href="https://www.google.com/maps">Google Maps</a>'
+              url="https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}"
+            />
+          </LayersControl.BaseLayer>
+          <LayersControl.BaseLayer name="Bản đồ mặc định (OSM)">
+            <TileLayer
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>'
+              url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+            />
+          </LayersControl.BaseLayer>
+        </LayersControl>
 
         <MapUpdater stationLat={stationLat} stationLng={stationLng} />
         <FlyToVehicle focusVehicle={focusVehicle ?? null} focusDeviceId={focusDeviceId ?? null} markerRefs={markerRefs} />
@@ -267,69 +284,102 @@ const StationMap = ({ stationLongitude, stationLatitude, radius, vehicles, focus
         />
 
         {/* Vehicle markers - rotated car icon (Vtracking style) */}
-        {vehicles.map((v) => {
-          const nStatus = normalizeStatus(v.status, v.timestamp);
-          const icon = createVehicleIcon(nStatus, v.direction, v.speed, zoom, v.vehicle_name, v.license_plate);
-          const statusClass = nStatus === "run" ? "bg-emerald-50 text-emerald-700 border border-emerald-100" :
-            nStatus === "park" ? "bg-amber-50 text-amber-700 border border-amber-100" :
-              "bg-slate-50 text-slate-500 border border-slate-100";
-          const statusLabel = nStatus === "run" ? "Đang chạy" : nStatus === "park" ? "Đang dừng" : "Mất kết nối";
-
-          return (
-            <Marker key={v.device_id} position={[v.latitude, v.longitude]} icon={icon}
-              ref={(ref) => setMarkerRef(v.device_id, ref as unknown as L.Marker | null)}>
-              <Popup>
-                <div className="font-sans min-w-55 p-0.5">
-                  {/* Header */}
-                  <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
-                    <div className="flex flex-col">
-                      <strong className="text-base font-bold text-slate-800 uppercase">{v.license_plate}</strong>
-                      <span className="text-xs text-slate-500 truncate max-w-50">{v.vehicle_name}</span>
-                    </div>
-                    <span className={`ml-auto shrink-0 font-semibold px-2 py-0.5 rounded-full text-[11px] ${statusClass}`}>
-                      {statusLabel}
-                    </span>
-                  </div>
-
-                  {/* Details */}
-                  <div className="space-y-1.5 pt-2">
-                    <div className="flex justify-between items-center text-sm">
-                      <span className="text-slate-400">Vận tốc</span>
-                      <span className="font-semibold text-slate-700 tabular-nums">{v.speed} <span className="text-[11px] text-slate-400 font-normal">km/h</span></span>
-                    </div>
-                    <div className="flex justify-between items-center text-sm">
-                      <span className="text-slate-400">Hướng</span>
-                      <span className="font-semibold text-slate-700">
-                        {directionToCompass(v.direction)} <span className="text-[11px] text-slate-400 font-normal">({Math.round(v.direction)}°)</span>
-                      </span>
-                    </div>
-                    <div className="flex justify-between items-center text-sm">
-                      <span className="text-slate-400">Cách trạm</span>
-                      <span className="font-semibold text-slate-700 tabular-nums">
-                        {v.distance >= 1000 ? `${(v.distance / 1000).toFixed(1)} km` : `${v.distance} m`}
-                      </span>
-                    </div>
-                    {v.geocoding && (
-                      <div className="flex justify-between items-start text-sm gap-2">
-                        <span className="text-slate-400 shrink-0">Vị trí</span>
-                        <span className="font-medium text-slate-600 text-right text-[11px] leading-relaxed">{v.geocoding}</span>
-                      </div>
-                    )}
-                    {v.timestamp && (
-                      <div className="flex justify-between items-center text-sm">
-                        <span className="text-slate-400">Cập nhật</span>
-                        <span className="font-medium text-slate-500 text-[11px]">{formatTimestamp(v.timestamp)}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </Popup>
-            </Marker>
-          );
-        })}
+        {vehicles.map((v) => (
+          <VehicleMarkerWithAddress
+            key={v.device_id}
+            vehicle={v}
+            zoom={zoom}
+            setMarkerRef={setMarkerRef}
+          />
+        ))}
       </MapContainer>
     </div>
   );
 };
+
+/** Individual vehicle marker with on-demand reverse geocoding */
+function VehicleMarkerWithAddress({
+  vehicle: v,
+  zoom,
+  setMarkerRef,
+}: {
+  vehicle: NearbyVehicle;
+  zoom: number;
+  setMarkerRef: (deviceId: string, ref: L.Marker | null) => void;
+}) {
+  const nStatus = normalizeStatus(v.status, v.timestamp);
+  const icon = createVehicleIcon(nStatus, v.direction, v.speed, zoom, v.vehicle_name, v.license_plate);
+  const statusClass = nStatus === "run" ? "bg-emerald-50 text-emerald-700 border border-emerald-100" :
+    nStatus === "park" ? "bg-amber-50 text-amber-700 border border-amber-100" :
+      "bg-slate-50 text-slate-500 border border-slate-100";
+  const statusLabel = nStatus === "run" ? "Đang chạy" : nStatus === "park" ? "Đang dừng" : "Mất kết nối";
+
+  // On-demand reverse geocoding
+  const { loading: addrLoading, address, fetchAddress } = useReverseGeocode();
+
+  const handlePopupOpen = useCallback(() => {
+    fetchAddress(v.latitude, v.longitude, v.geocoding);
+  }, [fetchAddress, v.latitude, v.longitude, v.geocoding]);
+
+  const displayAddress = addrLoading
+    ? "Đang lấy địa chỉ..."
+    : address || v.geocoding || "";
+
+  return (
+    <Marker
+      position={[v.latitude, v.longitude]}
+      icon={icon}
+      ref={(ref) => setMarkerRef(v.device_id, ref as unknown as L.Marker | null)}
+      eventHandlers={{ popupopen: handlePopupOpen }}
+    >
+      <Popup>
+        <div className="font-sans min-w-55 p-0.5">
+          {/* Header */}
+          <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
+            <div className="flex flex-col">
+              <strong className="text-base font-bold text-slate-800 uppercase">{v.license_plate}</strong>
+              <span className="text-xs text-slate-500 truncate max-w-50">{v.vehicle_name}</span>
+            </div>
+            <span className={`ml-auto shrink-0 font-semibold px-2 py-0.5 rounded-full text-[11px] ${statusClass}`}>
+              {statusLabel}
+            </span>
+          </div>
+
+          {/* Details */}
+          <div className="space-y-1.5 pt-2">
+            <div className="flex justify-between items-center text-sm">
+              <span className="text-slate-400">Vận tốc</span>
+              <span className="font-semibold text-slate-700 tabular-nums">{v.speed} <span className="text-[11px] text-slate-400 font-normal">km/h</span></span>
+            </div>
+            <div className="flex justify-between items-center text-sm">
+              <span className="text-slate-400">Hướng</span>
+              <span className="font-semibold text-slate-700">
+                {directionToCompass(v.direction)} <span className="text-[11px] text-slate-400 font-normal">({Math.round(v.direction)}°)</span>
+              </span>
+            </div>
+            <div className="flex justify-between items-center text-sm">
+              <span className="text-slate-400">Cách trạm</span>
+              <span className="font-semibold text-slate-700 tabular-nums">
+                {v.distance >= 1000 ? `${(v.distance / 1000).toFixed(1)} km` : `${v.distance} m`}
+              </span>
+            </div>
+            <div className="flex justify-between items-start text-sm gap-2">
+              <span className="text-slate-400 shrink-0">Vị trí</span>
+              <span className={`font-medium text-right text-[11px] leading-relaxed ${addrLoading ? "text-sky-500 animate-pulse" : "text-slate-600"}`}>
+                {displayAddress || "Không xác định"}
+              </span>
+            </div>
+            {v.timestamp && (
+              <div className="flex justify-between items-center text-sm">
+                <span className="text-slate-400">Cập nhật</span>
+                <span className="font-medium text-slate-500 text-[11px]">{formatTimestamp(v.timestamp)}</span>
+              </div>
+            )}
+          </div>
+        </div>
+      </Popup>
+    </Marker>
+  );
+}
 
 export default React.memo(StationMap);

@@ -1,9 +1,27 @@
 import { PERMISSIONS } from "@/constants/permissions";
-import { ROLES } from "@/constants/roles";
 import { SIDEBAR } from "@/constants/route";
 import {
-  ArrowRightLeft, Bot, CalendarCheck, Car, CalendarClock, ClipboardList, Fuel, Gauge, Layers, MapPin,
-  Package, Settings, ShieldCheck, UserCog, UsersRound, UtensilsCrossed, Wrench
+  ArrowRightLeft,
+  Award,
+  Bot,
+  Briefcase,
+  BriefcaseBusiness,
+  Building2,
+  CalendarDays,
+  Car,
+  ClipboardList,
+  Fuel,
+  Gauge,
+  Layers,
+  Link2,
+  MapPin,
+  Package,
+  Settings2,
+  ShieldCheck,
+  UserCog,
+  UsersRound,
+  UtensilsCrossed,
+  Wrench,
 } from "lucide-react";
 import React from "react";
 
@@ -14,11 +32,15 @@ export interface PageFunc {
 
 export interface NavItem {
   key: string;
-  label: string; // Translation key in 'Sidebar' namespace
+  label: string;
   icon?: React.ReactNode;
   actions?: PageFunc[];
   children?: NavItem[];
-  roles?: string[]; // Optional: restrict this item to specific roles (e.g., ['admin', 'dispatcher'])
+  roles?: string[];
+  /** Ẩn khỏi menu sidebar nhưng vẫn giữ trong config (vẫn sinh cây phân quyền + vẫn là route hợp lệ). */
+  hideInSidebar?: boolean;
+  /** Các route key khác cũng cho phép hiện mục này (vd trang gộp mở được bằng 1 trong 2 quyền). */
+  extraAccessKeys?: string[];
 }
 
 export const navigationConfig: NavItem[] = [
@@ -34,7 +56,10 @@ export const navigationConfig: NavItem[] = [
       { key: PERMISSIONS.DASHBOARD.CHECKLOG, label: "Xem nhật ký vận hành" },
       { key: PERMISSIONS.DASHBOARD.MANUAL_SORT, label: "Thao tác sắp xếp thứ tự lốt xe" },
       { key: PERMISSIONS.DASHBOARD.VIEW_MAP, label: "Xem bản đồ" },
-      { key: PERMISSIONS.DASHBOARD.MANUAL_CAMERA_FALLBACK, label: "Thao tác cho xe vào/xuất trạm (camera sự cố)" },
+      {
+        key: PERMISSIONS.DASHBOARD.MANUAL_CAMERA_FALLBACK,
+        label: "Thao tác cho xe vào/xuất trạm (camera sự cố)",
+      },
       { key: PERMISSIONS.DASHBOARD.SYSTEM_SETTINGS, label: "Cấu hình vận hành" },
     ],
   },
@@ -58,17 +83,6 @@ export const navigationConfig: NavItem[] = [
       { key: PERMISSIONS.VEHICLE_MAINTENANCES.CREATE, label: "Thêm bảo trì" },
       { key: PERMISSIONS.VEHICLE_MAINTENANCES.UPDATE, label: "Sửa bảo trì" },
       { key: PERMISSIONS.VEHICLE_MAINTENANCES.DELETE, label: "Xóa bảo trì" },
-    ],
-  },
-  {
-    key: SIDEBAR.VEHICLE_TYPES,
-    label: "vehicleTypes",
-    icon: <Layers />,
-    actions: [
-      { key: PERMISSIONS.VEHICLE_TYPES.VIEW, label: "Xem danh sách loại phương tiện" },
-      { key: PERMISSIONS.VEHICLE_TYPES.CREATE, label: "Thêm loại phương tiện" },
-      { key: PERMISSIONS.VEHICLE_TYPES.UPDATE, label: "Sửa loại phương tiện" },
-      { key: PERMISSIONS.VEHICLE_TYPES.DELETE, label: "Xóa loại phương tiện" },
     ],
   },
   {
@@ -119,9 +133,26 @@ export const navigationConfig: NavItem[] = [
         icon: <UtensilsCrossed size={18} />,
       },
       {
-        key: SIDEBAR.ATTENDANCE,
-        label: "attendance",
-        icon: <CalendarCheck size={18} />,
+        key: SIDEBAR.WORK_ATTENDANCE,
+        label: "workAttendance",
+        icon: <CalendarDays size={18} />,
+        // Gộp vào "Bố trí công việc": ẩn khỏi menu nhưng giữ trong config để bảng phân quyền vẫn cấp được quyền chấm công.
+        hideInSidebar: true,
+        actions: [
+          { key: PERMISSIONS.WORK_ATTENDANCE.VIEW, label: "Xem bảng công" },
+          { key: PERMISSIONS.WORK_ATTENDANCE.UPDATE, label: "Cập nhật nghỉ nửa ngày" },
+        ],
+      },
+      {
+        key: SIDEBAR.WORK_ARRANGEMENTS,
+        label: "workArrangements",
+        icon: <BriefcaseBusiness size={18} />,
+        // Trang "Bố trí công việc" gộp 2 tab (Phân công + Chấm công); hiện ở menu nếu có 1 trong 2 quyền.
+        extraAccessKeys: [SIDEBAR.WORK_ATTENDANCE],
+        actions: [
+          { key: PERMISSIONS.WORK_ARRANGEMENTS.VIEW, label: "Xem phân công" },
+          { key: PERMISSIONS.WORK_ARRANGEMENTS.UPDATE, label: "Cập nhật phân công" },
+        ],
       },
     ],
   },
@@ -130,6 +161,69 @@ export const navigationConfig: NavItem[] = [
     label: "aiAssistant",
     icon: <Bot />,
     // roles: [ROLES.ADMIN],
+  },
+  {
+    key: "category-group",
+    label: "category",
+    icon: <Settings2 />,
+    children: [
+      {
+        key: SIDEBAR.VEHICLE_TYPES,
+        label: "vehicleTypes",
+        icon: <Layers size={18} />,
+        actions: [
+          { key: PERMISSIONS.VEHICLE_TYPES.VIEW, label: "Xem danh sách loại phương tiện" },
+          { key: PERMISSIONS.VEHICLE_TYPES.CREATE, label: "Thêm loại phương tiện" },
+          { key: PERMISSIONS.VEHICLE_TYPES.UPDATE, label: "Sửa loại phương tiện" },
+          { key: PERMISSIONS.VEHICLE_TYPES.DELETE, label: "Xóa loại phương tiện" },
+        ],
+      },
+      {
+        key: SIDEBAR.DEPARTMENTS,
+        label: "departments",
+        icon: <Building2 size={18} />,
+        actions: [
+          { key: PERMISSIONS.DEPARTMENTS.VIEW, label: "Xem danh sách bộ phận" },
+          { key: PERMISSIONS.DEPARTMENTS.CREATE, label: "Thêm bộ phận" },
+          { key: PERMISSIONS.DEPARTMENTS.UPDATE, label: "Sửa bộ phận" },
+          { key: PERMISSIONS.DEPARTMENTS.ASSIGN_USERS, label: "Gán nhân sự vào bộ phận" },
+          { key: PERMISSIONS.DEPARTMENTS.DELETE, label: "Xóa bộ phận" },
+        ],
+      },
+      {
+        key: SIDEBAR.SKILLS,
+        label: "skills",
+        icon: <Award size={18} />,
+        actions: [
+          { key: PERMISSIONS.SKILLS.VIEW, label: "Xem danh sách tay nghề" },
+          { key: PERMISSIONS.SKILLS.CREATE, label: "Thêm tay nghề" },
+          { key: PERMISSIONS.SKILLS.UPDATE, label: "Sửa tay nghề" },
+          { key: PERMISSIONS.SKILLS.DELETE, label: "Xóa tay nghề" },
+        ],
+      },
+      {
+        key: SIDEBAR.USER_ASSIGNMENTS,
+        label: "userAssignments",
+        icon: <Link2 size={18} />,
+        actions: [
+          { key: PERMISSIONS.USER_ASSIGNMENTS.VIEW, label: "Xem danh mục nhân sự" },
+          { key: PERMISSIONS.USER_ASSIGNMENTS.CREATE, label: "Thêm nhân sự" },
+          { key: PERMISSIONS.USER_ASSIGNMENTS.UPDATE, label: "Sửa nhân sự" },
+          { key: PERMISSIONS.USER_ASSIGNMENTS.DELETE, label: "Xóa nhân sự" },
+        ],
+      },
+      {
+        key: SIDEBAR.WORKS,
+        label: "works",
+        icon: <Briefcase size={18} />,
+        actions: [
+          { key: PERMISSIONS.WORKS.VIEW, label: "Xem danh sách công việc" },
+          { key: PERMISSIONS.WORKS.CREATE, label: "Thêm công việc" },
+          { key: PERMISSIONS.WORKS.UPDATE, label: "Sửa công việc" },
+          { key: PERMISSIONS.WORKS.DELETE, label: "Xóa công việc" },
+        ],
+      },
+    ],
   },
   {
     key: "user-manage-group",

@@ -117,6 +117,10 @@ export default function Sidebar() {
       return items
         .map((item) => ({ ...item }))
         .filter((item) => {
+          if (item.hideInSidebar) {
+            return false;
+          }
+
           if (item.roles && !item.roles.includes(role || "")) {
             return false;
           }
@@ -126,7 +130,10 @@ export default function Sidebar() {
             return item.children.length > 0;
           }
 
-          return hasPageAccess(item.key);
+          return (
+            hasPageAccess(item.key) ||
+            (item.extraAccessKeys?.some((key) => hasPageAccess(key)) ?? false)
+          );
         });
     };
     return filterItems(baseMenuItems);

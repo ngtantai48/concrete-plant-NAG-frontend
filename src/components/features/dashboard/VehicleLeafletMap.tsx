@@ -3,8 +3,10 @@
 import "leaflet/dist/leaflet.css";
 
 import type { VtrackingVehicle } from "@/types/vtracking";
+import { useReverseGeocode } from "@/hooks/useReverseGeocode";
 import L from "leaflet";
-import { MapContainer, Marker, Popup, TileLayer } from "react-leaflet";
+import { useCallback } from "react";
+import { MapContainer, Marker, Popup, TileLayer, LayersControl } from "react-leaflet";
 
 const OFFLINE_THRESHOLD_MS = 10 * 60 * 1000;
 
@@ -96,13 +98,45 @@ export default function VehicleLeafletMap({ vehicle }: { vehicle: VtrackingVehic
     },
   }[displayStatus];
 
+  // On-demand reverse geocoding
+  const { loading: addrLoading, address, fetchAddress } = useReverseGeocode();
+
+  const handlePopupOpen = useCallback(() => {
+    fetchAddress(lat, lng, vehicle.geocoding);
+  }, [fetchAddress, lat, lng, vehicle.geocoding]);
+
+  // Determine what to display for address
+  const displayAddress = addrLoading
+    ? "Đang lấy địa chỉ..."
+    : address || vehicle.geocoding || "";
+
   return (
     <MapContainer center={[lat, lng]} zoom={17} scrollWheelZoom style={{ width: "100%", height: "100%" }}>
-      <TileLayer
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>'
-        url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
-      />
-      <Marker position={[lat, lng]} icon={icon}>
+        <LayersControl position="topright">
+          <LayersControl.BaseLayer checked name="Bản đồ Google">
+            <TileLayer
+              attribution='&copy; <a href="https://www.google.com/maps">Google Maps</a>'
+              url="https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}"
+            />
+          </LayersControl.BaseLayer>
+          <LayersControl.BaseLayer name="Vệ tinh Google">
+            <TileLayer
+              attribution='&copy; <a href="https://www.google.com/maps">Google Maps</a>'
+              url="https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}"
+            />
+          </LayersControl.BaseLayer>
+          <LayersControl.BaseLayer name="Bản đồ mặc định (OSM)">
+            <TileLayer
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>'
+              url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+            />
+          </LayersControl.BaseLayer>
+        </LayersControl>
+      <Marker
+        position={[lat, lng]}
+        icon={icon}
+        eventHandlers={{ popupopen: handlePopupOpen }}
+      >
         <Popup>
           <div className="font-sans min-w-55 p-0.5">
             <div className="flex items-center gap-2 pb-2 border-b border-slate-100">
@@ -128,12 +162,12 @@ export default function VehicleLeafletMap({ vehicle }: { vehicle: VtrackingVehic
                   {directionToCompass(vehicle.direction)} <span className="text-[11px] text-slate-400 font-normal">({Math.round(vehicle.direction)}°)</span>
                 </span>
               </div>
-              {vehicle.geocoding && (
-                <div className="flex justify-between items-start text-sm gap-2">
-                  <span className="text-slate-400 shrink-0">Vị trí</span>
-                  <span className="font-medium text-slate-600 text-right text-[11px] leading-relaxed">{vehicle.geocoding}</span>
-                </div>
-              )}
+              <div className="flex justify-between items-start text-sm gap-2">
+                <span className="text-slate-400 shrink-0">Vị trí</span>
+                <span className={`font-medium text-right text-[11px] leading-relaxed ${addrLoading ? "text-sky-500 animate-pulse" : "text-slate-600"}`}>
+                  {displayAddress || "Không xác định"}
+                </span>
+              </div>
               {vehicle.timestamp && (
                 <div className="flex justify-between items-center text-sm">
                   <span className="text-slate-400">Cập nhật</span>

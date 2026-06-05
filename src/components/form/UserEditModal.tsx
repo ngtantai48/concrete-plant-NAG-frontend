@@ -1,6 +1,5 @@
 "use client";
 
-import { zodResolver } from "@hookform/resolvers/zod";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import {
@@ -28,6 +27,7 @@ import { userApi } from "@/services/user.service";
 import type { AppDispatch } from "@/store";
 import { updateUser } from "@/store/slices/userSlice";
 import type { UpdateUserPayload, User } from "@/types/user";
+import { zodResolver } from "@hookform/resolvers/zod";
 import { format, isValid, parse } from "date-fns";
 import { Calendar as CalendarIcon, Eye, EyeOff, Loader2, Save, UserCog, X } from "lucide-react";
 import { useTranslations } from "next-intl";
@@ -50,6 +50,7 @@ const joinDateSchema = z
 
 const editUserSchema = z.object({
   user_full_name: z.string().trim().min(1, "Vui lòng nhập họ tên"),
+  user_short_name: z.string().trim().optional(),
   user_email: z.string().trim().email("Email không hợp lệ"),
   user_phone_number: z
     .string()
@@ -116,6 +117,7 @@ export default function UserEditModal({ open, user, onClose }: UserEditModalProp
     resolver: zodResolver(editUserSchema),
     defaultValues: {
       user_full_name: "",
+      user_short_name: "",
       user_email: "",
       user_phone_number: "",
       user_address: "",
@@ -132,6 +134,7 @@ export default function UserEditModal({ open, user, onClose }: UserEditModalProp
 
     reset({
       user_full_name: user.user_full_name || "",
+      user_short_name: user.user_short_name || "",
       user_email: user.user_email || "",
       user_phone_number: user.user_phone_number || "",
       user_address: user.user_address || "",
@@ -156,6 +159,7 @@ export default function UserEditModal({ open, user, onClose }: UserEditModalProp
     try {
       const payload: UpdateUserPayload = {
         user_full_name: values.user_full_name,
+        user_short_name: values.user_short_name || "",
         user_email: values.user_email,
         user_phone_number: values.user_phone_number,
         user_address: values.user_address || "",
@@ -205,13 +209,24 @@ export default function UserEditModal({ open, user, onClose }: UserEditModalProp
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-4 px-4">
           <section className="space-y-2">
             <h3 className="text-sm font-semibold text-slate-700">{t("personalInfo")}</h3>
-            <div className="space-y-1">
-              <Label htmlFor="edit-user-full-name">
-                {t("full_name")}
-                {requiredMark}
-              </Label>
-              <Input id="edit-user-full-name" {...register("user_full_name")} />
-              {errorText(errors.user_full_name?.message)}
+            <div className="grid gap-3 md:grid-cols-2">
+              <div className="space-y-1">
+                <Label htmlFor="edit-user-full-name">
+                  {t("full_name")}
+                  {requiredMark}
+                </Label>
+                <Input id="edit-user-full-name" {...register("user_full_name")} />
+                {errorText(errors.user_full_name?.message)}
+              </div>
+
+              <div className="space-y-1">
+                <Label htmlFor="edit-user-short-name">
+                  {t("short_name")}
+                  {optionalLabel}
+                </Label>
+                <Input id="edit-user-short-name" {...register("user_short_name")} />
+                {errorText(errors.user_short_name?.message)}
+              </div>
             </div>
 
             <div className="grid gap-3 md:grid-cols-2">
@@ -305,12 +320,13 @@ export default function UserEditModal({ open, user, onClose }: UserEditModalProp
                       </SelectTrigger>
                       <SelectContent>
                         {roleOptions.length > 0 ? (
-                          // roles.map((role) => (
-                          roles.filter((role) => role.role !== 'admin').map((role) => (
-                            <SelectItem key={`${role.id}-${role.role}`} value={role.role}>
-                              {role.role_label}
-                            </SelectItem>
-                          ))
+                          roleOptions
+                            .filter((role) => role.role !== "admin")
+                            .map((role) => (
+                              <SelectItem key={`${role.id}-${role.role}`} value={role.role}>
+                                {role.role_label}
+                              </SelectItem>
+                            ))
                         ) : (
                           <SelectItem value="user" disabled>
                             Chưa có vai trò
@@ -322,6 +338,9 @@ export default function UserEditModal({ open, user, onClose }: UserEditModalProp
                 />
                 {errorText(errors.role?.message)}
               </div>
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-2">
               <div className="space-y-1">
                 <Label htmlFor="edit-join-date">
                   {t("join_date")}
@@ -350,7 +369,7 @@ export default function UserEditModal({ open, user, onClose }: UserEditModalProp
                             <CalendarIcon className="ml-2 size-4 opacity-50" />
                           </Button>
                         </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0 z-[300]" align="start">
+                        <PopoverContent className="z-[300] w-auto p-0" align="start">
                           <Calendar
                             mode="single"
                             selected={selectedDate}
@@ -366,19 +385,19 @@ export default function UserEditModal({ open, user, onClose }: UserEditModalProp
                 />
                 {errorText(errors.user_join_date?.message)}
               </div>
-            </div>
 
-            <div className="space-y-1">
-              <Label htmlFor="edit-work-shift">
-                {t("work_shift")}
-                {optionalLabel}
-              </Label>
-              <Input
-                id="edit-work-shift"
-                {...register("user_work_shift")}
-                placeholder={t("workShiftPlaceholder")}
-              />
-              {errorText(errors.user_work_shift?.message)}
+              <div className="space-y-1">
+                <Label htmlFor="edit-work-shift">
+                  {t("work_shift")}
+                  {optionalLabel}
+                </Label>
+                <Input
+                  id="edit-work-shift"
+                  {...register("user_work_shift")}
+                  placeholder={t("workShiftPlaceholder")}
+                />
+                {errorText(errors.user_work_shift?.message)}
+              </div>
             </div>
           </section>
 

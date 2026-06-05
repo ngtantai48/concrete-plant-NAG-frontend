@@ -6,11 +6,19 @@ import { Input as ShadcnInput } from "@/components/ui/input";
 import {
   PaginationContent,
   PaginationEllipsis,
-  PaginationItem, PaginationLink,
-  PaginationNext, PaginationPrevious,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
   Pagination as ShadcnPagination,
 } from "@/components/ui/pagination";
-import { SelectContent, SelectItem, SelectTrigger, SelectValue, Select as ShadcnSelect, } from "@/components/ui/select";
+import {
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  Select as ShadcnSelect,
+} from "@/components/ui/select";
 import { PERMISSIONS } from "@/constants/permissions";
 import { SIDEBAR } from "@/constants/route";
 import { useAppDispatch, useAppSelector } from "@/hooks/use-app-selector";
@@ -21,18 +29,34 @@ import mediaApi from "@/services/media.service";
 import { userApi } from "@/services/user.service";
 import vehicleTypeApi from "@/services/vehicle-type.service";
 import vehicleApi from "@/services/vehicle.service";
-import { clearVehicles, fetchVehicles, setPagination, } from "@/store/slices/vehicleSlice";
+import { clearVehicles, fetchVehicles, setPagination } from "@/store/slices/vehicleSlice";
 import type { Driver } from "@/types/driver";
 import type { VehicleMedia } from "@/types/media";
 import type { Vehicle, VehicleType } from "@/types/vehicle";
 import {
-  Divider, Form, Image, Input, Modal,
-  Popconfirm, Select, Space, Table, Tooltip,
+  Divider,
+  Form,
+  Image,
+  Input,
+  Modal,
+  Popconfirm,
+  Select,
+  Space,
+  Table,
+  Tooltip,
 } from "antd";
 import {
-  CarFront, Download, FileArchive, FileText, Hash,
-  PenSquare, Plus, RefreshCw,
-  Trash2, Upload as UploadIcon, X
+  CarFront,
+  Download,
+  FileArchive,
+  FileText,
+  Hash,
+  PenSquare,
+  Plus,
+  RefreshCw,
+  Trash2,
+  Upload as UploadIcon,
+  X,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -131,7 +155,12 @@ export default function TableVehicles() {
       setDriverFilter("all");
       setStatusFilter("all");
     } else if (searchCategory === "driver") {
-      if (driverInputBuf === "all" && driverFilter === "all" && !vehicleLicensePlate && statusFilter === "all") {
+      if (
+        driverInputBuf === "all" &&
+        driverFilter === "all" &&
+        !vehicleLicensePlate &&
+        statusFilter === "all"
+      ) {
         toast.warning("Vui lòng chọn tài xế tiếp nhận!");
         return;
       }
@@ -139,7 +168,12 @@ export default function TableVehicles() {
       setVehicleLicensePlate("");
       setStatusFilter("all");
     } else if (searchCategory === "status") {
-      if (statusInputBuf === "all" && statusFilter === "all" && !vehicleLicensePlate && driverFilter === "all") {
+      if (
+        statusInputBuf === "all" &&
+        statusFilter === "all" &&
+        !vehicleLicensePlate &&
+        driverFilter === "all"
+      ) {
         toast.warning("Vui lòng chọn trạng thái xe!");
         return;
       }
@@ -148,20 +182,32 @@ export default function TableVehicles() {
       setDriverFilter("all");
     }
     dispatch(clearVehicles());
-  }, [searchCategory, plateInput, driverInputBuf, statusInputBuf, dispatch, vehicleLicensePlate, driverFilter, statusFilter]);
+  }, [
+    searchCategory,
+    plateInput,
+    driverInputBuf,
+    statusInputBuf,
+    dispatch,
+    vehicleLicensePlate,
+    driverFilter,
+    statusFilter,
+  ]);
 
-  const fetchVehiclesData = useCallback(async (force: boolean = false) => {
-    dispatch(
-      fetchVehicles({
-        page,
-        limit,
-        vehicle_license_plate: vehicleLicensePlate || undefined,
-        vehicle_status: statusFilter !== "all" ? statusFilter : undefined,
-        user_id: driverFilter !== "all" ? driverFilter : undefined,
-        force,
-      })
-    );
-  }, [dispatch, page, limit, vehicleLicensePlate, statusFilter, driverFilter]);
+  const fetchVehiclesData = useCallback(
+    async (force: boolean = false) => {
+      dispatch(
+        fetchVehicles({
+          page,
+          limit,
+          vehicle_license_plate: vehicleLicensePlate || undefined,
+          vehicle_status: statusFilter !== "all" ? statusFilter : undefined,
+          user_id: driverFilter !== "all" ? driverFilter : undefined,
+          force,
+        })
+      );
+    },
+    [dispatch, page, limit, vehicleLicensePlate, statusFilter, driverFilter]
+  );
 
   const fetchVehicleTypes = useCallback(async () => {
     try {
@@ -329,7 +375,7 @@ export default function TableVehicles() {
     } catch (error) {
       // const message = (error as any)?.response?.data?.message || (error as Error)?.message || t("saveFailed");
       // toast.error(t("failed"), { description: message });
-      toast.error(t("failed"), { description: t("saveFailed") })
+      toast.error(t("failed"), { description: t("saveFailed") });
     } finally {
       setSaving(false);
     }
@@ -340,7 +386,12 @@ export default function TableVehicles() {
       await vehicleApi.delete(record.vehicle_id);
       toast.success(
         <>
-          {t("licensePlate")} <b>{record.vehicle_license_plate}{record.vehicle_name ? ` | ${record.vehicle_name}` : ''}</b> {t("deleteSuccess")}
+          {t("licensePlate")}{" "}
+          <b>
+            {record.vehicle_license_plate}
+            {record.vehicle_name ? ` | ${record.vehicle_name}` : ""}
+          </b>{" "}
+          {t("deleteSuccess")}
         </>
       );
       fetchVehiclesData(true);
@@ -536,7 +587,8 @@ export default function TableVehicles() {
       key: "vehicle_license_plate",
       render: (text: string, record: Vehicle) => (
         <div className="font-semibold text-slate-800 bg-slate-100 uppercase tracking-wider px-3 py-1 rounded inline-block border-2 border-slate-300">
-          {text}{record.vehicle_name ? ` | ${record.vehicle_name}` : ''}
+          {text}
+          {record.vehicle_name ? ` | ${record.vehicle_name}` : ""}
         </div>
       ),
     },
@@ -548,10 +600,20 @@ export default function TableVehicles() {
       align: "center" as const,
       render: (val: number) => {
         const found = vehicleTypes.find((vt) => vt.vehicle_type_id === val);
-        return found?.vehicle_type_name || `#${val}`;
+        if (!found) return `#${val}`;
+
+        return (
+          <div className="inline-flex items-center justify-center gap-2">
+            {found.vehicle_type_symbol ? (
+              <span className="rounded border border-slate-300 bg-slate-100 px-2 py-0.5 text-xs font-bold uppercase tracking-wider text-slate-800">
+                {found.vehicle_type_symbol}
+              </span>
+            ) : null}
+            <span>{found.vehicle_type_name}</span>
+          </div>
+        );
       },
     },
-
     {
       title: t("description"),
       dataIndex: "vehicle_description",
@@ -584,7 +646,12 @@ export default function TableVehicles() {
               title={t("confirmTitle")}
               description={
                 <span>
-                  {t("confirmDelete")} <b>{record.vehicle_license_plate}{record.vehicle_name ? ` | ${record.vehicle_name}` : ''}</b>?
+                  {t("confirmDelete")}{" "}
+                  <b>
+                    {record.vehicle_license_plate}
+                    {record.vehicle_name ? ` | ${record.vehicle_name}` : ""}
+                  </b>
+                  ?
                 </span>
               }
               okText={t("okText")}
@@ -695,10 +762,7 @@ export default function TableVehicles() {
             )}
 
             {searchCategory === "status" && (
-              <ShadcnSelect
-                value={statusInputBuf}
-                onValueChange={(val) => setStatusInputBuf(val)}
-              >
+              <ShadcnSelect value={statusInputBuf} onValueChange={(val) => setStatusInputBuf(val)}>
                 <SelectTrigger className="flex-1 bg-white">
                   <SelectValue placeholder="Tìm kiếm theo trạng thái xe" />
                 </SelectTrigger>
@@ -741,7 +805,7 @@ export default function TableVehicles() {
             <div className="text-sm text-slate-500 flex flex-row">
               {vehicles.length > 0 ? (
                 <>
-                  <i>{t("total")}</i>:{" "}<b>{total}</b>
+                  <i>{t("total")}</i>: <b>{total}</b>
                 </>
               ) : null}
             </div>
@@ -780,10 +844,18 @@ export default function TableVehicles() {
                       );
                     }
                     if (p === 2 && page > 3) {
-                      return <PaginationItem key="ellipsis-start"><PaginationEllipsis /></PaginationItem>;
+                      return (
+                        <PaginationItem key="ellipsis-start">
+                          <PaginationEllipsis />
+                        </PaginationItem>
+                      );
                     }
                     if (p === Math.ceil(total / limit) - 1 && page < Math.ceil(total / limit) - 2) {
-                      return <PaginationItem key="ellipsis-end"><PaginationEllipsis /></PaginationItem>;
+                      return (
+                        <PaginationItem key="ellipsis-end">
+                          <PaginationEllipsis />
+                        </PaginationItem>
+                      );
                     }
                     return null;
                   })}
@@ -793,9 +865,12 @@ export default function TableVehicles() {
                       href="#"
                       onClick={(e) => {
                         e.preventDefault();
-                        if (page < Math.ceil(total / limit)) dispatch(setPagination({ page: page + 1, limit }));
+                        if (page < Math.ceil(total / limit))
+                          dispatch(setPagination({ page: page + 1, limit }));
                       }}
-                      className={page >= Math.ceil(total / limit) ? "pointer-events-none opacity-50" : ""}
+                      className={
+                        page >= Math.ceil(total / limit) ? "pointer-events-none opacity-50" : ""
+                      }
                     />
                   </PaginationItem>
                 </PaginationContent>
@@ -938,8 +1013,6 @@ export default function TableVehicles() {
                     className="rounded-lg"
                   />
                 </Form.Item>
-
-
 
                 <Form.Item
                   label={<span className="font-medium text-slate-700">{t("status")}</span>}

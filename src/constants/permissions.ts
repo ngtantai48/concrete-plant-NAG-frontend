@@ -1,74 +1,105 @@
 export const PERMISSIONS = {
-    DASHBOARD: {
-        VIEW: 'view',
-        ORDER_DETAIL: 'order_detail',
-        SYNC_SLOTS: 'sync_slots',
-        HISTORY: 'history',
-        CHECKLOG: 'checklog',
-        MANUAL_SORT: 'manual_sort',
-        MANUAL_CAMERA_FALLBACK: 'manual_camera_fallback',
-        VIEW_MAP: 'view_map',
-        SYSTEM_SETTINGS: 'system_settings',
-    },
+  DASHBOARD: {
+    VIEW: "view",
+    ORDER_DETAIL: "order_detail",
+    SYNC_SLOTS: "sync_slots",
+    HISTORY: "history",
+    CHECKLOG: "checklog",
+    MANUAL_SORT: "manual_sort",
+    MANUAL_CAMERA_FALLBACK: "manual_camera_fallback",
+    VIEW_MAP: "view_map",
+    SYSTEM_SETTINGS: "system_settings",
+  },
 
-    USER_MANAGE: {
-        VIEW: 'view',
-        CREATE: 'create',
-        UPDATE: 'update',
-        DELETE: 'delete',
-    },
+  USER_MANAGE: {
+    VIEW: "view",
+    CREATE: "create",
+    UPDATE: "update",
+    DELETE: "delete",
+  },
 
-    VEHICLES: {
-        VIEW: 'view',
-        CREATE: 'create',
-        UPDATE: 'update',
-        DELETE: 'delete',
-    },
+  VEHICLES: {
+    VIEW: "view",
+    CREATE: "create",
+    UPDATE: "update",
+    DELETE: "delete",
+  },
 
-    VEHICLE_MAINTENANCES: {
-        VIEW: 'view',
-        CREATE: 'create',
-        UPDATE: 'update',
-        DELETE: 'delete',
-    },
+  VEHICLE_MAINTENANCES: {
+    VIEW: "view",
+    CREATE: "create",
+    UPDATE: "update",
+    DELETE: "delete",
+  },
 
-    VEHICLE_TYPES: {
-        VIEW: 'view',
-        CREATE: 'create',
-        UPDATE: 'update',
-        DELETE: 'delete',
-    },
+  VEHICLE_TYPES: {
+    VIEW: "view",
+    CREATE: "create",
+    UPDATE: "update",
+    DELETE: "delete",
+  },
 
-    STATIONS: {
-        VIEW: 'view',
-        CREATE: 'create',
-        UPDATE: 'update',
-        DELETE: 'delete',
-    },
+  STATIONS: {
+    VIEW: "view",
+    CREATE: "create",
+    UPDATE: "update",
+    DELETE: "delete",
+  },
 
-    // MEAL_CHECK: {
-    //     VIEW: 'view',
-    // },
+  DEPARTMENTS: {
+    VIEW: "view",
+    CREATE: "create",
+    UPDATE: "update",
+    ASSIGN_USERS: "assign_users",
+    DELETE: "delete",
+  },
 
-    // ATTENDANCE: {
-    //     VIEW: 'view',
-    // },
+  SKILLS: {
+    VIEW: "view",
+    CREATE: "create",
+    UPDATE: "update",
+    DELETE: "delete",
+  },
 
-    PERMISSIONS_MANAGE: {
-        VIEW: 'view',
-        UPDATE: 'update',
-    },
+  USER_ASSIGNMENTS: {
+    VIEW: "view",
+    CREATE: "create",
+    UPDATE: "update",
+    DELETE: "delete",
+  },
 
-    REPORTS: {
-        VIEW: 'view',
-    },
+  WORKS: {
+    VIEW: "view",
+    CREATE: "create",
+    UPDATE: "update",
+    DELETE: "delete",
+  },
 
-    END_OF_DAY: {
-        VIEW: 'view',
-    },
+  WORK_ATTENDANCE: {
+    VIEW: "view",
+    UPDATE: "update",
+  },
 
-    PARKING_IDLE_ENGINE: {
-        VIEW: 'view',
-        SETTINGS: 'settings',
-    },
+  WORK_ARRANGEMENTS: {
+    VIEW: "view",
+    UPDATE: "update",
+  },
+
+  PERMISSIONS_MANAGE: {
+    VIEW: "view",
+    UPDATE: "update",
+  },
+
+  REPORTS: {
+    VIEW: "view",
+  },
+
+  END_OF_DAY: {
+    VIEW: "view",
+  },
+
+  PARKING_IDLE_ENGINE: {
+    VIEW: "view",
+    SETTINGS: "settings",
+  },
 };
