@@ -42,11 +42,20 @@ export interface OrderCheck {
 export interface OrderMulti {
   distance_start: number;
   nStop_start: number;
+  vehicle_checkin_gps?: string | null;
+  auto_pending_vehicle_flow?: boolean;
+  auto_non_tanker_vehicle_flow?: boolean;
   distance_end: number;
   nStop_end: number;
   stop_duration_seconds?: number;
+  vehicle_checkout_gps?: string | null;
   checkin_time_station?: string | null;
   checkout_time_station?: string | null;
+  outside_yard_without_load?: boolean;
+  outside_yard_without_load_note?: string | null;
+  outside_yard_without_load_started_at?: string | null;
+  outside_yard_without_load_returned_at?: string | null;
+  outside_yard_without_load_duration_seconds?: number | null;
 }
 
 export interface Order {

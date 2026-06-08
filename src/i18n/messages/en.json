@@ -574,6 +574,8 @@
     "moving": "In transit",
     "collected": "Collected",
     "mixing": "Mixing",
+    "outsideYardWithoutLoadLabel": "No pickup",
+    "outsideYardWithoutLoadCount": "{count} no pickup",
     "systemTime": "System time",
     "network": "Network",
     "data": "Data",
