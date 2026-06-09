@@ -58,6 +58,9 @@ export const navigationConfig: NavItem[] = [
       { key: PERMISSIONS.VEHICLE_MAINTENANCES.CREATE, label: "Thêm bảo trì" },
       { key: PERMISSIONS.VEHICLE_MAINTENANCES.UPDATE, label: "Sửa bảo trì" },
       { key: PERMISSIONS.VEHICLE_MAINTENANCES.DELETE, label: "Xóa bảo trì" },
+      { key: PERMISSIONS.VEHICLE_MAINTENANCES.SUBMIT, label: "Gửi phiếu bảo trì" },
+      { key: PERMISSIONS.VEHICLE_MAINTENANCES.DISPATCH_REVIEW, label: "Điều phối/quản đốc kiểm tra" },
+      { key: PERMISSIONS.VEHICLE_MAINTENANCES.PRODUCTION_APPROVE, label: "Quản lý sản xuất duyệt" },
     ],
   },
   {

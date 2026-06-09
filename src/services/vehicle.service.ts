@@ -8,6 +8,15 @@ export interface ListVehicles {
   limit: number;
 }
 
+export interface ListVehicleNamesParams {
+  page?: number;
+  limit?: number;
+  search?: string;
+  vehicle_name?: string;
+  vehicle_license_plate?: string;
+  vehicle_status?: string;
+}
+
 export interface EndOfDayVehicle {
   vehicle_id: number;
   vehicle_name: string;
@@ -46,6 +55,8 @@ export interface EndOfDayStatusResponse {
 const vehicleApi = {
   getAll: (params?: { page?: number; limit?: number; vehicle_license_plate?: string; vehicle_status?: string; user_id?: number }) =>
     http.get<ListVehicles>("/vehicles", { params }),
+  getListName: (params?: ListVehicleNamesParams) =>
+    http.get<ListVehicles>("/vehicles/list/name", { params }),
   getById: (id: number) => http.get(`/vehicles/${id}`),
   create: (data: Partial<Vehicle>) => http.post("/vehicles", data),
   update: (id: number, data: Partial<Vehicle>) => http.put(`/vehicles/${id}`, data),

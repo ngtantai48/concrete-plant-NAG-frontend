@@ -114,7 +114,8 @@ function RoleDeleteDialog({
           </div> */}
           <DialogTitle>Xóa vai trò?</DialogTitle>
           <DialogDescription>
-            Bạn có chắc chắn muốn xóa vai trò {role ? `"${role.role_label}"` : "này"} không?
+            Bạn có chắc chắn muốn xóa vai trò <b><i>{role ? `"${role.role_label}"` : "này"}</i></b> không?
+            <b>Lưu ý:</b> Nếu tồn tại tài khoản đang sở hữu vai trò này thì không thể xóa được.
           </DialogDescription>
         </DialogHeader>
 
@@ -160,9 +161,8 @@ function SortableRoleTabLabel({
     <div
       ref={setNodeRef}
       style={style}
-      className={`flex max-w-[240px] items-center gap-2 ${
-        active ? "font-semibold text-blue-700" : "text-slate-700"
-      }`}
+      className={`flex max-w-[240px] items-center gap-2 ${active ? "font-semibold text-blue-700" : "text-slate-700"
+        }`}
     >
       <Tooltip>
         <TooltipTrigger asChild>
@@ -524,9 +524,9 @@ export default function RolePermissionsManager() {
           children: [
             ...(hasActions
               ? item.actions!.map((action) => ({
-                  title: action.label,
-                  key: `${item.key}__${action.key}`,
-                }))
+                title: action.label,
+                key: `${item.key}__${action.key}`,
+              }))
               : []),
             ...(hasChildren ? buildTree(item.children!) : []),
           ],
