@@ -5,6 +5,25 @@ import { useAppSelector } from "@/hooks/use-app-selector";
 
 export type RolePermissions = Record<string, string[]>;
 
+const getNavigationRouteKeys = (items: NavItem[]): string[] =>
+  items.flatMap((item) => {
+    const childKeys = item.children ? getNavigationRouteKeys(item.children) : [];
+    return item.key.startsWith("/") ? [item.key, ...childKeys] : childKeys;
+  });
+
+const PAGE_ROUTE_KEYS = getNavigationRouteKeys(navigationConfig).sort(
+  (left, right) => right.length - left.length
+);
+
+export const normalizePermissionPageKey = (pageKey: string) => {
+  const rawPath = String(pageKey || "").split(/[?#]/)[0];
+  const normalizedPath = rawPath.replace(/\/+$/, "") || "/";
+  const matchedRoute = PAGE_ROUTE_KEYS.find(
+    (route) => normalizedPath === route || normalizedPath.startsWith(`${route}/`)
+  );
+  return matchedRoute || normalizedPath;
+};
+
 export const usePermissions = () => {
   const user = useAppSelector((state: any) => state.auth.user);
   const role = user?.role || "user";
@@ -19,7 +38,11 @@ export const usePermissions = () => {
    */
   const hasPageAccess = (pageKey: string) => {
     if (isAdmin) return true;
-    return userPermissions.includes(`${pageKey}__view`) || userPermissions.includes(pageKey);
+    const permissionPageKey = normalizePermissionPageKey(pageKey);
+    return (
+      userPermissions.includes(`${permissionPageKey}__view`) ||
+      userPermissions.includes(permissionPageKey)
+    );
   };
 
   /**
@@ -28,7 +51,7 @@ export const usePermissions = () => {
    */
   const hasActionAccess = (pageKey: string, actionKey: string) => {
     if (isAdmin) return true;
-    const fullKey = `${pageKey}__${actionKey}`;
+    const fullKey = `${normalizePermissionPageKey(pageKey)}__${actionKey}`;
     return userPermissions.includes(fullKey);
   };
 
