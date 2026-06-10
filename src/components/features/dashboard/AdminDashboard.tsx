@@ -30,6 +30,7 @@ import type { Station } from "@/types/station";
 import type { Vehicle } from "@/types/vehicle";
 import { format } from "date-fns";
 import {
+  AlertTriangle,
   ArrowRight,
   Calendar as CalendarIcon,
   CalendarClock,
@@ -129,6 +130,9 @@ const getVtrackingDisplayStatus = (status: string, timestamp?: number) => {
   if (["stop", "park", "idle", "parking", "stopped"].includes(normalizedStatus)) return "park";
   return "offline";
 };
+
+const isOutsideYardWithoutLoadOrder = (order: Order) =>
+  order.order_multi?.outside_yard_without_load === true;
 
 export default function AdminDashboard() {
   const t = useTranslations("DashboardPage");
@@ -1952,6 +1956,9 @@ export default function AdminDashboard() {
                 tCommon("hour"),
                 tCommon("minute")
               );
+              const outsideYardWithoutLoadCount = tripOrders.filter(
+                isOutsideYardWithoutLoadOrder
+              ).length;
 
               return (
                 <div className="flex flex-col flex-1 min-h-0">
@@ -2061,6 +2068,7 @@ export default function AdminDashboard() {
                           );
                           const isTripActive =
                             o.order_status === "running" || o.order_status === "transporting";
+                          const isOutsideYardWithoutLoad = isOutsideYardWithoutLoadOrder(o);
 
                           return (
                             <Card
@@ -2068,7 +2076,7 @@ export default function AdminDashboard() {
                               className="relative overflow-hidden border shadow-sm"
                             >
                               <div
-                                className={`absolute left-0 top-0 bottom-0 w-1 ${isTripActive ? "bg-sky-500" : "bg-emerald-500"}`}
+                                className={`absolute left-0 top-0 bottom-0 w-1 ${isOutsideYardWithoutLoad ? "bg-amber-500" : isTripActive ? "bg-sky-500" : "bg-emerald-500"}`}
                               />
                               <CardContent>
                                 <div className="px-2 space-y-2">
@@ -2089,7 +2097,16 @@ export default function AdminDashboard() {
                                         {o.stations?.station_name || t("unassigned")}
                                       </span>
                                     </div>
-                                    <div className="flex items-center">
+                                    <div className="flex items-center gap-1.5">
+                                      {isOutsideYardWithoutLoad && (
+                                        <Badge
+                                          variant="outline"
+                                          className="bg-amber-50 text-amber-700 border-amber-300 text-sm px-2 py-0.5 font-semibold shadow-none"
+                                        >
+                                          <AlertTriangle className="h-3.5 w-3.5" />
+                                          {t("outsideYardWithoutLoadLabel")}
+                                        </Badge>
+                                      )}
                                       {/* {o.order_status === 'running' && (
                                       <Button size="sm" variant="primary" onClick={() => setShowVehicleLocation(true)}>
                                         {t('viewLocation')}
@@ -2243,6 +2260,16 @@ export default function AdminDashboard() {
                             <Timer size={16} />
                             <span>
                               {t("mixing")}: {mixTotalDurationStr}
+                            </span>
+                          </div>
+                        )}
+                        {outsideYardWithoutLoadCount > 0 && (
+                          <div className="flex items-center gap-1.5 text-sm font-bold whitespace-nowrap text-amber-600">
+                            <AlertTriangle size={16} />
+                            <span>
+                              {t("outsideYardWithoutLoadCount", {
+                                count: outsideYardWithoutLoadCount,
+                              })}
                             </span>
                           </div>
                         )}

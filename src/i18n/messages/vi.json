@@ -597,6 +597,8 @@
     "moving": "Đang di chuyển",
     "collected": "Đã lấy hàng",
     "mixing": "Trộn",
+    "outsideYardWithoutLoadLabel": "Không lấy hàng",
+    "outsideYardWithoutLoadCount": "{count} không lấy hàng",
     "systemTime": "Giờ hệ thống",
     "network": "Mạng",
     "data": "Dữ liệu",
