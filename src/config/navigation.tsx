@@ -128,6 +128,12 @@ export const navigationConfig: NavItem[] = [
     icon: <Package />,
     children: [
       {
+        key: SIDEBAR.CALENDAR,
+        label: "calendar",
+        icon: <CalendarDays size={18} />,
+        actions: [{ key: PERMISSIONS.CALENDAR.VIEW, label: "Xem lịch âm/dương" }],
+      },
+      {
         key: SIDEBAR.MEAL_CHECK,
         label: "mealCheck",
         icon: <UtensilsCrossed size={18} />,
@@ -142,6 +148,14 @@ export const navigationConfig: NavItem[] = [
           { key: PERMISSIONS.WORK_ATTENDANCE.VIEW, label: "Xem bảng công" },
           { key: PERMISSIONS.WORK_ATTENDANCE.UPDATE, label: "Cập nhật nghỉ nửa ngày" },
         ],
+      },
+      {
+        key: SIDEBAR.WORK_ARRANGEMENTS_EXPERIMENT,
+        label: "workArrangementsExperiment",
+        icon: <ClipboardList size={18} />,
+        // Bản thử nghiệm đã lên làm trang chính (/work-arrangements); URL này giữ bản gốc, ẩn khỏi menu.
+        hideInSidebar: true,
+        extraAccessKeys: [SIDEBAR.WORK_ARRANGEMENTS, SIDEBAR.WORK_ATTENDANCE, SIDEBAR.WORKS],
       },
       {
         key: SIDEBAR.WORK_ARRANGEMENTS,

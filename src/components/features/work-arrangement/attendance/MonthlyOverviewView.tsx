@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import {
   workAttendanceApi,
   type WorkAttendanceRangeExportData,
@@ -34,10 +35,16 @@ type OffEntry = {
 };
 
 type MonthlyOverviewViewProps = {
-  onMarkDay: (date: string) => void;
+  onMarkDay?: (date: string) => void;
+  showMarkDayAction?: boolean;
+  compact?: boolean;
 };
 
-export default function MonthlyOverviewView({ onMarkDay }: MonthlyOverviewViewProps) {
+export default function MonthlyOverviewView({
+  onMarkDay,
+  showMarkDayAction = true,
+  compact = false,
+}: MonthlyOverviewViewProps) {
   const t = useTranslations("WorkAttendancePage");
 
   const [month, setMonth] = useState<Dayjs>(dayjs().startOf("month"));
@@ -388,14 +395,21 @@ export default function MonthlyOverviewView({ onMarkDay }: MonthlyOverviewViewPr
   return (
     <div>
       {/* Toolbar */}
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-slate-200 pb-3">
+      <div
+        className={cn(
+          "border-b border-slate-200",
+          compact
+            ? "flex items-center gap-1.5 pb-2"
+            : "flex flex-wrap items-center gap-x-3 gap-y-2 pb-3"
+        )}
+      >
         <DatePicker
           picker="month"
           value={month}
           onChange={(value) => value && setMonth(value.startOf("month"))}
           format="MM/YYYY"
           allowClear={false}
-          className="h-9 w-[130px]"
+          className={cn(compact ? "h-8 w-[104px] shrink-0" : "h-9 w-[130px]")}
         />
         <Button
           type="button"
@@ -403,41 +417,60 @@ export default function MonthlyOverviewView({ onMarkDay }: MonthlyOverviewViewPr
           size="sm"
           onClick={loadMonth}
           disabled={loading}
-          className="h-9 border-slate-200 text-slate-700 hover:bg-slate-50"
+          title={t("reload")}
+          className={cn(
+            "h-9 border-slate-200 text-slate-700 hover:bg-slate-50",
+            compact && "h-8 w-8 shrink-0 rounded-none px-0"
+          )}
         >
           {loading ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw size={15} />}
-          {t("reload")}
+          <span className={compact ? "sr-only" : undefined}>{t("reload")}</span>
         </Button>
 
-        <div className="ml-auto flex items-center gap-2">
+        <div className={cn("flex items-center gap-2", compact ? "ml-auto gap-1.5" : "ml-auto")}>
           <Button
             type="button"
             variant="outline"
             size="sm"
             onClick={handlePreview}
             disabled={loading || !data}
-            className="h-9 border-slate-200 text-slate-700 hover:bg-slate-50"
+            title={t("previewButton")}
+            className={cn(
+              "h-9 border-slate-200 text-slate-700 hover:bg-slate-50",
+              compact && "h-8 w-8 rounded-none px-0"
+            )}
           >
             <Eye size={15} />
-            <span className="hidden sm:inline">{t("previewButton")}</span>
+            <span className={compact ? "sr-only" : "hidden sm:inline"}>{t("previewButton")}</span>
           </Button>
           <Button
             type="button"
             size="sm"
             onClick={handleExport}
             disabled={exporting || !data}
-            className="h-9 bg-teal-600 font-semibold text-white hover:bg-teal-700"
+            title={t("exportButton")}
+            className={cn(
+              "h-9 bg-teal-600 font-semibold text-white hover:bg-teal-700",
+              compact && "h-8 rounded-none px-2.5"
+            )}
           >
             {exporting ? <Loader2 className="size-4 animate-spin" /> : <Download size={15} />}
-            <span className="hidden sm:inline">{t("exportButton")}</span>
+            <span className={compact ? "inline" : "hidden sm:inline"}>
+              {compact ? t("exportShortButton") : t("exportButton")}
+            </span>
           </Button>
         </div>
       </div>
 
       {/* Stats */}
-      <div className="mt-3 flex flex-wrap items-center gap-4 text-sm text-slate-600">
+      <div
+        className={cn(
+          "flex flex-wrap items-center text-slate-600",
+          compact ? "mt-2 gap-3 text-xs" : "mt-3 gap-4 text-sm"
+        )}
+      >
         <span className="inline-flex items-center gap-1.5">
-          <CalendarCheck size={15} className="text-teal-600" />
+          <CalendarCheck size={compact ? 14 : 15} className="text-teal-600" />
           {t("markedDaysLabel")}
           <b className="text-slate-900">{monthStats.markedDays}</b>
         </span>
@@ -449,24 +482,32 @@ export default function MonthlyOverviewView({ onMarkDay }: MonthlyOverviewViewPr
       </div>
 
       {/* Calendar */}
-      <div className="mt-3 rounded-lg border border-slate-200 bg-white p-2 sm:p-3">
+      <div
+        className={cn(
+          "rounded-lg border border-slate-200 bg-white",
+          compact ? "mt-2 p-1.5" : "mt-3 p-2 sm:p-3"
+        )}
+      >
         {loading ? (
           <div className="p-4">
             <Skeleton active paragraph={{ rows: 6 }} />
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-7 gap-1">
+            <div className={cn("grid grid-cols-7", compact ? "gap-0.5" : "gap-1")}>
               {WEEK_HEADER.map((label) => (
                 <div
                   key={label}
-                  className="py-1 text-center text-xs font-semibold uppercase tracking-wide text-slate-400"
+                  className={cn(
+                    "py-1 text-center font-semibold uppercase tracking-wide text-slate-400",
+                    compact ? "text-[11px]" : "text-xs"
+                  )}
                 >
                   {label}
                 </div>
               ))}
             </div>
-            <div className="mt-1 grid grid-cols-7 gap-1">
+            <div className={cn("mt-1 grid grid-cols-7", compact ? "gap-0.5" : "gap-1")}>
               {monthCells.map((day, index) => {
                 if (!day) return <div key={`blank-${index}`} className="aspect-square" />;
 
@@ -482,7 +523,9 @@ export default function MonthlyOverviewView({ onMarkDay }: MonthlyOverviewViewPr
                     type="button"
                     onClick={() => setDrawerDate(dateStr)}
                     className={[
-                      "relative aspect-square min-w-0 rounded-md border p-1.5 text-left align-top text-sm transition-colors",
+                      compact
+                        ? "relative aspect-square min-w-0 rounded border p-1 text-left align-top text-xs transition-colors"
+                        : "relative aspect-square min-w-0 rounded-md border p-1.5 text-left align-top text-sm transition-colors",
                       offCount > 0
                         ? "border-rose-200 bg-rose-50 hover:border-rose-300"
                         : marked
@@ -531,7 +574,7 @@ export default function MonthlyOverviewView({ onMarkDay }: MonthlyOverviewViewPr
             : t("previewTitle")
         }
         footer={
-          drawerDate ? (
+          drawerDate && showMarkDayAction && onMarkDay ? (
             <Button
               type="button"
               onClick={() => {

@@ -23,7 +23,13 @@ import { toast } from "sonner";
  * "Lốt trộn" — danh sách lốt xe (hàng đợi pending), kéo để sắp xếp thứ tự.
  * Mỗi lốt hiển thị người phụ trách lấy từ draft Xe bồn hôm nay (nếu có).
  */
-export default function WorkMixSlotBoard({ active = true }: { active?: boolean }) {
+export default function WorkMixSlotBoard({
+  active = true,
+  compact = false,
+}: {
+  active?: boolean;
+  compact?: boolean;
+}) {
   const t = useTranslations("WorkMixSlotPage");
 
   const [items, setItems] = useState<WorkMixSlotItem[]>([]);
@@ -92,21 +98,31 @@ export default function WorkMixSlotBoard({ active = true }: { active?: boolean }
   const isEmpty = !loading && items.length === 0;
 
   return (
-    <section className="rounded-lg border border-slate-200 bg-white">
-      <div className="flex items-center gap-3 border-b border-slate-100 px-4 py-3">
-        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-teal-600 text-white">
-          <ListOrdered size={20} />
+    <section
+      className={
+        compact ? "border border-slate-300 bg-white" : "rounded-lg border border-slate-200 bg-white"
+      }
+    >
+      {!compact && (
+        <div className="flex items-center gap-3 border-b border-slate-100 px-4 py-3">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-teal-600 text-white">
+            <ListOrdered size={20} />
+          </div>
+          <h2 className="m-0 text-base font-bold text-slate-900">{t("heading")}</h2>
         </div>
-        <h2 className="m-0 text-base font-bold text-slate-900">{t("heading")}</h2>
-      </div>
+      )}
 
-      <div className="p-4">
+      <div className={compact ? "p-3" : "p-4"}>
         {loading ? (
-          <div className="flex min-h-[200px] items-center justify-center text-slate-400">
+          <div
+            className={`flex items-center justify-center text-slate-400 ${compact ? "min-h-[96px]" : "min-h-[200px]"}`}
+          >
             <RefreshCw className="h-6 w-6 animate-spin" />
           </div>
         ) : isEmpty ? (
-          <div className="flex min-h-[200px] flex-col items-center justify-center gap-2 text-slate-400">
+          <div
+            className={`flex flex-col items-center justify-center gap-2 text-slate-400 ${compact ? "min-h-[96px]" : "min-h-[200px]"}`}
+          >
             <FileSpreadsheet className="h-8 w-8 opacity-30" />
             <p className="m-0 text-sm italic">{t("empty")}</p>
           </div>

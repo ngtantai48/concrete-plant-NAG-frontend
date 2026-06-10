@@ -75,6 +75,10 @@ export const PERMISSIONS = {
     DELETE: "delete",
   },
 
+  CALENDAR: {
+    VIEW: "view",
+  },
+
   WORK_ATTENDANCE: {
     VIEW: "view",
     UPDATE: "update",

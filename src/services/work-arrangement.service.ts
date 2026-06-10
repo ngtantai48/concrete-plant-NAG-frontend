@@ -488,21 +488,36 @@ const getPumpRoleByWorkType = (value: unknown): WorkPumpRoleKey | null => {
   return null;
 };
 
-const getPersonnelFallback = async (): Promise<WorkPersonnel[]> => {
-  const assignments = await userAssignmentApi.list({ limit: 1000 });
-
-  return assignments.data
-    .filter((assignment) => !assignment.delete_flag && assignment.user_id)
-    .map((assignment) => ({
-      user_id: Number(assignment.user_id),
-      user_full_name: assignment.user_full_name,
-      user_short_name: assignment.user_short_name,
-      department_id: assignment.department_id ?? null,
-      department_name: assignment.department_name,
-      skill_id: assignment.skill_id ?? null,
-      skill_name: assignment.skill_name,
-    }));
+// Nhiều khối trên trang Bố trí công việc cùng mount (kèm StrictMode dev gọi đôi) nên các request
+// giống nhau bắn trùng trong cùng một nhịp, khiến backend rate-limit (429) và browser báo Network Error.
+// Gộp các request đang bay theo key: cùng key đang chạy thì dùng chung 1 promise.
+const inflightRequests = new Map<string, Promise<unknown>>();
+const dedupeInflight = <T>(key: string, run: () => Promise<T>): Promise<T> => {
+  const existing = inflightRequests.get(key);
+  if (existing) return existing as Promise<T>;
+  const request = run().finally(() => inflightRequests.delete(key));
+  inflightRequests.set(key, request);
+  return request;
 };
+
+const getVehicleTypesShared = () => dedupeInflight("vehicle-types", () => vehicleTypeApi.getAll());
+
+const getPersonnelFallback = (): Promise<WorkPersonnel[]> =>
+  dedupeInflight("personnel", async () => {
+    const assignments = await userAssignmentApi.list({ limit: 1000 });
+
+    return assignments.data
+      .filter((assignment) => !assignment.delete_flag && assignment.user_id)
+      .map((assignment) => ({
+        user_id: Number(assignment.user_id),
+        user_full_name: assignment.user_full_name,
+        user_short_name: assignment.user_short_name,
+        department_id: assignment.department_id ?? null,
+        department_name: assignment.department_name,
+        skill_id: assignment.skill_id ?? null,
+        skill_name: assignment.skill_name,
+      }));
+  });
 
 const getVehiclesFromPayload = (payload: unknown) =>
   getArrayFromPayload<Vehicle>(payload, ["vehicles", "data", "items", "results", "rows"]);
@@ -541,11 +556,11 @@ const getAllVehicles = async (): Promise<Vehicle[]> => {
 
 const SYMBOL_MIXER = "x";
 
-const getWorkVehicleSets = async (): Promise<{
+const fetchWorkVehicleSets = async (): Promise<{
   pump: WorkVehicle[];
   mixer: WorkVehicle[];
 }> => {
-  const [vehicles, vehicleTypeRes] = await Promise.all([getAllVehicles(), vehicleTypeApi.getAll()]);
+  const [vehicles, vehicleTypeRes] = await Promise.all([getAllVehicles(), getVehicleTypesShared()]);
   const vehicleTypes = getArrayFromPayload<VehicleType>(vehicleTypeRes.data, [
     "vehicle_types",
     "data",
@@ -580,19 +595,23 @@ const getWorkVehicleSets = async (): Promise<{
   return { pump, mixer };
 };
 
-const listUserDayStatuses = async (workDate: string): Promise<BackendUserDayStatus[]> => {
-  const res = await http.get("/user-day-status", {
-    params: { work_date: workDate, limit: 1000 },
-  });
+const getWorkVehicleSets = (): Promise<{ pump: WorkVehicle[]; mixer: WorkVehicle[] }> =>
+  dedupeInflight("work-vehicle-sets", fetchWorkVehicleSets);
 
-  return getArrayFromPayload<BackendUserDayStatus>(res.data, [
-    "user_day_status",
-    "day_statuses",
-    "items",
-    "results",
-    "rows",
-  ]).filter((status) => !status.delete_flag && normalizeDate(status.work_date) === workDate);
-};
+const listUserDayStatuses = (workDate: string): Promise<BackendUserDayStatus[]> =>
+  dedupeInflight(`user-day-status:${workDate}`, async () => {
+    const res = await http.get("/user-day-status", {
+      params: { work_date: workDate, limit: 1000 },
+    });
+
+    return getArrayFromPayload<BackendUserDayStatus>(res.data, [
+      "user_day_status",
+      "day_statuses",
+      "items",
+      "results",
+      "rows",
+    ]).filter((status) => !status.delete_flag && normalizeDate(status.work_date) === workDate);
+  });
 
 const createUserDayStatus = async (payload: {
   user_id: number;
@@ -663,35 +682,39 @@ const listAttendanceDailyRecordDatesLegacy = async (workDate: string): Promise<s
   }
 };
 
-const listAttendanceDailyRecordDates = async (
+const listAttendanceDailyRecordDates = (
   fromDate: string,
   toDate: string,
   recordStatus?: string
-): Promise<string[]> => {
-  try {
-    const res = await http.get("/attendance-daily-records/report", {
-      params: {
-        from: fromDate,
-        to: toDate,
-        ...(recordStatus ? { record_status: recordStatus } : {}),
-      },
-    });
+): Promise<string[]> =>
+  dedupeInflight(`attendance-dates:${fromDate}:${toDate}:${recordStatus || ""}`, async () => {
+    try {
+      const res = await http.get("/attendance-daily-records/report", {
+        params: {
+          from: fromDate,
+          to: toDate,
+          ...(recordStatus ? { record_status: recordStatus } : {}),
+        },
+      });
 
-    return filterAttendanceDailyRecordDates(
-      getArrayFromPayload<BackendAttendanceDailyRecordItem>(res.data, ATTENDANCE_DAILY_RECORD_KEYS),
-      fromDate,
-      toDate
-    );
-  } catch (error) {
-    if (!shouldUseLocalFallback(error)) throw error;
+      return filterAttendanceDailyRecordDates(
+        getArrayFromPayload<BackendAttendanceDailyRecordItem>(
+          res.data,
+          ATTENDANCE_DAILY_RECORD_KEYS
+        ),
+        fromDate,
+        toDate
+      );
+    } catch (error) {
+      if (!shouldUseLocalFallback(error)) throw error;
 
-    const dates = buildDateList(fromDate, toDate);
-    const legacyGroups = await Promise.all(
-      dates.map((date) => listAttendanceDailyRecordDatesLegacy(date))
-    );
-    return uniqueDates(legacyGroups.flat());
-  }
-};
+      const dates = buildDateList(fromDate, toDate);
+      const legacyGroups = await Promise.all(
+        dates.map((date) => listAttendanceDailyRecordDatesLegacy(date))
+      );
+      return uniqueDates(legacyGroups.flat());
+    }
+  });
 
 type BackendMonthlyReportDay = {
   work_date?: string;
@@ -751,19 +774,20 @@ const ensureAttendanceDailyRecord = async (workDate: string) => {
   return createAttendanceDailyRecord(workDate);
 };
 
-const listArrangementDays = async (workDate: string): Promise<BackendArrangementDay[]> => {
-  const res = await http.get("/work-arrangement-days", {
-    params: { arrangement_date: workDate, limit: 1000 },
-  });
+const listArrangementDays = (workDate: string): Promise<BackendArrangementDay[]> =>
+  dedupeInflight(`arrangement-days:${workDate}`, async () => {
+    const res = await http.get("/work-arrangement-days", {
+      params: { arrangement_date: workDate, limit: 1000 },
+    });
 
-  return getArrayFromPayload<BackendArrangementDay>(res.data, [
-    "work_arrangement_days",
-    "arrangement_days",
-    "items",
-    "results",
-    "rows",
-  ]).filter((day) => !day.delete_flag && normalizeDate(day.arrangement_date) === workDate);
-};
+    return getArrayFromPayload<BackendArrangementDay>(res.data, [
+      "work_arrangement_days",
+      "arrangement_days",
+      "items",
+      "results",
+      "rows",
+    ]).filter((day) => !day.delete_flag && normalizeDate(day.arrangement_date) === workDate);
+  });
 
 const createArrangementDay = async (workDate: string) => {
   const res = await http.post("/work-arrangement-days", {
@@ -792,19 +816,20 @@ const ensureArrangementDay = async (workDate: string) => {
   return createArrangementDay(workDate);
 };
 
-const listArrangementItems = async (dayId: number): Promise<BackendArrangementItem[]> => {
-  const res = await http.get("/work-arrangement-items", {
-    params: { work_arrangement_day_id: dayId, limit: 1000 },
-  });
+const listArrangementItems = (dayId: number): Promise<BackendArrangementItem[]> =>
+  dedupeInflight(`arrangement-items:${dayId}`, async () => {
+    const res = await http.get("/work-arrangement-items", {
+      params: { work_arrangement_day_id: dayId, limit: 1000 },
+    });
 
-  return getArrayFromPayload<BackendArrangementItem>(res.data, [
-    "work_arrangement_items",
-    "arrangement_items",
-    "items",
-    "results",
-    "rows",
-  ]).filter((item) => !item.delete_flag && Number(item.work_arrangement_day_id) === dayId);
-};
+    return getArrayFromPayload<BackendArrangementItem>(res.data, [
+      "work_arrangement_items",
+      "arrangement_items",
+      "items",
+      "results",
+      "rows",
+    ]).filter((item) => !item.delete_flag && Number(item.work_arrangement_day_id) === dayId);
+  });
 
 const createArrangementItem = async (
   dayId: number,
@@ -904,20 +929,23 @@ const ensureArrangementItems = async (dayId: number) => {
   return result;
 };
 
-const listArrangementPersonnel = async (itemId: number): Promise<BackendArrangementPersonnel[]> => {
-  const res = await http.get("/work-arrangement-personnel", {
-    params: { work_arrangement_item_id: itemId, limit: 1000 },
-  });
+const listArrangementPersonnel = (itemId: number): Promise<BackendArrangementPersonnel[]> =>
+  dedupeInflight(`arrangement-personnel:${itemId}`, async () => {
+    const res = await http.get("/work-arrangement-personnel", {
+      params: { work_arrangement_item_id: itemId, limit: 1000 },
+    });
 
-  return getArrayFromPayload<BackendArrangementPersonnel>(res.data, [
-    "work_arrangement_personnel",
-    "arrangement_personnel",
-    "personnel",
-    "items",
-    "results",
-    "rows",
-  ]).filter((person) => !person.delete_flag && Number(person.work_arrangement_item_id) === itemId);
-};
+    return getArrayFromPayload<BackendArrangementPersonnel>(res.data, [
+      "work_arrangement_personnel",
+      "arrangement_personnel",
+      "personnel",
+      "items",
+      "results",
+      "rows",
+    ]).filter(
+      (person) => !person.delete_flag && Number(person.work_arrangement_item_id) === itemId
+    );
+  });
 
 const createArrangementPersonnel = async (itemId: number, person: WorkPersonnel, role: string) => {
   const res = await http.post("/work-arrangement-personnel", {
@@ -1561,7 +1589,7 @@ export const workTaskApi = {
     try {
       const [personnel, worksRes, arrangementDays] = await Promise.all([
         getPersonnelFallback(),
-        workApi.list({ limit: 1000 }),
+        dedupeInflight("works:list", () => workApi.list({ limit: 1000 })),
         listArrangementDays(workDate),
       ]);
       const works = worksRes.data.filter((work) => !work.delete_flag);
@@ -1628,65 +1656,66 @@ const getMixSlotCode = (symbol?: string | null, licensePlate?: string | null) =>
 };
 
 export const workMixSlotApi = {
-  getList: async (): Promise<WorkMixSlotItem[]> => {
-    const [ordersRes, vehicleTypeRes, personnel] = await Promise.all([
-      orderApi.getByStatus("pending"),
-      vehicleTypeApi.getAll(),
-      getPersonnelFallback(),
-    ]);
+  getList: (): Promise<WorkMixSlotItem[]> =>
+    dedupeInflight("mix-slot-list", async () => {
+      const [ordersRes, vehicleTypeRes, personnel] = await Promise.all([
+        orderApi.getByStatus("pending"),
+        getVehicleTypesShared(),
+        getPersonnelFallback(),
+      ]);
 
-    const orders = getArrayFromPayload<Order>(ordersRes.data, [
-      "orders",
-      "data",
-      "items",
-      "results",
-      "rows",
-    ]);
-    const vehicleTypes = getArrayFromPayload<VehicleType>(vehicleTypeRes.data, [
-      "vehicle_types",
-      "data",
-      "items",
-      "results",
-      "rows",
-    ]);
+      const orders = getArrayFromPayload<Order>(ordersRes.data, [
+        "orders",
+        "data",
+        "items",
+        "results",
+        "rows",
+      ]);
+      const vehicleTypes = getArrayFromPayload<VehicleType>(vehicleTypeRes.data, [
+        "vehicle_types",
+        "data",
+        "items",
+        "results",
+        "rows",
+      ]);
 
-    const symbolByTypeId = new Map(
-      vehicleTypes.map((type) => [Number(type.vehicle_type_id), type.vehicle_type_symbol ?? null])
-    );
-    const shortNameByUserId = new Map(
-      personnel.map((person) => [
-        Number(person.user_id),
-        getDisplayShortName(person.user_full_name, person.user_short_name),
-      ])
-    );
+      const symbolByTypeId = new Map(
+        vehicleTypes.map((type) => [Number(type.vehicle_type_id), type.vehicle_type_symbol ?? null])
+      );
+      const shortNameByUserId = new Map(
+        personnel.map((person) => [
+          Number(person.user_id),
+          getDisplayShortName(person.user_full_name, person.user_short_name),
+        ])
+      );
 
-    return orders
-      .filter((order) => order.shift_closing?.shift_status !== 1)
-      .filter((order) => {
-        const status = order.vehicles?.vehicle_status?.toLowerCase();
-        return !status || !MIX_SLOT_EXCLUDED_VEHICLE_STATUSES.has(status);
-      })
-      .filter((order) => Number(order.vehicles?.vehicle_id) > 0)
-      .sort((a, b) => (a.order_number || 0) - (b.order_number || 0))
-      .map((order) => {
-        const symbol = symbolByTypeId.get(Number(order.vehicles?.vehicle_type_id)) ?? null;
-        const shortName =
-          shortNameByUserId.get(Number(order.users?.user_id)) ??
-          getDisplayShortName(order.users?.user_full_name, null);
-        const code = getMixSlotCode(symbol, order.vehicles?.vehicle_license_plate);
+      return orders
+        .filter((order) => order.shift_closing?.shift_status !== 1)
+        .filter((order) => {
+          const status = order.vehicles?.vehicle_status?.toLowerCase();
+          return !status || !MIX_SLOT_EXCLUDED_VEHICLE_STATUSES.has(status);
+        })
+        .filter((order) => Number(order.vehicles?.vehicle_id) > 0)
+        .sort((a, b) => (a.order_number || 0) - (b.order_number || 0))
+        .map((order) => {
+          const symbol = symbolByTypeId.get(Number(order.vehicles?.vehicle_type_id)) ?? null;
+          const shortName =
+            shortNameByUserId.get(Number(order.users?.user_id)) ??
+            getDisplayShortName(order.users?.user_full_name, null);
+          const code = getMixSlotCode(symbol, order.vehicles?.vehicle_license_plate);
 
-        return {
-          order_id: Number(order.order_id),
-          order_number: Number(order.order_number) || 0,
-          user_id: Number(order.users?.user_id) || 0,
-          vehicle_id: Number(order.vehicles?.vehicle_id) || 0,
-          vehicle_name: order.vehicles?.vehicle_name ?? null,
-          vehicle_license_plate: order.vehicles?.vehicle_license_plate || "",
-          vehicle_type_symbol: symbol,
-          short_name: shortName,
-          code,
-          label: `${shortName}_${code}`,
-        };
-      });
-  },
+          return {
+            order_id: Number(order.order_id),
+            order_number: Number(order.order_number) || 0,
+            user_id: Number(order.users?.user_id) || 0,
+            vehicle_id: Number(order.vehicles?.vehicle_id) || 0,
+            vehicle_name: order.vehicles?.vehicle_name ?? null,
+            vehicle_license_plate: order.vehicles?.vehicle_license_plate || "",
+            vehicle_type_symbol: symbol,
+            short_name: shortName,
+            code,
+            label: `${shortName}_${code}`,
+          };
+        });
+    }),
 };

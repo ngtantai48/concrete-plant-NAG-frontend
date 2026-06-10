@@ -33,6 +33,12 @@ export const getVehicleLabel = (vehicle: WorkVehicle) =>
   [vehicle.vehicle_license_plate, vehicle.vehicle_name].filter(Boolean).join(" | ") ||
   `#${vehicle.vehicle_id}`;
 
+/** So sánh xe theo thứ tự tự nhiên: X1, X2, ... X10 (không phải X1, X10, X2). */
+export const compareVehicleByName = (a: WorkVehicle, b: WorkVehicle) => {
+  const key = (v: WorkVehicle) => v.vehicle_name || v.vehicle_license_plate || `#${v.vehicle_id}`;
+  return key(a).localeCompare(key(b), undefined, { numeric: true, sensitivity: "base" });
+};
+
 export const normalizeSearchText = (value: unknown) =>
   String(value ?? "")
     .normalize("NFD")
@@ -40,6 +46,10 @@ export const normalizeSearchText = (value: unknown) =>
     .toLowerCase()
     .replace(/đ/g, "d")
     .trim();
+
+// Lọc option của antd Select theo label, không phân biệt dấu/hoa thường.
+export const filterSelectOptionByLabel = (input: string, option?: { label?: unknown }) =>
+  normalizeSearchText(option?.label).includes(normalizeSearchText(input));
 
 export type ChipTone = "slate" | "teal" | "amber" | "emerald" | "sky" | "violet" | "indigo";
 
