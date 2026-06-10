@@ -13,13 +13,17 @@ import type {
 import { message } from "antd";
 import dayjs, { type Dayjs } from "dayjs";
 import { useTranslations } from "next-intl";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import DailyMarkingView from "./attendance/DailyMarkingView";
 import MonthlyOverviewView from "./attendance/MonthlyOverviewView";
 
 export default function WorkAttendanceManager({
+  compact = false,
+  todayOnly = false,
   onDirtyChange,
 }: {
+  compact?: boolean;
+  todayOnly?: boolean;
   onDirtyChange?: (dirty: boolean) => void;
 }) {
   const t = useTranslations("WorkAttendancePage");
@@ -37,8 +41,18 @@ export default function WorkAttendanceManager({
   const [draft, setDraft] = useState<WorkAttendanceDraft>(() =>
     createEmptyAttendanceDraft(dayjs().format("YYYY-MM-DD"))
   );
+  const onDirtyChangeRef = useRef(onDirtyChange);
+
+  useEffect(() => {
+    onDirtyChangeRef.current = onDirtyChange;
+  }, [onDirtyChange]);
 
   const workDate = selectedDate.format("YYYY-MM-DD");
+
+  useEffect(() => {
+    if (!todayOnly) return;
+    setSelectedDate((prev) => (prev.isSame(dayjs(), "day") ? prev : dayjs()));
+  }, [todayOnly]);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -48,36 +62,33 @@ export default function WorkAttendanceManager({
       setDraft(bootstrap.draft || createEmptyAttendanceDraft(workDate));
       setAttendanceMarked(Boolean(bootstrap.is_attendance_marked));
       setDirtyState(false);
-      onDirtyChange?.(false);
+      onDirtyChangeRef.current?.(false);
     } catch (error) {
       const msg = error instanceof Error ? error.message : t("unknownError");
       message.error(`${t("loadFailed")}: ${msg}`);
     } finally {
       setLoading(false);
     }
-  }, [onDirtyChange, t, workDate]);
+  }, [t, workDate]);
 
   useEffect(() => {
     loadData();
   }, [loadData]);
 
-  const handleSetStatus = useCallback(
-    (userId: number, status: WorkAttendanceStatus) => {
-      setDraft((current) => ({
-        ...current,
-        user_statuses:
-          status === "working"
-            ? current.user_statuses.filter((entry) => entry.user_id !== userId)
-            : [
-                ...current.user_statuses.filter((entry) => entry.user_id !== userId),
-                { user_id: userId, status },
-              ],
-      }));
-      setDirtyState(true);
-      onDirtyChange?.(true);
-    },
-    [onDirtyChange]
-  );
+  const handleSetStatus = useCallback((userId: number, status: WorkAttendanceStatus) => {
+    setDraft((current) => ({
+      ...current,
+      user_statuses:
+        status === "working"
+          ? current.user_statuses.filter((entry) => entry.user_id !== userId)
+          : [
+              ...current.user_statuses.filter((entry) => entry.user_id !== userId),
+              { user_id: userId, status },
+            ],
+    }));
+    setDirtyState(true);
+    onDirtyChangeRef.current?.(true);
+  }, []);
 
   const handleSave = useCallback(async () => {
     setSaving(true);
@@ -86,7 +97,7 @@ export default function WorkAttendanceManager({
       setDraft(saved);
       setAttendanceMarked(true);
       setDirtyState(false);
-      onDirtyChange?.(false);
+      onDirtyChangeRef.current?.(false);
       message.success(t("saveSuccess"));
     } catch (error) {
       const msg = error instanceof Error ? error.message : t("unknownError");
@@ -94,12 +105,41 @@ export default function WorkAttendanceManager({
     } finally {
       setSaving(false);
     }
-  }, [draft, onDirtyChange, t]);
+  }, [draft, t]);
 
   const handleMarkDay = useCallback((date: string) => {
     setSelectedDate(dayjs(date));
     setActiveTab("daily");
   }, []);
+
+  const handleChangeDate = useCallback(
+    (nextDate: Dayjs) => {
+      if (todayOnly) return;
+      setSelectedDate(nextDate);
+    },
+    [todayOnly]
+  );
+
+  if (compact) {
+    return (
+      <DailyMarkingView
+        date={selectedDate}
+        personnel={personnel}
+        draft={draft}
+        loading={loading}
+        saving={saving}
+        dirty={dirty}
+        canUpdate={canUpdate}
+        attendanceMarked={attendanceMarked}
+        compact
+        todayOnly={todayOnly}
+        onChangeDate={handleChangeDate}
+        onReload={loadData}
+        onSave={handleSave}
+        onSetStatus={handleSetStatus}
+      />
+    );
+  }
 
   return (
     <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "daily" | "overview")}>
@@ -128,7 +168,9 @@ export default function WorkAttendanceManager({
           dirty={dirty}
           canUpdate={canUpdate}
           attendanceMarked={attendanceMarked}
-          onChangeDate={setSelectedDate}
+          compact={compact}
+          todayOnly={todayOnly}
+          onChangeDate={handleChangeDate}
           onReload={loadData}
           onSave={handleSave}
           onSetStatus={handleSetStatus}

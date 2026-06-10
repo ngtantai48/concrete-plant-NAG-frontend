@@ -16,6 +16,7 @@ export const SIDEBAR = {
   ATTENDANCE: "/attendance",
   WORK_ATTENDANCE: "/work-attendance",
   WORK_ARRANGEMENTS: "/work-arrangements",
+  WORK_ARRANGEMENTS_EXPERIMENT: "/work-arrangements/experiment",
   AI_ASSISTANT: "/ai-assistant",
   DEPARTMENTS: "/configuration/departments",
   SKILLS: "/configuration/skills",

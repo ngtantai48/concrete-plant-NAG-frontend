@@ -150,6 +150,14 @@ export const navigationConfig: NavItem[] = [
         ],
       },
       {
+        key: SIDEBAR.WORK_ARRANGEMENTS_EXPERIMENT,
+        label: "workArrangementsExperiment",
+        icon: <ClipboardList size={18} />,
+        // Bản thử nghiệm đã lên làm trang chính (/work-arrangements); URL này giữ bản gốc, ẩn khỏi menu.
+        hideInSidebar: true,
+        extraAccessKeys: [SIDEBAR.WORK_ARRANGEMENTS, SIDEBAR.WORK_ATTENDANCE, SIDEBAR.WORKS],
+      },
+      {
         key: SIDEBAR.WORK_ARRANGEMENTS,
         label: "workArrangements",
         icon: <BriefcaseBusiness size={18} />,

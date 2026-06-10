@@ -29,11 +29,13 @@ type AssignmentSubTab = "pump" | "mixer";
 
 export default function WorkAssignmentManager({
   active = true,
+  layout = "tabs",
   onDirtyChange,
   onRegisterChup,
   onChupLoadingChange,
 }: {
   active?: boolean;
+  layout?: "tabs" | "stacked";
   onDirtyChange?: (dirty: boolean) => void;
   onRegisterChup?: (fn: (() => void) | null) => void;
   onChupLoadingChange?: (loading: boolean) => void;
@@ -266,45 +268,103 @@ export default function WorkAssignmentManager({
     onChupLoadingChange?.(chupLoading);
   }, [chupLoading, onChupLoadingChange]);
 
+  const dateControls = (
+    <div className="flex items-center gap-1">
+      <button
+        type="button"
+        aria-label={t("prevDay")}
+        onClick={() => setSelectedDate(selectedDate.subtract(1, "day"))}
+        className="flex h-9 w-9 items-center justify-center rounded-md border border-slate-200 text-slate-600 transition-colors hover:bg-slate-50"
+      >
+        <ChevronLeft size={18} />
+      </button>
+      <DatePicker
+        value={selectedDate}
+        onChange={(value) => value && setSelectedDate(value)}
+        format="DD/MM/YYYY"
+        allowClear={false}
+        className="h-9 w-[140px]"
+      />
+      <button
+        type="button"
+        aria-label={t("nextDay")}
+        onClick={() => setSelectedDate(selectedDate.add(1, "day"))}
+        className="flex h-9 w-9 items-center justify-center rounded-md border border-slate-200 text-slate-600 transition-colors hover:bg-slate-50"
+      >
+        <ChevronRight size={18} />
+      </button>
+      {!isToday && (
+        <Button
+          type="button"
+          size="sm"
+          variant="ghost"
+          onClick={() => setSelectedDate(dayjs())}
+          className="ml-1 h-9 text-teal-700 hover:bg-teal-50 hover:text-teal-800"
+        >
+          {t("today")}
+        </Button>
+      )}
+    </div>
+  );
+
+  if (layout === "stacked") {
+    return (
+      <div>
+        <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-2">{dateControls}</div>
+        {loading ? (
+          <div className="mt-4 rounded-lg border border-slate-200 bg-white p-5">
+            <Skeleton active paragraph={{ rows: 10 }} />
+          </div>
+        ) : (
+          <div className="space-y-6">
+            <section>
+              <div className="mb-2 flex items-center gap-2">
+                <span className="h-2 w-2 rounded-full bg-teal-500" />
+                <h3 className="m-0 text-sm font-bold uppercase tracking-wide text-slate-700">
+                  {t("sectionPump")}
+                </h3>
+              </div>
+              <PumpAssignmentBoard
+                personnel={personnel}
+                assignedUserIds={assignedUserIds}
+                vehicles={pumpVehicles}
+                halfDaySet={halfDaySet}
+                draft={pumpDraft}
+                saving={savingPump}
+                dirty={pumpDirty}
+                onChangeDraft={onChangePumpDraft}
+                onSave={handleSavePump}
+              />
+            </section>
+            <section>
+              <div className="mb-2 flex items-center gap-2">
+                <span className="h-2 w-2 rounded-full bg-indigo-500" />
+                <h3 className="m-0 text-sm font-bold uppercase tracking-wide text-slate-700">
+                  {t("sectionMixer")}
+                </h3>
+              </div>
+              <MixerAssignmentBoard
+                personnel={personnel}
+                assignedUserIds={assignedUserIds}
+                vehicles={mixerVehicles}
+                halfDaySet={halfDaySet}
+                draft={mixerDraft}
+                saving={savingMixer}
+                dirty={mixerDirty}
+                onChangeDraft={onChangeMixerDraft}
+                onSave={handleSaveMixer}
+              />
+            </section>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <Tabs value={subTab} onValueChange={(value) => setSubTab(value as AssignmentSubTab)}>
       <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-2">
-        <div className="flex items-center gap-1">
-          <button
-            type="button"
-            aria-label={t("prevDay")}
-            onClick={() => setSelectedDate(selectedDate.subtract(1, "day"))}
-            className="flex h-9 w-9 items-center justify-center rounded-md border border-slate-200 text-slate-600 transition-colors hover:bg-slate-50"
-          >
-            <ChevronLeft size={18} />
-          </button>
-          <DatePicker
-            value={selectedDate}
-            onChange={(value) => value && setSelectedDate(value)}
-            format="DD/MM/YYYY"
-            allowClear={false}
-            className="h-9 w-[140px]"
-          />
-          <button
-            type="button"
-            aria-label={t("nextDay")}
-            onClick={() => setSelectedDate(selectedDate.add(1, "day"))}
-            className="flex h-9 w-9 items-center justify-center rounded-md border border-slate-200 text-slate-600 transition-colors hover:bg-slate-50"
-          >
-            <ChevronRight size={18} />
-          </button>
-          {!isToday && (
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              onClick={() => setSelectedDate(dayjs())}
-              className="ml-1 h-9 text-teal-700 hover:bg-teal-50 hover:text-teal-800"
-            >
-              {t("today")}
-            </Button>
-          )}
-        </div>
+        {dateControls}
 
         <TabsList className="sm:w-fit">
           <TabsTrigger
