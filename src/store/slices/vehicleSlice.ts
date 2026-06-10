@@ -1,6 +1,6 @@
 import { createSlice, createAsyncThunk, PayloadAction } from "@reduxjs/toolkit";
 import type { Vehicle } from "@/types/vehicle";
-import vehicleApi, { ListVehicles } from "@/services/vehicle.service";
+import vehicleApi, { ListVehicleNamesParams, ListVehicles } from "@/services/vehicle.service";
 
 export interface VehicleState {
   pages: Record<number, Vehicle[]>;
@@ -9,6 +9,10 @@ export interface VehicleState {
   limit: number;
   loading: boolean;
   error: string | null;
+  nameOptions: Vehicle[];
+  nameOptionsLoaded: boolean;
+  nameOptionsLoading: boolean;
+  nameOptionsError: string | null;
 }
 
 const initialState: VehicleState = {
@@ -18,7 +22,29 @@ const initialState: VehicleState = {
   limit: 10,
   loading: false,
   error: null,
+  nameOptions: [],
+  nameOptionsLoaded: false,
+  nameOptionsLoading: false,
+  nameOptionsError: null,
 };
+
+function normalizeVehicleList(payload: any, fallbackPage: number, fallbackLimit: number): ListVehicles {
+  if (Array.isArray(payload)) {
+    return {
+      data: payload,
+      total: payload.length,
+      page: fallbackPage,
+      limit: fallbackLimit,
+    };
+  }
+
+  return {
+    data: payload?.data || [],
+    total: payload?.total || payload?.data?.length || 0,
+    page: payload?.page || fallbackPage,
+    limit: payload?.limit || fallbackLimit,
+  };
+}
 
 // Fetch list of vehicles
 export const fetchVehicles = createAsyncThunk(
@@ -28,21 +54,7 @@ export const fetchVehicles = createAsyncThunk(
       const res = await vehicleApi.getAll(params);
       // Ensure we extract data properly based on expected ListVehicles format or response wrap
       const payloadData = (res as any).data || res;
-      // In case the API returns an array directly because of legacy support or fallback
-      if (Array.isArray(payloadData)) {
-        return {
-           data: payloadData,
-           total: payloadData.length,
-           page: params.page,
-           limit: params.limit,
-        } as ListVehicles;
-      }
-      return {
-        data: payloadData.data || [],
-        total: payloadData.total || 0,
-        page: payloadData.page || params.page,
-        limit: payloadData.limit || params.limit,
-      } as ListVehicles;
+      return normalizeVehicleList(payloadData, params.page, params.limit);
     } catch (error: any) {
       if (error.response) {
         return rejectWithValue({
@@ -68,6 +80,39 @@ export const fetchVehicles = createAsyncThunk(
       }
       return true;
     }
+  }
+);
+
+export const fetchVehicleNameOptions = createAsyncThunk(
+  "vehicles/fetchNameOptions",
+  async (params: ListVehicleNamesParams | undefined, { rejectWithValue }) => {
+    const requestParams = { limit: 1000, ...(params || {}) };
+    try {
+      const res = await vehicleApi.getListName(requestParams);
+      const payloadData = (res as any).data || res;
+      return normalizeVehicleList(
+        payloadData,
+        Number(requestParams.page) || 1,
+        Number(requestParams.limit) || 1000
+      );
+    } catch (error: any) {
+      if (error.response) {
+        return rejectWithValue({
+          status: error.response.status,
+          message: error.response.data.message || "Failed to fetch vehicle names",
+        });
+      }
+      return rejectWithValue({
+        status: 500,
+        message: error.message || "Unexpected error",
+      });
+    }
+  },
+  {
+    condition: (_params, { getState }) => {
+      const state = getState() as { vehicles: VehicleState };
+      return !state.vehicles.nameOptionsLoaded && !state.vehicles.nameOptionsLoading;
+    },
   }
 );
 
@@ -120,6 +165,12 @@ const vehicleSlice = createSlice({
       state.total = 0;
       state.page = 1;
     },
+    clearVehicleNameOptions: (state) => {
+      state.nameOptions = [];
+      state.nameOptionsLoaded = false;
+      state.nameOptionsLoading = false;
+      state.nameOptionsError = null;
+    },
     // Cache mutation actions if optimistic updates are preferred
     updateVehicleCache: (state, action: PayloadAction<Vehicle>) => {
       for (const pageKey in state.pages) {
@@ -135,6 +186,15 @@ const vehicleSlice = createSlice({
           break;
         }
       }
+      const optionIndex = state.nameOptions.findIndex(
+        (v) => v.vehicle_id === action.payload.vehicle_id
+      );
+      if (optionIndex !== -1) {
+        state.nameOptions[optionIndex] = {
+          ...state.nameOptions[optionIndex],
+          ...action.payload,
+        };
+      }
     },
     deleteVehicleCache: (state, action: PayloadAction<number>) => {
       for (const pageKey in state.pages) {
@@ -143,6 +203,9 @@ const vehicleSlice = createSlice({
           (v) => v.vehicle_id !== action.payload
         );
       }
+      state.nameOptions = state.nameOptions.filter(
+        (v) => v.vehicle_id !== action.payload
+      );
       state.total = Math.max(0, state.total - 1);
       const maxPage = Math.ceil(state.total / state.limit) || 1;
       for (let p = state.page; p <= maxPage + 1; p++) {
@@ -169,9 +232,29 @@ const vehicleSlice = createSlice({
       .addCase(fetchVehicles.rejected, (state, action) => {
         state.loading = false;
         state.error = action.error.message || "Failed to fetch vehicles";
+      })
+      .addCase(fetchVehicleNameOptions.pending, (state) => {
+        state.nameOptionsLoading = true;
+        state.nameOptionsError = null;
+      })
+      .addCase(fetchVehicleNameOptions.fulfilled, (state, action) => {
+        state.nameOptionsLoading = false;
+        state.nameOptionsLoaded = true;
+        state.nameOptions = action.payload.data;
+      })
+      .addCase(fetchVehicleNameOptions.rejected, (state, action) => {
+        state.nameOptionsLoading = false;
+        state.nameOptionsError = action.error.message || "Failed to fetch vehicle names";
       });
   },
 });
 
-export const { setPage, setPagination, clearVehicles, updateVehicleCache, deleteVehicleCache } = vehicleSlice.actions;
+export const {
+  setPage,
+  setPagination,
+  clearVehicles,
+  clearVehicleNameOptions,
+  updateVehicleCache,
+  deleteVehicleCache,
+} = vehicleSlice.actions;
 export default vehicleSlice.reducer;

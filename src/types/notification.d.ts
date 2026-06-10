@@ -14,9 +14,15 @@ export interface Notification {
     message?: string;
     order_id?: number;
     order_number?: number;
+    vehicle_maintenance_id?: number | string;
     vehicle_id?: number;
     vehicle_name?: string;
     vehicle_license_plate?: string;
+    from_status?: string;
+    to_status?: string;
+    actor_id?: number;
+    actor_name?: string;
+    note?: string | null;
     station_id?: number;
     station_name?: string;
     user_id?: number;

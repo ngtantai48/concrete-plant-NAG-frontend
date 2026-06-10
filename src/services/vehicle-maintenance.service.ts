@@ -1,119 +1,190 @@
-// import http from "@/lib/http";
-// import type { VehicleMaintenance } from "@/types/vehicle";
+import http from "@/lib/http";
+import type {
+  DriverMaintenanceContext,
+  VehicleMaintenance,
+  VehicleMaintenanceDocument,
+  VehicleMaintenanceHistory,
+  VehicleMaintenanceWorkflowAction,
+} from "@/types/vehicle";
 
-// type VehicleMaintenanceListPayload =
-//   | VehicleMaintenance[]
-//   | {
-//       data?: VehicleMaintenance[];
-//     };
+export interface ListVehicleMaintenances {
+  data: VehicleMaintenance[];
+  total: number;
+  page: number;
+  limit: number;
+}
 
-// function normalizeList(payload: VehicleMaintenanceListPayload): VehicleMaintenance[] {
-//   return Array.isArray(payload) ? payload : (payload.data ?? []);
-// }
+export interface BulkDeleteVehicleMaintenancesResult {
+  deleted_ids: number[];
+  failed_ids: Array<{ id: number; reason: string }>;
+  total_deleted: number;
+  total_failed: number;
+}
 
-// const vehicleMaintenanceApi = {
-//   getAll: async (params?: Record<string, unknown>) => {
-//     const response = await http.get<VehicleMaintenanceListPayload>("/vehicle-maintenances", { params });
-//     return { ...response, data: normalizeList(response.data) };
-//   },
+type VehicleMaintenanceListPayload =
+  | VehicleMaintenance[]
+  | {
+      data?: VehicleMaintenance[];
+      total?: number;
+      page?: number;
+      limit?: number;
+    };
 
-//   create: (data: Omit<VehicleMaintenance, "vehicle_maintenance_id">) =>
-//     http.post<VehicleMaintenance>("/vehicle-maintenances", data),
+type ApiPayload<T> = T | ({ data?: T } & Record<string, unknown>);
 
-//   update: (id: number, data: Partial<VehicleMaintenance>) =>
-//     http.put<VehicleMaintenance>(`/vehicle-maintenances/${id}`, data),
+function normalizeList(payload: VehicleMaintenanceListPayload): ListVehicleMaintenances {
+  const rows = Array.isArray(payload) ? payload : payload.data ?? [];
+  return {
+    data: rows,
+    total: Array.isArray(payload) ? rows.length : payload.total ?? rows.length,
+    page: Array.isArray(payload) ? 1 : payload.page ?? 1,
+    limit: Array.isArray(payload) ? rows.length : payload.limit ?? rows.length,
+  };
+}
 
-//   delete: (id: number) => http.delete(`/vehicle-maintenances/${id}`),
-// };
+function normalizeItem<T>(payload: ApiPayload<T>): T {
+  if (
+    payload &&
+    typeof payload === "object" &&
+    "data" in payload &&
+    payload.data !== undefined
+  ) {
+    return payload.data as T;
+  }
+  return payload as T;
+}
 
-// export default vehicleMaintenanceApi;
+function normalizeArrayItem<T>(payload: ApiPayload<T[]>): T[] {
+  const normalized = normalizeItem<T[]>(payload);
+  if (Array.isArray(normalized)) return normalized;
+  if (!normalized || typeof normalized !== "object") return [];
 
-
-// Mock service for vehicle maintenance — will be replaced with real API later
-
-import type { VehicleMaintenance } from "@/types/vehicle";
-
-const MOCK_DATA: VehicleMaintenance[] = [
-  {
-    vehicle_maintenance_id: 1,
-    vehicle_maintenance_from_datetime: "2026-03-10T08:00:00",
-    vehicle_maintenance_to_datetime: "2026-03-12T17:00:00",
-    vehicle_distance_covered: 15200,
-    vehicle_maintenance_description: "Thay dầu động cơ, lọc dầu, lọc gió. Kiểm tra hệ thống phanh.",
-    vehicle_id: 1,
-  },
-  {
-    vehicle_maintenance_id: 2,
-    vehicle_maintenance_from_datetime: "2026-03-15T07:30:00",
-    vehicle_maintenance_to_datetime: "2026-03-20T16:00:00",
-    vehicle_distance_covered: 32500,
-    vehicle_maintenance_description: "Bảo dưỡng định kỳ 30.000km: thay bố thắng, kiểm tra bơm thuỷ lực trộn bê tông.",
-    vehicle_id: 2,
-  },
-  {
-    vehicle_maintenance_id: 3,
-    vehicle_maintenance_from_datetime: "2026-02-20T09:00:00",
-    vehicle_maintenance_to_datetime: "2026-02-22T15:00:00",
-    vehicle_distance_covered: 8750,
-    vehicle_maintenance_description: "Sửa chữa hệ thống điện, thay ắc-quy, kiểm tra đèn chiếu sáng.",
-    vehicle_id: 3,
-  },
-  {
-    vehicle_maintenance_id: 4,
-    vehicle_maintenance_from_datetime: "2026-01-05T08:00:00",
-    vehicle_maintenance_to_datetime: "2026-01-08T17:00:00",
-    vehicle_distance_covered: 45000,
-    vehicle_maintenance_description: "Thay lốp xe (4 lốp), căn chỉnh thước lái, cân bằng động.",
-    vehicle_id: 1,
-  },
-  {
-    vehicle_maintenance_id: 5,
-    vehicle_maintenance_from_datetime: "2026-03-16T08:00:00",
-    vehicle_maintenance_to_datetime: "2026-03-25T17:00:00",
-    vehicle_distance_covered: 60200,
-    vehicle_maintenance_description: "Bảo dưỡng lớn 60.000km: thay dây curoa, bộ ly hợp, kiểm tra hộp số.",
-    vehicle_id: 4,
-  },
-  {
-    vehicle_maintenance_id: 6,
-    vehicle_maintenance_from_datetime: "2025-12-10T07:00:00",
-    vehicle_maintenance_to_datetime: "2025-12-11T12:00:00",
-    vehicle_distance_covered: 5200,
-    vehicle_maintenance_description: "Kiểm tra & bơm mỡ các khớp nối bồn trộn, thay gioăng chống rò rỉ.",
-    vehicle_id: 5,
-  },
-];
-
-let mockStore = [...MOCK_DATA];
-let nextId = 7;
-
-const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+  return Object.entries(normalized as Record<string, unknown>)
+    .filter(([key]) => /^\d+$/.test(key))
+    .sort(([left], [right]) => Number(left) - Number(right))
+    .map(([, value]) => value as T);
+}
 
 const vehicleMaintenanceApi = {
-  getAll: async () => {
-    await delay(400);
-    return { data: [...mockStore] };
+  getAll: async (params?: Record<string, unknown>) => {
+    const response = await http.get<VehicleMaintenanceListPayload>("/vehicle-maintenances", {
+      params,
+    });
+    return { ...response, data: normalizeList(response.data) };
   },
 
-  create: async (data: Omit<VehicleMaintenance, "vehicle_maintenance_id">) => {
-    await delay(300);
-    const newRecord: VehicleMaintenance = { ...data, vehicle_maintenance_id: nextId++ };
-    mockStore = [newRecord, ...mockStore];
-    return { data: newRecord };
+  getListName: async (params?: Record<string, unknown>) => {
+    const response = await http.get<VehicleMaintenanceListPayload>(
+      "/vehicle-maintenances/list/name",
+      { params }
+    );
+    return { ...response, data: normalizeList(response.data) };
+  },
+
+  getById: async (id: number) => {
+    const response = await http.get<ApiPayload<VehicleMaintenance>>(`/vehicle-maintenances/${id}`);
+    return { ...response, data: normalizeItem<VehicleMaintenance>(response.data) };
+  },
+
+  getHistory: async (id: number) => {
+    const response = await http.get<ApiPayload<VehicleMaintenanceHistory[]>>(
+      `/vehicle-maintenances/${id}/history`
+    );
+    return { ...response, data: normalizeArrayItem<VehicleMaintenanceHistory>(response.data) };
+  },
+
+  create: async (data: Partial<VehicleMaintenance>) => {
+    const response = await http.post<ApiPayload<VehicleMaintenance>>("/vehicle-maintenances", data);
+    return { ...response, data: normalizeItem<VehicleMaintenance>(response.data) };
   },
 
   update: async (id: number, data: Partial<VehicleMaintenance>) => {
-    await delay(300);
-    mockStore = mockStore.map((item) =>
-      item.vehicle_maintenance_id === id ? { ...item, ...data } : item
+    const response = await http.put<ApiPayload<VehicleMaintenance>>(
+      `/vehicle-maintenances/${id}`,
+      data
     );
-    return { data: mockStore.find((item) => item.vehicle_maintenance_id === id) };
+    return { ...response, data: normalizeItem<VehicleMaintenance>(response.data) };
   },
 
-  delete: async (id: number) => {
-    await delay(300);
-    mockStore = mockStore.filter((item) => item.vehicle_maintenance_id !== id);
-    return { data: { success: true } };
+  delete: (id: number) => http.delete(`/vehicle-maintenances/${id}`),
+
+  bulkDelete: async (ids: number[]) => {
+    const response = await http.post<ApiPayload<BulkDeleteVehicleMaintenancesResult>>(
+      "/vehicle-maintenances/bulk-delete",
+      { vehicle_maintenance_ids: ids }
+    );
+    return {
+      ...response,
+      data: normalizeItem<BulkDeleteVehicleMaintenancesResult>(response.data),
+    };
+  },
+
+  runWorkflowAction: async (
+    id: number,
+    action: VehicleMaintenanceWorkflowAction,
+    payload?: { note?: string | null; reason?: string | null }
+  ) => {
+    const endpointByAction: Record<VehicleMaintenanceWorkflowAction, string> = {
+      submit: "submit",
+      dispatch_approve: "dispatch-approve",
+      dispatch_reject: "dispatch-reject",
+      production_approve: "production-approve",
+      production_reject: "production-reject",
+    };
+    const endpoint = endpointByAction[action];
+    const body =
+      action === "dispatch_reject" || action === "production_reject"
+        ? { reason: payload?.reason || payload?.note || "" }
+        : { note: payload?.note || null };
+    const response = await http.post<ApiPayload<VehicleMaintenance>>(
+      `/vehicle-maintenances/${id}/${endpoint}`,
+      body
+    );
+    return { ...response, data: normalizeItem<VehicleMaintenance>(response.data) };
+  },
+
+  addDocument: async (
+    maintenanceId: number,
+    data: Partial<VehicleMaintenanceDocument> & { media_id: number }
+  ) => {
+    const response = await http.post<ApiPayload<VehicleMaintenanceDocument>>(
+      `/vehicle-maintenances/${maintenanceId}/documents`,
+      data
+    );
+    return { ...response, data: normalizeItem<VehicleMaintenanceDocument>(response.data) };
+  },
+
+  updateDocument: async (documentId: number, data: Partial<VehicleMaintenanceDocument>) => {
+    const response = await http.put<ApiPayload<VehicleMaintenanceDocument>>(
+      `/vehicle-maintenances/documents/${documentId}`,
+      data
+    );
+    return { ...response, data: normalizeItem<VehicleMaintenanceDocument>(response.data) };
+  },
+
+  deleteDocument: (documentId: number) =>
+    http.delete(`/vehicle-maintenances/documents/${documentId}`),
+
+  runOcrForMaintenance: async (maintenanceId: number) => {
+    const response = await http.post<ApiPayload<VehicleMaintenance>>(
+      `/vehicle-maintenances/${maintenanceId}/ocr`
+    );
+    return { ...response, data: normalizeItem<VehicleMaintenance>(response.data) };
+  },
+
+  runOcrForDocument: async (documentId: number) => {
+    const response = await http.post<ApiPayload<VehicleMaintenanceDocument>>(
+      `/vehicle-maintenances/documents/${documentId}/ocr`
+    );
+    return { ...response, data: normalizeItem<VehicleMaintenanceDocument>(response.data) };
+  },
+
+  getDriverContext: async (params?: { date?: string }) => {
+    const response = await http.get<ApiPayload<DriverMaintenanceContext>>(
+      "/vehicle-maintenances/driver-context",
+      { params }
+    );
+    return { ...response, data: normalizeItem<DriverMaintenanceContext>(response.data) };
   },
 };
 

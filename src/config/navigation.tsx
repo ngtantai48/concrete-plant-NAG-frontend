@@ -1,27 +1,8 @@
 import { PERMISSIONS } from "@/constants/permissions";
 import { SIDEBAR } from "@/constants/route";
 import {
-  ArrowRightLeft,
-  Award,
-  Bot,
-  Briefcase,
-  BriefcaseBusiness,
-  Building2,
-  CalendarDays,
-  Car,
-  ClipboardList,
-  Fuel,
-  Gauge,
-  Layers,
-  Link2,
-  MapPin,
-  Package,
-  Settings2,
-  ShieldCheck,
-  UserCog,
-  UsersRound,
-  UtensilsCrossed,
-  Wrench,
+  ArrowRightLeft, Award, Bot, Briefcase, BriefcaseBusiness, Building2, CalendarDays, Car, ClipboardList,
+  Fuel, Gauge, Layers, Link2, MapPin, Package, Settings2, ShieldCheck, UserCog, UsersRound, UtensilsCrossed, Wrench
 } from "lucide-react";
 import React from "react";
 
@@ -83,6 +64,9 @@ export const navigationConfig: NavItem[] = [
       { key: PERMISSIONS.VEHICLE_MAINTENANCES.CREATE, label: "Thêm bảo trì" },
       { key: PERMISSIONS.VEHICLE_MAINTENANCES.UPDATE, label: "Sửa bảo trì" },
       { key: PERMISSIONS.VEHICLE_MAINTENANCES.DELETE, label: "Xóa bảo trì" },
+      { key: PERMISSIONS.VEHICLE_MAINTENANCES.SUBMIT, label: "Gửi phiếu bảo trì" },
+      { key: PERMISSIONS.VEHICLE_MAINTENANCES.DISPATCH_REVIEW, label: "Kiểm tra bảo trì" },
+      { key: PERMISSIONS.VEHICLE_MAINTENANCES.PRODUCTION_APPROVE, label: "Phê duyệt bảo trì" },
     ],
   },
   {

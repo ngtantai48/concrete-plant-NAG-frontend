@@ -24,14 +24,21 @@ export interface NotificationPayload {
   visibleDate?: string;
   reader_list?: (string | number)[];
   order_id?: string | number;
+  vehicle_maintenance_id?: string | number;
   vehicle_id?: string | number;
   vehicle_name?: string;
+  vehicle_license_plate?: string;
   station_id?: string | number;
+  from_status?: string;
+  to_status?: string;
+  actor_id?: string | number;
+  actor_name?: string;
+  note?: string | null;
   [key: string]: unknown;
 }
 
 export interface NotificationMarkReadPayload {
-  user_id: string;
+  user_id: string | number;
   noti_id: string | number;
 }
 

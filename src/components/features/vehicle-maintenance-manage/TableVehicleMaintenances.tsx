@@ -1,90 +1,478 @@
 "use client";
 
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { useNavigationStore } from "@/hooks/use-navigation-store";
-import vehicleMaintenanceApi from "@/services/vehicle-maintenance.service";
-import vehicleApi from "@/services/vehicle.service";
-import type { Vehicle, VehicleMaintenance } from "@/types/vehicle";
-import { DatePicker, Form, Input, InputNumber, Modal, Pagination, Popconfirm, Select, Space, Table, Tooltip } from "antd";
-import dayjs from "dayjs";
-import { Calendar, ClipboardList, PenSquare, Plus, RefreshCw, Trash2, Wrench } from "lucide-react";
-import { useTranslations } from "next-intl";
-import { usePermissions } from "@/hooks/use-permissions";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { toast } from "sonner";
-import { SIDEBAR } from "@/constants/route";
+import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
+import { Calendar as CalendarPicker } from "@/components/ui/calendar";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input as ShadInput } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Select as ShadSelect,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Textarea as ShadTextarea } from "@/components/ui/textarea";
 import { PERMISSIONS } from "@/constants/permissions";
+import { SIDEBAR } from "@/constants/route";
+import { useNavigationStore } from "@/hooks/use-navigation-store";
+import { usePermissions } from "@/hooks/use-permissions";
+import {
+  formatVietnameseCurrencyValue,
+  normalizeVietnameseCurrencyInput,
+  parseVietnameseCurrencyInput,
+} from "@/lib/currency";
+import mediaApi from "@/services/media.service";
+import ocrApi from "@/services/ocr.service";
+import vehicleMaintenanceApi from "@/services/vehicle-maintenance.service";
+import { useAppDispatch, useAppSelector } from "@/hooks/use-app-selector";
+import {
+  bulkDeleteVehicleMaintenancesThunk,
+  clearSelectedVehicleMaintenanceIds,
+  fetchVehicleMaintenances,
+  setSelectedVehicleMaintenanceIds,
+  setVehicleMaintenancePagination,
+} from "@/store/slices/vehicleMaintenanceSlice";
+import { fetchVehicleNameOptions } from "@/store/slices/vehicleSlice";
+import type { Vehicle, VehicleMaintenance, VehicleMaintenanceDocument } from "@/types/vehicle";
+import { Pagination, Table, Tooltip } from "antd";
+import type { TableProps } from "antd";
+import dayjs from "dayjs";
+import {
+  Calendar as CalendarIcon,
+  Camera,
+  ClipboardList,
+  FileText,
+  Plus,
+  ReceiptText,
+  RefreshCw,
+  ScanText,
+  Search,
+  Trash2,
+  UploadCloud,
+  Wrench,
+  X,
+} from "lucide-react";
+import { useTranslations } from "next-intl";
+import { useRouter } from "next/navigation";
+import { type Key, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { toast } from "sonner";
 
-const { RangePicker } = DatePicker;
-const { TextArea } = Input;
+const DIALOG_CONTROL_CLASS = "!h-11 min-h-11 w-full bg-white px-3 py-2 text-sm";
+const DIALOG_GRID_CLASS = "grid grid-cols-1 gap-x-8 gap-y-5 md:grid-cols-2";
+
+const MAINTENANCE_TYPES = [
+  { value: "maintenance", label: "Bảo dưỡng" },
+  { value: "repair", label: "Sửa chữa" },
+  { value: "inspection", label: "Kiểm tra" },
+  { value: "other", label: "Khác" },
+];
+
+const STATUS_OPTIONS = [
+  { value: "draft", label: "Nháp" },
+  { value: "submitted", label: "Đã gửi" },
+  { value: "reviewing", label: "Đang duyệt" },
+  { value: "approved", label: "Đã duyệt" },
+  { value: "rejected", label: "Từ chối" },
+  { value: "completed", label: "Hoàn tất" },
+  { value: "canceled", label: "Đã hủy" },
+];
+
+const PAYMENT_STATUS_OPTIONS = [
+  { value: "unpaid", label: "Chưa thanh toán" },
+  { value: "partial", label: "Thanh toán một phần" },
+  { value: "paid", label: "Đã thanh toán" },
+  { value: "not_required", label: "Không cần thanh toán" },
+];
+
+const RANK_OPTIONS = [
+  { value: 1, label: "Thấp" },
+  { value: 2, label: "Trung bình" },
+  { value: 3, label: "Cao" },
+  { value: 4, label: "Rất nghiêm trọng" },
+];
+
+const MAINTENANCE_LIST_TABS = [
+  { value: "all", label: "Tất cả" },
+  { value: "mine", label: "Của tôi" },
+  { value: "submitted", label: "Chờ kiểm tra" },
+  { value: "reviewing", label: "Chờ phê duyệt" },
+  { value: "approved", label: "Đã duyệt" },
+  { value: "rejected", label: "Từ chối" },
+];
+
+type MaintenanceFormValues = {
+  vehicle_id: number;
+  dateRange?: [dayjs.Dayjs, dayjs.Dayjs];
+  vehicle_maintenance_location?: string | null;
+  vehicle_distance_covered?: number | null;
+  vehicle_maintenance_description?: string | null;
+  vehicle_maintenance_type?: string;
+  vehicle_maintenance_rank?: number;
+  vehicle_maintenance_status?: string;
+  payment_status?: string;
+  deadline_pay?: dayjs.Dayjs | null;
+  paid_at?: dayjs.Dayjs | null;
+  service_provider_name?: string | null;
+  service_provider_address?: string | null;
+  invoice_no?: string | null;
+  invoice_date?: dayjs.Dayjs | null;
+  total_amount?: number | null;
+  currency?: string | null;
+  vehicle_maintenance_ocr_text?: string | null;
+};
+
+type UploadMediaResponse = {
+  media_id?: number;
+  data?: { media_id?: number };
+};
+
+type MaintenanceFormErrors = Partial<Record<keyof MaintenanceFormValues | "dateRange", string>>;
+
+function createDefaultFormValues(): MaintenanceFormValues {
+  return {
+    dateRange: [dayjs(), dayjs()],
+    vehicle_maintenance_type: "maintenance",
+    vehicle_maintenance_rank: 1,
+    vehicle_maintenance_status: "draft",
+    payment_status: "unpaid",
+    currency: "VND",
+  } as MaintenanceFormValues;
+}
+
+function FieldError({ message }: { message?: string }) {
+  if (!message) return null;
+  return <p className="mt-1 text-xs font-medium text-red-500">{message}</p>;
+}
+
+function DialogFormSection({
+  icon,
+  title,
+  children,
+}: {
+  icon: ReactNode;
+  title: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm md:p-6">
+      <div className="mb-5 flex items-center gap-3 border-b border-slate-100 pb-3">
+        <div className="flex size-9 items-center justify-center rounded-md bg-slate-100 text-slate-600">
+          {icon}
+        </div>
+        <h3 className="text-base font-semibold text-slate-900">{title}</h3>
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function DateField({
+  label,
+  value,
+  placeholder,
+  error,
+  onChange,
+}: {
+  label: string;
+  value?: dayjs.Dayjs | null;
+  placeholder: string;
+  error?: string;
+  onChange: (value: dayjs.Dayjs | null) => void;
+}) {
+  const selectedDate = value?.isValid() ? value.toDate() : undefined;
+
+  return (
+    <div className="space-y-2">
+      <Label className="text-slate-700">{label}</Label>
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button
+            type="button"
+            variant="outline"
+            className={`!h-11 min-h-11 w-full justify-start bg-white px-3 py-2 text-left text-sm font-normal ${value?.isValid() ? "text-slate-900" : "text-muted-foreground"
+              }`}
+          >
+            <CalendarIcon className="size-4 text-muted-foreground" />
+            {value?.isValid() ? value.format("DD/MM/YYYY") : placeholder}
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-auto p-0" align="start">
+          <CalendarPicker
+            mode="single"
+            selected={selectedDate}
+            onSelect={(date) => onChange(date ? dayjs(date) : null)}
+            captionLayout="dropdown"
+          />
+        </PopoverContent>
+      </Popover>
+      <FieldError message={error} />
+    </div>
+  );
+}
+
+function getVehicleLabelById(vehicles: Vehicle[], vehicleId: number) {
+  const found = vehicles.find((v) => v.vehicle_id === vehicleId);
+  if (!found) return `#${vehicleId}`;
+  return found.vehicle_license_plate
+    ? `${found.vehicle_license_plate}${found.vehicle_name ? ` | ${found.vehicle_name}` : ""}`
+    : `#${vehicleId}`;
+}
+
+function getVehicleLabel(record: VehicleMaintenance, vehicles: Vehicle[]) {
+  const vehicle = record.vehicle;
+  if (vehicle?.vehicle_license_plate) {
+    return `${vehicle.vehicle_license_plate}${vehicle.vehicle_name ? ` | ${vehicle.vehicle_name}` : ""}`;
+  }
+  return getVehicleLabelById(vehicles, record.vehicle_id);
+}
+
+function getMaintenanceStatus(record: VehicleMaintenance) {
+  if (record.vehicle_maintenance_status) return record.vehicle_maintenance_status;
+  const toDate = record.vehicle_maintenance_to_datetime
+    ? dayjs(record.vehicle_maintenance_to_datetime)
+    : null;
+  return toDate && toDate.isAfter(dayjs()) ? "submitted" : "completed";
+}
+
+function getStatusLabel(status: string) {
+  return STATUS_OPTIONS.find((item) => item.value === status)?.label || status;
+}
+
+function getRankLabel(rank?: number) {
+  return RANK_OPTIONS.find((item) => item.value === Number(rank))?.label || "-";
+}
+
+function getDurationDays(from: string, to?: string | null) {
+  if (!to) return 0;
+  return Math.max(dayjs(to).diff(dayjs(from), "day"), 0);
+}
+
+function getStatusBadgeClass(status: string) {
+  if (status === "completed" || status === "approved") {
+    return "border-emerald-200 bg-emerald-50 text-emerald-700";
+  }
+  if (status === "rejected" || status === "canceled") {
+    return "border-red-200 bg-red-50 text-red-700";
+  }
+  if (status === "reviewing") {
+    return "border-sky-200 bg-sky-50 text-sky-700";
+  }
+  return "border-amber-200 bg-amber-50 text-amber-700";
+}
+
+function getRankBadgeClass(rank?: number) {
+  const value = Number(rank || 1);
+  if (value >= 4) return "border-red-200 bg-red-50 text-red-700";
+  if (value === 3) return "border-orange-200 bg-orange-50 text-orange-700";
+  if (value === 2) return "border-amber-200 bg-amber-50 text-amber-700";
+  return "border-emerald-200 bg-emerald-50 text-emerald-700";
+}
+
+function getPaymentStatusBadgeClass(status?: string | null) {
+  if (status === "paid") {
+    return "border-emerald-200 bg-emerald-50 text-emerald-700";
+  }
+  if (status === "partial") {
+    return "border-sky-200 bg-sky-50 text-sky-700";
+  }
+  if (status === "not_required") {
+    return "border-slate-200 bg-slate-50 text-slate-600";
+  }
+  return "border-red-200 bg-red-50 text-red-700";
+}
+
+function getStatusDisplay(record: VehicleMaintenance) {
+  const status = getMaintenanceStatus(record);
+  return (
+    <Badge variant="outline" className={getStatusBadgeClass(status)}>
+      {getStatusLabel(status)}
+    </Badge>
+  );
+}
+
+function getRankDisplay(rank?: number) {
+  const value = Number(rank || 1);
+  return (
+    <Badge variant="outline" className={getRankBadgeClass(value)}>
+      {getRankLabel(value)}
+    </Badge>
+  );
+}
+
+function buildPayload(values: MaintenanceFormValues): Partial<VehicleMaintenance> {
+  return {
+    vehicle_id: values.vehicle_id,
+    vehicle_maintenance_from_datetime:
+      values.dateRange?.[0]?.toISOString() || new Date().toISOString(),
+    vehicle_maintenance_to_datetime: values.dateRange?.[1]?.toISOString() || null,
+    vehicle_maintenance_location: values.vehicle_maintenance_location || null,
+    vehicle_distance_covered: values.vehicle_distance_covered || null,
+    vehicle_maintenance_description: values.vehicle_maintenance_description || null,
+    vehicle_maintenance_type: values.vehicle_maintenance_type || "maintenance",
+    vehicle_maintenance_rank: values.vehicle_maintenance_rank || 1,
+    vehicle_maintenance_status: "draft",
+    payment_status: values.payment_status || "unpaid",
+    deadline_pay: values.deadline_pay ? values.deadline_pay.toISOString() : null,
+    paid_at: values.paid_at ? values.paid_at.toISOString() : null,
+    service_provider_name: values.service_provider_name || null,
+    service_provider_address: values.service_provider_address || null,
+    invoice_no: values.invoice_no || null,
+    invoice_date: values.invoice_date ? values.invoice_date.toISOString() : null,
+    total_amount: values.total_amount ?? null,
+    currency: values.currency || "VND",
+    vehicle_maintenance_ocr_text: values.vehicle_maintenance_ocr_text || null,
+  };
+}
 
 export default function TableVehicleMaintenances() {
   const t = useTranslations("VehicleMaintenancePage");
   const tCommon = useTranslations("Common");
   const { hasActionAccess } = usePermissions();
   const { setDirty } = useNavigationStore();
+  const router = useRouter();
+  const dispatch = useAppDispatch();
+  const documentInputRef = useRef<HTMLInputElement | null>(null);
+  const {
+    bulkDeleting,
+    items: maintenances,
+    limit,
+    loading,
+    page,
+    selectedIds,
+    total,
+  } = useAppSelector((state) => state.vehicleMaintenances);
+  const {
+    nameOptions: vehicles,
+    nameOptionsLoaded: vehicleOptionsLoaded,
+    nameOptionsLoading: vehicleOptionsLoading,
+  } = useAppSelector((state) => state.vehicles);
 
-  const [form] = Form.useForm();
-  const [maintenances, setMaintenances] = useState<VehicleMaintenance[]>([]);
-  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [formValues, setFormValues] = useState<MaintenanceFormValues>(() =>
+    createDefaultFormValues()
+  );
+  const [formErrors, setFormErrors] = useState<MaintenanceFormErrors>({});
+  const [assignedVehicleIds, setAssignedVehicleIds] = useState<number[]>([]);
   const [searchText, setSearchText] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [refreshDisabled, setRefreshDisabled] = useState(0);
   const [isModalVisible, setIsModalVisible] = useState(false);
+  const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false);
   const [editingRecord, setEditingRecord] = useState<VehicleMaintenance | null>(null);
+  const [currentDocuments, setCurrentDocuments] = useState<VehicleMaintenanceDocument[]>([]);
+  const [pendingFiles, setPendingFiles] = useState<File[]>([]);
+  const [ocrLoading, setOcrLoading] = useState(false);
+  const [ocrFileName, setOcrFileName] = useState<string | null>(null);
+  const [totalAmountInput, setTotalAmountInput] = useState("");
+  const isTotalAmountFocusedRef = useRef(false);
   const [saving, setSaving] = useState(false);
 
-  const fetchMaintenances = useCallback(async () => {
-    setLoading(true);
+  const buildListParams = useCallback(
+    (overrides?: { page?: number; limit?: number; search?: string; status?: string }) => {
+      const nextPage = overrides?.page ?? page;
+      const nextLimit = overrides?.limit ?? limit;
+      const nextSearch = overrides?.search ?? searchText;
+      const nextStatus = overrides?.status ?? statusFilter;
+      const params: Record<string, unknown> = {
+        page: nextPage,
+        limit: nextLimit,
+      };
+      const keyword = nextSearch.trim();
+      if (keyword) params.search = keyword;
+      if (nextStatus === "mine") {
+        params.mine = true;
+      } else if (nextStatus !== "all") {
+        params.status = nextStatus;
+      }
+      return params;
+    },
+    [limit, page, searchText, statusFilter]
+  );
+
+  const fetchMaintenances = useCallback(async (overrides?: { page?: number; limit?: number; search?: string; status?: string }) => {
     try {
-      const res = await vehicleMaintenanceApi.getAll();
-      setMaintenances(res.data || []);
+      await dispatch(fetchVehicleMaintenances(buildListParams(overrides))).unwrap();
     } catch {
       toast.error(t("loadFailed"), { position: "top-right" });
-    } finally {
-      setLoading(false);
     }
-  }, [t]);
+  }, [buildListParams, dispatch, t]);
 
-  const fetchVehicles = useCallback(async () => {
+  const ensureVehicleOptions = useCallback(async () => {
+    if (vehicleOptionsLoaded || vehicleOptionsLoading) return;
+    const result = await dispatch(fetchVehicleNameOptions({ limit: 1000 }));
+    if (fetchVehicleNameOptions.rejected.match(result)) {
+      toast.error("Không tải được danh sách xe", { position: "top-right" });
+    }
+  }, [dispatch, vehicleOptionsLoaded, vehicleOptionsLoading]);
+
+  const markFormDirty = useCallback(() => {
+    if (!useNavigationStore.getState().isDirty) {
+      setDirty(true);
+    }
+  }, [setDirty]);
+
+  const updateFormField = useCallback(
+    <K extends keyof MaintenanceFormValues>(field: K, value: MaintenanceFormValues[K]) => {
+      setFormValues((prev) => ({ ...prev, [field]: value }));
+      setFormErrors((prev) => ({ ...prev, [field]: undefined }));
+      markFormDirty();
+    },
+    [markFormDirty]
+  );
+
+  const handleTotalAmountChange = useCallback(
+    (value: string) => {
+      const normalized = normalizeVietnameseCurrencyInput(value);
+      setTotalAmountInput(normalized);
+      updateFormField("total_amount", parseVietnameseCurrencyInput(normalized));
+    },
+    [updateFormField]
+  );
+
+  const fetchDriverContext = useCallback(async () => {
     try {
-      const res = await vehicleApi.getAll();
-      setVehicles(res.data?.data || res.data || []);
+      const res = await vehicleMaintenanceApi.getDriverContext({
+        date: dayjs().format("YYYY-MM-DD"),
+      });
+      const assigned = res.data.assigned_vehicles_today || [];
+      setAssignedVehicleIds(assigned.map((item) => item.vehicle_id));
+      const defaultVehicleId = Number(res.data.default_vehicle_id);
+      if (Number.isFinite(defaultVehicleId) && defaultVehicleId > 0) {
+        setFormValues((prev) => ({ ...prev, vehicle_id: defaultVehicleId }));
+      }
     } catch {
-      // silent
+      setAssignedVehicleIds([]);
     }
   }, []);
 
   useEffect(() => {
     fetchMaintenances();
-    fetchVehicles();
-  }, [fetchMaintenances, fetchVehicles]);
-
-  const getMaintenanceStatus = (record: VehicleMaintenance) => {
-    const now = dayjs();
-    const toDate = dayjs(record.vehicle_maintenance_to_datetime);
-    return toDate.isAfter(now) ? "active" : "completed";
-  };
-
-  const getVehiclePlate = (vehicleId: number) => {
-    const found = vehicles.find((v) => v.vehicle_id === vehicleId);
-    return found?.vehicle_license_plate ? `${found.vehicle_license_plate}${found.vehicle_name ? ` | ${found.vehicle_name}` : ''}` : `#${vehicleId}`;
-  };
+  }, [fetchMaintenances]);
 
   const filteredMaintenances = useMemo(() => {
-    return maintenances.filter((m) => {
-      const plate = getVehiclePlate(m.vehicle_id);
-      const matchSearch =
-        !searchText ||
-        plate.toLowerCase().includes(searchText.toLowerCase()) ||
-        m.vehicle_maintenance_description?.toLowerCase().includes(searchText.toLowerCase());
-      const status = getMaintenanceStatus(m);
-      const matchStatus = statusFilter === "all" || status === statusFilter;
-      return matchSearch && matchStatus;
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [maintenances, statusFilter, searchText, vehicles]);
+    return maintenances;
+  }, [maintenances]);
 
   const handleRefresh = () => {
     if (refreshDisabled > 0) return;
@@ -101,54 +489,197 @@ export default function TableVehicleMaintenances() {
     }, 1000);
   };
 
-  const openAddModal = () => {
+  const openAddModal = async () => {
     setEditingRecord(null);
-    form.resetFields();
+    setCurrentDocuments([]);
+    setPendingFiles([]);
+    setOcrLoading(false);
+    setOcrFileName(null);
+    isTotalAmountFocusedRef.current = false;
+    setTotalAmountInput("");
+    setFormErrors({});
+    setFormValues(createDefaultFormValues());
     setIsModalVisible(true);
+    ensureVehicleOptions();
+    fetchDriverContext();
   };
 
-  const openEditModal = (record: VehicleMaintenance) => {
-    setEditingRecord(record);
-    form.setFieldsValue({
-      vehicle_id: record.vehicle_id,
-      dateRange: [
-        dayjs(record.vehicle_maintenance_from_datetime),
-        dayjs(record.vehicle_maintenance_to_datetime),
-      ],
-      vehicle_distance_covered: record.vehicle_distance_covered,
-      vehicle_maintenance_description: record.vehicle_maintenance_description,
-    });
-    setIsModalVisible(true);
+  const openEditModal = async (record: VehicleMaintenance) => {
+    try {
+      ensureVehicleOptions();
+      const detail = await vehicleMaintenanceApi.getById(record.vehicle_maintenance_id);
+      const item = detail.data || record;
+      setEditingRecord(item);
+      setCurrentDocuments(item.documents || []);
+      setPendingFiles([]);
+      setOcrLoading(false);
+      setOcrFileName(null);
+      isTotalAmountFocusedRef.current = false;
+      setTotalAmountInput(formatVietnameseCurrencyValue(item.total_amount));
+      setFormErrors({});
+      setFormValues({
+        vehicle_id: item.vehicle_id,
+        dateRange: [
+          dayjs(item.vehicle_maintenance_from_datetime),
+          item.vehicle_maintenance_to_datetime
+            ? dayjs(item.vehicle_maintenance_to_datetime)
+            : dayjs(item.vehicle_maintenance_from_datetime),
+        ],
+        vehicle_maintenance_location: item.vehicle_maintenance_location || "",
+        vehicle_distance_covered: item.vehicle_distance_covered || null,
+        vehicle_maintenance_description: item.vehicle_maintenance_description || "",
+        vehicle_maintenance_type: item.vehicle_maintenance_type || "maintenance",
+        vehicle_maintenance_rank: item.vehicle_maintenance_rank || 1,
+        vehicle_maintenance_status: item.vehicle_maintenance_status || "draft",
+        payment_status: item.payment_status || "unpaid",
+        deadline_pay: item.deadline_pay ? dayjs(item.deadline_pay) : null,
+        paid_at: item.paid_at ? dayjs(item.paid_at) : null,
+        service_provider_name: item.service_provider_name || "",
+        service_provider_address: item.service_provider_address || "",
+        invoice_no: item.invoice_no || "",
+        invoice_date: item.invoice_date ? dayjs(item.invoice_date) : null,
+        total_amount: item.total_amount ?? null,
+        currency: item.currency || "VND",
+        vehicle_maintenance_ocr_text: item.vehicle_maintenance_ocr_text || "",
+      });
+      setIsModalVisible(true);
+    } catch (error) {
+      const message =
+        (error as any)?.response?.data?.message || (error as Error)?.message || t("loadFailed");
+      toast.error(t("failed"), { description: message });
+    }
   };
 
   const handleCancel = () => {
     setIsModalVisible(false);
-    form.resetFields();
+    setFormValues(createDefaultFormValues());
+    setFormErrors({});
+    setEditingRecord(null);
+    setCurrentDocuments([]);
+    setPendingFiles([]);
+    setOcrLoading(false);
+    setOcrFileName(null);
+    isTotalAmountFocusedRef.current = false;
+    setTotalAmountInput("");
     setDirty(false);
   };
 
+  const replaceOcrText = useCallback(
+    (text: string) => {
+      setFormValues((prev) => ({
+        ...prev,
+        vehicle_maintenance_ocr_text: text,
+      }));
+      markFormDirty();
+    },
+    [markFormDirty]
+  );
+
+  const runOcrForFiles = useCallback(
+    async (files: File[]) => {
+      const readableFiles = files.filter((file) => {
+        const lowerName = file.name.toLowerCase();
+        return file.type.startsWith("image/") || file.type === "application/pdf" || lowerName.endsWith(".pdf");
+      });
+      if (readableFiles.length === 0) return;
+
+      setOcrLoading(true);
+      try {
+        setOcrFileName(readableFiles.length > 1 ? `${readableFiles.length} file` : readableFiles[0].name);
+        const textBlocks = (
+          await Promise.all(
+            readableFiles.map(async (file) => {
+              const result = await ocrApi.extractInvoiceText(file);
+              const text = result.text.trim();
+              if (!text) return "";
+              return readableFiles.length > 1 ? `--- ${file.name} ---\n${text}` : text;
+            })
+          )
+        ).filter(Boolean);
+
+        if (textBlocks.length > 0) {
+          replaceOcrText(textBlocks.join("\n\n"));
+          toast.success("OCR đã đọc xong hóa đơn", { position: "top-right" });
+        } else {
+          toast.warning("OCR không trả về nội dung để điền", { position: "top-right" });
+        }
+      } catch (error) {
+        const message = (error as Error)?.message || "OCR hóa đơn thất bại";
+        toast.error("OCR hóa đơn thất bại", { description: message });
+      } finally {
+        setOcrLoading(false);
+        setOcrFileName(null);
+      }
+    },
+    [replaceOcrText]
+  );
+
+  const handleSelectedDocumentFiles = useCallback(
+    (files: File[]) => {
+      if (files.length === 0) return;
+      setPendingFiles((prev) => [...prev, ...files]);
+      markFormDirty();
+    },
+    [markFormDirty]
+  );
+
+  const uploadPendingFiles = async (maintenanceId: number) => {
+    await Promise.all(
+      pendingFiles.map(async (file, index) => {
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("media_name", buildMediaName(file, maintenanceId, index));
+        formData.append("media_description", file.name);
+        formData.append("media_reference_type", "vehicle_maintenances");
+        formData.append("media_reference_id", String(maintenanceId));
+
+        const upload = await mediaApi.upload(formData);
+        const mediaPayload = normalizeUploadedMedia(upload.data as UploadMediaResponse);
+        if (!mediaPayload.media_id) {
+          throw new Error("ERR_MEDIA::MISSING_MEDIA_ID");
+        }
+
+        await vehicleMaintenanceApi.addDocument(maintenanceId, {
+          media_id: mediaPayload.media_id,
+          document_type: "invoice",
+          ocr_status: "pending",
+          ocr_text: null,
+          sort_order: currentDocuments.length + index,
+        });
+      })
+    );
+  };
+
   const handleSave = async () => {
+    const errors = validateFormValues();
+    if (Object.keys(errors).length > 0) {
+      setFormErrors(errors);
+      toast.error(t("failed"), {
+        description: Object.values(errors)[0] || t("saveFailed"),
+      });
+      return;
+    }
+
     try {
-      const values = await form.validateFields();
       setSaving(true);
 
-      const payload = {
-        vehicle_id: values.vehicle_id,
-        vehicle_maintenance_from_datetime: values.dateRange[0].toISOString(),
-        vehicle_maintenance_to_datetime: values.dateRange[1].toISOString(),
-        vehicle_distance_covered: values.vehicle_distance_covered || 0,
-        vehicle_maintenance_description: values.vehicle_maintenance_description,
-      };
+      const payload = buildPayload(formValues);
+      const saved = editingRecord
+        ? await vehicleMaintenanceApi.update(editingRecord.vehicle_maintenance_id, payload)
+        : await vehicleMaintenanceApi.create(payload);
 
-      if (editingRecord) {
-        await vehicleMaintenanceApi.update(editingRecord.vehicle_maintenance_id, payload);
-      } else {
-        await vehicleMaintenanceApi.create(payload as Omit<VehicleMaintenance, "vehicle_maintenance_id">);
-      }
+      await uploadPendingFiles(saved.data.vehicle_maintenance_id);
 
       setIsModalVisible(false);
-      form.resetFields();
+      setFormValues(createDefaultFormValues());
+      setFormErrors({});
       setDirty(false);
+      setPendingFiles([]);
+      setCurrentDocuments([]);
+      setOcrLoading(false);
+      setOcrFileName(null);
+      isTotalAmountFocusedRef.current = false;
+      setTotalAmountInput("");
       toast.success(editingRecord ? t("updateSuccess") : t("createSuccess"), {
         position: "top-right",
       });
@@ -174,31 +705,92 @@ export default function TableVehicleMaintenances() {
     }
   };
 
-  const onValuesChange = () => {
-    if (!useNavigationStore.getState().isDirty) {
-      setDirty(true);
+  const canDelete = hasActionAccess(
+    SIDEBAR.VEHICLE_MAINTENANCES,
+    PERMISSIONS.VEHICLE_MAINTENANCES.DELETE
+  );
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.length === 0) return;
+
+    try {
+      const result = await dispatch(bulkDeleteVehicleMaintenancesThunk(selectedIds)).unwrap();
+      dispatch(clearSelectedVehicleMaintenanceIds());
+      setIsBulkDeleteOpen(false);
+
+      if (result.total_deleted > 0) {
+        toast.success(`Đã xóa ${result.total_deleted} phiếu bảo trì`, { position: "top-right" });
+      }
+      if (result.total_failed > 0) {
+        toast.warning(`${result.total_failed} phiếu không thể xóa`, { position: "top-right" });
+      }
+
+      const remainingTotal = Math.max(0, total - result.total_deleted);
+      const maxPage = Math.max(1, Math.ceil(remainingTotal / limit));
+      const nextPage = Math.min(page, maxPage);
+      dispatch(setVehicleMaintenancePagination({ page: nextPage, limit }));
+      fetchMaintenances({ page: nextPage, limit });
+    } catch (error) {
+      const message =
+        (error as any)?.response?.data?.message || (error as Error)?.message || t("deleteFailed");
+      toast.error(t("failed"), { description: message });
     }
   };
 
-  const getStatusDisplay = (record: VehicleMaintenance) => {
-    const status = getMaintenanceStatus(record);
-    if (status === "active") {
-      return (
-        <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200/60">
-          {t("active")}
-        </span>
+  const rowSelection: TableProps<VehicleMaintenance>["rowSelection"] | undefined = canDelete
+    ? {
+      preserveSelectedRowKeys: true,
+      selectedRowKeys: selectedIds,
+      onChange: (keys: Key[]) => {
+        const ids: number[] = [];
+        for (const key of keys) {
+          const id = Number(key);
+          if (Number.isFinite(id)) ids.push(id);
+        }
+        dispatch(setSelectedVehicleMaintenanceIds(ids));
+      },
+    }
+    : undefined;
+
+  const handlePageChange = (nextPage: number, nextLimit: number) => {
+    dispatch(setVehicleMaintenancePagination({ page: nextPage, limit: nextLimit }));
+  };
+
+  const openDetailPage = (record: VehicleMaintenance) => {
+    router.push(`${SIDEBAR.VEHICLE_MAINTENANCES}/${record.vehicle_maintenance_id}`);
+  };
+
+  const handleDeleteDocument = async (document: VehicleMaintenanceDocument) => {
+    try {
+      await vehicleMaintenanceApi.deleteDocument(document.vehicle_maintenance_document_id);
+      setCurrentDocuments((prev) =>
+        prev.filter(
+          (item) =>
+            item.vehicle_maintenance_document_id !== document.vehicle_maintenance_document_id
+        )
       );
+      toast.success("Đã xóa tài liệu", { position: "top-right" });
+    } catch (error) {
+      const message =
+        (error as any)?.response?.data?.message ||
+        (error as Error)?.message ||
+        "Xóa tài liệu thất bại";
+      toast.error(t("failed"), { description: message });
     }
-    return (
-      <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200/60">
-        {t("completed")}
-      </span>
-    );
   };
 
-  const getDurationDays = (from: string, to: string) => {
-    const diff = dayjs(to).diff(dayjs(from), "day");
-    return diff;
+  const validateFormValues = () => {
+    const errors: MaintenanceFormErrors = {};
+    if (!formValues.vehicle_id) {
+      errors.vehicle_id = t("requiredVehicle");
+    }
+    if (!formValues.dateRange?.[0] || !formValues.dateRange?.[1]) {
+      errors.dateRange = t("requiredDateRange");
+    }
+    if (!formValues.vehicle_maintenance_description?.trim()) {
+      errors.vehicle_maintenance_description = t("requiredDescription");
+    }
+    return errors;
   };
 
   const columns = [
@@ -213,9 +805,9 @@ export default function TableVehicleMaintenances() {
       title: t("vehicle"),
       dataIndex: "vehicle_id",
       key: "vehicle_id",
-      render: (vehicleId: number) => (
+      render: (_vehicleId: number, record: VehicleMaintenance) => (
         <div className="font-semibold text-slate-800 bg-slate-100 uppercase tracking-wider px-3 py-1 rounded inline-block border-2 border-slate-300">
-          {getVehiclePlate(vehicleId)}
+          {getVehicleLabel(record, vehicles)}
         </div>
       ),
     },
@@ -225,13 +817,15 @@ export default function TableVehicleMaintenances() {
       render: (_: unknown, record: VehicleMaintenance) => (
         <div className="space-y-1">
           <div className="flex items-center gap-1.5 text-sm">
-            <Calendar className="w-3.5 h-3.5 text-slate-400" />
+            <CalendarIcon className="size-3.5 text-slate-400" />
             <span className="text-slate-700">
               {dayjs(record.vehicle_maintenance_from_datetime).format("DD/MM/YYYY")}
             </span>
             <span className="text-slate-400 mx-1">→</span>
             <span className="text-slate-700">
-              {dayjs(record.vehicle_maintenance_to_datetime).format("DD/MM/YYYY")}
+              {record.vehicle_maintenance_to_datetime
+                ? dayjs(record.vehicle_maintenance_to_datetime).format("DD/MM/YYYY")
+                : "-"}
             </span>
           </div>
           <div className="text-xs text-slate-400">
@@ -245,30 +839,59 @@ export default function TableVehicleMaintenances() {
       ),
     },
     {
-      title: t("distanceCovered"),
-      dataIndex: "vehicle_distance_covered",
-      key: "vehicle_distance_covered",
-      align: "right" as const,
-      render: (val: number) => (
-        <span className="font-medium text-slate-700 tabular-nums">
-          {val?.toLocaleString("vi-VN")} {t("km")}
-        </span>
-      ),
+      title: "Mức độ",
+      dataIndex: "vehicle_maintenance_rank",
+      key: "vehicle_maintenance_rank",
+      align: "center" as const,
+      render: (rank: number) => getRankDisplay(rank),
     },
     {
       title: t("description"),
       dataIndex: "vehicle_maintenance_description",
       key: "vehicle_maintenance_description",
-      width: 300,
+      width: 320,
       ellipsis: true,
-      render: (val: string | null) =>
-        val ? (
-          <Tooltip title={val}>
-            <span className="text-slate-600">{val}</span>
+      render: (val: string | null, record: VehicleMaintenance) => {
+        const text = val || record.service_provider_name || "-";
+        return text !== "-" ? (
+          <Tooltip title={text}>
+            <span className="text-slate-600">{text}</span>
           </Tooltip>
         ) : (
           <span className="text-slate-400 italic">-</span>
-        ),
+        );
+      },
+    },
+    {
+      title: "Thanh toán",
+      key: "payment_status",
+      render: (_: unknown, record: VehicleMaintenance) => (
+        <div className="space-y-1">
+          <Badge
+            variant="outline"
+            className={`rounded-md ${getPaymentStatusBadgeClass(record.payment_status)}`}
+          >
+            {PAYMENT_STATUS_OPTIONS.find((item) => item.value === record.payment_status)?.label ||
+              "-"}
+          </Badge>
+          {record.deadline_pay ? (
+            <div className="text-xs text-slate-500">
+              Hạn: {dayjs(record.deadline_pay).format("DD/MM/YYYY")}
+            </div>
+          ) : null}
+        </div>
+      ),
+    },
+    {
+      title: "Tài liệu",
+      key: "documents",
+      align: "center" as const,
+      render: (_: unknown, record: VehicleMaintenance) => (
+        <Badge variant="outline" className="rounded-md">
+          <FileText className="size-3" />
+          {record.document_count ?? record.documents?.length ?? 0}
+        </Badge>
+      ),
     },
     {
       title: t("status"),
@@ -276,102 +899,113 @@ export default function TableVehicleMaintenances() {
       align: "center" as const,
       render: (_: unknown, record: VehicleMaintenance) => getStatusDisplay(record),
     },
-    {
-      title: t("actions"),
-      key: "actions",
-      align: "center" as const,
-      fixed: "right" as const,
-      render: (_: unknown, record: VehicleMaintenance) => (
-        <Space size="middle">
-          {hasActionAccess(SIDEBAR.VEHICLE_MAINTENANCES, PERMISSIONS.VEHICLE_MAINTENANCES.UPDATE) && (
-            <Tooltip title={t("editTooltip")}>
-              <Button variant="outline" size="iconSquare" onClick={() => openEditModal(record)}>
-                <PenSquare className="w-4 h-4 text-blue-600" />
-              </Button>
-            </Tooltip>
-          )}
-          {hasActionAccess(SIDEBAR.VEHICLE_MAINTENANCES, PERMISSIONS.VEHICLE_MAINTENANCES.DELETE) && (
-            <Popconfirm
-              title={t("confirmTitle")}
-              description={t("confirmDelete")}
-              okText={t("okText")}
-              cancelText={t("cancelText")}
-              placement="leftBottom"
-              okButtonProps={{ danger: true }}
-              onConfirm={() => handleDelete(record)}
-            >
-              <Tooltip title={t("deleteTooltip")}>
-                <Button variant="outline" size="iconSquare">
-                  <Trash2 className="w-4 h-4 text-red-500" />
-                </Button>
-              </Tooltip>
-            </Popconfirm>
-          )}
-        </Space>
-      ),
-    },
   ];
 
   return (
     <>
-      <div className="m-10 bg-white rounded-lg shadow-sm border border-slate-200 animate-fade-in overflow-hidden">
-        <div className="p-6 md:p-8 border-b-2 border-slate-100 flex items-start justify-between gap-6 flex-wrap bg-slate-50/50">
-          <div className="flex-1">
-            <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-slate-900 flex items-center gap-3">
-              {t("title")}
-            </h1>
-            <p className="text-slate-500 mt-2 text-lg">{t("subtitle")}</p>
-          </div>
+      <Card className="m-4 gap-0 overflow-hidden rounded-lg py-0 shadow-sm md:m-10">
+        <CardHeader className="border-b bg-muted/30 px-6 py-6 md:px-8">
+          <div className="flex flex-wrap items-start justify-between gap-6">
+            <div className="flex-1">
+              <h1 className="text-3xl md:text-4xl font-bold tracking-tight text-slate-900 flex items-center gap-3">
+                {t("title")}
+              </h1>
+              <p className="text-slate-500 mt-2 text-lg">{t("subtitle")}</p>
+            </div>
 
-          <div className="flex gap-3 mt-2 sm:mt-0 flex-wrap">
-            {hasActionAccess(SIDEBAR.VEHICLE_MAINTENANCES, PERMISSIONS.VEHICLE_MAINTENANCES.CREATE) && (
-              <Tooltip title={t("addTooltip")}>
-                <Button variant="primary" onClick={openAddModal}>
-                  <Plus className="w-4 h-4" />
-                  {t("addMaintenance")}
+            <div className="flex gap-3 mt-2 sm:mt-0 flex-wrap">
+              {hasActionAccess(
+                SIDEBAR.VEHICLE_MAINTENANCES,
+                PERMISSIONS.VEHICLE_MAINTENANCES.CREATE
+              ) && (
+                  <Tooltip title={t("addTooltip")}>
+                    <Button variant="primary" onClick={openAddModal}>
+                      <Plus className="size-4" />
+                      {t("addMaintenance")}
+                    </Button>
+                  </Tooltip>
+                )}
+
+              <Tooltip title={tCommon("refreshData")}>
+                <Button
+                  className="hover:bg-slate-100 transition-smooth min-w-[120px]"
+                  variant="outline"
+                  onClick={handleRefresh}
+                  disabled={refreshDisabled > 0}
+                >
+                  <div className="flex items-center gap-2">
+                    <RefreshCw className={`size-4 ${refreshDisabled > 0 ? "animate-spin" : ""}`} />
+                    <span>
+                      {refreshDisabled > 0
+                        ? `${tCommon("refresh")} (${refreshDisabled}s)`
+                        : tCommon("refresh")}
+                    </span>
+                  </div>
                 </Button>
               </Tooltip>
-            )}
-
-            <Tooltip title={tCommon("refreshData")}>
-              <Button
-                className="hover:bg-slate-100 transition-smooth min-w-[120px]"
-                variant="outline"
-                onClick={handleRefresh}
-                disabled={refreshDisabled > 0}
-              >
-                <div className="flex items-center gap-2">
-                  <RefreshCw className={`w-4 h-4 ${refreshDisabled > 0 ? "animate-spin" : ""}`} />
-                  <span>
-                    {refreshDisabled > 0
-                      ? `${tCommon("refresh")} (${refreshDisabled}s)`
-                      : tCommon("refresh")}
-                  </span>
-                </div>
-              </Button>
-            </Tooltip>
+            </div>
           </div>
-        </div>
+        </CardHeader>
 
-        <div className="px-6 md:px-8 py-6 flex flex-col sm:flex-row gap-4 items-start sm:items-center">
-          <Input
-            placeholder={t("searchPlaceholder")}
-            value={searchText}
-            onChange={(e) => setSearchText(e.target.value)}
-            className="max-w-xs"
-            allowClear
-          />
-          <Select
-            value={statusFilter}
-            onChange={setStatusFilter}
-            className="min-w-[180px]"
-            options={[
-              { value: "all", label: t("all") },
-              { value: "active", label: t("active") },
-              { value: "completed", label: t("completed") },
-            ]}
-          />
-        </div>
+        <CardContent className="px-6 py-5 md:px-8">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+            <div className="relative w-full sm:max-w-xs">
+              <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <ShadInput
+                placeholder={t("searchPlaceholder")}
+                value={searchText}
+                onChange={(e) => {
+                  setSearchText(e.target.value);
+                  dispatch(setVehicleMaintenancePagination({ page: 1, limit }));
+                }}
+                className="h-10 pl-9 pr-9"
+              />
+              {searchText ? (
+                <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 size-8 -translate-y-1/2"
+                  onClick={() => {
+                    setSearchText("");
+                    dispatch(setVehicleMaintenancePagination({ page: 1, limit }));
+                  }}
+                >
+                  <X className="size-4" />
+                </Button>
+              ) : null}
+            </div>
+
+            <Tabs
+              value={statusFilter}
+              onValueChange={(value) => {
+                setStatusFilter(value);
+                dispatch(setVehicleMaintenancePagination({ page: 1, limit }));
+                dispatch(clearSelectedVehicleMaintenanceIds());
+              }}
+            >
+              <TabsList>
+                {MAINTENANCE_LIST_TABS.map((item) => (
+                  <TabsTrigger key={item.value} value={item.value} className="px-3">
+                    {item.label}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </Tabs>
+
+            {canDelete && selectedIds.length > 0 ? (
+              // <div className="flex flex-wrap items-center gap-3 rounded-md border border-red-100 bg-red-50 px-3 py-2">
+              //   <span className="text-sm font-medium text-red-700">
+              //     Đã chọn {selectedIds.length} phiếu
+              //   </span>
+              //   <Button type="button" variant="destructive"  disabled={bulkDeleting} onClick={() => setIsBulkDeleteOpen(true)}>
+              //     <Trash2 className="size-4" />
+              //     Xóa đã chọn
+              //   </Button>
+              // </div>
+              <Button type="button" variant="destructive" disabled={bulkDeleting} onClick={() => setIsBulkDeleteOpen(true)}>
+                <Trash2 className="size-4" />
+                Xóa {selectedIds.length} phiếu
+              </Button>
+            ) : null}
+          </div>
+        </CardContent>
 
         <div
           className="animate-slide-up border-t border-slate-200 overflow-hidden"
@@ -381,6 +1015,21 @@ export default function TableVehicleMaintenances() {
             columns={columns}
             dataSource={filteredMaintenances}
             rowKey="vehicle_maintenance_id"
+            rowSelection={rowSelection}
+            onRow={(record) => ({
+              className: "cursor-pointer",
+              onClick: (event) => {
+                const target = event.target as HTMLElement;
+                if (
+                  target.closest(
+                    "button,a,input,.ant-checkbox,.ant-checkbox-wrapper,.ant-table-selection-column"
+                  )
+                ) {
+                  return;
+                }
+                openDetailPage(record);
+              },
+            })}
             loading={loading}
             pagination={false}
             bordered
@@ -388,60 +1037,482 @@ export default function TableVehicleMaintenances() {
             tableLayout="auto"
           />
 
-          <div className="border-t border-slate-200 bg-slate-50 p-4">
+          <CardFooter className="justify-end border-t bg-muted/30 p-4">
             <Pagination
-              total={filteredMaintenances.length}
+              current={page}
+              pageSize={limit}
+              total={total}
               align="end"
+              showSizeChanger
+              onChange={handlePageChange}
               showTotal={(total) => (
                 <>
                   <i>{t("total")}</i>: <b>{total}</b>
                 </>
               )}
             />
-          </div>
+          </CardFooter>
         </div>
 
-        {!loading && filteredMaintenances.length === 0 && (
+        {/* {!loading && filteredMaintenances.length === 0 && (
           <div className="text-center py-12 text-gray-500">
             <Wrench className="w-12 h-12 mx-auto mb-3 text-gray-300" />
             <p className="text-lg">{t("emptyTitle")}</p>
             <p className="text-sm mt-2">{t("emptyHint")}</p>
           </div>
-        )}
-      </div>
+        )} */}
+      </Card>
 
-      <Modal
-        title={
-          <div className="flex items-center gap-3 pb-4 border-b border-slate-200">
-            <div
-              className={`flex items-center justify-center w-10 h-10 rounded-full ${editingRecord ? "bg-amber-100" : "bg-blue-100"}`}
+      <AlertDialog open={isBulkDeleteOpen} onOpenChange={setIsBulkDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Xóa các phiếu bảo trì đã chọn?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Thao tác này sẽ xóa mềm {selectedIds.length} phiếu bảo trì và các tài liệu liên quan.
+              File trong MinIO sẽ không bị xóa vật lý ngay.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={bulkDeleting}>Hủy</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-red-600 text-white hover:bg-red-700"
+              disabled={bulkDeleting}
+              onClick={(event) => {
+                event.preventDefault();
+                handleBulkDelete();
+              }}
             >
-              <Wrench
-                className={`w-5 h-5 ${editingRecord ? "text-amber-600" : "text-blue-600"}`}
-              />
+              {bulkDeleting ? "Đang xóa..." : "Xóa phiếu"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <Dialog
+        open={isModalVisible}
+        onOpenChange={(open) => {
+          if (!open) handleCancel();
+        }}
+      >
+        <DialogContent className="max-h-[92vh] gap-0 overflow-hidden border-slate-200 bg-slate-50 p-0 sm:max-w-[960px]">
+          <DialogHeader className="border-b bg-white px-8 py-6 pr-14 md:px-10">
+            <div className="flex items-center gap-3">
+              <div
+                className={`flex size-12 items-center justify-center rounded-full ${editingRecord ? "bg-amber-100" : "bg-blue-100"
+                  }`}
+              >
+                <Wrench
+                  className={`size-5 ${editingRecord ? "text-amber-600" : "text-blue-600"}`}
+                />
+              </div>
+              <div>
+                <DialogTitle className="text-xl text-slate-900">
+                  {editingRecord ? t("editMaintenance") : t("newMaintenance")}
+                </DialogTitle>
+                <DialogDescription className="mt-1">
+                  {editingRecord ? t("editSubtitle") : t("newSubtitle")}
+                </DialogDescription>
+              </div>
             </div>
-            <div>
-              <h2 className="text-xl font-semibold text-slate-900">
-                {editingRecord ? t("editMaintenance") : t("newMaintenance")}
-              </h2>
-              <p className="text-sm text-slate-500 mt-0.5">
-                {editingRecord ? t("editSubtitle") : t("newSubtitle")}
-              </p>
+          </DialogHeader>
+          <div className="max-h-[calc(92vh-164px)] overflow-y-auto px-8 py-6 md:px-10">
+            <div className="space-y-5">
+              <DialogFormSection
+                icon={<ClipboardList className="size-5" />}
+                title={t("sectionInfo")}
+              >
+                <div className={DIALOG_GRID_CLASS}>
+                  <div className="space-y-2">
+                    <Label className="text-slate-700">{t("vehicle")}</Label>
+                    <ShadSelect
+                      value={formValues.vehicle_id ? String(formValues.vehicle_id) : undefined}
+                      onValueChange={(value) => updateFormField("vehicle_id", Number(value))}
+                    >
+                      <SelectTrigger
+                        className={DIALOG_CONTROL_CLASS}
+                        aria-invalid={Boolean(formErrors.vehicle_id)}
+                      >
+                        <SelectValue placeholder={t("vehiclePlaceholder")} />
+                      </SelectTrigger>
+                      <SelectContent className="max-h-72 overflow-y-auto">
+                        {vehicles.map((v) => (
+                          <SelectItem key={v.vehicle_id} value={String(v.vehicle_id)}>
+                            {v.vehicle_license_plate}
+                            {v.vehicle_name ? ` | ${v.vehicle_name}` : ""}
+                            {assignedVehicleIds.includes(v.vehicle_id)
+                              ? " | được phân công hôm nay"
+                              : ""}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </ShadSelect>
+                    <FieldError message={formErrors.vehicle_id} />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-slate-700">Loại phiếu</Label>
+                    <ShadSelect
+                      value={formValues.vehicle_maintenance_type || "maintenance"}
+                      onValueChange={(value) => updateFormField("vehicle_maintenance_type", value)}
+                    >
+                      <SelectTrigger className={DIALOG_CONTROL_CLASS}>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {MAINTENANCE_TYPES.map((item) => (
+                          <SelectItem key={item.value} value={item.value}>
+                            {item.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </ShadSelect>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-slate-700">Mức độ nghiêm trọng</Label>
+                    <ShadSelect
+                      value={String(formValues.vehicle_maintenance_rank || 1)}
+                      onValueChange={(value) =>
+                        updateFormField("vehicle_maintenance_rank", Number(value))
+                      }
+                    >
+                      <SelectTrigger className={DIALOG_CONTROL_CLASS}>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {RANK_OPTIONS.map((item) => (
+                          <SelectItem key={item.value} value={String(item.value)}>
+                            {item.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </ShadSelect>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-slate-700">{t("status")}</Label>
+                    <ShadSelect
+                      value={formValues.vehicle_maintenance_status || "draft"}
+                      disabled
+                      onValueChange={(value) =>
+                        updateFormField("vehicle_maintenance_status", value)
+                      }
+                    >
+                      <SelectTrigger className={DIALOG_CONTROL_CLASS}>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {STATUS_OPTIONS.map((item) => (
+                          <SelectItem key={item.value} value={item.value}>
+                            {item.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </ShadSelect>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-slate-700">{t("distanceCovered")}</Label>
+                    <div className="relative">
+                      <ShadInput
+                        type="number"
+                        min={0}
+                        placeholder={t("distancePlaceholder")}
+                        value={formValues.vehicle_distance_covered ?? ""}
+                        onChange={(event) =>
+                          updateFormField(
+                            "vehicle_distance_covered",
+                            event.target.value === "" ? null : Number(event.target.value)
+                          )
+                        }
+                        className={`${DIALOG_CONTROL_CLASS} pr-12`}
+                      />
+                      <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+                        {t("km")}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-slate-700">Địa điểm sửa chữa</Label>
+                    <ShadInput
+                      className={DIALOG_CONTROL_CLASS}
+                      placeholder="Garage, xưởng sửa chữa, trạm bảo trì..."
+                      value={formValues.vehicle_maintenance_location || ""}
+                      onChange={(event) =>
+                        updateFormField("vehicle_maintenance_location", event.target.value)
+                      }
+                    />
+                  </div>
+
+                  <div className="md:col-span-2 space-y-2">
+                    <Label className="text-slate-700">{t("dateRange")}</Label>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <DateField
+                        label={t("dateRangePlaceholder.0") as string}
+                        placeholder={t("dateRangePlaceholder.0") as string}
+                        value={formValues.dateRange?.[0]}
+                        onChange={(value) => {
+                          if (!value) return;
+                          const current = formValues.dateRange ?? [value, value];
+                          updateFormField("dateRange", [value, current[1] ?? value]);
+                        }}
+                      />
+                      <DateField
+                        label={t("dateRangePlaceholder.1") as string}
+                        placeholder={t("dateRangePlaceholder.1") as string}
+                        value={formValues.dateRange?.[1]}
+                        onChange={(value) => {
+                          if (!value) return;
+                          const current = formValues.dateRange ?? [value, value];
+                          updateFormField("dateRange", [current[0] ?? value, value]);
+                        }}
+                      />
+                    </div>
+                    <FieldError message={formErrors.dateRange} />
+                  </div>
+                </div>
+              </DialogFormSection>
+
+              <DialogFormSection
+                icon={<ReceiptText className="size-5" />}
+                title="Hóa đơn và thanh toán"
+              >
+                <div className={DIALOG_GRID_CLASS}>
+                  <div className="space-y-2">
+                    <Label className="text-slate-700">Đơn vị sửa chữa</Label>
+                    <ShadInput
+                      className={DIALOG_CONTROL_CLASS}
+                      value={formValues.service_provider_name || ""}
+                      onChange={(event) =>
+                        updateFormField("service_provider_name", event.target.value)
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-slate-700">Địa chỉ đơn vị</Label>
+                    <ShadInput
+                      className={DIALOG_CONTROL_CLASS}
+                      value={formValues.service_provider_address || ""}
+                      onChange={(event) =>
+                        updateFormField("service_provider_address", event.target.value)
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-slate-700">Số hóa đơn</Label>
+                    <ShadInput
+                      className={DIALOG_CONTROL_CLASS}
+                      value={formValues.invoice_no || ""}
+                      onChange={(event) => updateFormField("invoice_no", event.target.value)}
+                    />
+                  </div>
+                  <DateField
+                    label="Ngày hóa đơn"
+                    placeholder="Chọn ngày hóa đơn"
+                    value={formValues.invoice_date}
+                    onChange={(value) => updateFormField("invoice_date", value)}
+                  />
+                  <div className="space-y-2">
+                    <Label className="text-slate-700">Tổng tiền</Label>
+                    <ShadInput
+                      type="text"
+                      inputMode="decimal"
+                      className={DIALOG_CONTROL_CLASS}
+                      placeholder="VD: 100.000.000 hoặc 10.000.500,50"
+                      value={totalAmountInput}
+                      onFocus={() => {
+                        isTotalAmountFocusedRef.current = true;
+                        setTotalAmountInput(formatVietnameseCurrencyValue(formValues.total_amount));
+                      }}
+                      onBlur={() => {
+                        isTotalAmountFocusedRef.current = false;
+                        setTotalAmountInput(formatVietnameseCurrencyValue(formValues.total_amount));
+                      }}
+                      onChange={(event) => handleTotalAmountChange(event.target.value)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-slate-700">Tiền tệ</Label>
+                    <ShadSelect
+                      value={formValues.currency || "VND"}
+                      onValueChange={(value) => updateFormField("currency", value)}
+                    >
+                      <SelectTrigger className={DIALOG_CONTROL_CLASS}>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="VND">VND</SelectItem>
+                      </SelectContent>
+                    </ShadSelect>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-slate-700">Trạng thái thanh toán</Label>
+                    <ShadSelect
+                      value={formValues.payment_status || "unpaid"}
+                      onValueChange={(value) => updateFormField("payment_status", value)}
+                    >
+                      <SelectTrigger className={DIALOG_CONTROL_CLASS}>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {PAYMENT_STATUS_OPTIONS.map((item) => (
+                          <SelectItem key={item.value} value={item.value}>
+                            {item.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </ShadSelect>
+                  </div>
+                  <DateField
+                    label="Hạn thanh toán"
+                    placeholder="Chọn hạn thanh toán"
+                    value={formValues.deadline_pay}
+                    onChange={(value) => updateFormField("deadline_pay", value)}
+                  />
+                </div>
+              </DialogFormSection>
+
+              <DialogFormSection icon={<Wrench className="size-5" />} title={t("sectionDetails")}>
+                <div className="space-y-2">
+                  <Label className="text-slate-700">{t("description")}</Label>
+                  <ShadTextarea
+                    rows={4}
+                    placeholder={t("descriptionPlaceholder")}
+                    className="min-h-32 bg-white"
+                    value={formValues.vehicle_maintenance_description || ""}
+                    onChange={(event) =>
+                      updateFormField("vehicle_maintenance_description", event.target.value)
+                    }
+                  />
+                  <FieldError message={formErrors.vehicle_maintenance_description} />
+                </div>
+              </DialogFormSection>
+
+              <DialogFormSection icon={<Camera className="size-5" />} title="Tài liệu và OCR">
+                <div className="mb-4 space-y-2">
+                  <Label className="text-slate-700">Nội dung OCR / bản dịch hóa đơn</Label>
+                  <ShadTextarea
+                    rows={5}
+                    className="min-h-36 bg-white"
+                    placeholder="Nội dung OCR sẽ được điền tự động khi tích hợp OCR provider; tài xế có thể chỉnh lại trước khi lưu."
+                    value={formValues.vehicle_maintenance_ocr_text || ""}
+                    onChange={(event) =>
+                      updateFormField("vehicle_maintenance_ocr_text", event.target.value)
+                    }
+                  />
+                </div>
+
+                <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50/80 p-5">
+                  <ShadInput
+                    ref={documentInputRef}
+                    id="vehicle-maintenance-document-upload"
+                    type="file"
+                    multiple
+                    accept="image/*,.pdf"
+                    className="hidden"
+                    onChange={(event) => {
+                      const files = Array.from(event.target.files || []);
+                      handleSelectedDocumentFiles(files);
+                      event.currentTarget.value = "";
+                    }}
+                  />
+                  <div className="flex flex-wrap items-center gap-3">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-11 bg-white"
+                      onClick={(event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        documentInputRef.current?.click();
+                      }}
+                    >
+                      <UploadCloud className="size-4" />
+                      Chọn ảnh/PDF hóa đơn
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-11 bg-white"
+                      disabled={pendingFiles.length === 0 || ocrLoading}
+                      onClick={() => runOcrForFiles(pendingFiles)}
+                    >
+                      {ocrLoading ? (
+                        <RefreshCw className="size-4 animate-spin" />
+                      ) : (
+                        <ScanText className="size-4" />
+                      )}
+                      {ocrLoading ? "Đang đọc hóa đơn" : "Đọc thông tin hóa đơn"}
+                    </Button>
+                    {ocrLoading && ocrFileName ? (
+                      <span className="text-sm text-slate-500">Đang xử lý: {ocrFileName}</span>
+                    ) : null}
+                  </div>
+
+                  {pendingFiles.length > 0 ? (
+                    <div className="mt-4 space-y-2">
+                      {pendingFiles.map((file, index) => (
+                        <div
+                          key={`${file.name}-${index}`}
+                          className="flex items-center justify-between gap-3 rounded-md border border-slate-200 bg-white px-4 py-3 text-sm"
+                        >
+                          <span className="truncate">{file.name}</span>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="iconSquare"
+                            onClick={() =>
+                              setPendingFiles((prev) => {
+                                markFormDirty();
+                                return prev.filter((_, i) => i !== index);
+                              })
+                            }
+                          >
+                            <Trash2 className="size-4 text-red-500" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+
+                  {currentDocuments.length > 0 ? (
+                    <div className="mt-4 space-y-2">
+                      {currentDocuments.map((document) => (
+                        <div
+                          key={document.vehicle_maintenance_document_id}
+                          className="flex items-center justify-between gap-3 rounded-md border border-slate-200 bg-white px-4 py-3 text-sm"
+                        >
+                          <a
+                            href={document.media?.media_url || "#"}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="truncate text-blue-600 hover:underline"
+                          >
+                            {document.media?.media_name || `Tài liệu #${document.media_id}`}
+                          </a>
+                          <div className="flex shrink-0 items-center gap-2">
+                            <Badge variant="outline" className="rounded-md">
+                              {document.ocr_status}
+                            </Badge>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="iconSquare"
+                              onClick={() => handleDeleteDocument(document)}
+                            >
+                              <Trash2 className="size-4 text-red-500" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              </DialogFormSection>
             </div>
           </div>
-        }
-        open={isModalVisible}
-        onCancel={handleCancel}
-        width={650}
-        styles={{
-          body: {
-            maxHeight: "75vh",
-            overflowY: "auto",
-            padding: "24px",
-          },
-        }}
-        footer={
-          <div className="flex justify-end gap-3 pt-4 border-t border-slate-200 mt-2">
+          <DialogFooter className="border-t bg-white px-8 py-5 md:px-10">
             <Button
               variant="outline"
               onClick={handleCancel}
@@ -453,108 +1524,24 @@ export default function TableVehicleMaintenances() {
             <Button
               onClick={handleSave}
               disabled={saving}
-              className={`min-w-[140px] text-white ${editingRecord ? "bg-amber-600 hover:bg-amber-700" : "bg-blue-600 hover:bg-blue-700"}`}
+              className={`min-w-[140px] text-white ${editingRecord ? "bg-amber-600 hover:bg-amber-700" : "bg-blue-600 hover:bg-blue-700"
+                }`}
             >
               {t("save")}
             </Button>
-          </div>
-        }
-        destroyOnClose
-      >
-        <div className="p-2">
-          <Form
-            form={form}
-            name="vehicle-maintenance-form"
-            layout="vertical"
-            autoComplete="off"
-            onValuesChange={onValuesChange}
-            className="space-y-6"
-          >
-            {/* Section: Maintenance Info */}
-            <div>
-              <div className="flex items-center gap-2 mb-4 pb-2 border-b border-slate-100">
-                <ClipboardList className="w-5 h-5 text-slate-500" />
-                <h3 className="text-base font-medium text-slate-800">{t("sectionInfo")}</h3>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
-                <Form.Item
-                  label={<span className="font-medium text-slate-700">{t("vehicle")}</span>}
-                  name="vehicle_id"
-                  rules={[{ required: true, message: t("requiredVehicle") }]}
-                  className="mb-0"
-                >
-                  <Select size="large" className="rounded-lg" placeholder={t("vehiclePlaceholder")}>
-                    {vehicles.map((v) => (
-                      <Select.Option key={v.vehicle_id} value={v.vehicle_id}>
-                        {v.vehicle_license_plate}{v.vehicle_name ? ` | ${v.vehicle_name}` : ''}
-                      </Select.Option>
-                    ))}
-                  </Select>
-                </Form.Item>
-
-                <Form.Item
-                  label={
-                    <span className="font-medium text-slate-700">{t("distanceCovered")}</span>
-                  }
-                  name="vehicle_distance_covered"
-                  className="mb-0"
-                >
-                  <InputNumber
-                    size="large"
-                    className="w-full rounded-lg"
-                    placeholder={t("distancePlaceholder")}
-                    min={0}
-                    formatter={(value) =>
-                      `${value}`.replace(/\B(?=(\d{3})+(?!\d))/g, ",")
-                    }
-                    addonAfter={t("km")}
-                  />
-                </Form.Item>
-
-                <div className="md:col-span-2">
-                  <Form.Item
-                    label={
-                      <span className="font-medium text-slate-700">{t("dateRange")}</span>
-                    }
-                    name="dateRange"
-                    rules={[{ required: true, message: t("requiredDateRange") }]}
-                    className="mb-0"
-                  >
-                    <RangePicker
-                      size="large"
-                      className="w-full rounded-lg"
-                      format="DD/MM/YYYY"
-                      placeholder={[t("dateRangePlaceholder.0") as string, t("dateRangePlaceholder.1") as string]}
-                    />
-                  </Form.Item>
-                </div>
-              </div>
-            </div>
-
-            {/* Section: Work Details */}
-            <div>
-              <div className="flex items-center gap-2 mb-4 pb-2 border-b border-slate-100">
-                <Wrench className="w-5 h-5 text-slate-500" />
-                <h3 className="text-base font-medium text-slate-800">{t("sectionDetails")}</h3>
-              </div>
-              <Form.Item
-                label={<span className="font-medium text-slate-700">{t("description")}</span>}
-                name="vehicle_maintenance_description"
-                rules={[{ required: true, message: t("requiredDescription") }]}
-                className="mb-0"
-              >
-                <TextArea
-                  rows={4}
-                  placeholder={t("descriptionPlaceholder")}
-                  className="rounded-lg"
-                  showCount
-                  maxLength={500}
-                />
-              </Form.Item>
-            </div>
-          </Form>
-        </div>
-      </Modal>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   );
+}
+
+function normalizeUploadedMedia(payload: UploadMediaResponse) {
+  return payload.data || payload;
+}
+
+function buildMediaName(file: File, maintenanceId: number, index: number) {
+  const base = file.name.replace(/\.[^/.]+$/, "");
+  const safeBase = base.replace(/[^a-zA-Z0-9_-]+/g, "_").replace(/^_+|_+$/g, "");
+  return `vehicle_maintenance_${maintenanceId}_${Date.now()}_${index}_${safeBase || "file"}`;
 }

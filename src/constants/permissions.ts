@@ -26,10 +26,13 @@ export const PERMISSIONS = {
   },
 
   VEHICLE_MAINTENANCES: {
-    VIEW: "view",
-    CREATE: "create",
-    UPDATE: "update",
-    DELETE: "delete",
+    VIEW: 'view',
+    CREATE: 'create',
+    UPDATE: 'update',
+    DELETE: 'delete',
+    SUBMIT: 'submit',
+    DISPATCH_REVIEW: 'dispatch_review',
+    PRODUCTION_APPROVE: 'production_approve',
   },
 
   VEHICLE_TYPES: {

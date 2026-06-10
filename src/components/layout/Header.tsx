@@ -5,13 +5,17 @@ import NotificationList from "@/components/NotificationList";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { SIDEBAR } from "@/constants/route";
 import { useSocket } from "@/context/socket-context";
 import { useAppSelector } from "@/hooks/use-app-selector";
+import type { Notification } from "@/types/notification";
 import { UserOutlined } from "@ant-design/icons";
 import { Avatar, Dropdown, Layout, MenuProps, Space } from "antd";
-import { BellRing, Volume2, VolumeX } from "lucide-react";
+import { BellRing, Volume2, VolumeX, Wrench } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 
 const { Header } = Layout;
 
@@ -29,12 +33,31 @@ const AppHeader: React.FC<AppHeaderProps> = ({
   onLogout,
 }) => {
   const t = useTranslations("Header");
+  const router = useRouter();
 
   const reduxUserName = useAppSelector((state: any) => state.auth.user?.fullName);
   const authLoading = useAppSelector((state: any) => state.auth.loading);
   const [localUserName, setLocalUserName] = useState<string | undefined>(userName);
-  const [isPopoverOpen, setIsPopoverOpen] = useState(false);
-  const { notifications, unreadCount, markAsRead, markAllAsRead, isMuted, toggleMute } = useSocket();
+  const [isGeneralPopoverOpen, setIsGeneralPopoverOpen] = useState(false);
+  const [isMaintenancePopoverOpen, setIsMaintenancePopoverOpen] = useState(false);
+  const { notifications, markAsRead, isMuted, toggleMute } = useSocket();
+
+  const maintenanceNotifications = useMemo(
+    () => notifications.filter((item) => item.type === "vehicle_maintenance"),
+    [notifications]
+  );
+  const generalNotifications = useMemo(
+    () => notifications.filter((item) => item.type !== "vehicle_maintenance"),
+    [notifications]
+  );
+  const generalUnreadCount = useMemo(
+    () => generalNotifications.filter((item) => !item.read).length,
+    [generalNotifications]
+  );
+  const maintenanceUnreadCount = useMemo(
+    () => maintenanceNotifications.filter((item) => !item.read).length,
+    [maintenanceNotifications]
+  );
 
   useEffect(() => {
     if (userName) {
@@ -62,6 +85,21 @@ const AppHeader: React.FC<AppHeaderProps> = ({
     { type: "divider" },
     { key: "logout", label: t("logout"), danger: true, onClick: onLogout },
   ];
+
+  const markNotificationsAsRead = (items: Notification[]) => {
+    for (const item of items) {
+      if (!item.read) markAsRead(item.id);
+    }
+  };
+
+  const handleMaintenanceNotificationClick = (notification: Notification) => {
+    markAsRead(notification.id);
+    setIsMaintenancePopoverOpen(false);
+    const maintenanceId = notification.vehicle_maintenance_id;
+    if (typeof maintenanceId === "number" || typeof maintenanceId === "string") {
+      router.push(`${SIDEBAR.VEHICLE_MAINTENANCES}/${maintenanceId}`);
+    }
+  };
 
   return (
     <Header
@@ -92,34 +130,80 @@ const AppHeader: React.FC<AppHeaderProps> = ({
           </div>
         ) : (
           <>
-            <Popover open={isPopoverOpen} onOpenChange={setIsPopoverOpen}>
-              <PopoverTrigger asChild>
-                <Button variant="ghost" size="icon" className="relative hover:bg-gray-300">
-                  <BellRing />
-                  {unreadCount > 0 && (
-                    <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 rounded-full bg-red-500 text-[10px] ring-2 ring-white">
-                      {unreadCount > 99 ? "99+" : unreadCount}
-                    </Badge>
-                  )}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent
-                align="end"
-                className="z-1000 p-0 w-[360px] shadow-lg border-none"
-                sideOffset={5}
-              >
-                <NotificationList notifications={notifications} onMarkAsRead={markAsRead} onMarkAllAsRead={markAllAsRead} />
-              </PopoverContent>
-            </Popover>
+            <TooltipProvider delayDuration={300}>
+              <Tooltip>
+                <Popover open={isMaintenancePopoverOpen} onOpenChange={setIsMaintenancePopoverOpen}>
+                  <TooltipTrigger asChild>
+                    <PopoverTrigger asChild>
+                      <Button variant="ghost" size="icon" className="relative hover:bg-gray-300">
+                        <Wrench />
+                        {maintenanceUnreadCount > 0 && (
+                          <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 rounded-full bg-blue-600 text-[10px] ring-2 ring-white">
+                            {maintenanceUnreadCount > 99 ? "99+" : maintenanceUnreadCount}
+                          </Badge>
+                        )}
+                      </Button>
+                    </PopoverTrigger>
+                  </TooltipTrigger>
+                  <PopoverContent
+                    align="end"
+                    className="z-1000 p-0 w-[360px] shadow-lg border-none"
+                    sideOffset={5}
+                  >
+                    <NotificationList
+                      notifications={maintenanceNotifications}
+                      onMarkAsRead={markAsRead}
+                      onMarkAllAsRead={() => markNotificationsAsRead(maintenanceNotifications)}
+                      onNotificationClick={handleMaintenanceNotificationClick}
+                    />
+                  </PopoverContent>
+                </Popover>
+                <TooltipContent>
+                  <p>Thông báo bảo trì xe</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+
+            <TooltipProvider delayDuration={300}>
+              <Tooltip>
+                <Popover open={isGeneralPopoverOpen} onOpenChange={setIsGeneralPopoverOpen}>
+                  <TooltipTrigger asChild>
+                    <PopoverTrigger asChild>
+                      <Button variant="ghost" size="icon" className="relative hover:bg-gray-300">
+                        <BellRing />
+                        {generalUnreadCount > 0 && (
+                          <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 rounded-full bg-red-500 text-[10px] ring-2 ring-white">
+                            {generalUnreadCount > 99 ? "99+" : generalUnreadCount}
+                          </Badge>
+                        )}
+                      </Button>
+                    </PopoverTrigger>
+                  </TooltipTrigger>
+                  <PopoverContent
+                    align="end"
+                    className="z-1000 p-0 w-[360px] shadow-lg border-none"
+                    sideOffset={5}
+                  >
+                    <NotificationList
+                      notifications={generalNotifications}
+                      onMarkAsRead={markAsRead}
+                      onMarkAllAsRead={() => markNotificationsAsRead(generalNotifications)}
+                    />
+                  </PopoverContent>
+                </Popover>
+                <TooltipContent>
+                  <p>Thông báo lốt xe</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
 
             {/* Voice notification mute toggle */}
             <Button
               variant="ghost"
               size="icon"
               onClick={toggleMute}
-              className={`relative hover:bg-gray-300 transition-colors ${
-                isMuted ? 'text-red-500' : 'text-slate-600'
-              }`}
+              className={`relative hover:bg-gray-300 transition-colors ${isMuted ? 'text-red-500' : 'text-slate-600'
+                }`}
               title={isMuted ? 'Bật âm thanh thông báo' : 'Tắt âm thanh thông báo'}
             >
               {isMuted ? <VolumeX className="h-5 w-5" /> : <Volume2 className="h-5 w-5" />}
