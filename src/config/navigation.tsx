@@ -1,27 +1,8 @@
 import { PERMISSIONS } from "@/constants/permissions";
 import { SIDEBAR } from "@/constants/route";
 import {
-  ArrowRightLeft,
-  Award,
-  Bot,
-  Briefcase,
-  BriefcaseBusiness,
-  Building2,
-  CalendarDays,
-  Car,
-  ClipboardList,
-  Fuel,
-  Gauge,
-  Layers,
-  Link2,
-  MapPin,
-  Package,
-  Settings2,
-  ShieldCheck,
-  UserCog,
-  UsersRound,
-  UtensilsCrossed,
-  Wrench,
+  ArrowRightLeft, Award, Bot, Briefcase, BriefcaseBusiness, Building2, CalendarDays, Car, ClipboardList,
+  Fuel, Gauge, Layers, Link2, MapPin, Package, Settings2, ShieldCheck, UserCog, UsersRound, UtensilsCrossed, Wrench
 } from "lucide-react";
 import React from "react";
 
