@@ -114,12 +114,12 @@ const RANK_OPTIONS = [
 ];
 
 const MAINTENANCE_LIST_TABS = [
+  { value: "all", label: "Tất cả" },
   { value: "mine", label: "Của tôi" },
-  { value: "submitted", label: "Chờ điều phối" },
-  { value: "reviewing", label: "Chờ quản lý sản xuất" },
+  { value: "submitted", label: "Chờ kiểm tra" },
+  { value: "reviewing", label: "Chờ phê duyệt" },
   { value: "approved", label: "Đã duyệt" },
   { value: "rejected", label: "Từ chối" },
-  { value: "all", label: "Tất cả" },
 ];
 
 type MaintenanceFormValues = {
@@ -375,7 +375,7 @@ export default function TableVehicleMaintenances() {
   const [formErrors, setFormErrors] = useState<MaintenanceFormErrors>({});
   const [assignedVehicleIds, setAssignedVehicleIds] = useState<number[]>([]);
   const [searchText, setSearchText] = useState("");
-  const [statusFilter, setStatusFilter] = useState("mine");
+  const [statusFilter, setStatusFilter] = useState("all");
   const [refreshDisabled, setRefreshDisabled] = useState(0);
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [isBulkDeleteOpen, setIsBulkDeleteOpen] = useState(false);
@@ -757,7 +757,7 @@ export default function TableVehicleMaintenances() {
   };
 
   const openDetailPage = (record: VehicleMaintenance) => {
-    router.push(`/vehicle-maintenances/${record.vehicle_maintenance_id}`);
+    router.push(`${SIDEBAR.VEHICLE_MAINTENANCES}/${record.vehicle_maintenance_id}`);
   };
 
   const handleDeleteDocument = async (document: VehicleMaintenanceDocument) => {
@@ -961,11 +961,7 @@ export default function TableVehicleMaintenances() {
                 className="h-10 pl-9 pr-9"
               />
               {searchText ? (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="absolute right-1 top-1/2 size-8 -translate-y-1/2"
+                <Button type="button" variant="ghost" size="icon" className="absolute right-1 top-1/2 size-8 -translate-y-1/2"
                   onClick={() => {
                     setSearchText("");
                     dispatch(setVehicleMaintenancePagination({ page: 1, limit }));

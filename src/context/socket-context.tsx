@@ -13,6 +13,11 @@ type SocketEventHandler = (eventName: string, ...args: unknown[]) => void;
 
 const VI_NOTIFICATION_LOCALE = "vi";
 const VI_NOTIFICATION_LANG = "vi-VN";
+
+function getNotificationOwnerId(notification: Notification): string | number {
+  const ownerId = notification.userId ?? notification.user_id ?? "all";
+  return typeof ownerId === "string" || typeof ownerId === "number" ? ownerId : "all";
+}
 const FEMALE_VOICE_KEYWORDS = ["hoaimy", "female", "woman", "girl", "nu"];
 
 function getVoiceIdentity(voice: SpeechSynthesisVoice): string {
@@ -212,7 +217,21 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   // Initialize socket managers (singleton)
   useEffect(() => {
-    if (!process.env.NEXT_PUBLIC_SOCKET_URL || !tokenState) return;
+    if (!tokenState) {
+      SocketManager.cleanupAll();
+      managerRef.current = null;
+      prevTokenRef.current = undefined;
+      setIsConnected(false);
+      setNotifications([]);
+      setStatusMap({
+        notifications: { isConnected: false, reconnectAttempts: 0 },
+      });
+      return;
+    }
+
+    if (!process.env.NEXT_PUBLIC_SOCKET_URL) {
+      return;
+    }
 
     // 1. Notifications namespace
     const managerNoti = SocketManager.getInstance('notifications', {
@@ -254,8 +273,9 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     // Lần đầu hoặc token đổi (refresh) -> reconnect/connect
     const prevToken = prevTokenRef.current;
     prevTokenRef.current = tokenState;
+    const notificationSocketAlreadyConnected = Boolean(managerNoti.getSocket()?.connected);
 
-    if (prevToken && prevToken !== tokenState) {
+    if ((prevToken && prevToken !== tokenState) || (!prevToken && notificationSocketAlreadyConnected)) {
       managerNoti.reconnect();
       if (managerUpdates.getSocket()) {
         managerUpdates.reconnect();
@@ -277,9 +297,6 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     const unsubscribes: Array<() => void> = [];
 
-    // Request all notifications on connect
-    manager.emit('notification:get_all');
-
     // notification:list
     unsubscribes.push(
       manager.on('notification:list', (payload: unknown) => {
@@ -299,6 +316,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       manager.on('notification:new', (payload: unknown) => {
         const validated = validateNotificationPayload(payload);
         if (!validated) return;
+
         const exists = notificationsRef.current.some((item) => item.id === validated.id);
         if (!exists) {
           speakNotification(validated);
@@ -424,6 +442,9 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       })
     );
 
+    // Request all notifications after listeners are ready.
+    manager.emit('notification:get_all');
+
     // Broadcast events to custom listeners (for DriverDisplay, etc.)
     unsubscribes.push(
       manager.onAny((eventName: string, ...args: unknown[]) => {
@@ -459,7 +480,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       if (!manager || !isConnected) return;
 
       manager.emit('notification:mark_read', {
-        user_id: 'all',
+        user_id: getNotificationOwnerId(target),
         noti_id: id,
       });
     },
@@ -480,7 +501,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     unreadItems.forEach((item) => {
       manager.emit('notification:mark_read', {
-        user_id: 'all',
+        user_id: getNotificationOwnerId(item),
         noti_id: item.id,
       });
     });
