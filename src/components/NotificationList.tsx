@@ -11,9 +11,15 @@ interface NotificationListProps {
   notifications: Notification[];
   onMarkAsRead: (id: string | number) => void;
   onMarkAllAsRead?: () => void;
+  onNotificationClick?: (notification: Notification) => void;
 }
 
-export default function NotificationList({ notifications, onMarkAsRead, onMarkAllAsRead }: NotificationListProps) {
+export default function NotificationList({
+  notifications,
+  onMarkAsRead,
+  onMarkAllAsRead,
+  onNotificationClick,
+}: NotificationListProps) {
   const t = useTranslations("Notification");
   const locale = useLocale();
   const dateLocale = locale.startsWith("en") ? "en-US" : "vi-VN";
@@ -135,7 +141,7 @@ export default function NotificationList({ notifications, onMarkAsRead, onMarkAl
             {filteredNotifications.map((item) => (
               <div
                 key={item.id}
-                onClick={() => onMarkAsRead(item.id)}
+                onClick={() => (onNotificationClick ? onNotificationClick(item) : onMarkAsRead(item.id))}
                 className={cn(
                   "group flex items-start gap-3 px-4 py-3 border-b last:border-0 transition-all cursor-pointer",
                   !item.read

@@ -748,7 +748,7 @@ export default function AdminDashboard() {
               </Tooltip>
 
               {/* LED Status */}
-              <Tooltip>
+              {/* <Tooltip>
                 <TooltipTrigger asChild>
                   <div className={`flex items-center gap-1.5 rounded-full px-2.5 py-1 border text-sm font-bold uppercase cursor-default ${isLedConnected
                     ? "border-emerald-200 text-emerald-700 animate-flash-bg"
@@ -764,7 +764,7 @@ export default function AdminDashboard() {
                 <TooltipContent>
                   <p>{isLedConnected ? 'Bảng LED đang kết nối' : 'Bảng LED đang mất kết nối'}</p>
                 </TooltipContent>
-              </Tooltip>
+              </Tooltip> */}
 
               {/* Network Status */}
               <Tooltip>

@@ -21,6 +21,7 @@ type NotificationLike = {
   timeout_threshold_minutes?: unknown;
   elapsed_minutes?: unknown;
   license_plate?: unknown;
+  vehicle_maintenance_id?: unknown;
 };
 
 const NOTIFICATION_TEXT_TEMPLATES: Record<NotificationLocale, Record<string, string>> = {
@@ -33,6 +34,10 @@ const NOTIFICATION_TEXT_TEMPLATES: Record<NotificationLocale, Record<string, str
     [NOTIFICATION_EVENTS.STATION_CHECKOUT_VEHICLE_CHECKIN_TIMEOUT_RESET]: "Đã làm mới lốt xe của xe {vehicle}",
     [NOTIFICATION_EVENTS.PARKING_IDLE_ENGINE_WARNING]: "Cảnh báo xe {vehicle} nổ máy trong bãi đã {elapsed_minutes} phút",
     [NOTIFICATION_EVENTS.PARKING_IDLE_ENGINE_WARNING_RESOLVED]: "Xe {vehicle} đã tắt máy trong bãi",
+    [NOTIFICATION_EVENTS.VEHICLE_MAINTENANCE_SUBMITTED]: "Phiếu bảo trì xe {vehicle} đã được gửi, cần kiểm tra.",
+    [NOTIFICATION_EVENTS.VEHICLE_MAINTENANCE_CONFIRMED]: "Phiếu bảo trì xe {vehicle} đã được xác nhận, chờ duyệt.",
+    [NOTIFICATION_EVENTS.VEHICLE_MAINTENANCE_REJECTED]: "Phiếu bảo trì xe {vehicle} đã bị từ chối, cần kiểm tra lại.",
+    [NOTIFICATION_EVENTS.VEHICLE_MAINTENANCE_APPROVED]: "Phiếu bảo trì xe {vehicle} đã được duyệt.",
   },
   en: {
     [NOTIFICATION_EVENTS.STATION_CHECK_IN]: "Vehicle {vehicle} checked in at {station}",
@@ -43,6 +48,10 @@ const NOTIFICATION_TEXT_TEMPLATES: Record<NotificationLocale, Record<string, str
     [NOTIFICATION_EVENTS.STATION_CHECKOUT_VEHICLE_CHECKIN_TIMEOUT_RESET]: "Vehicle {vehicle} slot has been reset",
     [NOTIFICATION_EVENTS.PARKING_IDLE_ENGINE_WARNING]: "Warning: Vehicle {vehicle} has been idling in the yard for {elapsed_minutes} minutes",
     [NOTIFICATION_EVENTS.PARKING_IDLE_ENGINE_WARNING_RESOLVED]: "Vehicle {vehicle} engine has been turned off in the yard",
+    [NOTIFICATION_EVENTS.VEHICLE_MAINTENANCE_SUBMITTED]: "Vehicle maintenance ticket for {vehicle} was submitted and needs review.",
+    [NOTIFICATION_EVENTS.VEHICLE_MAINTENANCE_CONFIRMED]: "Vehicle maintenance ticket for {vehicle} was confirmed and is waiting for approval.",
+    [NOTIFICATION_EVENTS.VEHICLE_MAINTENANCE_REJECTED]: "Vehicle maintenance ticket for {vehicle} was rejected and needs review.",
+    [NOTIFICATION_EVENTS.VEHICLE_MAINTENANCE_APPROVED]: "Vehicle maintenance ticket for {vehicle} was approved.",
   },
 };
 
@@ -68,11 +77,19 @@ function getStringValue(value: unknown, fallback = ""): string {
 
 function getVehicleDisplayValue(notification: NotificationLike): string {
   const licensePlate = getStringValue(notification.vehicle_license_plate) || getStringValue(notification.license_plate);
+  const type = getStringValue(notification.type);
+  const name = getStringValue(notification.vehicle_name);
+
+  if (type === "vehicle_maintenance") {
+    if (licensePlate && name) return `${licensePlate} | ${name}`;
+    if (licensePlate) return licensePlate;
+    if (name) return name;
+  }
+
   if (licensePlate) {
     return licensePlate.slice(-3);
   }
 
-  const name = getStringValue(notification.vehicle_name);
   if (name) {
     return name.slice(-3);
   }

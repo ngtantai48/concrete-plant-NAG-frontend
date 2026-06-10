@@ -269,10 +269,10 @@ function getWorkflowActionLabel(action: string) {
     create: "Tạo phiếu",
     update: "Cập nhật phiếu",
     submit: "Gửi phiếu",
-    dispatch_approve: "Điều phối xác nhận",
-    dispatch_reject: "Điều phối từ chối",
-    production_approve: "Quản lý sản xuất duyệt",
-    production_reject: "Quản lý sản xuất từ chối",
+    dispatch_approve: "Kiểm tra bảo trì đạt",
+    dispatch_reject: "Kiểm tra bảo trì từ chối",
+    production_approve: "Phê duyệt bảo trì",
+    production_reject: "Phê duyệt bảo trì từ chối",
     delete: "Xóa phiếu",
     bulk_delete: "Xóa hàng loạt",
   };
@@ -286,29 +286,29 @@ function getWorkflowDialogText(action: VehicleMaintenanceWorkflowAction) {
   > = {
     submit: {
       title: "Gửi phiếu bảo trì?",
-      description: "Phiếu sẽ chuyển sang trạng thái chờ điều phối/quản đốc kiểm tra.",
+      description: "Phiếu sẽ chuyển sang trạng thái chờ kiểm tra bảo trì.",
       confirmLabel: "Gửi phiếu",
     },
     dispatch_approve: {
-      title: "Xác nhận điều phối?",
-      description: "Phiếu sẽ được chuyển lên quản lý sản xuất để duyệt cuối.",
-      confirmLabel: "Xác nhận",
+      title: "Hoàn tất kiểm tra bảo trì?",
+      description: "Phiếu sẽ được chuyển sang bước phê duyệt bảo trì.",
+      confirmLabel: "Chuyển phê duyệt",
     },
     dispatch_reject: {
-      title: "Từ chối ở bước điều phối?",
-      description: "Phiếu sẽ trả về trạng thái từ chối để tài xế chỉnh sửa và gửi lại.",
-      confirmLabel: "Từ chối",
+      title: "Từ chối ở bước kiểm tra bảo trì?",
+      description: "Phiếu sẽ trả về trạng thái từ chối để người tạo phiếu chỉnh sửa và gửi lại.",
+      confirmLabel: "Từ chối kiểm tra",
       requiresReason: true,
     },
     production_approve: {
-      title: "Duyệt phiếu bảo trì?",
+      title: "Phê duyệt phiếu bảo trì?",
       description: "Phiếu sẽ được đánh dấu đã duyệt và khóa theo luồng xử lý hiện tại.",
-      confirmLabel: "Duyệt phiếu",
+      confirmLabel: "Phê duyệt",
     },
     production_reject: {
-      title: "Từ chối duyệt phiếu?",
+      title: "Từ chối phê duyệt phiếu?",
       description: "Phiếu sẽ trả về trạng thái từ chối để bổ sung hoặc chỉnh sửa.",
-      confirmLabel: "Từ chối",
+      confirmLabel: "Từ chối phê duyệt",
       requiresReason: true,
     },
   };
@@ -484,7 +484,7 @@ export default function VehicleMaintenanceDetail({ maintenanceId }: { maintenanc
   const router = useRouter();
   const dispatch = useAppDispatch();
   const { hasActionAccess } = usePermissions();
-  const { setDirty } = useNavigationStore();
+  const { isDirty, setDirty } = useNavigationStore();
   const documentInputRef = useRef<HTMLInputElement | null>(null);
   const maintenance = useAppSelector((state) => state.vehicleMaintenances.entities[maintenanceId]);
   const histories = useAppSelector(
@@ -505,6 +505,7 @@ export default function VehicleMaintenanceDetail({ maintenanceId }: { maintenanc
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [isEditing, setIsEditing] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [isLeaveDialogOpen, setIsLeaveDialogOpen] = useState(false);
   const [isOcrDetailOpen, setIsOcrDetailOpen] = useState(false);
   const [workflowAction, setWorkflowAction] = useState<VehicleMaintenanceWorkflowAction | null>(null);
   const [workflowNote, setWorkflowNote] = useState("");
@@ -520,6 +521,11 @@ export default function VehicleMaintenanceDetail({ maintenanceId }: { maintenanc
   const canEditMaintenance = canUpdate && ["draft", "rejected"].includes(currentStatus);
   const disabled = !isEditing || saving || deleting;
   const workflowDialogText = workflowAction ? getWorkflowDialogText(workflowAction) : null;
+
+  useEffect(() => {
+    setDirty(false);
+    return () => setDirty(false);
+  }, [maintenanceId, setDirty]);
 
   const refreshDetail = useCallback(async () => {
     if (!Number.isFinite(maintenanceId) || maintenanceId <= 0) return;
@@ -717,12 +723,26 @@ export default function VehicleMaintenanceDetail({ maintenanceId }: { maintenanc
       await dispatch(deleteVehicleMaintenanceThunk(maintenanceId)).unwrap();
       setDirty(false);
       toast.success("Đã xóa phiếu bảo trì", { position: "top-right" });
-      router.push("/vehicle-maintenances");
+      router.push(SIDEBAR.VEHICLE_MAINTENANCES);
     } catch (error) {
       const message =
         (error as any)?.response?.data?.message || (error as Error)?.message || "Xóa phiếu bảo trì thất bại";
       toast.error("Xóa phiếu bảo trì thất bại", { description: message });
     }
+  };
+
+  const handleBackToList = () => {
+    if (isDirty) {
+      setIsLeaveDialogOpen(true);
+      return;
+    }
+    router.push(SIDEBAR.VEHICLE_MAINTENANCES);
+  };
+
+  const confirmLeaveToList = () => {
+    setDirty(false);
+    setIsLeaveDialogOpen(false);
+    router.push(SIDEBAR.VEHICLE_MAINTENANCES);
   };
 
   const openWorkflowDialog = (action: VehicleMaintenanceWorkflowAction) => {
@@ -815,7 +835,7 @@ export default function VehicleMaintenanceDetail({ maintenanceId }: { maintenanc
         <div className="flex flex-col items-center gap-4 text-center">
           <Wrench className="size-10 text-slate-300" />
           <p className="text-lg font-semibold text-slate-800">Không tìm thấy phiếu bảo trì</p>
-          <Button variant="outline" onClick={() => router.push("/vehicle-maintenances")}>
+          <Button variant="outline" onClick={() => router.push(SIDEBAR.VEHICLE_MAINTENANCES)}>
             <ArrowLeft className="size-4" />
             Quay lại
           </Button>
@@ -830,7 +850,7 @@ export default function VehicleMaintenanceDetail({ maintenanceId }: { maintenanc
         <CardHeader className="border-b bg-white px-6 py-6 md:px-8">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="flex flex-row items-center gap-7">
-              <Button size="iconCircle" variant="outline" onClick={() => router.push("/vehicle-maintenances")}>
+              <Button size="iconCircle" variant="outline" onClick={handleBackToList}>
                 <ArrowLeft className="size-4" />
               </Button>
               <div>
@@ -878,7 +898,7 @@ export default function VehicleMaintenanceDetail({ maintenanceId }: { maintenanc
                   onClick={() => openWorkflowDialog("dispatch_approve")}
                 >
                   <CheckCircle2 className="size-4" />
-                  Chuyển quản lý SX
+                  Chuyển phê duyệt
                 </Button>
               ) : null}
               {workflowActions.includes("production_approve") ? (
@@ -888,7 +908,7 @@ export default function VehicleMaintenanceDetail({ maintenanceId }: { maintenanc
                   onClick={() => openWorkflowDialog("production_approve")}
                 >
                   <CheckCircle2 className="size-4" />
-                  Duyệt
+                  Phê duyệt
                 </Button>
               ) : null}
               {workflowActions.includes("dispatch_reject") ? (
@@ -899,7 +919,7 @@ export default function VehicleMaintenanceDetail({ maintenanceId }: { maintenanc
                   onClick={() => openWorkflowDialog("dispatch_reject")}
                 >
                   <XCircle className="size-4" />
-                  Từ chối
+                  Từ chối kiểm tra
                 </Button>
               ) : null}
               {workflowActions.includes("production_reject") ? (
@@ -910,7 +930,7 @@ export default function VehicleMaintenanceDetail({ maintenanceId }: { maintenanc
                   onClick={() => openWorkflowDialog("production_reject")}
                 >
                   <XCircle className="size-4" />
-                  Từ chối
+                  Từ chối phê duyệt
                 </Button>
               ) : null}
               {canEditMaintenance && !isEditing ? (
@@ -1507,6 +1527,29 @@ export default function VehicleMaintenanceDetail({ maintenanceId }: { maintenanc
               }}
             >
               {deleting ? "Đang xóa..." : "Xóa phiếu"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={isLeaveDialogOpen} onOpenChange={setIsLeaveDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Bạn chưa lưu thay đổi</AlertDialogTitle>
+            <AlertDialogDescription>
+              Phiếu bảo trì đang có thay đổi chưa được lưu. Nếu quay lại danh sách, các thay đổi này sẽ bị mất.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              onClick={() => {
+                setIsLeaveDialogOpen(false);
+              }}
+            >
+              Ở lại
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={confirmLeaveToList}>
+              Rời khỏi trang
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
