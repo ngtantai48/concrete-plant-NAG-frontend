@@ -1,15 +1,6 @@
 "use client";
 
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Calendar as CalendarPicker } from "@/components/ui/calendar";
@@ -17,21 +8,8 @@ import { Card, CardContent, CardFooter, CardHeader } from "@/components/ui/card"
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, } from "@/components/ui/dialog";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import VehicleMaintenanceDiscussion from "@/components/features/vehicle-maintenance-manage/VehicleMaintenanceDiscussion";
 import { PERMISSIONS } from "@/constants/permissions";
@@ -39,53 +17,20 @@ import { SIDEBAR } from "@/constants/route";
 import { useNavigationStore } from "@/hooks/use-navigation-store";
 import { usePermissions } from "@/hooks/use-permissions";
 import { useAppDispatch, useAppSelector } from "@/hooks/use-app-selector";
-import {
-  formatVietnameseCurrencyValue,
-  normalizeVietnameseCurrencyInput,
-  parseVietnameseCurrencyInput,
-} from "@/lib/currency";
+import { formatVietnameseCurrencyValue, normalizeVietnameseCurrencyInput, parseVietnameseCurrencyInput } from "@/lib/currency";
 import mediaApi from "@/services/media.service";
 import ocrApi from "@/services/ocr.service";
 import vehicleMaintenanceApi from "@/services/vehicle-maintenance.service";
-import {
-  deleteVehicleMaintenanceThunk,
-  fetchVehicleMaintenanceHistoryThunk,
-  fetchVehicleMaintenanceById,
-  runVehicleMaintenanceWorkflowThunk,
-  updateVehicleMaintenanceThunk,
-} from "@/store/slices/vehicleMaintenanceSlice";
+import vtrackingApi from "@/services/vtracking.service";
+import { deleteVehicleMaintenanceThunk, fetchVehicleMaintenanceHistoryThunk, fetchVehicleMaintenanceById, runVehicleMaintenanceWorkflowThunk, updateVehicleMaintenanceThunk } from "@/store/slices/vehicleMaintenanceSlice";
 import { fetchVehicleNameOptions } from "@/store/slices/vehicleSlice";
-import type {
-  Vehicle,
-  VehicleMaintenance,
-  VehicleMaintenanceDocument,
-  VehicleMaintenanceHistory,
-  VehicleMaintenanceWorkflowAction,
-} from "@/types/vehicle";
+import type { Vehicle, VehicleMaintenance, VehicleMaintenanceDocument, VehicleMaintenanceHistory, VehicleMaintenanceWorkflowAction } from "@/types/vehicle";
+import type { VtrackingVehicle } from "@/types/vtracking";
 import { Image, Popconfirm, Spin, Tooltip } from "antd";
 import dayjs from "dayjs";
-import {
-  ArrowLeft,
-  Calendar as CalendarIcon,
-  Camera,
-  CheckCircle2,
-  ClipboardList,
-  FileText,
-  History,
-  Pencil,
-  ReceiptText,
-  RefreshCw,
-  Save,
-  ScanText,
-  Send,
-  Trash2,
-  UploadCloud,
-  Wrench,
-  X,
-  XCircle,
-} from "lucide-react";
+import { ArrowLeft, Calendar as CalendarIcon, Camera, CheckCircle2, ClipboardList, FileText, History, Pencil, ReceiptText, RefreshCw, Save, ScanText, Send, Trash2, UploadCloud, Wrench, X, XCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { type ReactNode, useCallback, useEffect, useRef, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 const CONTROL_CLASS = "!h-11 min-h-11 w-full bg-white px-3 py-2 text-sm disabled:bg-slate-50";
@@ -121,6 +66,12 @@ const RANK_OPTIONS = [
   { value: 3, label: "Cao" },
   { value: 4, label: "Rất nghiêm trọng" },
 ];
+
+const VTRACKING_DISTANCE_KEY = "distance";
+
+const EMPTY_HISTORIES: VehicleMaintenanceHistory[] = [];
+
+type VehicleOption = Pick<Vehicle, "vehicle_id" | "vehicle_license_plate" | "vehicle_name">;
 
 type MaintenanceFormValues = {
   vehicle_id: number;
@@ -192,12 +143,13 @@ function DateField({
   error?: string;
   onChange: (value: dayjs.Dayjs | null) => void;
 }) {
+  const [isOpen, setIsOpen] = useState(false);
   const selectedDate = value?.isValid() ? value.toDate() : undefined;
 
   return (
     <div className="space-y-2">
       <Label className="text-slate-700">{label}</Label>
-      <Popover>
+      <Popover open={isOpen} onOpenChange={setIsOpen}>
         <PopoverTrigger asChild>
           <Button
             type="button"
@@ -214,7 +166,10 @@ function DateField({
           <CalendarPicker
             mode="single"
             selected={selectedDate}
-            onSelect={(date) => onChange(date ? dayjs(date) : null)}
+            onSelect={(date) => {
+              onChange(date ? dayjs(date) : null);
+              if (date) setIsOpen(false);
+            }}
             captionLayout="dropdown"
           />
         </PopoverContent>
@@ -224,7 +179,70 @@ function DateField({
   );
 }
 
-function getVehicleLabelById(vehicles: Vehicle[], vehicleId: number) {
+function normalizeVehicleIdentity(value?: string | null) {
+  return String(value ?? "")
+    .trim()
+    .toUpperCase()
+    .replace(/[\s._-]/g, "");
+}
+
+function isSameVehicleIdentity(left?: string | null, right?: string | null) {
+  const normalizedLeft = normalizeVehicleIdentity(left);
+  const normalizedRight = normalizeVehicleIdentity(right);
+  if (!normalizedLeft || !normalizedRight) return false;
+  if (normalizedLeft === normalizedRight) return true;
+
+  return (
+    normalizedLeft.length >= 5 &&
+    normalizedRight.length >= 5 &&
+    (normalizedLeft.includes(normalizedRight) || normalizedRight.includes(normalizedLeft))
+  );
+}
+
+function parseVtrackingNumericValue(value: unknown) {
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  if (typeof value !== "string") return null;
+
+  const compactValue = value.trim().replace(/\s/g, "");
+  if (!compactValue) return null;
+
+  const dotCount = (compactValue.match(/\./g) || []).length;
+  const normalized = compactValue.includes(",")
+    ? compactValue.replace(/\./g, "").replace(",", ".")
+    : dotCount > 1
+      ? compactValue.replace(/\./g, "")
+      : compactValue.replace(/,/g, "");
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function getVtrackingDistanceKm(vehicle?: VtrackingVehicle | null) {
+  const attr = vehicle?.attributes?.find((item) => item.attribute_key === VTRACKING_DISTANCE_KEY);
+  const rawValue = parseVtrackingNumericValue(attr?.value);
+  if (rawValue === null || rawValue < 0) return null;
+
+  return rawValue;
+}
+
+function formatVtrackingDistanceValue(value?: number | null) {
+  if (value === undefined || value === null || !Number.isFinite(Number(value))) return "";
+  return String(Number(value));
+}
+
+function findMatchingVtrackingVehicle(vtrackingVehicles: VtrackingVehicle[], vehicle?: VehicleOption | null) {
+  if (!vehicle) return null;
+
+  return (
+    vtrackingVehicles.find(
+      (item) =>
+        isSameVehicleIdentity(item.license_plate, vehicle.vehicle_license_plate) ||
+        isSameVehicleIdentity(item.vehicle_name, vehicle.vehicle_name) ||
+        isSameVehicleIdentity(item.vehicle_name, vehicle.vehicle_license_plate)
+    ) ?? null
+  );
+}
+
+function getVehicleLabelById(vehicles: VehicleOption[], vehicleId: number) {
   const found = vehicles.find((v) => v.vehicle_id === vehicleId);
   if (!found) return `#${vehicleId}`;
   return found.vehicle_license_plate
@@ -232,7 +250,7 @@ function getVehicleLabelById(vehicles: Vehicle[], vehicleId: number) {
     : `#${vehicleId}`;
 }
 
-function getVehicleLabel(maintenance: VehicleMaintenance, vehicles: Vehicle[]) {
+function getVehicleLabel(maintenance: VehicleMaintenance, vehicles: VehicleOption[]) {
   const vehicle = maintenance.vehicle;
   if (vehicle?.vehicle_license_plate) {
     return `${vehicle.vehicle_license_plate}${vehicle.vehicle_name ? ` | ${vehicle.vehicle_name}` : ""}`;
@@ -368,7 +386,7 @@ function buildPayload(values: MaintenanceFormValues): Partial<VehicleMaintenance
       values.dateRange?.[0]?.toISOString() || new Date().toISOString(),
     vehicle_maintenance_to_datetime: values.dateRange?.[1]?.toISOString() || null,
     vehicle_maintenance_location: values.vehicle_maintenance_location || null,
-    vehicle_distance_covered: values.vehicle_distance_covered || null,
+    vehicle_distance_covered: values.vehicle_distance_covered ?? null,
     vehicle_maintenance_description: values.vehicle_maintenance_description || null,
     vehicle_maintenance_type: values.vehicle_maintenance_type || "maintenance",
     vehicle_maintenance_rank: values.vehicle_maintenance_rank || 1,
@@ -487,12 +505,8 @@ export default function VehicleMaintenanceDetail({ maintenanceId }: { maintenanc
   const { isDirty, setDirty } = useNavigationStore();
   const documentInputRef = useRef<HTMLInputElement | null>(null);
   const maintenance = useAppSelector((state) => state.vehicleMaintenances.entities[maintenanceId]);
-  const histories = useAppSelector(
-    (state) => state.vehicleMaintenances.historiesById[maintenanceId] || []
-  );
-  const { deleting, detailLoading, historyLoading, saving, workflowLoading } = useAppSelector(
-    (state) => state.vehicleMaintenances
-  );
+  const histories = useAppSelector((state) => state.vehicleMaintenances.historiesById[maintenanceId] || EMPTY_HISTORIES);
+  const { deleting, detailLoading, historyLoading, saving, workflowLoading } = useAppSelector((state) => state.vehicleMaintenances);
   const {
     nameOptions: vehicles,
     nameOptionsLoaded: vehicleOptionsLoaded,
@@ -511,8 +525,10 @@ export default function VehicleMaintenanceDetail({ maintenanceId }: { maintenanc
   const [workflowNote, setWorkflowNote] = useState("");
   const [ocrLoading, setOcrLoading] = useState(false);
   const [ocrFileName, setOcrFileName] = useState<string | null>(null);
+  const [distanceLoading, setDistanceLoading] = useState(false);
   const [totalAmountInput, setTotalAmountInput] = useState("");
   const isTotalAmountFocusedRef = useRef(false);
+  const vtrackingDistanceRequestIdRef = useRef(0);
 
   const canUpdate = hasActionAccess(SIDEBAR.VEHICLE_MAINTENANCES, PERMISSIONS.VEHICLE_MAINTENANCES.UPDATE);
   const canDelete = hasActionAccess(SIDEBAR.VEHICLE_MAINTENANCES, PERMISSIONS.VEHICLE_MAINTENANCES.DELETE);
@@ -521,6 +537,22 @@ export default function VehicleMaintenanceDetail({ maintenanceId }: { maintenanc
   const canEditMaintenance = canUpdate && ["draft", "rejected"].includes(currentStatus);
   const disabled = !isEditing || saving || deleting;
   const workflowDialogText = workflowAction ? getWorkflowDialogText(workflowAction) : null;
+  const vehicleSelectOptions = useMemo<VehicleOption[]>(() => {
+    const selectedVehicleId = formValues?.vehicle_id;
+    if (!selectedVehicleId || vehicles.some((vehicle) => vehicle.vehicle_id === selectedVehicleId)) {
+      return vehicles;
+    }
+
+    const detailVehicle = maintenance?.vehicle;
+    return [
+      {
+        vehicle_id: selectedVehicleId,
+        vehicle_license_plate: detailVehicle?.vehicle_license_plate || `#${selectedVehicleId}`,
+        vehicle_name: detailVehicle?.vehicle_name ?? null,
+      },
+      ...vehicles,
+    ];
+  }, [formValues?.vehicle_id, maintenance?.vehicle, vehicles]);
 
   useEffect(() => {
     setDirty(false);
@@ -532,7 +564,7 @@ export default function VehicleMaintenanceDetail({ maintenanceId }: { maintenanc
     try {
       await dispatch(fetchVehicleMaintenanceById(maintenanceId)).unwrap();
     } catch {
-      toast.error("Không tải được chi tiết phiếu bảo trì", { position: "top-right" });
+      toast.error("Không tải được chi tiết phiếu bảo trì");
     }
   }, [dispatch, maintenanceId]);
 
@@ -541,7 +573,7 @@ export default function VehicleMaintenanceDetail({ maintenanceId }: { maintenanc
     try {
       await dispatch(fetchVehicleMaintenanceHistoryThunk(maintenanceId)).unwrap();
     } catch {
-      toast.error("Không tải được lịch sử xử lý phiếu", { position: "top-right" });
+      toast.error("Không tải được lịch sử xử lý phiếu");
     }
   }, [dispatch, maintenanceId]);
 
@@ -557,7 +589,7 @@ export default function VehicleMaintenanceDetail({ maintenanceId }: { maintenanc
     if (vehicleOptionsLoaded || vehicleOptionsLoading) return;
     const result = await dispatch(fetchVehicleNameOptions({ limit: 1000 }));
     if (fetchVehicleNameOptions.rejected.match(result)) {
-      toast.error("Không tải được danh sách xe", { position: "top-right" });
+      toast.error("Không tải được danh sách xe");
     }
   }, [dispatch, vehicleOptionsLoaded, vehicleOptionsLoading]);
 
@@ -579,6 +611,66 @@ export default function VehicleMaintenanceDetail({ maintenanceId }: { maintenanc
     },
     [setDirty]
   );
+
+  const fetchDistanceFromVtracking = useCallback(
+    async (vehicleId: number, vehicleOverride?: VehicleOption | null) => {
+      const selectedVehicle = vehicleOverride ?? vehicleSelectOptions.find((item) => item.vehicle_id === vehicleId);
+      if (!selectedVehicle) {
+        toast.warning("Chưa tìm thấy phương tiện trong danh sách xe.");
+        return;
+      }
+
+      const requestId = vtrackingDistanceRequestIdRef.current + 1;
+      vtrackingDistanceRequestIdRef.current = requestId;
+      setDistanceLoading(true);
+
+      try {
+        const response = await vtrackingApi.fetchVehicles();
+        if (vtrackingDistanceRequestIdRef.current === requestId) {
+          const matchedVehicle = findMatchingVtrackingVehicle(response.data?.vehicles || [], selectedVehicle);
+          const distanceKm = getVtrackingDistanceKm(matchedVehicle);
+
+          if (distanceKm === null) {
+            toast.warning("Không có dữ liệu số km từ VTracking cho phương tiện này.");
+          } else {
+            setFormValues((prev) =>
+              prev?.vehicle_id === vehicleId ? { ...prev, vehicle_distance_covered: distanceKm } : prev
+            );
+            setDirty(true);
+            toast.success("Đã cập nhật số km từ VTracking.");
+          }
+        }
+      } catch {
+        if (vtrackingDistanceRequestIdRef.current === requestId) {
+          toast.error("Không lấy được số km từ VTracking.");
+        }
+      } finally {
+        if (vtrackingDistanceRequestIdRef.current === requestId) {
+          setDistanceLoading(false);
+        }
+      }
+    },
+    [setDirty, vehicleSelectOptions]
+  );
+
+  const handleVehicleChange = useCallback(
+    (value: string) => {
+      const vehicleId = Number(value);
+      const selectedVehicle = vehicleSelectOptions.find((item) => item.vehicle_id === vehicleId);
+      setFormValues((prev) =>
+        prev ? { ...prev, vehicle_id: vehicleId, vehicle_distance_covered: null } : prev
+      );
+      setFormErrors((prev) => ({ ...prev, vehicle_id: undefined }));
+      setDirty(true);
+      void fetchDistanceFromVtracking(vehicleId, selectedVehicle);
+    },
+    [fetchDistanceFromVtracking, setDirty, vehicleSelectOptions]
+  );
+
+  const handleRefreshDistance = useCallback(() => {
+    if (!formValues?.vehicle_id) return;
+    void fetchDistanceFromVtracking(formValues.vehicle_id);
+  }, [fetchDistanceFromVtracking, formValues?.vehicle_id]);
 
   const handleTotalAmountChange = useCallback(
     (value: string) => {
@@ -639,9 +731,9 @@ export default function VehicleMaintenanceDetail({ maintenanceId }: { maintenanc
 
         if (textBlocks.length > 0) {
           replaceOcrText(textBlocks.join("\n\n"));
-          toast.success("OCR đã đọc xong hóa đơn", { position: "top-right" });
+          toast.success("OCR đã đọc xong hóa đơn");
         } else {
-          toast.warning("OCR không trả về nội dung để điền", { position: "top-right" });
+          toast.warning("OCR không trả về nội dung để điền");
         }
       } catch (error) {
         const message = (error as Error)?.message || "OCR hóa đơn thất bại";
@@ -708,9 +800,10 @@ export default function VehicleMaintenanceDetail({ maintenanceId }: { maintenanc
       setFormErrors({});
       isTotalAmountFocusedRef.current = false;
       setTotalAmountInput(formatVietnameseCurrencyValue(formValues.total_amount));
+      setDistanceLoading(false);
       setIsEditing(false);
       setDirty(false);
-      toast.success("Đã lưu phiếu bảo trì", { position: "top-right" });
+      toast.success("Đã lưu phiếu bảo trì");
     } catch (error) {
       const message =
         (error as any)?.response?.data?.message || (error as Error)?.message || "Lưu phiếu bảo trì thất bại";
@@ -722,7 +815,7 @@ export default function VehicleMaintenanceDetail({ maintenanceId }: { maintenanc
     try {
       await dispatch(deleteVehicleMaintenanceThunk(maintenanceId)).unwrap();
       setDirty(false);
-      toast.success("Đã xóa phiếu bảo trì", { position: "top-right" });
+      toast.success("Đã xóa phiếu bảo trì");
       router.push(SIDEBAR.VEHICLE_MAINTENANCES);
     } catch (error) {
       const message =
@@ -760,7 +853,7 @@ export default function VehicleMaintenanceDetail({ maintenanceId }: { maintenanc
     if (!workflowAction || !workflowDialogText) return;
     const note = workflowNote.trim();
     if (workflowDialogText.requiresReason && !note) {
-      toast.error("Vui lòng nhập lý do từ chối", { position: "top-right" });
+      toast.error("Vui lòng nhập lý do từ chối");
       return;
     }
 
@@ -778,7 +871,7 @@ export default function VehicleMaintenanceDetail({ maintenanceId }: { maintenanc
       setIsEditing(false);
       setDirty(false);
       closeWorkflowDialog();
-      toast.success("Đã cập nhật trạng thái phiếu bảo trì", { position: "top-right" });
+      toast.success("Đã cập nhật trạng thái phiếu bảo trì");
     } catch (error) {
       const message =
         (error as any)?.response?.data?.message ||
@@ -795,7 +888,7 @@ export default function VehicleMaintenanceDetail({ maintenanceId }: { maintenanc
         prev.filter((item) => item.vehicle_maintenance_document_id !== document.vehicle_maintenance_document_id)
       );
       await refreshDetail();
-      toast.success("Đã xóa tài liệu", { position: "top-right" });
+      toast.success("Đã xóa tài liệu");
     } catch (error) {
       const message =
         (error as any)?.response?.data?.message || (error as Error)?.message || "Xóa tài liệu thất bại";
@@ -817,6 +910,8 @@ export default function VehicleMaintenanceDetail({ maintenanceId }: { maintenanc
     setFormErrors({});
     isTotalAmountFocusedRef.current = false;
     setTotalAmountInput(formatVietnameseCurrencyValue(maintenance?.total_amount));
+    vtrackingDistanceRequestIdRef.current += 1;
+    setDistanceLoading(false);
     setIsEditing(false);
     setDirty(false);
   };
@@ -967,13 +1062,15 @@ export default function VehicleMaintenanceDetail({ maintenanceId }: { maintenanc
                     <Select
                       disabled={disabled}
                       value={formValues.vehicle_id ? String(formValues.vehicle_id) : undefined}
-                      onValueChange={(value) => updateFormField("vehicle_id", Number(value))}
+                      onValueChange={handleVehicleChange}
                     >
                       <SelectTrigger className={CONTROL_CLASS} aria-invalid={Boolean(formErrors.vehicle_id)}>
-                        <SelectValue placeholder="Chọn xe" />
+                        <SelectValue placeholder="Chọn xe">
+                          {formValues.vehicle_id ? getVehicleLabelById(vehicleSelectOptions, formValues.vehicle_id) : undefined}
+                        </SelectValue>
                       </SelectTrigger>
                       <SelectContent className="max-h-92 overflow-y-auto">
-                        {vehicles.map((vehicle) => (
+                        {vehicleSelectOptions.map((vehicle) => (
                           <SelectItem key={vehicle.vehicle_id} value={String(vehicle.vehicle_id)}>
                             {vehicle.vehicle_license_plate}
                             {vehicle.vehicle_name ? ` | ${vehicle.vehicle_name}` : ""}
@@ -1046,19 +1143,33 @@ export default function VehicleMaintenanceDetail({ maintenanceId }: { maintenanc
 
                   <div className="space-y-2">
                     <Label className="text-slate-700">Số km đã chạy</Label>
-                    <Input
-                      disabled={disabled}
-                      type="number"
-                      min={0}
-                      className={CONTROL_CLASS}
-                      value={formValues.vehicle_distance_covered ?? ""}
-                      onChange={(event) =>
-                        updateFormField(
-                          "vehicle_distance_covered",
-                          event.target.value === "" ? null : Number(event.target.value)
-                        )
-                      }
-                    />
+                    <div className="relative">
+                      <Input
+                        disabled={!isEditing || saving || deleting}
+                        readOnly
+                        inputMode="decimal"
+                        className={`${CONTROL_CLASS} ${isEditing ? "!pr-24 cursor-default bg-slate-50" : "!pr-12"}`}
+                        value={formatVtrackingDistanceValue(formValues.vehicle_distance_covered)}
+                      />
+                      <div className="absolute inset-y-0 right-2 flex items-center gap-1">
+                        <span className="border-r border-slate-200 pr-2 text-sm font-medium text-slate-500">Km</span>
+                        {isEditing ? (
+                          <Tooltip title="Cập nhật số km từ VTracking">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="size-7 rounded-sm text-slate-500 hover:text-blue-600"
+                              disabled={distanceLoading || saving || deleting || !formValues.vehicle_id}
+                              onClick={handleRefreshDistance}
+                            >
+                              <RefreshCw className={`size-4 ${distanceLoading ? "animate-spin" : ""}`} />
+                            </Button>
+                          </Tooltip>
+                        ) : null}
+
+                      </div>
+                    </div>
                   </div>
 
                   <div className="space-y-2">
@@ -1367,6 +1478,7 @@ export default function VehicleMaintenanceDetail({ maintenanceId }: { maintenanc
                     <div className="space-y-0">
                       {histories.map((item, index) => {
                         const actorRole = getHistoryActorRole(item);
+                        const hasFromStatus = Boolean(item.from_status);
                         return (
                           <div
                             key={item.vehicle_maintenance_history_id}
@@ -1385,13 +1497,17 @@ export default function VehicleMaintenanceDetail({ maintenanceId }: { maintenanc
                                     {getWorkflowActionLabel(item.action)}
                                   </p>
                                   <div className="flex items-center gap-1.5 text-xs">
-                                    <Badge
-                                      variant="outline"
-                                      className={`rounded-md px-2 py-0.5 font-medium ${getHistoryStatusBadgeClass(item.from_status)}`}
-                                    >
-                                      {getStatusLabel(item.from_status)}
-                                    </Badge>
-                                    <span className="text-slate-400">{"->"}</span>
+                                    {hasFromStatus ? (
+                                      <>
+                                        <Badge
+                                          variant="outline"
+                                          className={`rounded-md px-2 py-0.5 font-medium ${getHistoryStatusBadgeClass(item.from_status)}`}
+                                        >
+                                          {getStatusLabel(item.from_status)}
+                                        </Badge>
+                                        <span className="text-slate-400">{"->"}</span>
+                                      </>
+                                    ) : null}
                                     <Badge
                                       variant="outline"
                                       className={`rounded-md px-2 py-0.5 font-medium ${getHistoryStatusBadgeClass(item.to_status)}`}
