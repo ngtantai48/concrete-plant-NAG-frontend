@@ -991,7 +991,8 @@
     "applySuccess": "Đã áp dụng phân loại AI",
     "applyFailed": "Không thể áp dụng phân loại AI",
     "regeneratePending": "AI đang phân tích, vui lòng đợi",
-    "regenerateLimited": "Vừa sinh lại xong, thử lại sau 1 phút"
+    "regenerateLimited": "Vừa sinh lại xong, thử lại sau 1 phút",
+    "regenerateFailed": "Không thể sinh lại phân tích"
   },
   "MealCheck": {
     "title": "Cơm ca",

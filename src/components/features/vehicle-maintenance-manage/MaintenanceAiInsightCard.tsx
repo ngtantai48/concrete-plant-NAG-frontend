@@ -69,7 +69,7 @@ export default function MaintenanceAiInsightCard({
       );
       if (code.includes("PENDING")) toast.info(t("regeneratePending"));
       else if (code.includes("RATE_LIMITED")) toast.info(t("regenerateLimited"));
-      else toast.error(t("applyFailed"));
+      else toast.error(t("regenerateFailed"));
     } finally {
       setBusy(false);
     }
@@ -114,7 +114,12 @@ export default function MaintenanceAiInsightCard({
         <p className="mt-3 flex items-center gap-2 text-xs text-red-500">
           {t("failed")}
           {canModerateStep && (
-            <button type="button" className="underline" onClick={() => void handleRegenerate()}>
+            <button
+              type="button"
+              disabled={busy}
+              className="underline disabled:opacity-50"
+              onClick={() => void handleRegenerate()}
+            >
               {t("retry")}
             </button>
           )}
@@ -149,9 +154,10 @@ export default function MaintenanceAiInsightCard({
               <div>
                 <p className="text-[11px] text-slate-400">{t("suggestedLabel")}</p>
                 <p className="text-xs font-medium text-sky-700">
-                  {TYPE_LABELS[insight.suggested_type || ""] || insight.suggested_type}
+                  {TYPE_LABELS[insight.suggested_type ?? maintenance.vehicle_maintenance_type ?? ""] ||
+                    (insight.suggested_type ?? maintenance.vehicle_maintenance_type)}
                   {" · "}
-                  {RANK_LABELS[insight.suggested_rank || 1]}
+                  {RANK_LABELS[insight.suggested_rank ?? maintenance.vehicle_maintenance_rank ?? 1]}
                 </p>
               </div>
               <span className="flex-1" />

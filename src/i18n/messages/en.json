@@ -969,7 +969,8 @@
     "applySuccess": "AI classification applied",
     "applyFailed": "Could not apply AI classification",
     "regeneratePending": "AI is analyzing, please wait",
-    "regenerateLimited": "Just regenerated, retry in 1 minute"
+    "regenerateLimited": "Just regenerated, retry in 1 minute",
+    "regenerateFailed": "Could not regenerate analysis"
   },
   "DriverDisplayPage": {
     "title": "VEHICLE DISPATCH SCHEDULE",
