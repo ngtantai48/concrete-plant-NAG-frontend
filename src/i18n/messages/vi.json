@@ -976,6 +976,23 @@
     "aiPrefix": "AI",
     "close": "Đóng"
   },
+  "MaintenanceAiInsight": {
+    "title": "Phân tích AI",
+    "confidence": "độ tin cậy {percent}%",
+    "regenerate": "Sinh lại",
+    "analyzing": "AI đang phân tích…",
+    "updating": "Đang cập nhật lại…",
+    "failed": "Phân tích AI thất bại",
+    "retry": "Thử lại",
+    "currentLabel": "Phân loại hiện tại",
+    "suggestedLabel": "AI gợi ý",
+    "applyButton": "Áp dụng phân loại AI",
+    "appliedAt": "Đã áp dụng phân loại AI · {time}",
+    "applySuccess": "Đã áp dụng phân loại AI",
+    "applyFailed": "Không thể áp dụng phân loại AI",
+    "regeneratePending": "AI đang phân tích, vui lòng đợi",
+    "regenerateLimited": "Vừa sinh lại xong, thử lại sau 1 phút"
+  },
   "MealCheck": {
     "title": "Cơm ca",
     "description": "Chấm tiền ăn qua bữa: xe rời điểm ăn trong khung giờ một bữa thì kíp xe được tính 1 suất. Người không thuộc xe chấm tay.",

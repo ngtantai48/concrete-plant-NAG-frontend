@@ -954,6 +954,23 @@
     "aiPrefix": "AI",
     "close": "Close"
   },
+  "MaintenanceAiInsight": {
+    "title": "AI analysis",
+    "confidence": "confidence {percent}%",
+    "regenerate": "Regenerate",
+    "analyzing": "AI analyzing…",
+    "updating": "Updating…",
+    "failed": "AI analysis failed",
+    "retry": "Retry",
+    "currentLabel": "Current classification",
+    "suggestedLabel": "AI suggestion",
+    "applyButton": "Apply AI classification",
+    "appliedAt": "AI classification applied · {time}",
+    "applySuccess": "AI classification applied",
+    "applyFailed": "Could not apply AI classification",
+    "regeneratePending": "AI is analyzing, please wait",
+    "regenerateLimited": "Just regenerated, retry in 1 minute"
+  },
   "DriverDisplayPage": {
     "title": "VEHICLE DISPATCH SCHEDULE",
     "collectingStatus": "CONCRETE SUPPLY STATION",
