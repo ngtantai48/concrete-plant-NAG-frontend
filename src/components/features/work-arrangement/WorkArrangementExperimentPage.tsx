@@ -10,7 +10,6 @@ import {
   BriefcaseBusiness,
   CalendarDays,
   Camera,
-  ListOrdered,
   Loader2,
   type LucideIcon,
 } from "lucide-react";
@@ -20,7 +19,6 @@ import MonthlyOverviewView from "./attendance/MonthlyOverviewView";
 import WorkAssignmentSelectManager from "./assignment/WorkAssignmentSelectManager";
 import WorkTaskSelectManager from "./assignment/WorkTaskSelectManager";
 import WorkAttendanceManager from "./WorkAttendanceManager";
-import WorkMixSlotBoard from "./WorkMixSlotBoard";
 
 type TrialSectionKey = "attendance" | "assignment" | "worktask";
 
@@ -108,8 +106,8 @@ export default function WorkArrangementExperimentPage() {
           </div>
         </header>
 
-        {/* Bố cục: Xe bồn cột trái, Xe bơm cột phải; dưới Xe bơm là Công việc → Chấm công → Lốt trộn
-            (3 khối truyền qua children để nằm trong cột phải của manager). */}
+        {/* Bố cục: Xe bồn cột trái (kèm cột Lốt), Xe bơm cột phải; dưới Xe bơm là Công việc → Chấm công
+            (các khối truyền qua children để nằm trong cột phải của manager). */}
         <div className="mt-3">
           <WorkAssignmentSelectManager
             active
@@ -165,9 +163,6 @@ export default function WorkArrangementExperimentPage() {
               </Tabs>
             </WorkbenchSection>
 
-            <WorkbenchSection id="trial-mix-slot" icon={ListOrdered} title={t("tabMixSlot")}>
-              <WorkMixSlotBoard active compact />
-            </WorkbenchSection>
           </WorkAssignmentSelectManager>
         </div>
       </div>

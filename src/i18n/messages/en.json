@@ -1220,6 +1220,7 @@
     "noPumpAssignments": "No pump truck rows yet; select an available vehicle to add one",
     "clearSelection": "Clear selection",
     "vehicleStatus": "Status",
+    "mixerLot": "Slot",
     "selectedPersonnelCount": "{count} personnel",
     "chupButton": "Snapshot",
     "chupDirtyWarning": "Please save the assignment before taking a snapshot",

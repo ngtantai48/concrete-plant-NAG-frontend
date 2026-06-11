@@ -1223,6 +1223,7 @@
     "noPumpAssignments": "Chưa có xe bơm nào; chọn xe trống để thêm dòng",
     "clearSelection": "Bỏ chọn",
     "vehicleStatus": "Trạng thái",
+    "mixerLot": "Lốt",
     "selectedPersonnelCount": "{count} nhân sự",
     "chupButton": "Chụp lịch",
     "chupDirtyWarning": "Vui lòng Lưu phân công trước khi chụp",

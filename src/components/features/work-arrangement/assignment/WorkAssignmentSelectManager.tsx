@@ -117,6 +117,10 @@ export default function WorkAssignmentSelectManager({
   const [mixerDraft, setMixerDraft] = useState<WorkMixerAssignmentDraft>(() =>
     createEmptyMixerAssignmentDraft(dayjs().format("YYYY-MM-DD"))
   );
+  // Số lốt theo xe (thứ tự trong hàng đợi lốt trộn hôm nay); 1 xe có thể giữ nhiều lốt.
+  const [lotNumbersByVehicle, setLotNumbersByVehicle] = useState<Map<number, number[]>>(
+    new Map()
+  );
   const onDirtyChangeRef = useRef(onDirtyChange);
 
   useEffect(() => {
@@ -203,6 +207,28 @@ export default function WorkAssignmentSelectManager({
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  // Lốt hôm nay (hàng đợi pending toàn cục, không theo ngày chọn) — lỗi thì để trống, không chặn bảng.
+  const loadLots = useCallback(async () => {
+    try {
+      const lots = await workMixSlotApi.getList();
+      const map = new Map<number, number[]>();
+      lots.forEach((item, index) => {
+        const positions = map.get(item.vehicle_id) || [];
+        positions.push(index + 1);
+        map.set(item.vehicle_id, positions);
+      });
+      setLotNumbersByVehicle(map);
+    } catch (error) {
+      console.error("[WorkAssignmentSelectManager] load lots error:", error);
+      setLotNumbersByVehicle(new Map());
+    }
+  }, []);
+
+  // Tải khi mở và mỗi lần quay lại trang (lốt đổi theo hàng đợi) — giữ hành vi của khối Lốt trộn cũ.
+  useEffect(() => {
+    if (active) void loadLots();
+  }, [active, loadLots]);
 
   useEffect(() => {
     onDirtyChangeRef.current?.(dirty);
@@ -691,8 +717,8 @@ export default function WorkAssignmentSelectManager({
                   <th className="w-[45%] border border-slate-300 px-2 py-1.5 text-left">
                     {t("mixerDriver")}
                   </th>
-                  <th className="w-[90px] border border-slate-300 px-2 py-1.5 text-left">
-                    {t("vehicleStatus")}
+                  <th className="w-[90px] border border-slate-300 px-2 py-1.5 text-center">
+                    {t("mixerLot")}
                   </th>
                 </tr>
               </thead>
@@ -712,6 +738,7 @@ export default function WorkAssignmentSelectManager({
                 ) : (
                   sortedMixerVehicles.map((vehicle, index) => {
                     const driverId = mixerDriverByVehicle.get(vehicle.vehicle_id) || null;
+                    const lotNumbers = lotNumbersByVehicle.get(vehicle.vehicle_id);
                     return (
                       <tr key={vehicle.vehicle_id} className="h-10">
                         <td className="border border-slate-200 bg-slate-50 px-2 text-center text-xs font-medium text-slate-500">
@@ -736,8 +763,11 @@ export default function WorkAssignmentSelectManager({
                             onChange={(ids) => setMixerDriver(vehicle.vehicle_id, ids[0] || null)}
                           />
                         </td>
-                        <td className="border border-slate-200 px-2 py-1">
-                          {vehicle.vehicle_status ? <Chip>{vehicle.vehicle_status}</Chip> : "-"}
+                        <td className="border border-slate-200 px-2 py-1 text-center">
+                          {/* Xe không có lốt thì bỏ trống */}
+                          {lotNumbers && lotNumbers.length > 0 && (
+                            <Chip tone="teal">{lotNumbers.join(", ")}</Chip>
+                          )}
                         </td>
                       </tr>
                     );
