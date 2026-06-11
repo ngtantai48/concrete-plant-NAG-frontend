@@ -966,6 +966,7 @@
     "ticketsAmount": "{count} tickets · {amount}",
     "waitingHours": "waiting {hours}h",
     "remainingDays": "~{days} days left",
+    "remainingKm": "~{km} km left",
     "empty": "No data",
     "loadFailed": "Could not load AI overview",
     "refresh": "Refresh"

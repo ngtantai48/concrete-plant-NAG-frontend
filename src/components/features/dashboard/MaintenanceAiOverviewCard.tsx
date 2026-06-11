@@ -51,6 +51,9 @@ export default function MaintenanceAiOverviewCard() {
   const goVehicle = (vehicleId: number) =>
     router.push(`${SIDEBAR.VEHICLE_MAINTENANCES}?vehicle_id=${vehicleId}`);
 
+  const formatAmountShort = (amount: number) =>
+    amount >= 1_000_000 ? `${Math.round(amount / 1_000_000)}tr` : `${Math.round(amount / 1_000)}k`;
+
   const renderEmpty = () => <p className="text-xs text-slate-400">{t("empty")}</p>;
   const sectionLabel = (label: string) => (
     <p className="mb-1 text-[10px] font-bold uppercase tracking-wide text-slate-400">{label}</p>
@@ -98,7 +101,7 @@ export default function MaintenanceAiOverviewCard() {
                 <span className="text-red-700">
                   {t("ticketsAmount", {
                     count: row.count,
-                    amount: `${Math.round(row.total_amount / 1_000_000)}tr`,
+                    amount: formatAmountShort(row.total_amount),
                   })}
                 </span>
               </button>
@@ -134,7 +137,11 @@ export default function MaintenanceAiOverviewCard() {
                 className="flex w-full items-center justify-between py-0.5 text-xs hover:bg-slate-50"
               >
                 <span className="font-semibold">{vehicleLabel(row.vehicle)}</span>
-                <span className="text-slate-500">{t("remainingDays", { days: row.remaining })}</span>
+                <span className="text-slate-500">
+                  {row.basis === "km"
+                    ? t("remainingKm", { km: row.remaining })
+                    : t("remainingDays", { days: row.remaining })}
+                </span>
               </button>
             ))
           : renderEmpty()}

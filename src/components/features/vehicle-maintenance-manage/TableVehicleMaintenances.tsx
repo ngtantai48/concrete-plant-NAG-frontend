@@ -435,6 +435,12 @@ export default function TableVehicleMaintenances() {
   useSocketEventListener("maintenance:pending_upsert", scheduleRealtimeRefresh, "notifications", isConnected);
   useSocketEventListener("maintenance:pending_remove", scheduleRealtimeRefresh, "notifications", isConnected);
 
+  useEffect(() => {
+    return () => {
+      if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+    };
+  }, []);
+
   const ensureVehicleOptions = useCallback(async () => {
     if (vehicleOptionsLoaded || vehicleOptionsLoading) return;
     const result = await dispatch(fetchVehicleNameOptions({ limit: 1000 }));

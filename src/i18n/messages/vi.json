@@ -988,6 +988,7 @@
     "ticketsAmount": "{count} phiếu · {amount}",
     "waitingHours": "chờ {hours}h",
     "remainingDays": "còn ~{days} ngày",
+    "remainingKm": "còn ~{km} km",
     "empty": "Không có dữ liệu",
     "loadFailed": "Không tải được tổng quan AI",
     "refresh": "Làm mới"
