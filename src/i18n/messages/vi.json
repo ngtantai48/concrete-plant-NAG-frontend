@@ -995,6 +995,10 @@
   },
   "MaintenanceAiInsight": {
     "title": "Phân tích AI",
+    "columnTitle": "AI",
+    "recommendApprove": "Duyệt nhanh",
+    "recommendReview": "Xem kỹ",
+    "errorShort": "AI lỗi",
     "confidence": "độ tin cậy {percent}%",
     "regenerate": "Sinh lại",
     "analyzing": "AI đang phân tích…",

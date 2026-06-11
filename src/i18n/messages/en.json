@@ -973,6 +973,10 @@
   },
   "MaintenanceAiInsight": {
     "title": "AI analysis",
+    "columnTitle": "AI",
+    "recommendApprove": "Quick approve",
+    "recommendReview": "Review carefully",
+    "errorShort": "AI error",
     "confidence": "confidence {percent}%",
     "regenerate": "Regenerate",
     "analyzing": "AI analyzing…",

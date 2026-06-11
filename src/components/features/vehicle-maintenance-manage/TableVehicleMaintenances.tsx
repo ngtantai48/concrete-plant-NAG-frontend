@@ -48,6 +48,7 @@ import {
 import mediaApi from "@/services/media.service";
 import ocrApi from "@/services/ocr.service";
 import vehicleMaintenanceApi from "@/services/vehicle-maintenance.service";
+import MaintenanceAiBadge from "@/components/features/vehicle-maintenance-manage/MaintenanceAiBadge";
 import { useAppDispatch, useAppSelector } from "@/hooks/use-app-selector";
 import {
   bulkDeleteVehicleMaintenancesThunk,
@@ -351,6 +352,7 @@ function buildPayload(values: MaintenanceFormValues): Partial<VehicleMaintenance
 export default function TableVehicleMaintenances() {
   const t = useTranslations("VehicleMaintenancePage");
   const tCommon = useTranslations("Common");
+  const tAi = useTranslations("MaintenanceAiInsight");
   const { hasActionAccess } = usePermissions();
   const { setDirty } = useNavigationStore();
   const router = useRouter();
@@ -733,6 +735,14 @@ export default function TableVehicleMaintenances() {
     PERMISSIONS.VEHICLE_MAINTENANCES.DELETE
   );
 
+  // Cột AI chỉ hiện cho người có quyền duyệt (giống dock) — admin bypass qua hasActionAccess.
+  const canModerate =
+    hasActionAccess(SIDEBAR.VEHICLE_MAINTENANCES, PERMISSIONS.VEHICLE_MAINTENANCES.DISPATCH_REVIEW) ||
+    hasActionAccess(
+      SIDEBAR.VEHICLE_MAINTENANCES,
+      PERMISSIONS.VEHICLE_MAINTENANCES.PRODUCTION_APPROVE
+    );
+
   const handleBulkDelete = async () => {
     if (selectedIds.length === 0) return;
 
@@ -916,6 +926,18 @@ export default function TableVehicleMaintenances() {
         </Badge>
       ),
     },
+    ...(canModerate
+      ? [
+          {
+            title: tAi("columnTitle"),
+            key: "ai_insight",
+            align: "center" as const,
+            render: (_: unknown, record: VehicleMaintenance) => (
+              <MaintenanceAiBadge insight={record.ai_insight} />
+            ),
+          },
+        ]
+      : []),
     {
       title: t("status"),
       key: "status",
