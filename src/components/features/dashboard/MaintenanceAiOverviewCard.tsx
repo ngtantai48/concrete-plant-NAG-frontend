@@ -44,7 +44,14 @@ export default function MaintenanceAiOverviewCard() {
     if (canView) void load();
   }, [canView, load]);
 
-  if (!canView) return null;
+  const isEmpty =
+    !!data &&
+    data.sections.repeat_offenders.length === 0 &&
+    data.sections.stale_pending.length === 0 &&
+    data.sections.upcoming_maintenance.length === 0;
+
+  // Không có gì đáng chú ý thì ẩn hẳn card — dashboard không cần nhiễu
+  if (!canView || !data || isEmpty) return null;
 
   const vehicleLabel = (v: { vehicle_license_plate: string | null; vehicle_name?: string | null }) =>
     v.vehicle_license_plate || v.vehicle_name || "-";
