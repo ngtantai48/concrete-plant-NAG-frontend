@@ -57,12 +57,12 @@ export default function MaintenancePendingCardItem({
         </p>
       ) : insight?.status === "failed" ? (
         <p className="mt-2 text-xs text-red-500">{t("analysisFailed")}</p>
-      ) : (
+      ) : !insight || insight.status === "pending" ? (
         <p className="mt-2 flex items-center gap-1.5 text-xs text-slate-400">
           <RefreshCw className="size-3.5 animate-spin" />
           {t("analyzing")}
         </p>
-      )}
+      ) : null}
 
       {insight?.status === "done" && (
         <div className="mt-1.5 flex flex-wrap gap-1">

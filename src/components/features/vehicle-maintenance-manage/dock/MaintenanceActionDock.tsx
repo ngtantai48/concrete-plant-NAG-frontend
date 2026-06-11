@@ -23,6 +23,7 @@ export default function MaintenanceActionDock() {
   const { canModerate, isConnected, items, processingIds, runAction } = useMaintenancePendingDock();
   const [expanded, setExpanded] = useState(false);
   const knownIdsRef = useRef<Set<number>>(new Set());
+  const seededRef = useRef(false);
 
   useEffect(() => {
     setExpanded(typeof window !== "undefined" && localStorage.getItem(EXPANDED_KEY) === "1");
@@ -33,9 +34,16 @@ export default function MaintenanceActionDock() {
     localStorage.setItem(EXPANDED_KEY, value ? "1" : "0");
   };
 
-  // Auto-expand (collapsed -> expanded only) when a NEW urgent card arrives
+  // Auto-expand (collapsed -> expanded only) when a NEW urgent card arrives.
+  // The first non-empty snapshot only seeds knownIdsRef — it must NOT auto-expand,
+  // otherwise every reload would override the user's persisted collapsed preference.
   useEffect(() => {
     const known = knownIdsRef.current;
+    if (!seededRef.current) {
+      items.forEach((card) => known.add(card.vehicle_maintenance_id));
+      if (items.length > 0) seededRef.current = true;
+      return;
+    }
     const fresh = items.filter((card) => !known.has(card.vehicle_maintenance_id));
     items.forEach((card) => known.add(card.vehicle_maintenance_id));
     if (!expanded && fresh.some(isUrgentCard)) persistExpanded(true);

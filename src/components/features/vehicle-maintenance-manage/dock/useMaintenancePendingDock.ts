@@ -5,7 +5,8 @@ import { PERMISSIONS } from "@/constants/permissions";
 import { SIDEBAR } from "@/constants/route";
 import { useSocket } from "@/context/socket-context";
 import { usePermissions } from "@/hooks/use-permissions";
-import { useSocketEmit, useSocketEventListener } from "@/hooks/useSocketEventListener";
+import { useSocketEventListener } from "@/hooks/useSocketEventListener";
+import { SocketManager } from "@/lib/socket";
 import vehicleMaintenanceApi from "@/services/vehicle-maintenance.service";
 import type { PendingMaintenanceCard, VehicleMaintenanceWorkflowAction } from "@/types/vehicle";
 
@@ -49,15 +50,19 @@ export function useMaintenancePendingDock() {
     );
 
   const { isConnected } = useSocket();
-  const emit = useSocketEmit("notifications");
   const [items, setItems] = useState<PendingMaintenanceCard[]>([]);
   const [processingIds, setProcessingIds] = useState<number[]>([]);
 
-  // Subscribe khi mount + mỗi lần socket reconnect → server join room + trả snapshot
+  // Subscribe mỗi lần socket connect/reconnect → server join room + trả snapshot.
+  // Chỉ lấy instance khi isConnected=true: lúc đó SocketProvider đã tạo instance với
+  // config đúng, tránh race tự tạo instance "notifications" với config mặc định sai.
   useEffect(() => {
     if (!canModerate || !isConnected) return;
-    emit("maintenance:subscribe_pending");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    try {
+      SocketManager.getInstance("notifications").emit("maintenance:subscribe_pending");
+    } catch {
+      /* provider chưa khởi tạo — sẽ thử lại ở lần reconnect sau */
+    }
   }, [canModerate, isConnected]);
 
   useSocketEventListener(
@@ -67,7 +72,7 @@ export function useMaintenancePendingDock() {
       setItems(sortCards(data?.items ?? []));
     },
     "notifications",
-    canModerate
+    canModerate && isConnected
   );
 
   useSocketEventListener(
@@ -84,7 +89,7 @@ export function useMaintenancePendingDock() {
       );
     },
     "notifications",
-    canModerate
+    canModerate && isConnected
   );
 
   useSocketEventListener(
@@ -97,7 +102,7 @@ export function useMaintenancePendingDock() {
       );
     },
     "notifications",
-    canModerate
+    canModerate && isConnected
   );
 
   // Fallback: socket rớt → polling 60s, lỗi giữ dữ liệu cũ và thử lại tick sau
