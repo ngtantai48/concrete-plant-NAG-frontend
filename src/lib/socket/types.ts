@@ -2,6 +2,7 @@
  * Socket event type definitions và contracts
  * Tất cả events phải được định nghĩa rõ ràng ở đây để đảm bảo type safety
  */
+import type { PendingMaintenanceCard } from '@/types/vehicle';
 
 // ============================================================
 // Notification Events (namespace: /notifications)
@@ -54,6 +55,16 @@ export interface NotificationEvents {
   // Client -> Server
   'notification:get_all': void;
   'notification:mark_read': NotificationMarkReadPayload;
+
+  // Maintenance pending dock (server -> client)
+  'maintenance:pending_snapshot': { items: PendingMaintenanceCard[] };
+  'maintenance:pending_upsert': { item: PendingMaintenanceCard };
+  'maintenance:pending_remove': {
+    vehicle_maintenance_id: number;
+    reason: 'approved' | 'rejected' | 'deleted';
+  };
+  // Maintenance pending dock (client -> server)
+  'maintenance:subscribe_pending': void;
 
   // Connection events
   'connect': void;

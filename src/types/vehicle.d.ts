@@ -62,6 +62,7 @@ export interface VehicleMaintenance {
   document_count?: number;
   documents?: VehicleMaintenanceDocument[];
   workflow_available_actions?: VehicleMaintenanceWorkflowAction[];
+  ai_insight?: VehicleMaintenanceAiInsight | null;
 }
 
 export type VehicleMaintenanceWorkflowAction =
@@ -112,4 +113,64 @@ export interface DriverMaintenanceContext {
       assignment_sources?: string[];
     }
   >;
+}
+
+export interface VehicleMaintenanceAiInsightFlag {
+  code: 'cost_anomaly' | 'repeat_issue' | 'missing_invoice' | 'long_duration' | 'other';
+  severity: 'low' | 'medium' | 'high';
+  detail: string;
+}
+
+export interface VehicleMaintenanceAiInsight {
+  summary: string | null;
+  suggested_type: string | null;
+  suggested_rank: number | null;
+  flags: VehicleMaintenanceAiInsightFlag[];
+  recommendation: 'approve' | 'review_carefully' | null;
+  suggested_reject_reason: string | null;
+  confidence: number | null;
+  status: 'pending' | 'done' | 'failed';
+  error: string | null;
+  generated_at: string | null;
+  applied_by: number | null;
+  applied_at: string | null;
+}
+
+export interface PendingMaintenanceCard {
+  vehicle_maintenance_id: number;
+  vehicle: Pick<Vehicle, 'vehicle_id' | 'vehicle_license_plate' | 'vehicle_name'>;
+  vehicle_maintenance_type: string;
+  vehicle_maintenance_rank: number;
+  vehicle_maintenance_status: string;
+  total_amount: number | null;
+  vehicle_maintenance_from_datetime: string;
+  vehicle_maintenance_to_datetime: string | null;
+  submitted_at: string;
+  created_by_user: { user_id: number; user_full_name: string | null };
+  ai_insight: VehicleMaintenanceAiInsight | null;
+  workflow_available_actions: VehicleMaintenanceWorkflowAction[];
+}
+
+export interface MaintenanceAiOverview {
+  generated_at: string;
+  period: string;
+  sections: {
+    repeat_offenders: Array<{
+      vehicle: Pick<Vehicle, 'vehicle_id' | 'vehicle_license_plate' | 'vehicle_name'>;
+      count: number;
+      total_amount: number;
+    }>;
+    stale_pending: Array<{
+      vehicle_maintenance_id: number;
+      vehicle: Pick<Vehicle, 'vehicle_id' | 'vehicle_license_plate' | 'vehicle_name'>;
+      status: string;
+      waiting_hours: number;
+    }>;
+    upcoming_maintenance: Array<{
+      vehicle: Pick<Vehicle, 'vehicle_id' | 'vehicle_license_plate' | 'vehicle_name'>;
+      basis: 'km' | 'days';
+      remaining: number;
+    }>;
+  };
+  ai_commentary: string;
 }

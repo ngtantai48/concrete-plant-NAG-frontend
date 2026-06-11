@@ -1,6 +1,8 @@
 import http from "@/lib/http";
 import type {
   DriverMaintenanceContext,
+  MaintenanceAiOverview,
+  PendingMaintenanceCard,
   VehicleMaintenance,
   VehicleMaintenanceDocument,
   VehicleMaintenanceHistory,
@@ -177,6 +179,33 @@ const vehicleMaintenanceApi = {
       `/vehicle-maintenances/documents/${documentId}/ocr`
     );
     return { ...response, data: normalizeItem<VehicleMaintenanceDocument>(response.data) };
+  },
+
+  getPendingActions: async () => {
+    const response = await http.get<ApiPayload<{ items: PendingMaintenanceCard[]; total: number }>>(
+      "/vehicle-maintenances/pending-actions"
+    );
+    return {
+      ...response,
+      data: normalizeItem<{ items: PendingMaintenanceCard[]; total: number }>(response.data),
+    };
+  },
+
+  applyAiInsight: async (id: number) => {
+    const response = await http.post<ApiPayload<VehicleMaintenance>>(
+      `/vehicle-maintenances/${id}/ai-insight/apply`
+    );
+    return { ...response, data: normalizeItem<VehicleMaintenance>(response.data) };
+  },
+
+  regenerateAiInsight: (id: number) => http.post(`/vehicle-maintenances/${id}/ai-insight/regenerate`),
+
+  getAiOverview: async (params?: { period?: string; force?: boolean }) => {
+    const response = await http.get<ApiPayload<MaintenanceAiOverview>>(
+      "/vehicle-maintenances/ai/overview",
+      { params }
+    );
+    return { ...response, data: normalizeItem<MaintenanceAiOverview>(response.data) };
   },
 
   getDriverContext: async (params?: { date?: string }) => {
