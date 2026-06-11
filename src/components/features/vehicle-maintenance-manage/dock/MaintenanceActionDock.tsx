@@ -20,7 +20,8 @@ export default function MaintenanceActionDock() {
   const authUser = useAppSelector((state) => state.auth.user);
   const myUserId = authUser?.id ?? 0;
 
-  const { canModerate, isConnected, items, processingIds, runAction } = useMaintenancePendingDock();
+  const { canModerate, isConnected, items, processingIds, runAction, skipCard } =
+    useMaintenancePendingDock();
   const [expanded, setExpanded] = useState(false);
   const knownIdsRef = useRef<Set<number>>(new Set());
   const seededRef = useRef(false);
@@ -96,7 +97,7 @@ export default function MaintenanceActionDock() {
             {t("title")} · {items.length}
             <span
               className={`size-1.5 rounded-full ${isConnected ? "bg-emerald-500" : "bg-amber-500"}`}
-              title={isConnected ? "" : t("offline")}
+              title={isConnected ? t("online") : t("offline")}
             />
           </span>
           <button
@@ -117,6 +118,7 @@ export default function MaintenanceActionDock() {
               processing={processingIds.includes(card.vehicle_maintenance_id)}
               onAction={(action, reason) => void handleAction(card, action, reason)}
               onDetail={() => router.push(`${SIDEBAR.VEHICLE_MAINTENANCES}/${card.vehicle_maintenance_id}`)}
+              onSkip={() => skipCard(card.vehicle_maintenance_id)}
             />
           ))}
           {hiddenCount > 0 && (
