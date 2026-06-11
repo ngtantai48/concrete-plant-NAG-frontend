@@ -38,6 +38,8 @@ import { PERMISSIONS } from "@/constants/permissions";
 import { SIDEBAR } from "@/constants/route";
 import { useNavigationStore } from "@/hooks/use-navigation-store";
 import { usePermissions } from "@/hooks/use-permissions";
+import { useSocketEventListener } from "@/hooks/useSocketEventListener";
+import { useSocket } from "@/context/socket-context";
 import {
   formatVietnameseCurrencyValue,
   normalizeVietnameseCurrencyInput,
@@ -75,7 +77,7 @@ import {
   X,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { type Key, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -352,6 +354,9 @@ export default function TableVehicleMaintenances() {
   const { hasActionAccess } = usePermissions();
   const { setDirty } = useNavigationStore();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const vehicleIdFilter = Number(searchParams.get("vehicle_id")) || null;
+  const { isConnected } = useSocket();
   const dispatch = useAppDispatch();
   const documentInputRef = useRef<HTMLInputElement | null>(null);
   const {
@@ -405,9 +410,10 @@ export default function TableVehicleMaintenances() {
       } else if (nextStatus !== "all") {
         params.status = nextStatus;
       }
+      if (vehicleIdFilter) params.vehicle_id = vehicleIdFilter;
       return params;
     },
-    [limit, page, searchText, statusFilter]
+    [limit, page, searchText, statusFilter, vehicleIdFilter]
   );
 
   const fetchMaintenances = useCallback(async (overrides?: { page?: number; limit?: number; search?: string; status?: string }) => {
@@ -417,6 +423,17 @@ export default function TableVehicleMaintenances() {
       toast.error(t("loadFailed"), { position: "top-right" });
     }
   }, [buildListParams, dispatch, t]);
+
+  const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scheduleRealtimeRefresh = useCallback(() => {
+    if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+    refreshTimerRef.current = setTimeout(() => {
+      void dispatch(fetchVehicleMaintenances({ ...buildListParams(), force: true }));
+    }, 2000);
+  }, [buildListParams, dispatch]);
+
+  useSocketEventListener("maintenance:pending_upsert", scheduleRealtimeRefresh, "notifications", isConnected);
+  useSocketEventListener("maintenance:pending_remove", scheduleRealtimeRefresh, "notifications", isConnected);
 
   const ensureVehicleOptions = useCallback(async () => {
     if (vehicleOptionsLoaded || vehicleOptionsLoading) return;
@@ -972,6 +989,14 @@ export default function TableVehicleMaintenances() {
               ) : null}
             </div>
 
+            {vehicleIdFilter && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2.5 py-1 text-xs text-sky-700">
+                {`Xe #${vehicleIdFilter}`}
+                <button type="button" onClick={() => router.replace(SIDEBAR.VEHICLE_MAINTENANCES)} aria-label="clear">
+                  <X className="size-3" />
+                </button>
+              </span>
+            )}
             <Tabs
               value={statusFilter}
               onValueChange={(value) => {

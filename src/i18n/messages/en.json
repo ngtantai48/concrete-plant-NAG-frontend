@@ -954,6 +954,22 @@
     "aiPrefix": "AI",
     "close": "Close"
   },
+  "MaintenanceAiOverview": {
+    "title": "AI maintenance overview",
+    "updatedAt": "updated {time}",
+    "period7": "7 days",
+    "period30": "30 days",
+    "period90": "90 days",
+    "repeatOffenders": "Repeat / costliest vehicles",
+    "stalePending": "Pending >48h",
+    "upcoming": "Maintenance due soon",
+    "ticketsAmount": "{count} tickets · {amount}",
+    "waitingHours": "waiting {hours}h",
+    "remainingDays": "~{days} days left",
+    "empty": "No data",
+    "loadFailed": "Could not load AI overview",
+    "refresh": "Refresh"
+  },
   "MaintenanceAiInsight": {
     "title": "AI analysis",
     "confidence": "confidence {percent}%",

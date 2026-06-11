@@ -976,6 +976,22 @@
     "aiPrefix": "AI",
     "close": "Đóng"
   },
+  "MaintenanceAiOverview": {
+    "title": "AI tổng quan bảo trì",
+    "updatedAt": "cập nhật {time}",
+    "period7": "7 ngày",
+    "period30": "30 ngày",
+    "period90": "90 ngày",
+    "repeatOffenders": "Xe hỏng lặp lại / tốn nhất",
+    "stalePending": "Phiếu tồn đọng >48h",
+    "upcoming": "Sắp đến hạn bảo dưỡng",
+    "ticketsAmount": "{count} phiếu · {amount}",
+    "waitingHours": "chờ {hours}h",
+    "remainingDays": "còn ~{days} ngày",
+    "empty": "Không có dữ liệu",
+    "loadFailed": "Không tải được tổng quan AI",
+    "refresh": "Làm mới"
+  },
   "MaintenanceAiInsight": {
     "title": "Phân tích AI",
     "confidence": "độ tin cậy {percent}%",
