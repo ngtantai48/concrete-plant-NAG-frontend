@@ -30,11 +30,21 @@ const MAINTENANCE_TOAST_VARIANT: Record<string, "success" | "error" | "info"> = 
   [NOTIFICATION_EVENTS.VEHICLE_MAINTENANCE_CONFIRMED]: "info",
   [NOTIFICATION_EVENTS.VEHICLE_MAINTENANCE_APPROVED]: "success",
   [NOTIFICATION_EVENTS.VEHICLE_MAINTENANCE_REJECTED]: "error",
+  [NOTIFICATION_EVENTS.VEHICLE_MAINTENANCE_DELETED]: "info",
 };
 
 function getNotificationOwnerId(notification: Notification): string | number {
   const ownerId = notification.userId ?? notification.user_id ?? "all";
   return typeof ownerId === "string" || typeof ownerId === "number" ? ownerId : "all";
+}
+
+function isReadOnlyMaintenanceNotification(notification: NotificationPayload | Notification): boolean {
+  return (
+    notification.type === "vehicle_maintenance" &&
+    (notification.event === NOTIFICATION_EVENTS.VEHICLE_MAINTENANCE_DELETED ||
+      notification.read_only === true ||
+      notification.navigate_to === null)
+  );
 }
 const FEMALE_VOICE_KEYWORDS = ["hoaimy", "female", "woman", "girl", "nu"];
 
@@ -255,7 +265,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       const options: { duration: number; action?: { label: string; onClick: () => void } } = {
         duration: 6000,
       };
-      if (maintenanceId !== undefined && maintenanceId !== null) {
+      if (!isReadOnlyMaintenanceNotification(notification) && maintenanceId !== undefined && maintenanceId !== null) {
         options.action = {
           label: locale === "en" ? "View" : "Xem",
           onClick: () => router.push(`${SIDEBAR.VEHICLE_MAINTENANCES}/${maintenanceId}`),

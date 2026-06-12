@@ -335,9 +335,11 @@ Header buttons:
 - Bell: tooltip `Thông báo lốt xe`, shows notifications where `type !== "vehicle_maintenance"`.
 - Wrench: tooltip `Thông báo bảo trì xe`, shows only notifications where `type === "vehicle_maintenance"`.
 
-Clicking a maintenance notification should mark it as read and navigate to:
+Clicking a normal maintenance notification should mark it as read and navigate to:
 
 `SIDEBAR.VEHICLE_MAINTENANCES/{vehicle_maintenance_id}`
+
+Deleted-ticket notifications are read-only. If `event === "vehicle_maintenance_deleted"` or payload has `read_only: true` / `navigate_to: null`, mark it as read but do not navigate to the detail page.
 
 Do not hard-code `user_id: "all"` when marking as read. Use:
 
@@ -355,6 +357,7 @@ Recipients:
 - `revert_approval` to `reviewing`: users with `/vehicle-maintenances__production_approve`, plus the ticket creator
 - `revert_approval` to `submitted`: users with `/vehicle-maintenances__dispatch_review`, plus the ticket creator
 - `revert_approval` to `rejected`: ticket creator
+- `delete`/`bulk_delete`: remove stale notifications for the deleted ticket, then send one read-only `vehicle_maintenance_deleted` notification to affected users.
 
 Reject/approve notifications should target the concrete ticket creator, not every user with `/vehicle-maintenances__submit`. This avoids notifying unrelated drivers or submit-capable users.
 
@@ -372,6 +375,9 @@ Messages must stay role-neutral:
 - `revert_approval` to `reviewing`: `Phiếu bảo trì xe {vehicle} đã được hoàn duyệt, chờ phê duyệt lại.`
 - `revert_approval` to `submitted`: `Phiếu bảo trì xe {vehicle} đã được hoàn duyệt, cần kiểm tra lại.`
 - `revert_approval` to `rejected`: `Phiếu bảo trì xe {vehicle} đã được hoàn duyệt, cần chỉnh sửa lại.`
+- `vehicle_maintenance_deleted`: `Phiếu bảo trì xe {vehicle} đã bị xóa bởi {actor}.`
+
+When deleting a ticket, stale notifications must be cleaned in BE so users do not keep dead links. FE must still handle not-found detail responses gracefully because old Redis items, race conditions, or manually opened URLs can still happen.
 
 Vehicle label priority:
 

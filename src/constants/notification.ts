@@ -11,6 +11,7 @@ export const NOTIFICATION_EVENTS = {
   VEHICLE_MAINTENANCE_CONFIRMED: "vehicle_maintenance_confirmed",
   VEHICLE_MAINTENANCE_REJECTED: "vehicle_maintenance_rejected",
   VEHICLE_MAINTENANCE_APPROVED: "vehicle_maintenance_approved",
+  VEHICLE_MAINTENANCE_DELETED: "vehicle_maintenance_deleted",
 } as const;
 
 export const NOTIFICATION_EVENT_TRANSLATION_KEYS = {
@@ -26,4 +27,5 @@ export const NOTIFICATION_EVENT_TRANSLATION_KEYS = {
   [NOTIFICATION_EVENTS.VEHICLE_MAINTENANCE_CONFIRMED]: "vehicle_maintenance_confirmed",
   [NOTIFICATION_EVENTS.VEHICLE_MAINTENANCE_REJECTED]: "vehicle_maintenance_rejected",
   [NOTIFICATION_EVENTS.VEHICLE_MAINTENANCE_APPROVED]: "vehicle_maintenance_approved",
+  [NOTIFICATION_EVENTS.VEHICLE_MAINTENANCE_DELETED]: "vehicle_maintenance_deleted",
 } as const;

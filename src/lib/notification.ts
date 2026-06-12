@@ -38,6 +38,7 @@ const NOTIFICATION_TEXT_TEMPLATES: Record<NotificationLocale, Record<string, str
     [NOTIFICATION_EVENTS.VEHICLE_MAINTENANCE_CONFIRMED]: "Phiếu bảo trì xe {vehicle} đã được xác nhận, chờ duyệt.",
     [NOTIFICATION_EVENTS.VEHICLE_MAINTENANCE_REJECTED]: "Phiếu bảo trì xe {vehicle} đã bị từ chối, cần kiểm tra lại.",
     [NOTIFICATION_EVENTS.VEHICLE_MAINTENANCE_APPROVED]: "Phiếu bảo trì xe {vehicle} đã được duyệt.",
+    [NOTIFICATION_EVENTS.VEHICLE_MAINTENANCE_DELETED]: "Phiếu bảo trì xe {vehicle} đã bị xóa.",
   },
   en: {
     [NOTIFICATION_EVENTS.STATION_CHECK_IN]: "Vehicle {vehicle} checked in at {station}",
@@ -52,6 +53,7 @@ const NOTIFICATION_TEXT_TEMPLATES: Record<NotificationLocale, Record<string, str
     [NOTIFICATION_EVENTS.VEHICLE_MAINTENANCE_CONFIRMED]: "Vehicle maintenance ticket for {vehicle} was confirmed and is waiting for approval.",
     [NOTIFICATION_EVENTS.VEHICLE_MAINTENANCE_REJECTED]: "Vehicle maintenance ticket for {vehicle} was rejected and needs review.",
     [NOTIFICATION_EVENTS.VEHICLE_MAINTENANCE_APPROVED]: "Vehicle maintenance ticket for {vehicle} was approved.",
+    [NOTIFICATION_EVENTS.VEHICLE_MAINTENANCE_DELETED]: "Vehicle maintenance ticket for {vehicle} was deleted.",
   },
 };
 
@@ -140,6 +142,11 @@ export function getNotificationText(
   const resolvedLocale = getNotificationLocale(locale);
   const event =
     typeof notification.event === "string" ? notification.event : undefined;
+  const message = getStringValue(notification.message);
+  if (event === NOTIFICATION_EVENTS.VEHICLE_MAINTENANCE_DELETED && message) {
+    return message;
+  }
+
   const template = event ? NOTIFICATION_TEXT_TEMPLATES[resolvedLocale][event] : undefined;
 
   if (template) {
@@ -155,7 +162,6 @@ export function getNotificationText(
     });
   }
 
-  const message = getStringValue(notification.message);
   if (message) {
     return message;
   }

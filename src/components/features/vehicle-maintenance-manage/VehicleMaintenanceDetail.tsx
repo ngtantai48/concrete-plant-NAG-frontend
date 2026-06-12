@@ -398,6 +398,23 @@ function getHistoryActorRole(item: VehicleMaintenanceHistory) {
   return item.actor?.role_label || item.actor?.role || null;
 }
 
+function isMaintenanceNotFoundError(error: unknown): boolean {
+  const candidate = error as { response?: { status?: number; data?: { message?: string } }; status?: number; message?: string };
+  const status = candidate?.response?.status ?? candidate?.status;
+  if (status === 404) return true;
+
+  const message = [
+    candidate?.response?.data?.message,
+    candidate?.message,
+    typeof error === "string" ? error : "",
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  return message.includes("404") || message.includes("not_found") || message.includes("not found");
+}
+
 function toFormValues(item: VehicleMaintenance): MaintenanceFormValues {
   const fromDate = dayjs(item.vehicle_maintenance_from_datetime);
   return {
@@ -567,6 +584,7 @@ export default function VehicleMaintenanceDetail({ maintenanceId }: { maintenanc
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [isLeaveDialogOpen, setIsLeaveDialogOpen] = useState(false);
   const [isOcrDetailOpen, setIsOcrDetailOpen] = useState(false);
+  const [notFoundMaintenanceId, setNotFoundMaintenanceId] = useState<number | null>(null);
   const [workflowAction, setWorkflowAction] = useState<VehicleMaintenanceWorkflowAction | null>(null);
   const [workflowNote, setWorkflowNote] = useState("");
   const [workflowTargetStatus, setWorkflowTargetStatus] = useState<RevertApprovalTargetStatus>("submitted");
@@ -583,6 +601,7 @@ export default function VehicleMaintenanceDetail({ maintenanceId }: { maintenanc
   const workflowActions = maintenance?.workflow_available_actions || [];
   const canEditMaintenance = canUpdate && ["draft", "rejected"].includes(currentStatus);
   const disabled = !isEditing || saving || deleting;
+  const notFound = notFoundMaintenanceId === maintenanceId;
   const workflowDialogText = workflowAction ? getWorkflowDialogText(workflowAction) : null;
   const selectedRevertTarget = REVERT_APPROVAL_TARGET_OPTIONS.find((item) => item.value === workflowTargetStatus);
   const vehicleSelectOptions = useMemo<VehicleOption[]>(() => {
@@ -607,12 +626,20 @@ export default function VehicleMaintenanceDetail({ maintenanceId }: { maintenanc
     return () => setDirty(false);
   }, [maintenanceId, setDirty]);
 
-  const refreshDetail = useCallback(async () => {
-    if (!Number.isFinite(maintenanceId) || maintenanceId <= 0) return;
+  const refreshDetail = useCallback(async (): Promise<boolean> => {
+    if (!Number.isFinite(maintenanceId) || maintenanceId <= 0) return false;
     try {
       await dispatch(fetchVehicleMaintenanceById(maintenanceId)).unwrap();
-    } catch {
+      setNotFoundMaintenanceId((currentId) => (currentId === maintenanceId ? null : currentId));
+      return true;
+    } catch (error) {
+      if (isMaintenanceNotFoundError(error)) {
+        setNotFoundMaintenanceId(maintenanceId);
+        return false;
+      }
+
       toast.error("Không tải được chi tiết phiếu bảo trì");
+      return false;
     }
   }, [dispatch, maintenanceId]);
 
@@ -626,12 +653,18 @@ export default function VehicleMaintenanceDetail({ maintenanceId }: { maintenanc
   }, [dispatch, maintenanceId]);
 
   useEffect(() => {
-    refreshDetail();
-  }, [refreshDetail]);
+    let cancelled = false;
+    void (async () => {
+      const loaded = await refreshDetail();
+      if (!cancelled && loaded) {
+        await refreshHistory();
+      }
+    })();
 
-  useEffect(() => {
-    refreshHistory();
-  }, [refreshHistory]);
+    return () => {
+      cancelled = true;
+    };
+  }, [refreshDetail, refreshHistory]);
 
   const ensureVehicleOptions = useCallback(async () => {
     if (vehicleOptionsLoaded || vehicleOptionsLoading) return;
@@ -979,6 +1012,24 @@ export default function VehicleMaintenanceDetail({ maintenanceId }: { maintenanc
       <div className="flex min-h-[420px] items-center justify-center">
         <Spin />
       </div>
+    );
+  }
+
+  if (notFound) {
+    return (
+      <Card className="m-4 rounded-lg p-8 md:m-10">
+        <div className="flex flex-col items-center gap-4 text-center">
+          <Wrench className="size-10 text-slate-300" />
+          <div className="space-y-1">
+            <p className="text-lg font-semibold text-slate-800">Phiếu bảo trì không tồn tại</p>
+            <p className="text-sm text-slate-500">Phiếu này có thể đã bị xóa hoặc bạn không còn quyền xem.</p>
+          </div>
+          <Button variant="outline" onClick={() => router.push(SIDEBAR.VEHICLE_MAINTENANCES)}>
+            <ArrowLeft className="size-4" />
+            Quay lại danh sách
+          </Button>
+        </div>
+      </Card>
     );
   }
 
