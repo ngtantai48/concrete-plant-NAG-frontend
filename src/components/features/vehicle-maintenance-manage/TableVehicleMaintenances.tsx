@@ -38,6 +38,8 @@ import { PERMISSIONS } from "@/constants/permissions";
 import { SIDEBAR } from "@/constants/route";
 import { useNavigationStore } from "@/hooks/use-navigation-store";
 import { usePermissions } from "@/hooks/use-permissions";
+import { useSocketEventListener } from "@/hooks/useSocketEventListener";
+import { useSocket } from "@/context/socket-context";
 import {
   formatVietnameseCurrencyValue,
   normalizeVietnameseCurrencyInput,
@@ -47,6 +49,7 @@ import mediaApi from "@/services/media.service";
 import ocrApi from "@/services/ocr.service";
 import vehicleMaintenanceApi from "@/services/vehicle-maintenance.service";
 import vtrackingApi from "@/services/vtracking.service";
+import MaintenanceAiBadge from "@/components/features/vehicle-maintenance-manage/MaintenanceAiBadge";
 import { useAppDispatch, useAppSelector } from "@/hooks/use-app-selector";
 import {
   bulkDeleteVehicleMaintenancesThunk,
@@ -77,7 +80,7 @@ import {
   X,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { type Key, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -424,9 +427,13 @@ function buildPayload(values: MaintenanceFormValues): Partial<VehicleMaintenance
 export default function TableVehicleMaintenances() {
   const t = useTranslations("VehicleMaintenancePage");
   const tCommon = useTranslations("Common");
+  const tAi = useTranslations("MaintenanceAiInsight");
   const { hasActionAccess } = usePermissions();
   const { setDirty } = useNavigationStore();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const vehicleIdFilter = Number(searchParams.get("vehicle_id")) || null;
+  const { isConnected } = useSocket();
   const dispatch = useAppDispatch();
   const documentInputRef = useRef<HTMLInputElement | null>(null);
   const {
@@ -483,9 +490,10 @@ export default function TableVehicleMaintenances() {
       } else if (nextStatus !== "all") {
         params.status = nextStatus;
       }
+      if (vehicleIdFilter) params.vehicle_id = vehicleIdFilter;
       return params;
     },
-    [limit, page, searchText, statusFilter]
+    [limit, page, searchText, statusFilter, vehicleIdFilter]
   );
 
   const fetchMaintenances = useCallback(async (overrides?: { page?: number; limit?: number; search?: string; status?: string }) => {
@@ -496,8 +504,25 @@ export default function TableVehicleMaintenances() {
     }
   }, [buildListParams, dispatch, t]);
 
-  const ensureVehicleOptions = useCallback(async (): Promise<Vehicle[]> => {
-    if (vehicleOptionsLoaded || vehicleOptionsLoading) return vehicles;
+  const refreshTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scheduleRealtimeRefresh = useCallback(() => {
+    if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+    refreshTimerRef.current = setTimeout(() => {
+      void dispatch(fetchVehicleMaintenances({ ...buildListParams(), force: true }));
+    }, 2000);
+  }, [buildListParams, dispatch]);
+
+  useSocketEventListener("maintenance:pending_upsert", scheduleRealtimeRefresh, "notifications", isConnected);
+  useSocketEventListener("maintenance:pending_remove", scheduleRealtimeRefresh, "notifications", isConnected);
+
+  useEffect(() => {
+    return () => {
+      if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
+    };
+  }, []);
+
+  const ensureVehicleOptions = useCallback(async () => {
+    if (vehicleOptionsLoaded || vehicleOptionsLoading) return;
     const result = await dispatch(fetchVehicleNameOptions({ limit: 1000 }));
     if (fetchVehicleNameOptions.fulfilled.match(result)) {
       return result.payload.data;
@@ -866,6 +891,14 @@ export default function TableVehicleMaintenances() {
     PERMISSIONS.VEHICLE_MAINTENANCES.DELETE
   );
 
+  // Cột AI chỉ hiện cho người có quyền duyệt (giống dock) — admin bypass qua hasActionAccess.
+  const canModerate =
+    hasActionAccess(SIDEBAR.VEHICLE_MAINTENANCES, PERMISSIONS.VEHICLE_MAINTENANCES.DISPATCH_REVIEW) ||
+    hasActionAccess(
+      SIDEBAR.VEHICLE_MAINTENANCES,
+      PERMISSIONS.VEHICLE_MAINTENANCES.PRODUCTION_APPROVE
+    );
+
   const handleBulkDelete = async () => {
     if (selectedIds.length === 0) return;
 
@@ -1049,6 +1082,18 @@ export default function TableVehicleMaintenances() {
         </Badge>
       ),
     },
+    ...(canModerate
+      ? [
+          {
+            title: tAi("columnTitle"),
+            key: "ai_insight",
+            align: "center" as const,
+            render: (_: unknown, record: VehicleMaintenance) => (
+              <MaintenanceAiBadge insight={record.ai_insight} />
+            ),
+          },
+        ]
+      : []),
     {
       title: t("status"),
       key: "status",
@@ -1128,6 +1173,14 @@ export default function TableVehicleMaintenances() {
               ) : null}
             </div>
 
+            {vehicleIdFilter && (
+              <span className="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2.5 py-1 text-xs text-sky-700">
+                {`Xe #${vehicleIdFilter}`}
+                <button type="button" onClick={() => router.replace(SIDEBAR.VEHICLE_MAINTENANCES)} aria-label="clear">
+                  <X className="size-3" />
+                </button>
+              </span>
+            )}
             <Tabs
               value={statusFilter}
               onValueChange={(value) => {
