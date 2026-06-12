@@ -70,7 +70,8 @@ export type VehicleMaintenanceWorkflowAction =
   | 'dispatch_approve'
   | 'dispatch_reject'
   | 'production_approve'
-  | 'production_reject';
+  | 'production_reject'
+  | 'revert_approval';
 
 export interface VehicleMaintenanceHistory {
   vehicle_maintenance_history_id: number;
