@@ -345,6 +345,10 @@ Recipients:
 - `production_approve`: ticket creator
 - `production_reject`: ticket creator
 
+Reject/approve notifications should target the concrete ticket creator, not every user with `/vehicle-maintenances__submit`. This avoids notifying unrelated drivers or submit-capable users.
+
+If the creator user has been deleted or cannot log in anymore, the workflow must still succeed. Current behavior may write an orphaned Redis notification for the old `created_by`/`reported_by` user id; no active socket will consume it and Redis TTL will eventually remove it. Only add an active-user existence check or fallback recipient, such as admin/manager, if product explicitly wants that stricter behavior.
+
 Do not notify the actor themselves unless product asks for self-notification. Deduplicate recipients.
 
 Messages must stay role-neutral:

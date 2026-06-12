@@ -59,6 +59,7 @@ import {
 } from "@/store/slices/vehicleMaintenanceSlice";
 import { fetchVehicleNameOptions } from "@/store/slices/vehicleSlice";
 import type { Vehicle, VehicleMaintenance, VehicleMaintenanceDocument } from "@/types/vehicle";
+import type { VtrackingVehicle } from "@/types/vtracking";
 import { Pagination, Table, Tooltip } from "antd";
 import type { TableProps } from "antd";
 import dayjs from "dayjs";
@@ -125,6 +126,8 @@ const MAINTENANCE_LIST_TABS = [
   { value: "rejected", label: "Từ chối" },
 ];
 
+const VTRACKING_DISTANCE_KEY = "distance";
+
 type MaintenanceFormValues = {
   vehicle_id: number;
   dateRange?: [dayjs.Dayjs, dayjs.Dayjs];
@@ -162,6 +165,73 @@ function createDefaultFormValues(): MaintenanceFormValues {
     payment_status: "unpaid",
     currency: "VND",
   } as MaintenanceFormValues;
+}
+
+function normalizeVehicleIdentity(value?: string | null) {
+  return String(value ?? "")
+    .trim()
+    .toUpperCase()
+    .replace(/[\s._-]/g, "");
+}
+
+function isSameVehicleIdentity(left?: string | null, right?: string | null) {
+  const normalizedLeft = normalizeVehicleIdentity(left);
+  const normalizedRight = normalizeVehicleIdentity(right);
+  if (!normalizedLeft || !normalizedRight) return false;
+  if (normalizedLeft === normalizedRight) return true;
+
+  return (
+    normalizedLeft.length >= 5 &&
+    normalizedRight.length >= 5 &&
+    (normalizedLeft.includes(normalizedRight) || normalizedRight.includes(normalizedLeft))
+  );
+}
+
+function parseVtrackingNumericValue(value: unknown) {
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  if (typeof value !== "string") return null;
+
+  const compactValue = value.trim().replace(/\s/g, "");
+  if (!compactValue) return null;
+
+  const dotCount = (compactValue.match(/\./g) || []).length;
+  const normalized =
+    compactValue.includes(",")
+      ? compactValue.replace(/\./g, "").replace(",", ".")
+      : dotCount > 1
+        ? compactValue.replace(/\./g, "")
+        : compactValue.replace(/,/g, "");
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function getVtrackingDistanceKm(vehicle?: VtrackingVehicle | null) {
+  const attr = vehicle?.attributes?.find((item) => item.attribute_key === VTRACKING_DISTANCE_KEY);
+  const rawValue = parseVtrackingNumericValue(attr?.value);
+  if (rawValue === null || rawValue < 0) return null;
+
+  return rawValue;
+}
+
+function formatVtrackingDistanceValue(value?: number | null) {
+  if (value === undefined || value === null || !Number.isFinite(Number(value))) return "";
+  return String(Number(value));
+}
+
+function findMatchingVtrackingVehicle(
+  vtrackingVehicles: VtrackingVehicle[],
+  vehicle?: Vehicle | null
+) {
+  if (!vehicle) return null;
+
+  return (
+    vtrackingVehicles.find(
+      (item) =>
+        isSameVehicleIdentity(item.license_plate, vehicle.vehicle_license_plate) ||
+        isSameVehicleIdentity(item.vehicle_name, vehicle.vehicle_name) ||
+        isSameVehicleIdentity(item.vehicle_name, vehicle.vehicle_license_plate)
+    ) ?? null
+  );
 }
 
 function FieldError({ message }: { message?: string }) {
@@ -204,12 +274,13 @@ function DateField({
   error?: string;
   onChange: (value: dayjs.Dayjs | null) => void;
 }) {
+  const [isOpen, setIsOpen] = useState(false);
   const selectedDate = value?.isValid() ? value.toDate() : undefined;
 
   return (
     <div className="space-y-2">
       <Label className="text-slate-700">{label}</Label>
-      <Popover>
+      <Popover open={isOpen} onOpenChange={setIsOpen}>
         <PopoverTrigger asChild>
           <Button
             type="button"
@@ -225,7 +296,10 @@ function DateField({
           <CalendarPicker
             mode="single"
             selected={selectedDate}
-            onSelect={(date) => onChange(date ? dayjs(date) : null)}
+            onSelect={(date) => {
+              onChange(date ? dayjs(date) : null);
+              if (date) setIsOpen(false);
+            }}
             captionLayout="dropdown"
           />
         </PopoverContent>
@@ -391,8 +465,11 @@ export default function TableVehicleMaintenances() {
   const [pendingFiles, setPendingFiles] = useState<File[]>([]);
   const [ocrLoading, setOcrLoading] = useState(false);
   const [ocrFileName, setOcrFileName] = useState<string | null>(null);
+  const [distanceLoading, setDistanceLoading] = useState(false);
+  const [distanceHelperText, setDistanceHelperText] = useState<string | null>(null);
   const [totalAmountInput, setTotalAmountInput] = useState("");
   const isTotalAmountFocusedRef = useRef(false);
+  const vtrackingDistanceRequestIdRef = useRef(0);
   const [saving, setSaving] = useState(false);
 
   const buildListParams = useCallback(
@@ -446,10 +523,68 @@ export default function TableVehicleMaintenances() {
   const ensureVehicleOptions = useCallback(async () => {
     if (vehicleOptionsLoaded || vehicleOptionsLoading) return;
     const result = await dispatch(fetchVehicleNameOptions({ limit: 1000 }));
+    if (fetchVehicleNameOptions.fulfilled.match(result)) {
+      return result.payload.data;
+    }
     if (fetchVehicleNameOptions.rejected.match(result)) {
       toast.error("Không tải được danh sách xe", { position: "top-right" });
     }
-  }, [dispatch, vehicleOptionsLoaded, vehicleOptionsLoading]);
+    return [];
+  }, [dispatch, vehicleOptionsLoaded, vehicleOptionsLoading, vehicles]);
+
+  const resetDistanceFromVtracking = useCallback(() => {
+    vtrackingDistanceRequestIdRef.current += 1;
+    setDistanceLoading(false);
+    setDistanceHelperText(null);
+  }, []);
+
+  const fetchDistanceFromVtracking = useCallback(
+    async (vehicleId: number, vehicleOverride?: Vehicle) => {
+      const selectedVehicle = vehicleOverride ?? vehicles.find((item) => item.vehicle_id === vehicleId);
+      if (!selectedVehicle) {
+        setDistanceLoading(false);
+        setDistanceHelperText("Chưa tìm thấy phương tiện trong danh sách xe.");
+        return;
+      }
+
+      const requestId = vtrackingDistanceRequestIdRef.current + 1;
+      vtrackingDistanceRequestIdRef.current = requestId;
+      setDistanceLoading(true);
+      setDistanceHelperText("Đang lấy số km từ VTracking...");
+      setFormValues((prev) =>
+        prev.vehicle_id === vehicleId ? { ...prev, vehicle_distance_covered: null } : prev
+      );
+
+      try {
+        const response = await vtrackingApi.fetchVehicles();
+        if (vtrackingDistanceRequestIdRef.current === requestId) {
+          const matchedVehicle = findMatchingVtrackingVehicle(
+            response.data?.vehicles || [],
+            selectedVehicle
+          );
+          const distanceKm = getVtrackingDistanceKm(matchedVehicle);
+
+          if (distanceKm === null) {
+            setDistanceHelperText("Không có dữ liệu số km từ VTracking cho phương tiện này.");
+          } else {
+            setFormValues((prev) =>
+              prev.vehicle_id === vehicleId ? { ...prev, vehicle_distance_covered: distanceKm } : prev
+            );
+            setDistanceHelperText("Đã lấy số km từ VTracking.");
+          }
+        }
+      } catch {
+        if (vtrackingDistanceRequestIdRef.current === requestId) {
+          setDistanceHelperText("Không lấy được số km từ VTracking.");
+        }
+      } finally {
+        if (vtrackingDistanceRequestIdRef.current === requestId) {
+          setDistanceLoading(false);
+        }
+      }
+    },
+    [vehicles]
+  );
 
   const markFormDirty = useCallback(() => {
     if (!useNavigationStore.getState().isDirty) {
@@ -475,7 +610,20 @@ export default function TableVehicleMaintenances() {
     [updateFormField]
   );
 
-  const fetchDriverContext = useCallback(async () => {
+  const handleVehicleChange = useCallback(
+    (value: string) => {
+      const vehicleId = Number(value);
+      updateFormField("vehicle_id", vehicleId);
+      if (Number.isFinite(vehicleId) && vehicleId > 0) {
+        void fetchDistanceFromVtracking(vehicleId);
+      } else {
+        resetDistanceFromVtracking();
+      }
+    },
+    [fetchDistanceFromVtracking, resetDistanceFromVtracking, updateFormField]
+  );
+
+  const fetchDriverContext = useCallback(async (availableVehicles: Vehicle[] = vehicles) => {
     try {
       const res = await vehicleMaintenanceApi.getDriverContext({
         date: dayjs().format("YYYY-MM-DD"),
@@ -485,11 +633,15 @@ export default function TableVehicleMaintenances() {
       const defaultVehicleId = Number(res.data.default_vehicle_id);
       if (Number.isFinite(defaultVehicleId) && defaultVehicleId > 0) {
         setFormValues((prev) => ({ ...prev, vehicle_id: defaultVehicleId }));
+        const defaultVehicle = availableVehicles.find((item) => item.vehicle_id === defaultVehicleId);
+        if (defaultVehicle) {
+          void fetchDistanceFromVtracking(defaultVehicleId, defaultVehicle);
+        }
       }
     } catch {
       setAssignedVehicleIds([]);
     }
-  }, []);
+  }, [fetchDistanceFromVtracking, vehicles]);
 
   useEffect(() => {
     fetchMaintenances();
@@ -520,13 +672,14 @@ export default function TableVehicleMaintenances() {
     setPendingFiles([]);
     setOcrLoading(false);
     setOcrFileName(null);
+    resetDistanceFromVtracking();
     isTotalAmountFocusedRef.current = false;
     setTotalAmountInput("");
     setFormErrors({});
     setFormValues(createDefaultFormValues());
     setIsModalVisible(true);
-    ensureVehicleOptions();
-    fetchDriverContext();
+    const availableVehicles = await ensureVehicleOptions();
+    fetchDriverContext(availableVehicles);
   };
 
   const openEditModal = async (record: VehicleMaintenance) => {
@@ -539,6 +692,7 @@ export default function TableVehicleMaintenances() {
       setPendingFiles([]);
       setOcrLoading(false);
       setOcrFileName(null);
+      resetDistanceFromVtracking();
       isTotalAmountFocusedRef.current = false;
       setTotalAmountInput(formatVietnameseCurrencyValue(item.total_amount));
       setFormErrors({});
@@ -584,6 +738,7 @@ export default function TableVehicleMaintenances() {
     setPendingFiles([]);
     setOcrLoading(false);
     setOcrFileName(null);
+    resetDistanceFromVtracking();
     isTotalAmountFocusedRef.current = false;
     setTotalAmountInput("");
     setDirty(false);
@@ -1179,7 +1334,7 @@ export default function TableVehicleMaintenances() {
                     <Label className="text-slate-700">{t("vehicle")}</Label>
                     <ShadSelect
                       value={formValues.vehicle_id ? String(formValues.vehicle_id) : undefined}
-                      onValueChange={(value) => updateFormField("vehicle_id", Number(value))}
+                      onValueChange={handleVehicleChange}
                     >
                       <SelectTrigger
                         className={DIALOG_CONTROL_CLASS}
@@ -1268,22 +1423,28 @@ export default function TableVehicleMaintenances() {
                     <Label className="text-slate-700">{t("distanceCovered")}</Label>
                     <div className="relative">
                       <ShadInput
-                        type="number"
-                        min={0}
-                        placeholder={t("distancePlaceholder")}
-                        value={formValues.vehicle_distance_covered ?? ""}
-                        onChange={(event) =>
-                          updateFormField(
-                            "vehicle_distance_covered",
-                            event.target.value === "" ? null : Number(event.target.value)
-                          )
+                        type="text"
+                        disabled
+                        placeholder={
+                          distanceLoading
+                            ? "Đang lấy từ VTracking..."
+                            : formValues.vehicle_id
+                              ? "Tự động lấy từ VTracking"
+                              : t("vehiclePlaceholder")
                         }
-                        className={`${DIALOG_CONTROL_CLASS} pr-12`}
+                        value={formatVtrackingDistanceValue(formValues.vehicle_distance_covered)}
+                        className={`${DIALOG_CONTROL_CLASS} pr-12 disabled:opacity-100`}
                       />
+                      {distanceLoading ? (
+                        <RefreshCw className="absolute right-10 top-1/2 size-4 -translate-y-1/2 animate-spin text-blue-500" />
+                      ) : null}
                       <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
                         {t("km")}
                       </span>
                     </div>
+                    {distanceHelperText ? (
+                      <p className="text-xs text-muted-foreground">{distanceHelperText}</p>
+                    ) : null}
                   </div>
 
                   <div className="space-y-2">
@@ -1300,7 +1461,7 @@ export default function TableVehicleMaintenances() {
 
                   <div className="md:col-span-2 space-y-2">
                     <Label className="text-slate-700">{t("dateRange")}</Label>
-                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                    <div className="grid grid-cols-1 gap-8 sm:grid-cols-2">
                       <DateField
                         label={t("dateRangePlaceholder.0") as string}
                         placeholder={t("dateRangePlaceholder.0") as string}
