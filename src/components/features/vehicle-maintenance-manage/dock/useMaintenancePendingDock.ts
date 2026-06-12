@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { PERMISSIONS } from "@/constants/permissions";
 import { SIDEBAR } from "@/constants/route";
 import { useSocket } from "@/context/socket-context";
+import { useMaintenanceDockStore } from "@/hooks/use-maintenance-dock-store";
 import { usePermissions } from "@/hooks/use-permissions";
 import { useSocketEventListener } from "@/hooks/useSocketEventListener";
 import { SocketManager } from "@/lib/socket";
@@ -175,6 +176,14 @@ export function useMaintenancePendingDock() {
   );
 
   const visibleItems = items.filter((c) => !skippedIds.has(c.vehicle_maintenance_id));
+
+  // Đẩy trạng thái hiển thị của dock ra store dùng chung: dock hiện iff có quyền
+  // duyệt + còn phiếu chưa ẩn. Nút quick voice trên dashboard đọc để hiện/ẩn theo.
+  const setHasPending = useMaintenanceDockStore((s) => s.setHasPending);
+  useEffect(() => {
+    setHasPending(canModerate && visibleItems.length > 0);
+    return () => setHasPending(false);
+  }, [canModerate, visibleItems.length, setHasPending]);
 
   return { canModerate, isConnected, items: visibleItems, processingIds, runAction, skipCard };
 }
