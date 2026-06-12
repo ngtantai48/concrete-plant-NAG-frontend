@@ -22,6 +22,11 @@ export interface Notification {
     to_status?: string;
     actor_id?: number;
     actor_name?: string;
+    deleted_by?: number;
+    deleted_by_name?: string | null;
+    deleted_at?: string;
+    read_only?: boolean;
+    navigate_to?: string | null;
     note?: string | null;
     station_id?: number;
     station_name?: string;
