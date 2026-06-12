@@ -104,9 +104,10 @@ export const runVehicleMaintenanceWorkflowThunk = createAsyncThunk<
     action: VehicleMaintenanceWorkflowAction;
     note?: string | null;
     reason?: string | null;
+    target_status?: string | null;
   }
->("vehicleMaintenances/runWorkflow", async ({ id, action, note, reason }) => {
-  const res = await vehicleMaintenanceApi.runWorkflowAction(id, action, { note, reason });
+>("vehicleMaintenances/runWorkflow", async ({ id, action, note, reason, target_status }) => {
+  const res = await vehicleMaintenanceApi.runWorkflowAction(id, action, { note, reason, target_status });
   return res.data;
 });
 
