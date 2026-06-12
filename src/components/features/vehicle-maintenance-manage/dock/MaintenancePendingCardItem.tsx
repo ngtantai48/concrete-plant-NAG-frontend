@@ -67,10 +67,11 @@ export default function MaintenancePendingCardItem({
     ((insight.suggested_type != null && insight.suggested_type !== card.vehicle_maintenance_type) ||
       (insight.suggested_rank != null && insight.suggested_rank !== ticketRank));
 
-  // AI block: only show spinner when status is explicitly "pending"; hide block entirely when insight is null.
-  const showAiSpinner = insight?.status === "pending";
-  const showAiFailed = insight?.status === "failed";
+  // Khối AI luôn hiện ngay cùng phiếu: done → nội dung; failed → báo lỗi;
+  // còn lại (chưa có insight vì vừa submit, hoặc đang phân tích) → "đang tổng quan".
   const showAiDone = insight?.status === "done";
+  const showAiFailed = insight?.status === "failed";
+  const showAiSpinner = !showAiDone && !showAiFailed;
   const showAiBlock = showAiSpinner || showAiFailed || showAiDone;
 
   return (
@@ -148,7 +149,7 @@ export default function MaintenancePendingCardItem({
           ) : showAiFailed ? (
             <p className="text-xs text-slate-400">{t("analysisFailed")}</p>
           ) : (
-            /* showAiSpinner — only when status === "pending" */
+            /* showAiSpinner — chưa có insight (vừa submit) hoặc đang phân tích */
             <p className="flex items-center gap-1.5 text-xs text-slate-400">
               <RefreshCw className="size-3.5 animate-spin" />
               {t("analyzing")}
