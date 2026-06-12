@@ -11,6 +11,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import MaintenanceAiInsightCard from "@/components/features/vehicle-maintenance-manage/MaintenanceAiInsightCard";
 import VehicleMaintenanceDiscussion from "@/components/features/vehicle-maintenance-manage/VehicleMaintenanceDiscussion";
 import { PERMISSIONS } from "@/constants/permissions";
 import { SIDEBAR } from "@/constants/route";
@@ -313,6 +314,7 @@ function getWorkflowActionLabel(action: string) {
     production_reject: "Phê duyệt bảo trì từ chối",
     delete: "Xóa phiếu",
     bulk_delete: "Xóa hàng loạt",
+    ai_classification_applied: "Áp dụng phân loại AI",
   };
   return labels[action] || action;
 }
@@ -863,7 +865,11 @@ export default function VehicleMaintenanceDetail({ maintenanceId }: { maintenanc
 
   const openWorkflowDialog = (action: VehicleMaintenanceWorkflowAction) => {
     setWorkflowAction(action);
-    setWorkflowNote("");
+    const prefill =
+      (action === "dispatch_reject" || action === "production_reject")
+        ? (maintenance?.ai_insight?.suggested_reject_reason ?? "")
+        : "";
+    setWorkflowNote(prefill);
   };
 
   const closeWorkflowDialog = () => {
@@ -1073,6 +1079,15 @@ export default function VehicleMaintenanceDetail({ maintenanceId }: { maintenanc
               ) : null}
             </div>
           </div>
+          {maintenance && !isEditing && (
+            <MaintenanceAiInsightCard
+              maintenance={maintenance}
+              onChanged={() => {
+                void dispatch(fetchVehicleMaintenanceById(maintenanceId));
+                void dispatch(fetchVehicleMaintenanceHistoryThunk(maintenanceId));
+              }}
+            />
+          )}
         </CardHeader>
 
         <CardContent className="bg-white px-8">

@@ -65,6 +65,7 @@ import { computeTripStats, formatDuration } from "./trip-stats";
 import VehicleLocationDialog from "./VehicleLocationDialog";
 import VehicleStatusChange from "./VehicleStatusChange";
 import EndOfDayModal from "./EndOfDayModal";
+import MaintenanceAiOverviewCard from "./MaintenanceAiOverviewCard";
 import SystemSettingsForm from "../system-settings/SystemSettingsForm";
 import { SIDEBAR } from "@/constants/route";
 import { PERMISSIONS } from "@/constants/permissions";
@@ -1623,6 +1624,7 @@ export default function AdminDashboard() {
                 className="flex flex-col gap-1.5 h-full min-h-0 animate-fade-up"
                 style={{ flex: "3 1 0%", animationDelay: "0.6s" }}
               >
+                <MaintenanceAiOverviewCard />
                 {/* Section 1: Mixer Vehicles (Xe bồn) */}
                 <div
                   className="flex flex-col overflow-hidden dd-card min-h-0"
