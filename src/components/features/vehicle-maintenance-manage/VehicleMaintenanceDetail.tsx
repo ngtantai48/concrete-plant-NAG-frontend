@@ -294,7 +294,7 @@ function getWorkflowActionLabel(action: string) {
     production_reject: "Phê duyệt bảo trì từ chối",
     delete: "Xóa phiếu",
     bulk_delete: "Xóa hàng loạt",
-    ai_classification_applied: "Áp dụng phân loại AI",
+    ai_classification_applied: "Áp dụng phân loại",
   };
   return labels[action] || action;
 }

@@ -395,20 +395,32 @@ const ATTENDANCE_DAILY_RECORD_KEYS = [
   "rows",
 ];
 
+const formatDateKey = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
 const buildDateList = (fromDate: string, toDate: string) => {
   const dates: string[] = [];
   const current = new Date(`${fromDate}T00:00:00`);
   const end = new Date(`${toDate}T00:00:00`);
 
   while (current <= end) {
-    const year = current.getFullYear();
-    const month = String(current.getMonth() + 1).padStart(2, "0");
-    const day = String(current.getDate()).padStart(2, "0");
-    dates.push(`${year}-${month}-${day}`);
+    dates.push(formatDateKey(current));
     current.setDate(current.getDate() + 1);
   }
 
   return dates;
+};
+
+const getPreviousDate = (workDate: string) => {
+  const current = new Date(`${workDate}T00:00:00`);
+  if (Number.isNaN(current.getTime())) return "";
+
+  current.setDate(current.getDate() - 1);
+  return formatDateKey(current);
 };
 
 const normalizeStatusReason = (value: unknown) =>
@@ -789,6 +801,13 @@ const listArrangementDays = (workDate: string): Promise<BackendArrangementDay[]>
     ]).filter((day) => !day.delete_flag && normalizeDate(day.arrangement_date) === workDate);
   });
 
+const getPreviousArrangementDay = async (workDate: string) => {
+  const previousDate = getPreviousDate(workDate);
+  if (!previousDate || previousDate === workDate) return undefined;
+
+  return (await listArrangementDays(previousDate))[0];
+};
+
 const createArrangementDay = async (workDate: string) => {
   const res = await http.post("/work-arrangement-days", {
     arrangement_date: workDate,
@@ -1045,6 +1064,25 @@ const buildMixerDraftFromBackend = async (
   }
 
   return { work_date: workDate, mixer_assignments: mixerAssignments };
+};
+
+const hasWorkAssignmentDraftData = (
+  pumpDraft: WorkAssignmentDraft,
+  mixerDraft: WorkMixerAssignmentDraft
+) => pumpDraft.pump_assignments.length > 0 || mixerDraft.mixer_assignments.length > 0;
+
+const withPrefilledFromDate = <T extends { prefilled_from_date?: string }>(
+  draft: T,
+  sourceDate: string
+): T => ({
+  ...draft,
+  prefilled_from_date: sourceDate,
+});
+
+const withoutPrefilledFromDate = <T extends { prefilled_from_date?: string }>(draft: T): T => {
+  const next = { ...draft };
+  delete next.prefilled_from_date;
+  return next;
 };
 
 const syncArrangementPersonnel = async (
@@ -1384,10 +1422,30 @@ export const workAssignmentApi = {
         listArrangementDays(workDate),
       ]);
       const day = arrangementDays[0];
-      const [pumpDraft, mixerDraft] = await Promise.all([
+      const previousDate = getPreviousDate(workDate);
+      let [pumpDraft, mixerDraft] = await Promise.all([
         buildDraftFromBackend(workDate, day),
         buildMixerDraftFromBackend(workDate, day),
       ]);
+
+      if (!hasWorkAssignmentDraftData(pumpDraft, mixerDraft)) {
+        const previousDay = await getPreviousArrangementDay(workDate);
+        if (previousDay && previousDate) {
+          const [previousPumpDraft, previousMixerDraft] = await Promise.all([
+            buildDraftFromBackend(workDate, previousDay),
+            buildMixerDraftFromBackend(workDate, previousDay),
+          ]);
+
+          if (hasWorkAssignmentDraftData(previousPumpDraft, previousMixerDraft)) {
+            pumpDraft = previousPumpDraft.pump_assignments.length
+              ? withPrefilledFromDate(previousPumpDraft, previousDate)
+              : previousPumpDraft;
+            mixerDraft = previousMixerDraft.mixer_assignments.length
+              ? withPrefilledFromDate(previousMixerDraft, previousDate)
+              : previousMixerDraft;
+          }
+        }
+      }
 
       return {
         work_date: workDate,
@@ -1425,7 +1483,10 @@ export const workAssignmentApi = {
     draft: WorkAssignmentDraft,
     personnel: WorkPersonnel[]
   ): Promise<WorkAssignmentDraft> => {
-    const nextDraft = { ...draft, pump_assignments: draft.pump_assignments || [] };
+    const nextDraft = withoutPrefilledFromDate({
+      ...draft,
+      pump_assignments: draft.pump_assignments || [],
+    });
     try {
       const day = await ensureArrangementDay(draft.work_date);
       const dayId = getArrangementDayId(day);
@@ -1443,7 +1504,10 @@ export const workAssignmentApi = {
     draft: WorkMixerAssignmentDraft,
     personnel: WorkPersonnel[]
   ): Promise<WorkMixerAssignmentDraft> => {
-    const nextDraft = { ...draft, mixer_assignments: draft.mixer_assignments || [] };
+    const nextDraft = withoutPrefilledFromDate({
+      ...draft,
+      mixer_assignments: draft.mixer_assignments || [],
+    });
     try {
       const day = await ensureArrangementDay(draft.work_date);
       const dayId = getArrangementDayId(day);
@@ -1491,6 +1555,8 @@ const buildWorkTaskDraftFromBackend = async (
 
   return { work_date: workDate, task_assignments: taskAssignments };
 };
+
+const hasWorkTaskDraftData = (draft: WorkTaskAssignmentDraft) => draft.task_assignments.length > 0;
 
 const createWorkTaskItem = async (
   dayId: number,
@@ -1593,7 +1659,19 @@ export const workTaskApi = {
         listArrangementDays(workDate),
       ]);
       const works = worksRes.data.filter((work) => !work.delete_flag);
-      const draft = await buildWorkTaskDraftFromBackend(workDate, arrangementDays[0]);
+      const previousDate = getPreviousDate(workDate);
+      let draft = await buildWorkTaskDraftFromBackend(workDate, arrangementDays[0]);
+
+      if (!hasWorkTaskDraftData(draft)) {
+        const previousDay = await getPreviousArrangementDay(workDate);
+        if (previousDay && previousDate) {
+          const previousDraft = await buildWorkTaskDraftFromBackend(workDate, previousDay);
+          if (hasWorkTaskDraftData(previousDraft)) {
+            draft = withPrefilledFromDate(previousDraft, previousDate);
+          }
+        }
+      }
+
       return { work_date: workDate, personnel, works, draft };
     } catch (error) {
       if (!shouldUseLocalFallback(error)) throw error;
@@ -1613,7 +1691,10 @@ export const workTaskApi = {
     personnel: WorkPersonnel[],
     works: Work[]
   ): Promise<WorkTaskAssignmentDraft> => {
-    const nextDraft = { ...draft, task_assignments: draft.task_assignments || [] };
+    const nextDraft = withoutPrefilledFromDate({
+      ...draft,
+      task_assignments: draft.task_assignments || [],
+    });
     try {
       const day = await ensureArrangementDay(draft.work_date);
       const dayId = getArrangementDayId(day);

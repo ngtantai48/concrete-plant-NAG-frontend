@@ -150,8 +150,14 @@ export default function WorkAssignmentSelectManager({
   const pumpPrefilledTitle = pumpDraft.prefilled_from_date
     ? t("prefilledFromDate", { date: dayjs(pumpDraft.prefilled_from_date).format("DD/MM/YYYY") })
     : "";
+  const pumpPrefilledTab = pumpDraft.prefilled_from_date
+    ? t("prefilledTab", { date: dayjs(pumpDraft.prefilled_from_date).format("DD/MM") })
+    : "";
   const mixerPrefilledTitle = mixerDraft.prefilled_from_date
     ? t("prefilledFromDate", { date: dayjs(mixerDraft.prefilled_from_date).format("DD/MM/YYYY") })
+    : "";
+  const mixerPrefilledTab = mixerDraft.prefilled_from_date
+    ? t("prefilledTab", { date: dayjs(mixerDraft.prefilled_from_date).format("DD/MM") })
     : "";
   const halfDaySet = useMemo(() => new Set(halfDayUserIds), [halfDayUserIds]);
 
@@ -623,6 +629,14 @@ export default function WorkAssignmentSelectManager({
                     <span className="ml-0.5 h-1.5 w-1.5 rounded-full bg-white/90" />
                   )}
                 </Button>
+                {pumpPrefilledTab && (
+                  <span
+                    title={pumpPrefilledTitle}
+                    className="inline-flex h-8 items-center border border-amber-300 bg-amber-50 px-2 text-xs font-extrabold text-amber-700 shadow-sm"
+                  >
+                    {pumpPrefilledTab}
+                  </span>
+                )}
               </div>
             </div>
 
@@ -740,6 +754,14 @@ export default function WorkAssignmentSelectManager({
                 <span className="ml-0.5 h-1.5 w-1.5 rounded-full bg-white/90" />
               )}
             </Button>
+            {mixerPrefilledTab && (
+              <span
+                title={mixerPrefilledTitle}
+                className="inline-flex h-8 items-center border border-amber-300 bg-amber-50 px-2 text-xs font-extrabold text-amber-700 shadow-sm"
+              >
+                {mixerPrefilledTab}
+              </span>
+            )}
           </div>
 
           <div className="overflow-x-auto">

@@ -11,7 +11,7 @@ import type { Work } from "@/types/work";
 import type { WorkPersonnel, WorkTaskAssignmentDraft } from "@/types/work-arrangement";
 import { DatePicker, message, Modal, Select as AntSelect, Skeleton } from "antd";
 import dayjs, { type Dayjs } from "dayjs";
-import { ChevronLeft, ChevronRight, Loader2, Plus, Save, Trash2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Loader2, Plus, Save, Star, Trash2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Chip, filterSelectOptionByLabel } from "./shared";
@@ -72,6 +72,12 @@ export default function WorkTaskSelectManager({
 
   const workDate = selectedDate.format("YYYY-MM-DD");
   const isToday = selectedDate.isSame(dayjs(), "day");
+  const prefilledTitle = draft.prefilled_from_date
+    ? t("prefilledFromDate", { date: dayjs(draft.prefilled_from_date).format("DD/MM/YYYY") })
+    : "";
+  const prefilledTab = draft.prefilled_from_date
+    ? t("prefilledTab", { date: dayjs(draft.prefilled_from_date).format("DD/MM") })
+    : "";
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -356,8 +362,21 @@ export default function WorkTaskSelectManager({
           >
             {saving ? <Loader2 className="size-4 animate-spin" /> : <Save size={15} />}
             {t("save")}
+            {prefilledTitle && !saving && (
+              <span title={prefilledTitle} aria-label={prefilledTitle}>
+                <Star size={13} className="fill-amber-200 text-amber-200" />
+              </span>
+            )}
             {dirty && !saving && <span className="ml-0.5 h-1.5 w-1.5 rounded-full bg-white/90" />}
           </Button>
+          {prefilledTab && (
+            <span
+              title={prefilledTitle}
+              className="inline-flex h-8 items-center border border-amber-300 bg-amber-50 px-2 text-xs font-extrabold text-amber-700 shadow-sm"
+            >
+              {prefilledTab}
+            </span>
+          )}
         </div>
 
         <Modal

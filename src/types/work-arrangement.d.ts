@@ -48,6 +48,7 @@ export interface WorkAssignmentDraft {
     roles: Record<WorkPumpRoleKey, number[]>;
   }[];
   columns?: Record<WorkAssignmentColumnKey, number[]>;
+  prefilled_from_date?: string;
   updated_at?: string;
 }
 
@@ -72,6 +73,7 @@ export interface WorkMixerAssignmentDraft {
     vehicle_id: number;
     user_id: number | null; // 1 tài xế / xe; null = chưa gán
   }[];
+  prefilled_from_date?: string;
   updated_at?: string;
 }
 
@@ -107,6 +109,7 @@ export interface WorkTaskAssignmentDraft {
     work_id: number;
     user_ids: number[];
   }[];
+  prefilled_from_date?: string;
   updated_at?: string;
 }
 
