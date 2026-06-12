@@ -233,7 +233,22 @@ export default function DailyMarkingView({
           </span>
         </div>
 
-        <div className={cn("ml-auto hidden items-center gap-2 sm:flex", compact && "gap-1.5")}>
+        {compact && (
+          <div className="relative order-3 w-full sm:order-none sm:ml-auto sm:w-[300px] lg:w-[360px]">
+            <Search
+              size={15}
+              className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400"
+            />
+            <Input
+              value={nameFilter}
+              onChange={(event) => setNameFilter(event.target.value)}
+              placeholder={t("searchPersonnel")}
+              className="h-8 rounded-none border-slate-200 bg-white pl-8 text-sm shadow-none focus-visible:ring-teal-500/20"
+            />
+          </div>
+        )}
+
+        <div className={cn("hidden items-center gap-2 sm:flex", compact ? "gap-1.5" : "ml-auto")}>
           <Button
             type="button"
             variant="outline"

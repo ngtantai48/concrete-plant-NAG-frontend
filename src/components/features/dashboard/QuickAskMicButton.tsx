@@ -242,21 +242,12 @@ export default function QuickAskMicButton({ className }: { className?: string })
     void startRecording();
   }, [phase, resetAll, startRecording, stopRecording]);
 
-  const label =
-    phase === "recording"
-      ? "Stop"
-      : phase === "sending"
-        ? "Đang gửi"
-        : phase === "playing"
-          ? "Dừng"
-          : "Start";
-
   return (
     <div className={cn("fixed bottom-6 right-6 z-40", className)}>
       <button
         aria-label={phase === "recording" ? "Dừng ghi âm" : "Bắt đầu nói chuyện nhanh"}
         className={cn(
-          "flex h-14 min-w-28 select-none items-center justify-center gap-2 rounded-full px-4 text-sm font-extrabold uppercase shadow-2xl transition-all",
+          "flex size-14 select-none items-center justify-center rounded-full shadow-2xl transition-all",
           "focus:outline-none focus:ring-4",
           phase === "recording" &&
             "scale-105 bg-red-500 text-white shadow-red-500/45 focus:ring-red-500/30",
@@ -272,13 +263,12 @@ export default function QuickAskMicButton({ className }: { className?: string })
         type="button"
       >
         {phase === "sending" ? (
-          <Loader2 className="animate-spin" size={20} />
+          <Loader2 className="animate-spin" size={22} />
         ) : phase === "recording" || phase === "playing" ? (
-          <Square fill="currentColor" size={16} />
+          <Square fill="currentColor" size={18} />
         ) : (
-          <Mic size={20} />
+          <Mic size={22} />
         )}
-        <span>{label}</span>
       </button>
     </div>
   );
