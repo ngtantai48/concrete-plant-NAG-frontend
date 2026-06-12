@@ -24,6 +24,9 @@ import type {
   WorkPumpRoleKey,
   WorkVehicle,
 } from "@/types/work-arrangement";
+import { useSocket } from "@/context/socket-context";
+import { useSocketEventListener } from "@/hooks/useSocketEventListener";
+import systemApi from "@/services/system.service";
 import { exportChupLichExcel } from "@/utils/exportChupLich";
 import { DatePicker, message, Modal, Select as AntSelect, Skeleton } from "antd";
 import dayjs, { type Dayjs } from "dayjs";
@@ -35,6 +38,7 @@ import {
   Plus,
   Save,
   Search,
+  Star,
   Trash2,
   Truck,
 } from "lucide-react";
@@ -47,6 +51,9 @@ import {
   getVehicleLabel,
   normalizeSearchText,
 } from "./shared";
+
+const formatLocalDate = (d: Date): string =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
 const NONE_VALUE = "__none__";
 
@@ -93,6 +100,7 @@ export default function WorkAssignmentSelectManager({
   children?: ReactNode;
 }) {
   const t = useTranslations("WorkAssignmentPage");
+  const { isConnected } = useSocket();
   const { hasActionAccess } = usePermissions();
   const canUpdate = hasActionAccess(
     SIDEBAR.WORK_ARRANGEMENTS,
@@ -117,6 +125,10 @@ export default function WorkAssignmentSelectManager({
   const [mixerDraft, setMixerDraft] = useState<WorkMixerAssignmentDraft>(() =>
     createEmptyMixerAssignmentDraft(dayjs().format("YYYY-MM-DD"))
   );
+  // Số lốt theo xe (thứ tự trong hàng đợi lốt trộn hôm nay); 1 xe có thể giữ nhiều lốt.
+  const [lotNumbersByVehicle, setLotNumbersByVehicle] = useState<Map<number, number[]>>(
+    new Map()
+  );
   const onDirtyChangeRef = useRef(onDirtyChange);
 
   useEffect(() => {
@@ -135,6 +147,18 @@ export default function WorkAssignmentSelectManager({
   const workDate = selectedDate.format("YYYY-MM-DD");
   const isToday = selectedDate.isSame(dayjs(), "day");
   const dirty = pumpDirty || mixerDirty;
+  const pumpPrefilledTitle = pumpDraft.prefilled_from_date
+    ? t("prefilledFromDate", { date: dayjs(pumpDraft.prefilled_from_date).format("DD/MM/YYYY") })
+    : "";
+  const pumpPrefilledTab = pumpDraft.prefilled_from_date
+    ? t("prefilledTab", { date: dayjs(pumpDraft.prefilled_from_date).format("DD/MM") })
+    : "";
+  const mixerPrefilledTitle = mixerDraft.prefilled_from_date
+    ? t("prefilledFromDate", { date: dayjs(mixerDraft.prefilled_from_date).format("DD/MM/YYYY") })
+    : "";
+  const mixerPrefilledTab = mixerDraft.prefilled_from_date
+    ? t("prefilledTab", { date: dayjs(mixerDraft.prefilled_from_date).format("DD/MM") })
+    : "";
   const halfDaySet = useMemo(() => new Set(halfDayUserIds), [halfDayUserIds]);
 
   const personnelById = useMemo(() => new Map(personnel.map((p) => [p.user_id, p])), [personnel]);
@@ -203,6 +227,40 @@ export default function WorkAssignmentSelectManager({
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  // Cột Lốt = snapshot "Đồng bộ lốt xe" mới nhất trong ngày (chưa sync → trống).
+  const loadLots = useCallback(async () => {
+    try {
+      const today = formatLocalDate(new Date());
+      const res = await systemApi.getLatestTankerLotSync(today);
+      const items = res.data?.multi_data?.items ?? [];
+      const map = new Map<number, number[]>();
+      items.forEach((item) => {
+        const positions = map.get(item.vehicle_id) || [];
+        positions.push(item.position);
+        map.set(item.vehicle_id, positions);
+      });
+      setLotNumbersByVehicle(map);
+    } catch (error) {
+      console.error("[WorkAssignmentSelectManager] load lots error:", error);
+      setLotNumbersByVehicle(new Map());
+    }
+  }, []);
+
+  // Tải khi mở và mỗi lần quay lại trang (lốt đổi theo hàng đợi) — giữ hành vi của khối Lốt trộn cũ.
+  useEffect(() => {
+    if (active) void loadLots();
+  }, [active, loadLots]);
+
+  // Realtime: ai đó Đồng bộ / Apply trực sản xuất → snapshot đổi → tải lại cột Lốt.
+  useSocketEventListener(
+    "lot_sync:updated",
+    () => {
+      void loadLots();
+    },
+    "notifications",
+    active && isConnected
+  );
 
   useEffect(() => {
     onDirtyChangeRef.current?.(dirty);
@@ -562,10 +620,23 @@ export default function WorkAssignmentSelectManager({
                 >
                   {savingPump ? <Loader2 className="size-4 animate-spin" /> : <Save size={15} />}
                   {t("save")}
+                  {pumpPrefilledTitle && !savingPump && (
+                    <span title={pumpPrefilledTitle} aria-label={pumpPrefilledTitle}>
+                      <Star size={13} className="fill-amber-200 text-amber-200" />
+                    </span>
+                  )}
                   {pumpDirty && !savingPump && (
                     <span className="ml-0.5 h-1.5 w-1.5 rounded-full bg-white/90" />
                   )}
                 </Button>
+                {pumpPrefilledTab && (
+                  <span
+                    title={pumpPrefilledTitle}
+                    className="inline-flex h-8 items-center border border-amber-300 bg-amber-50 px-2 text-xs font-extrabold text-amber-700 shadow-sm"
+                  >
+                    {pumpPrefilledTab}
+                  </span>
+                )}
               </div>
             </div>
 
@@ -674,10 +745,23 @@ export default function WorkAssignmentSelectManager({
             >
               {savingMixer ? <Loader2 className="size-4 animate-spin" /> : <Save size={15} />}
               {t("save")}
+              {mixerPrefilledTitle && !savingMixer && (
+                <span title={mixerPrefilledTitle} aria-label={mixerPrefilledTitle}>
+                  <Star size={13} className="fill-amber-200 text-amber-200" />
+                </span>
+              )}
               {mixerDirty && !savingMixer && (
                 <span className="ml-0.5 h-1.5 w-1.5 rounded-full bg-white/90" />
               )}
             </Button>
+            {mixerPrefilledTab && (
+              <span
+                title={mixerPrefilledTitle}
+                className="inline-flex h-8 items-center border border-amber-300 bg-amber-50 px-2 text-xs font-extrabold text-amber-700 shadow-sm"
+              >
+                {mixerPrefilledTab}
+              </span>
+            )}
           </div>
 
           <div className="overflow-x-auto">
@@ -691,8 +775,8 @@ export default function WorkAssignmentSelectManager({
                   <th className="w-[45%] border border-slate-300 px-2 py-1.5 text-left">
                     {t("mixerDriver")}
                   </th>
-                  <th className="w-[90px] border border-slate-300 px-2 py-1.5 text-left">
-                    {t("vehicleStatus")}
+                  <th className="w-[90px] border border-slate-300 px-2 py-1.5 text-center">
+                    {t("mixerLot")}
                   </th>
                 </tr>
               </thead>
@@ -712,6 +796,7 @@ export default function WorkAssignmentSelectManager({
                 ) : (
                   sortedMixerVehicles.map((vehicle, index) => {
                     const driverId = mixerDriverByVehicle.get(vehicle.vehicle_id) || null;
+                    const lotNumbers = lotNumbersByVehicle.get(vehicle.vehicle_id);
                     return (
                       <tr key={vehicle.vehicle_id} className="h-10">
                         <td className="border border-slate-200 bg-slate-50 px-2 text-center text-xs font-medium text-slate-500">
@@ -736,8 +821,11 @@ export default function WorkAssignmentSelectManager({
                             onChange={(ids) => setMixerDriver(vehicle.vehicle_id, ids[0] || null)}
                           />
                         </td>
-                        <td className="border border-slate-200 px-2 py-1">
-                          {vehicle.vehicle_status ? <Chip>{vehicle.vehicle_status}</Chip> : "-"}
+                        <td className="border border-slate-200 px-2 py-1 text-center">
+                          {/* Xe không có lốt thì bỏ trống */}
+                          {lotNumbers && lotNumbers.length > 0 && (
+                            <Chip tone="teal">{lotNumbers.join(", ")}</Chip>
+                          )}
                         </td>
                       </tr>
                     );

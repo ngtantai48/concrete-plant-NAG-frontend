@@ -65,7 +65,6 @@ import { computeTripStats, formatDuration } from "./trip-stats";
 import VehicleLocationDialog from "./VehicleLocationDialog";
 import VehicleStatusChange from "./VehicleStatusChange";
 import EndOfDayModal from "./EndOfDayModal";
-import MaintenanceAiOverviewCard from "./MaintenanceAiOverviewCard";
 import SystemSettingsForm from "../system-settings/SystemSettingsForm";
 import { SIDEBAR } from "@/constants/route";
 import { PERMISSIONS } from "@/constants/permissions";
@@ -396,42 +395,37 @@ export default function AdminDashboard() {
   const handleSyncShift = useCallback(async () => {
     setIsSyncShiftDialogOpen(false);
     setIsSyncingShift(true);
-    try {
-      const sorted = [...activeFlowOrders].sort(
-        (a, b) => (a.order_number || 0) - (b.order_number || 0)
-      );
-      const maToStt: Record<string, number> = {};
-      const skipped: { order_number: number; reason: string; raw: unknown }[] = [];
-      let stt = 1;
-      for (const o of sorted) {
-        const raw = o.vehicles?.vehicle_name;
-        if (!raw) {
-          skipped.push({ order_number: o.order_number, reason: "no_vehicle_name", raw });
-          continue;
-        }
-        const upper = String(raw).trim().toUpperCase().replace(/\s+/g, "");
-        const m = upper.match(/^X0*(\d+)$/);
-        const maX = m ? `X${m[1]}` : upper;
-        if (!/^X\d+$/.test(maX)) {
-          skipped.push({ order_number: o.order_number, reason: "invalid_format", raw });
-          continue;
-        }
-        if (maX in maToStt) {
-          skipped.push({ order_number: o.order_number, reason: "duplicate", raw: maX });
-          continue;
-        }
-        maToStt[maX] = stt++;
+
+    const sorted = [...activeFlowOrders].sort(
+      (a, b) => (a.order_number || 0) - (b.order_number || 0)
+    );
+    const maToStt: Record<string, number> = {};
+    const skipped: { order_number: number; reason: string; raw: unknown }[] = [];
+    let stt = 1;
+    for (const o of sorted) {
+      const raw = o.vehicles?.vehicle_name;
+      if (!raw) {
+        skipped.push({ order_number: o.order_number, reason: "no_vehicle_name", raw });
+        continue;
       }
+      const upper = String(raw).trim().toUpperCase().replace(/\s+/g, "");
+      const m = upper.match(/^X0*(\d+)$/);
+      const maX = m ? `X${m[1]}` : upper;
+      if (!/^X\d+$/.test(maX)) {
+        skipped.push({ order_number: o.order_number, reason: "invalid_format", raw });
+        continue;
+      }
+      if (maX in maToStt) {
+        skipped.push({ order_number: o.order_number, reason: "duplicate", raw: maX });
+        continue;
+      }
+      maToStt[maX] = stt++;
+    }
 
-      console.log(
-        "[handleSyncShift] total pending:",
-        sorted.length,
-        "| unique mã X:",
-        Object.keys(maToStt).length
-      );
-      console.log("[handleSyncShift] maToStt:", maToStt);
-      if (skipped.length > 0) console.log("[handleSyncShift] skipped:", skipped);
+    if (skipped.length > 0) console.log("[handleSyncShift] skipped:", skipped);
 
+    // Đẩy STT lên Google Sheet (giữ nguyên hành vi cũ).
+    const pushToSheet = async () => {
       const res = await fetch("/api/google-sheets/bo-tri-cv/sync-lot", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -439,16 +433,32 @@ export default function AdminDashboard() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || "Sync failed");
-
-      console.log("[handleSyncShift] server response:", data);
       if (data.unmatchedMaX?.length > 0) {
         console.warn("[handleSyncShift] mã X không có trong sheet cột H:", data.unmatchedMaX);
       }
+      return data;
+    };
 
-      toast.success(t("syncShiftSuccess", { count: data.updated ?? Object.keys(maToStt).length }));
-    } catch (err) {
-      console.error("[handleSyncShift] error:", err);
-      toast.error(t("syncShiftFailed"));
+    try {
+      const [sheetResult, snapshotResult] = await Promise.allSettled([
+        pushToSheet(),
+        systemApi.captureTankerLotSync(),
+      ]);
+
+      if (sheetResult.status === "fulfilled") {
+        const data = sheetResult.value;
+        toast.success(t("syncShiftSuccess", { count: data.updated ?? Object.keys(maToStt).length }));
+      } else {
+        console.error("[handleSyncShift] sheet error:", sheetResult.reason);
+        toast.error(t("syncShiftFailed"));
+      }
+
+      if (snapshotResult.status === "fulfilled") {
+        toast.success(t("syncSnapshotSuccess"));
+      } else {
+        console.error("[handleSyncShift] snapshot error:", snapshotResult.reason);
+        toast.error(t("syncSnapshotFailed"));
+      }
     } finally {
       setIsSyncingShift(false);
     }
@@ -1624,7 +1634,6 @@ export default function AdminDashboard() {
                 className="flex flex-col gap-1.5 h-full min-h-0 animate-fade-up"
                 style={{ flex: "3 1 0%", animationDelay: "0.6s" }}
               >
-                <MaintenanceAiOverviewCard />
                 {/* Section 1: Mixer Vehicles (Xe bồn) */}
                 <div
                   className="flex flex-col overflow-hidden dd-card min-h-0"

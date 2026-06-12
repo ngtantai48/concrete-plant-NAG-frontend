@@ -50,6 +50,7 @@ import ocrApi from "@/services/ocr.service";
 import vehicleMaintenanceApi from "@/services/vehicle-maintenance.service";
 import vtrackingApi from "@/services/vtracking.service";
 import MaintenanceAiBadge from "@/components/features/vehicle-maintenance-manage/MaintenanceAiBadge";
+import MaintenanceAiOverviewCard from "@/components/features/vehicle-maintenance-manage/MaintenanceAiOverviewCard";
 import { useAppDispatch, useAppSelector } from "@/hooks/use-app-selector";
 import {
   bulkDeleteVehicleMaintenancesThunk,
@@ -1174,6 +1175,7 @@ export default function TableVehicleMaintenances() {
         </CardHeader>
 
         <CardContent className="px-6 py-5 md:px-8">
+          <MaintenanceAiOverviewCard className="mb-5" />
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
             <div className="relative w-full sm:max-w-xs">
               <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />

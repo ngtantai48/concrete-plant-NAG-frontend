@@ -1,19 +1,17 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { SIDEBAR } from "@/constants/route";
 import { useNavigationStore } from "@/hooks/use-navigation-store";
 import { usePermissions } from "@/hooks/use-permissions";
 import { cn } from "@/lib/utils";
-import { BriefcaseBusiness, Camera, ListOrdered, Loader2 } from "lucide-react";
+import { BriefcaseBusiness, Camera, Loader2 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import WorkAssignmentManager from "./assignment/WorkAssignmentManager";
 import WorkTaskManager from "./assignment/WorkTaskManager";
 import WorkAttendanceManager from "./WorkAttendanceManager";
-import WorkMixSlotBoard from "./WorkMixSlotBoard";
 
 type WorkArrangementTab = "assignment" | "attendance" | "worktask";
 
@@ -96,13 +94,11 @@ export default function WorkArrangementManager({
   const registerChup = useCallback((fn: (() => void) | null) => {
     chupHandlerRef.current = fn;
   }, []);
-  const [mixSlotOpen, setMixSlotOpen] = useState(false);
 
   const showAssignment = tabs.some((tab) => tab.key === "assignment");
   const showAttendance = tabs.some((tab) => tab.key === "attendance");
   const showWorkTask = tabs.some((tab) => tab.key === "worktask");
   const showTabBar = tabs.length > 1;
-  const canMixSlot = hasPageAccess(SIDEBAR.WORK_ARRANGEMENTS);
 
   return (
     <div className="min-h-screen bg-white px-4 py-3 text-slate-800 sm:px-6 sm:py-4">
@@ -112,18 +108,6 @@ export default function WorkArrangementManager({
         </div>
         <h1 className="m-0 text-lg font-bold text-slate-900">{t("title")}</h1>
         <div className="ml-auto flex items-center gap-2">
-          {canMixSlot && (
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => setMixSlotOpen(true)}
-              className="h-9 border-slate-200 text-slate-700 hover:bg-slate-50"
-            >
-              <ListOrdered size={15} />
-              {t("tabMixSlot")}
-            </Button>
-          )}
           {showAssignment && mountedTabs.has("assignment") && (
             <Button
               type="button"
@@ -198,13 +182,6 @@ export default function WorkArrangementManager({
           </TabsContent>
         )}
       </Tabs>
-
-      <Dialog open={mixSlotOpen} onOpenChange={setMixSlotOpen}>
-        <DialogContent className="max-h-[85vh] max-w-3xl overflow-y-auto p-0">
-          <DialogTitle className="sr-only">{t("tabMixSlot")}</DialogTitle>
-          <WorkMixSlotBoard active={mixSlotOpen} />
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

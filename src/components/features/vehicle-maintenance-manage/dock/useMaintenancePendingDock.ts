@@ -52,6 +52,19 @@ export function useMaintenancePendingDock() {
   const { isConnected } = useSocket();
   const [items, setItems] = useState<PendingMaintenanceCard[]>([]);
   const [processingIds, setProcessingIds] = useState<number[]>([]);
+  // Bỏ qua cục bộ (phiên hiện tại) — chỉ ẩn khỏi dock, KHÔNG đổi trạng thái phiếu.
+  // Tải lại trang là hiện lại; vẫn nhận realtime upsert/remove bình thường.
+  const [skippedIds, setSkippedIds] = useState<Set<number>>(new Set());
+
+  // Gỡ id khỏi tập đã-bỏ-qua khi phiếu rời pool (tránh phình theo phiên). Giữ nguyên ref nếu không có → không re-render thừa.
+  const dropSkipped = useCallback((id: number) => {
+    setSkippedIds((prev) => {
+      if (!prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
+  }, []);
 
   // Subscribe mỗi lần socket connect/reconnect → server join room + trả snapshot.
   // Chỉ lấy instance khi isConnected=true: lúc đó SocketProvider đã tạo instance với
@@ -96,10 +109,10 @@ export function useMaintenancePendingDock() {
     "maintenance:pending_remove",
     (payload) => {
       const data = payload as { vehicle_maintenance_id?: number };
-      if (!data?.vehicle_maintenance_id) return;
-      setItems((prev) =>
-        prev.filter((c) => c.vehicle_maintenance_id !== data.vehicle_maintenance_id)
-      );
+      const removeId = data?.vehicle_maintenance_id;
+      if (!removeId) return;
+      setItems((prev) => prev.filter((c) => c.vehicle_maintenance_id !== removeId));
+      dropSkipped(removeId);
     },
     "notifications",
     canModerate && isConnected
@@ -125,6 +138,14 @@ export function useMaintenancePendingDock() {
     };
   }, [canModerate, isConnected]);
 
+  const skipCard = useCallback((id: number) => {
+    setSkippedIds((prev) => {
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
+  }, []);
+
   // Optimistic: khóa thẻ khi đang gọi; thành công gỡ ngay (pending_remove xác nhận với mọi người)
   const runAction = useCallback(
     async (
@@ -137,19 +158,23 @@ export function useMaintenancePendingDock() {
       try {
         await vehicleMaintenanceApi.runWorkflowAction(id, action, { reason: reason ?? null });
         setItems((prev) => prev.filter((c) => c.vehicle_maintenance_id !== id));
+        dropSkipped(id);
         return { ok: true, alreadyHandled: false };
       } catch (error: unknown) {
         const alreadyHandled = extractErrorCode(error).includes("INVALID_TRANSITION");
         if (alreadyHandled) {
           setItems((prev) => prev.filter((c) => c.vehicle_maintenance_id !== id));
+          dropSkipped(id);
         }
         return { ok: false, alreadyHandled };
       } finally {
         setProcessingIds((prev) => prev.filter((x) => x !== id));
       }
     },
-    []
+    [dropSkipped]
   );
 
-  return { canModerate, isConnected, items, processingIds, runAction };
+  const visibleItems = items.filter((c) => !skippedIds.has(c.vehicle_maintenance_id));
+
+  return { canModerate, isConnected, items: visibleItems, processingIds, runAction, skipCard };
 }

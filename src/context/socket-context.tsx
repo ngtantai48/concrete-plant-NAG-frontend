@@ -1,8 +1,17 @@
 "use client";
 
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+import { NOTIFICATION_EVENTS } from "@/constants/notification";
+import { SIDEBAR } from "@/constants/route";
 import { useAppSelector } from "@/hooks/use-app-selector";
 import { useProactiveTokenRefresh } from "@/hooks/useProactiveTokenRefresh";
-import { getNotificationText, getNotificationTimestampValue, shouldSpeakNotification } from "@/lib/notification";
+import {
+  getNotificationText,
+  getNotificationTimestampValue,
+  getRuntimeNotificationLocale,
+  shouldSpeakNotification,
+} from "@/lib/notification";
 import { SocketManager } from "@/lib/socket";
 import { validateNotificationPayload } from "@/lib/socket/schema";
 import type { NotificationPayload } from "@/lib/socket/types";
@@ -13,6 +22,15 @@ type SocketEventHandler = (eventName: string, ...args: unknown[]) => void;
 
 const VI_NOTIFICATION_LOCALE = "vi";
 const VI_NOTIFICATION_LANG = "vi-VN";
+
+// Sự kiện bảo trì → kiểu toast nổi. Duyệt = xanh, từ chối = đỏ, còn lại = info.
+// BE đã nhắm đúng người nhận (tài xế tạo phiếu / người duyệt), nên FE chỉ cần hiển thị.
+const MAINTENANCE_TOAST_VARIANT: Record<string, "success" | "error" | "info"> = {
+  [NOTIFICATION_EVENTS.VEHICLE_MAINTENANCE_SUBMITTED]: "info",
+  [NOTIFICATION_EVENTS.VEHICLE_MAINTENANCE_CONFIRMED]: "info",
+  [NOTIFICATION_EVENTS.VEHICLE_MAINTENANCE_APPROVED]: "success",
+  [NOTIFICATION_EVENTS.VEHICLE_MAINTENANCE_REJECTED]: "error",
+};
 
 function getNotificationOwnerId(notification: Notification): string | number {
   const ownerId = notification.userId ?? notification.user_id ?? "all";
@@ -124,6 +142,8 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const notificationsRef = useRef<Notification[]>([]);
   const spokenNotificationIdsRef = useRef<Set<string | number>>(new Set());
+  // Tránh toast trùng khi cùng 1 notification đến qua cả notification:new lẫn notification:refresh.
+  const toastedNotificationIdsRef = useRef<Set<string | number>>(new Set());
   const [isMuted, setIsMuted] = useState(false);
   const isMutedRef = useRef(false);
 
@@ -134,6 +154,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const listenersRef = useRef<Set<SocketEventHandler>>(new Set());
 
   const tokenState = useAppSelector((state: any) => state.auth.token);
+  const router = useRouter();
 
   useEffect(() => {
     notificationsRef.current = notifications;
@@ -214,6 +235,39 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     window.speechSynthesis.speak(utterance);
   }, []);
+
+  // Toast nổi cho sự kiện bảo trì (vd: tài xế thấy ngay khi phiếu được duyệt/từ chối).
+  // Dùng lại getNotificationText() nên nội dung song ngữ sẵn, không cần thêm key i18n.
+  const showMaintenanceToast = useCallback(
+    (notification: NotificationPayload | Notification) => {
+      const event = typeof notification.event === "string" ? notification.event : "";
+      const variant = MAINTENANCE_TOAST_VARIANT[event];
+      if (!variant) return; // chỉ toast cho sự kiện bảo trì
+
+      const notificationId = notification.id;
+      if (notificationId === undefined || notificationId === null) return;
+      if (toastedNotificationIdsRef.current.has(notificationId)) return;
+      toastedNotificationIdsRef.current.add(notificationId);
+
+      const locale = getRuntimeNotificationLocale();
+      const message = getNotificationText(notification, locale);
+      const maintenanceId = notification.vehicle_maintenance_id;
+      const options: { duration: number; action?: { label: string; onClick: () => void } } = {
+        duration: 6000,
+      };
+      if (maintenanceId !== undefined && maintenanceId !== null) {
+        options.action = {
+          label: locale === "en" ? "View" : "Xem",
+          onClick: () => router.push(`${SIDEBAR.VEHICLE_MAINTENANCES}/${maintenanceId}`),
+        };
+      }
+
+      const show =
+        variant === "success" ? toast.success : variant === "error" ? toast.error : toast.info;
+      show(message, options);
+    },
+    [router]
+  );
 
   // Initialize socket managers (singleton)
   useEffect(() => {
@@ -320,6 +374,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         const exists = notificationsRef.current.some((item) => item.id === validated.id);
         if (!exists) {
           speakNotification(validated);
+          showMaintenanceToast(validated);
         }
         setNotifications((prev) => {
           const exists = prev.find((n) => n.id === validated.id);
@@ -412,6 +467,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
             const exists = notificationsRef.current.some((item) => item.id === validated.id);
             if (!exists) {
               speakNotification(validated);
+              showMaintenanceToast(validated);
             }
 
             setNotifications((prev) => {
@@ -461,7 +517,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return () => {
       unsubscribes.forEach((unsub) => unsub());
     };
-  }, [isConnected, speakNotification]);
+  }, [isConnected, speakNotification, showMaintenanceToast]);
 
   // Mark as read
   const markAsRead = useCallback(
