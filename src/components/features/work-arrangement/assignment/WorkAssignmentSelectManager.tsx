@@ -24,6 +24,9 @@ import type {
   WorkPumpRoleKey,
   WorkVehicle,
 } from "@/types/work-arrangement";
+import { useSocket } from "@/context/socket-context";
+import { useSocketEventListener } from "@/hooks/useSocketEventListener";
+import systemApi from "@/services/system.service";
 import { exportChupLichExcel } from "@/utils/exportChupLich";
 import { DatePicker, message, Modal, Select as AntSelect, Skeleton } from "antd";
 import dayjs, { type Dayjs } from "dayjs";
@@ -35,6 +38,7 @@ import {
   Plus,
   Save,
   Search,
+  Star,
   Trash2,
   Truck,
 } from "lucide-react";
@@ -47,6 +51,9 @@ import {
   getVehicleLabel,
   normalizeSearchText,
 } from "./shared";
+
+const formatLocalDate = (d: Date): string =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 
 const NONE_VALUE = "__none__";
 
@@ -93,6 +100,7 @@ export default function WorkAssignmentSelectManager({
   children?: ReactNode;
 }) {
   const t = useTranslations("WorkAssignmentPage");
+  const { isConnected } = useSocket();
   const { hasActionAccess } = usePermissions();
   const canUpdate = hasActionAccess(
     SIDEBAR.WORK_ARRANGEMENTS,
@@ -139,6 +147,12 @@ export default function WorkAssignmentSelectManager({
   const workDate = selectedDate.format("YYYY-MM-DD");
   const isToday = selectedDate.isSame(dayjs(), "day");
   const dirty = pumpDirty || mixerDirty;
+  const pumpPrefilledTitle = pumpDraft.prefilled_from_date
+    ? t("prefilledFromDate", { date: dayjs(pumpDraft.prefilled_from_date).format("DD/MM/YYYY") })
+    : "";
+  const mixerPrefilledTitle = mixerDraft.prefilled_from_date
+    ? t("prefilledFromDate", { date: dayjs(mixerDraft.prefilled_from_date).format("DD/MM/YYYY") })
+    : "";
   const halfDaySet = useMemo(() => new Set(halfDayUserIds), [halfDayUserIds]);
 
   const personnelById = useMemo(() => new Map(personnel.map((p) => [p.user_id, p])), [personnel]);
@@ -208,14 +222,16 @@ export default function WorkAssignmentSelectManager({
     loadData();
   }, [loadData]);
 
-  // Lốt hôm nay (hàng đợi pending toàn cục, không theo ngày chọn) — lỗi thì để trống, không chặn bảng.
+  // Cột Lốt = snapshot "Đồng bộ lốt xe" mới nhất trong ngày (chưa sync → trống).
   const loadLots = useCallback(async () => {
     try {
-      const lots = await workMixSlotApi.getList();
+      const today = formatLocalDate(new Date());
+      const res = await systemApi.getLatestTankerLotSync(today);
+      const items = res.data?.multi_data?.items ?? [];
       const map = new Map<number, number[]>();
-      lots.forEach((item, index) => {
+      items.forEach((item) => {
         const positions = map.get(item.vehicle_id) || [];
-        positions.push(index + 1);
+        positions.push(item.position);
         map.set(item.vehicle_id, positions);
       });
       setLotNumbersByVehicle(map);
@@ -229,6 +245,16 @@ export default function WorkAssignmentSelectManager({
   useEffect(() => {
     if (active) void loadLots();
   }, [active, loadLots]);
+
+  // Realtime: ai đó Đồng bộ / Apply trực sản xuất → snapshot đổi → tải lại cột Lốt.
+  useSocketEventListener(
+    "lot_sync:updated",
+    () => {
+      void loadLots();
+    },
+    "notifications",
+    active && isConnected
+  );
 
   useEffect(() => {
     onDirtyChangeRef.current?.(dirty);
@@ -588,6 +614,11 @@ export default function WorkAssignmentSelectManager({
                 >
                   {savingPump ? <Loader2 className="size-4 animate-spin" /> : <Save size={15} />}
                   {t("save")}
+                  {pumpPrefilledTitle && !savingPump && (
+                    <span title={pumpPrefilledTitle} aria-label={pumpPrefilledTitle}>
+                      <Star size={13} className="fill-amber-200 text-amber-200" />
+                    </span>
+                  )}
                   {pumpDirty && !savingPump && (
                     <span className="ml-0.5 h-1.5 w-1.5 rounded-full bg-white/90" />
                   )}
@@ -700,6 +731,11 @@ export default function WorkAssignmentSelectManager({
             >
               {savingMixer ? <Loader2 className="size-4 animate-spin" /> : <Save size={15} />}
               {t("save")}
+              {mixerPrefilledTitle && !savingMixer && (
+                <span title={mixerPrefilledTitle} aria-label={mixerPrefilledTitle}>
+                  <Star size={13} className="fill-amber-200 text-amber-200" />
+                </span>
+              )}
               {mixerDirty && !savingMixer && (
                 <span className="ml-0.5 h-1.5 w-1.5 rounded-full bg-white/90" />
               )}
