@@ -54,6 +54,46 @@ export interface TankerQueueSnapshotResponse {
   delete_flag: boolean;
 }
 
+export interface TankerLotSyncItem {
+  position: number;
+  group: "pending" | "running";
+  order_id: number;
+  order_number: number;
+  order_status: string;
+  vehicle_id: number;
+  vehicle_name: string | null;
+  vehicle_license_plate: string | null;
+  station_id: number | null;
+  user_id: number | null;
+  order_init_datetime: string | null;
+  order_start_datetime: string | null;
+}
+
+export interface TankerLotSyncData {
+  snapshot_date: string;
+  snapshot_at: string;
+  triggered_by: "manual" | "arrange_time";
+  total_items: number;
+  pending_count: number;
+  running_count: number;
+  items: TankerLotSyncItem[];
+}
+
+export interface TankerLotSyncLatestResponse {
+  statusCode: number;
+  snapshot_date?: string;
+  multi_id?: number;
+  multi_name?: string;
+  multi_data: TankerLotSyncData | null;
+  created_at?: string;
+  created_by?: number;
+}
+
+export interface TankerLotSyncCaptureResponse {
+  statusCode: number;
+  multi_data: TankerLotSyncData;
+}
+
 const systemApi = {
   getTransportsRuntime: () => 
     http.get<TransportsRuntimeResponse>("/multi/transports-runtime"),
@@ -63,6 +103,14 @@ const systemApi = {
 
   getTankerQueueSnapshot: (date: string) =>
     http.get<TankerQueueSnapshotResponse>("/multi/tanker-queue-snapshot", {
+      params: { date },
+    }),
+
+  captureTankerLotSync: () =>
+    http.post<TankerLotSyncCaptureResponse>("/multi/tanker-lot-sync"),
+
+  getLatestTankerLotSync: (date: string) =>
+    http.get<TankerLotSyncLatestResponse>("/multi/tanker-lot-sync/latest", {
       params: { date },
     }),
 };
