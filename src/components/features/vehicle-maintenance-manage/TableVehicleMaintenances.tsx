@@ -48,6 +48,7 @@ import {
 import mediaApi from "@/services/media.service";
 import ocrApi from "@/services/ocr.service";
 import vehicleMaintenanceApi from "@/services/vehicle-maintenance.service";
+import vtrackingApi from "@/services/vtracking.service";
 import MaintenanceAiBadge from "@/components/features/vehicle-maintenance-manage/MaintenanceAiBadge";
 import { useAppDispatch, useAppSelector } from "@/hooks/use-app-selector";
 import {
