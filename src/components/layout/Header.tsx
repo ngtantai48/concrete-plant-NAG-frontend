@@ -104,9 +104,9 @@ const AppHeader: React.FC<AppHeaderProps> = ({
 
   const handleMaintenanceNotificationClick = (notification: Notification) => {
     markAsRead(notification.id);
-    setIsMaintenancePopoverOpen(false);
     if (isReadOnlyMaintenanceNotification(notification)) return;
 
+    setIsMaintenancePopoverOpen(false);
     const maintenanceId = notification.vehicle_maintenance_id;
     if (typeof maintenanceId === "number" || typeof maintenanceId === "string") {
       router.push(`${SIDEBAR.VEHICLE_MAINTENANCES}/${maintenanceId}`);
