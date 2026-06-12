@@ -241,6 +241,24 @@ function FieldError({ message }: { message?: string }) {
   return <p className="mt-1 text-xs font-medium text-red-500">{message}</p>;
 }
 
+function FieldLabel({
+  children,
+  optional = false,
+  required = false,
+}: {
+  children: ReactNode;
+  optional?: boolean;
+  required?: boolean;
+}) {
+  return (
+    <Label className="text-slate-700">
+      {children}
+      {required ? <span className="text-destructive">*</span> : null}
+      {optional ? <span className="text-xs font-normal text-slate-400">(không bắt buộc)</span> : null}
+    </Label>
+  );
+}
+
 function DialogFormSection({
   icon,
   title,
@@ -265,12 +283,16 @@ function DialogFormSection({
 
 function DateField({
   label,
+  optional = false,
+  required = false,
   value,
   placeholder,
   error,
   onChange,
 }: {
   label: string;
+  optional?: boolean;
+  required?: boolean;
   value?: dayjs.Dayjs | null;
   placeholder: string;
   error?: string;
@@ -281,7 +303,7 @@ function DateField({
 
   return (
     <div className="space-y-2">
-      <Label className="text-slate-700">{label}</Label>
+      <FieldLabel optional={optional} required={required}>{label}</FieldLabel>
       <Popover open={isOpen} onOpenChange={setIsOpen}>
         <PopoverTrigger asChild>
           <Button
@@ -977,6 +999,9 @@ export default function TableVehicleMaintenances() {
     if (!formValues.dateRange?.[0] || !formValues.dateRange?.[1]) {
       errors.dateRange = t("requiredDateRange");
     }
+    if (formValues.total_amount === null || formValues.total_amount === undefined) {
+      errors.total_amount = "Vui lòng nhập tổng tiền";
+    }
     if (!formValues.vehicle_maintenance_description?.trim()) {
       errors.vehicle_maintenance_description = t("requiredDescription");
     }
@@ -1334,7 +1359,7 @@ export default function TableVehicleMaintenances() {
               >
                 <div className={DIALOG_GRID_CLASS}>
                   <div className="space-y-2">
-                    <Label className="text-slate-700">{t("vehicle")}</Label>
+                    <FieldLabel required>{t("vehicle")}</FieldLabel>
                     <ShadSelect
                       value={formValues.vehicle_id ? String(formValues.vehicle_id) : undefined}
                       onValueChange={handleVehicleChange}
@@ -1380,7 +1405,7 @@ export default function TableVehicleMaintenances() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="text-slate-700">Mức độ nghiêm trọng</Label>
+                    <FieldLabel required>Mức độ nghiêm trọng</FieldLabel>
                     <ShadSelect
                       value={String(formValues.vehicle_maintenance_rank || 1)}
                       onValueChange={(value) =>
@@ -1423,7 +1448,7 @@ export default function TableVehicleMaintenances() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="text-slate-700">{t("distanceCovered")}</Label>
+                    <FieldLabel optional>{t("distanceCovered")}</FieldLabel>
                     <div className="relative">
                       <ShadInput
                         type="text"
@@ -1451,7 +1476,7 @@ export default function TableVehicleMaintenances() {
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="text-slate-700">Địa điểm sửa chữa</Label>
+                    <FieldLabel optional>Địa điểm sửa chữa</FieldLabel>
                     <ShadInput
                       className={DIALOG_CONTROL_CLASS}
                       placeholder="Garage, xưởng sửa chữa, trạm bảo trì..."
@@ -1463,7 +1488,7 @@ export default function TableVehicleMaintenances() {
                   </div>
 
                   <div className="md:col-span-2 space-y-2">
-                    <Label className="text-slate-700">{t("dateRange")}</Label>
+                    <FieldLabel required>{t("dateRange")}</FieldLabel>
                     <div className="grid grid-cols-1 gap-8 sm:grid-cols-2">
                       <DateField
                         label={t("dateRangePlaceholder.0") as string}
@@ -1497,7 +1522,7 @@ export default function TableVehicleMaintenances() {
               >
                 <div className={DIALOG_GRID_CLASS}>
                   <div className="space-y-2">
-                    <Label className="text-slate-700">Đơn vị sửa chữa</Label>
+                    <FieldLabel optional>Đơn vị sửa chữa</FieldLabel>
                     <ShadInput
                       className={DIALOG_CONTROL_CLASS}
                       value={formValues.service_provider_name || ""}
@@ -1507,7 +1532,7 @@ export default function TableVehicleMaintenances() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-slate-700">Địa chỉ đơn vị</Label>
+                    <FieldLabel optional>Địa chỉ đơn vị</FieldLabel>
                     <ShadInput
                       className={DIALOG_CONTROL_CLASS}
                       value={formValues.service_provider_address || ""}
@@ -1517,7 +1542,7 @@ export default function TableVehicleMaintenances() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-slate-700">Số hóa đơn</Label>
+                    <FieldLabel optional>Số hóa đơn</FieldLabel>
                     <ShadInput
                       className={DIALOG_CONTROL_CLASS}
                       value={formValues.invoice_no || ""}
@@ -1526,12 +1551,13 @@ export default function TableVehicleMaintenances() {
                   </div>
                   <DateField
                     label="Ngày hóa đơn"
+                    optional
                     placeholder="Chọn ngày hóa đơn"
                     value={formValues.invoice_date}
                     onChange={(value) => updateFormField("invoice_date", value)}
                   />
                   <div className="space-y-2">
-                    <Label className="text-slate-700">Tổng tiền</Label>
+                    <FieldLabel required>Tổng tiền</FieldLabel>
                     <ShadInput
                       type="text"
                       inputMode="decimal"
@@ -1548,6 +1574,7 @@ export default function TableVehicleMaintenances() {
                       }}
                       onChange={(event) => handleTotalAmountChange(event.target.value)}
                     />
+                    <FieldError message={formErrors.total_amount} />
                   </div>
                   <div className="space-y-2">
                     <Label className="text-slate-700">Tiền tệ</Label>
@@ -1564,7 +1591,7 @@ export default function TableVehicleMaintenances() {
                     </ShadSelect>
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-slate-700">Trạng thái thanh toán</Label>
+                    <FieldLabel required>Trạng thái thanh toán</FieldLabel>
                     <ShadSelect
                       value={formValues.payment_status || "unpaid"}
                       onValueChange={(value) => updateFormField("payment_status", value)}
@@ -1583,6 +1610,7 @@ export default function TableVehicleMaintenances() {
                   </div>
                   <DateField
                     label="Hạn thanh toán"
+                    optional
                     placeholder="Chọn hạn thanh toán"
                     value={formValues.deadline_pay}
                     onChange={(value) => updateFormField("deadline_pay", value)}
@@ -1592,7 +1620,7 @@ export default function TableVehicleMaintenances() {
 
               <DialogFormSection icon={<Wrench className="size-5" />} title={t("sectionDetails")}>
                 <div className="space-y-2">
-                  <Label className="text-slate-700">{t("description")}</Label>
+                  <FieldLabel required>{t("description")}</FieldLabel>
                   <ShadTextarea
                     rows={4}
                     placeholder={t("descriptionPlaceholder")}
@@ -1608,7 +1636,7 @@ export default function TableVehicleMaintenances() {
 
               <DialogFormSection icon={<Camera className="size-5" />} title="Tài liệu và OCR">
                 <div className="mb-4 space-y-2">
-                  <Label className="text-slate-700">Nội dung OCR / bản dịch hóa đơn</Label>
+                  <FieldLabel optional>Nội dung OCR / bản dịch hóa đơn</FieldLabel>
                   <ShadTextarea
                     rows={5}
                     className="min-h-36 bg-white"

@@ -35,7 +35,7 @@ import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } fro
 import { toast } from "sonner";
 
 const CONTROL_CLASS = "!h-11 min-h-11 w-full bg-white px-3 py-2 text-sm disabled:bg-slate-50";
-const GRID_CLASS = "grid grid-cols-1 gap-x-4 gap-y-4 sm:grid-cols-2 lg:grid-cols-4";
+const GRID_CLASS = "grid grid-cols-1 gap-x-4 gap-y-4 sm:grid-cols-2 lg:grid-cols-4 px-1";
 
 const MAINTENANCE_TYPES = [
   { value: "maintenance", label: "Bảo dưỡng" },
@@ -114,9 +114,7 @@ function DetailSection({
   return (
     <section className="border-b border-slate-200 py-4 last:border-b-0">
       <div className="mb-3 flex items-center gap-2">
-        <div className="flex size-7 items-center justify-center text-slate-500">
-          {icon}
-        </div>
+        <div className="flex size-7 items-center justify-center text-slate-500">{icon}</div>
         <h3 className="text-base font-semibold text-slate-900">{title}</h3>
       </div>
       {children}
@@ -129,9 +127,29 @@ function FieldError({ message }: { message?: string }) {
   return <p className="mt-1 text-xs font-medium text-red-500">{message}</p>;
 }
 
+function FieldLabel({
+  children,
+  optional = false,
+  required = false,
+}: {
+  children: ReactNode;
+  optional?: boolean;
+  required?: boolean;
+}) {
+  return (
+    <Label className="text-slate-700">
+      {children}
+      {required ? <span className="text-destructive">*</span> : null}
+      {optional ? <span className="text-xs font-normal text-slate-400">(không bắt buộc)</span> : null}
+    </Label>
+  );
+}
+
 function DateField({
   disabled,
   label,
+  optional = false,
+  required = false,
   value,
   placeholder,
   error,
@@ -139,6 +157,8 @@ function DateField({
 }: {
   disabled: boolean;
   label: string;
+  optional?: boolean;
+  required?: boolean;
   value?: dayjs.Dayjs | null;
   placeholder: string;
   error?: string;
@@ -149,7 +169,7 @@ function DateField({
 
   return (
     <div className="space-y-2">
-      <Label className="text-slate-700">{label}</Label>
+      <FieldLabel optional={optional} required={required}>{label}</FieldLabel>
       <Popover open={isOpen} onOpenChange={setIsOpen}>
         <PopoverTrigger asChild>
           <Button
@@ -689,6 +709,9 @@ export default function VehicleMaintenanceDetail({ maintenanceId }: { maintenanc
     if (!formValues?.dateRange?.[0] || !formValues?.dateRange?.[1]) {
       errors.dateRange = "Vui lòng chọn thời gian bảo trì";
     }
+    if (formValues?.total_amount === null || formValues?.total_amount === undefined) {
+      errors.total_amount = "Vui lòng nhập tổng tiền";
+    }
     if (!formValues?.vehicle_maintenance_description?.trim()) {
       errors.vehicle_maintenance_description = "Vui lòng nhập mô tả công việc sửa chữa";
     }
@@ -1073,7 +1096,7 @@ export default function VehicleMaintenanceDetail({ maintenanceId }: { maintenanc
               <DetailSection icon={<ClipboardList className="size-5" />} title="Thông tin bảo trì">
                 <div className={GRID_CLASS}>
                   <div className="space-y-2">
-                    <Label className="text-slate-700">Phương tiện</Label>
+                    <FieldLabel required>Phương tiện</FieldLabel>
                     <Select
                       disabled={disabled}
                       value={formValues.vehicle_id ? String(formValues.vehicle_id) : undefined}
@@ -1117,7 +1140,7 @@ export default function VehicleMaintenanceDetail({ maintenanceId }: { maintenanc
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="text-slate-700">Mức độ nghiêm trọng</Label>
+                    <FieldLabel required>Mức độ nghiêm trọng</FieldLabel>
                     <Select
                       disabled={disabled}
                       value={String(formValues.vehicle_maintenance_rank || 1)}
@@ -1157,7 +1180,7 @@ export default function VehicleMaintenanceDetail({ maintenanceId }: { maintenanc
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="text-slate-700">Số km đã chạy</Label>
+                    <FieldLabel optional>Số km đã chạy</FieldLabel>
                     <div className="relative">
                       <Input
                         disabled={!isEditing || saving || deleting}
@@ -1167,7 +1190,7 @@ export default function VehicleMaintenanceDetail({ maintenanceId }: { maintenanc
                         value={formatVtrackingDistanceValue(formValues.vehicle_distance_covered)}
                       />
                       <div className="absolute inset-y-0 right-2 flex items-center gap-1">
-                        <span className="border-r border-slate-200 pr-2 text-sm font-medium text-slate-500">Km</span>
+                        <span className="text-sm font-medium text-slate-500">Km</span>
                         {isEditing ? (
                           <Tooltip title="Cập nhật số km từ VTracking">
                             <Button
@@ -1188,7 +1211,7 @@ export default function VehicleMaintenanceDetail({ maintenanceId }: { maintenanc
                   </div>
 
                   <div className="space-y-2">
-                    <Label className="text-slate-700">Địa điểm sửa chữa</Label>
+                    <FieldLabel optional>Địa điểm sửa chữa</FieldLabel>
                     <Input
                       disabled={disabled}
                       className={CONTROL_CLASS}
@@ -1200,6 +1223,7 @@ export default function VehicleMaintenanceDetail({ maintenanceId }: { maintenanc
                   <DateField
                     disabled={disabled}
                     label="Từ ngày"
+                    required
                     placeholder="Chọn ngày bắt đầu"
                     error={formErrors.dateRange}
                     value={formValues.dateRange?.[0]}
@@ -1213,6 +1237,7 @@ export default function VehicleMaintenanceDetail({ maintenanceId }: { maintenanc
                   <DateField
                     disabled={disabled}
                     label="Đến ngày"
+                    required
                     placeholder="Chọn ngày kết thúc"
                     value={formValues.dateRange?.[1]}
                     onChange={(value) => {
@@ -1227,7 +1252,7 @@ export default function VehicleMaintenanceDetail({ maintenanceId }: { maintenanc
               <DetailSection icon={<ReceiptText className="size-5" />} title="Hóa đơn và thanh toán">
                 <div className={GRID_CLASS}>
                   <div className="space-y-2">
-                    <Label className="text-slate-700">Đơn vị sửa chữa</Label>
+                    <FieldLabel optional>Đơn vị sửa chữa</FieldLabel>
                     <Input
                       disabled={disabled}
                       className={CONTROL_CLASS}
@@ -1236,7 +1261,7 @@ export default function VehicleMaintenanceDetail({ maintenanceId }: { maintenanc
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-slate-700">Địa chỉ đơn vị</Label>
+                    <FieldLabel optional>Địa chỉ đơn vị</FieldLabel>
                     <Input
                       disabled={disabled}
                       className={CONTROL_CLASS}
@@ -1245,7 +1270,7 @@ export default function VehicleMaintenanceDetail({ maintenanceId }: { maintenanc
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-slate-700">Số hóa đơn</Label>
+                    <FieldLabel optional>Số hóa đơn</FieldLabel>
                     <Input
                       disabled={disabled}
                       className={CONTROL_CLASS}
@@ -1256,12 +1281,13 @@ export default function VehicleMaintenanceDetail({ maintenanceId }: { maintenanc
                   <DateField
                     disabled={disabled}
                     label="Ngày hóa đơn"
+                    optional
                     placeholder="Chọn ngày hóa đơn"
                     value={formValues.invoice_date}
                     onChange={(value) => updateFormField("invoice_date", value)}
                   />
                   <div className="space-y-2">
-                    <Label className="text-slate-700">Tổng tiền</Label>
+                    <FieldLabel required>Tổng tiền</FieldLabel>
                     <Input
                       disabled={disabled}
                       type="text"
@@ -1279,6 +1305,7 @@ export default function VehicleMaintenanceDetail({ maintenanceId }: { maintenanc
                       }}
                       onChange={(event) => handleTotalAmountChange(event.target.value)}
                     />
+                    <FieldError message={formErrors.total_amount} />
                   </div>
                   <div className="space-y-2">
                     <Label className="text-slate-700">Tiền tệ</Label>
@@ -1292,7 +1319,7 @@ export default function VehicleMaintenanceDetail({ maintenanceId }: { maintenanc
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label className="text-slate-700">Trạng thái thanh toán</Label>
+                    <FieldLabel required>Trạng thái thanh toán</FieldLabel>
                     <Select
                       disabled={disabled}
                       value={formValues.payment_status || "unpaid"}
@@ -1313,6 +1340,7 @@ export default function VehicleMaintenanceDetail({ maintenanceId }: { maintenanc
                   <DateField
                     disabled={disabled}
                     label="Hạn thanh toán"
+                    optional
                     placeholder="Chọn hạn thanh toán"
                     value={formValues.deadline_pay}
                     onChange={(value) => updateFormField("deadline_pay", value)}
@@ -1324,6 +1352,7 @@ export default function VehicleMaintenanceDetail({ maintenanceId }: { maintenanc
             <div className="h-[520px] min-w-0 overflow-y-auto xl:border-l xl:border-slate-200/70 xl:pl-6">
               <DetailSection icon={<Wrench className="size-5" />} title="Mô tả công việc">
                 <div className="space-y-2">
+                  <FieldLabel required>Mô tả công việc</FieldLabel>
                   <Textarea
                     disabled={disabled}
                     rows={2}
