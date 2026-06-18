@@ -20,10 +20,16 @@ import MonthlyOverviewView from "./attendance/MonthlyOverviewView";
 export default function WorkAttendanceManager({
   compact = false,
   todayOnly = false,
+  selectedDate: controlledSelectedDate,
+  onSelectedDateChange,
+  hideDateControls = false,
   onDirtyChange,
 }: {
   compact?: boolean;
   todayOnly?: boolean;
+  selectedDate?: Dayjs;
+  onSelectedDateChange?: (date: Dayjs) => void;
+  hideDateControls?: boolean;
   onDirtyChange?: (dirty: boolean) => void;
 }) {
   const t = useTranslations("WorkAttendancePage");
@@ -32,7 +38,7 @@ export default function WorkAttendanceManager({
   const canUpdate = hasActionAccess(SIDEBAR.WORK_ATTENDANCE, PERMISSIONS.WORK_ATTENDANCE.UPDATE);
 
   const [activeTab, setActiveTab] = useState<"daily" | "overview">("daily");
-  const [selectedDate, setSelectedDate] = useState<Dayjs>(dayjs());
+  const [internalSelectedDate, setInternalSelectedDate] = useState<Dayjs>(dayjs());
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [dirty, setDirtyState] = useState(false);
@@ -47,12 +53,22 @@ export default function WorkAttendanceManager({
     onDirtyChangeRef.current = onDirtyChange;
   }, [onDirtyChange]);
 
+  const isDateControlled = controlledSelectedDate != null;
+  const selectedDate = controlledSelectedDate || internalSelectedDate;
+  const setSelectedDate = useCallback(
+    (nextDate: Dayjs) => {
+      if (isDateControlled) onSelectedDateChange?.(nextDate);
+      else setInternalSelectedDate(nextDate);
+    },
+    [isDateControlled, onSelectedDateChange]
+  );
+
   const workDate = selectedDate.format("YYYY-MM-DD");
 
   useEffect(() => {
-    if (!todayOnly) return;
-    setSelectedDate((prev) => (prev.isSame(dayjs(), "day") ? prev : dayjs()));
-  }, [todayOnly]);
+    if (!todayOnly || isDateControlled) return;
+    setInternalSelectedDate((prev) => (prev.isSame(dayjs(), "day") ? prev : dayjs()));
+  }, [isDateControlled, todayOnly]);
 
   const loadData = useCallback(async () => {
     setLoading(true);
@@ -132,7 +148,7 @@ export default function WorkAttendanceManager({
         canUpdate={canUpdate}
         attendanceMarked={attendanceMarked}
         compact
-        todayOnly={todayOnly}
+        todayOnly={todayOnly || hideDateControls}
         onChangeDate={handleChangeDate}
         onReload={loadData}
         onSave={handleSave}
@@ -169,7 +185,7 @@ export default function WorkAttendanceManager({
           canUpdate={canUpdate}
           attendanceMarked={attendanceMarked}
           compact={compact}
-          todayOnly={todayOnly}
+          todayOnly={todayOnly || hideDateControls}
           onChangeDate={handleChangeDate}
           onReload={loadData}
           onSave={handleSave}

@@ -20,6 +20,7 @@ import {
 import type {
   WorkAssignmentDraft,
   WorkMixerAssignmentDraft,
+  WorkMixSlotItem,
   WorkPersonnel,
   WorkPumpRoleKey,
   WorkVehicle,
@@ -34,6 +35,8 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
+  FileSpreadsheet,
   Loader2,
   Plus,
   Save,
@@ -41,6 +44,7 @@ import {
   Star,
   Trash2,
   Truck,
+  UserRound,
 } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
@@ -83,19 +87,95 @@ const getPersonLabel = (person?: WorkPersonnel) => {
   return person.user_short_name || person.user_full_name || `#${person.user_id}`;
 };
 
+const getDefaultLotCaptureName = () => `Lốt ${dayjs().format("H")}H`;
+
+const normalizeLotVehicleName = (raw: unknown) => {
+  const upper = String(raw || "")
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, "");
+  const match = upper.match(/^X0*(\d+)$/);
+  return match ? `X${match[1]}` : upper;
+};
+
+const buildLotSyncMap = (items: WorkMixSlotItem[]) => {
+  const maToStt: Record<string, number> = {};
+  const skipped: { order_number: number; reason: string; raw: unknown }[] = [];
+
+  items.forEach((item, index) => {
+    const maX = normalizeLotVehicleName(item.vehicle_name);
+    if (!/^X\d+$/.test(maX)) {
+      skipped.push({
+        order_number: item.order_number,
+        reason: "invalid_vehicle_name",
+        raw: item.vehicle_name,
+      });
+      return;
+    }
+    if (maX in maToStt) {
+      skipped.push({ order_number: item.order_number, reason: "duplicate", raw: maX });
+      return;
+    }
+    maToStt[maX] = index + 1;
+  });
+
+  return { maToStt, skipped };
+};
+
+const normalizeLotDisplayName = (value?: string) => {
+  const trimmed = value?.trim();
+  if (!trimmed) return "";
+  const withoutTechnicalPrefix = trimmed.replace(/^tanker_lot_sync\s*:?\s*/i, "").trim();
+  const displayName = (withoutTechnicalPrefix || trimmed).split(" - ")[0].trim();
+  const hourLabel = displayName.match(/(?:^|\D)([01]?\d|2[0-3])\s*H(?:\D|$)/i);
+  if (hourLabel) return `${Number(hourLabel[1])}H`;
+
+  const timeLabel =
+    displayName.match(/(?:^|[T\s])([01]?\d|2[0-3]):[0-5]\d/) ||
+    displayName.match(/^([01]?\d|2[0-3]):[0-5]\d/);
+  if (timeLabel) return `${Number(timeLabel[1])}H`;
+
+  const parsed = dayjs(displayName);
+  return parsed.isValid() ? `${parsed.hour()}H` : displayName;
+};
+
+const getLotDisplayName = (response: {
+  data?: {
+    multi_name?: string;
+    multi_description?: string;
+    multi_data?: { snapshot_note?: string } | null;
+  };
+}) => {
+  return (
+    normalizeLotDisplayName(response.data?.multi_data?.snapshot_note) ||
+    normalizeLotDisplayName(response.data?.multi_description) ||
+    normalizeLotDisplayName(response.data?.multi_name)
+  );
+};
+
 export default function WorkAssignmentSelectManager({
   active = true,
   todayOnly = false,
+  selectedDate: controlledSelectedDate,
+  onSelectedDateChange,
+  hideDateControls = false,
   onDirtyChange,
   onRegisterChup,
   onChupLoadingChange,
+  onRegisterLotCapture,
+  onLotCaptureLoadingChange,
   children,
 }: {
   active?: boolean;
   todayOnly?: boolean;
+  selectedDate?: Dayjs;
+  onSelectedDateChange?: (date: Dayjs) => void;
+  hideDateControls?: boolean;
   onDirtyChange?: (dirty: boolean) => void;
   onRegisterChup?: (fn: (() => void) | null) => void;
   onChupLoadingChange?: (loading: boolean) => void;
+  onRegisterLotCapture?: (fn: (() => void) | null) => void;
+  onLotCaptureLoadingChange?: (loading: boolean) => void;
   /** Các khối hiển thị bên dưới bảng Xe bơm (cột phải): Công việc, Chấm công, Lốt trộn... */
   children?: ReactNode;
 }) {
@@ -106,8 +186,9 @@ export default function WorkAssignmentSelectManager({
     SIDEBAR.WORK_ARRANGEMENTS,
     PERMISSIONS.WORK_ARRANGEMENTS.UPDATE
   );
+  const canSyncLots = hasActionAccess(SIDEBAR.DASHBOARD, PERMISSIONS.DASHBOARD.SYNC_SLOTS);
 
-  const [selectedDate, setSelectedDate] = useState<Dayjs>(dayjs());
+  const [internalSelectedDate, setInternalSelectedDate] = useState<Dayjs>(dayjs());
   const [loading, setLoading] = useState(false);
   const [savingPump, setSavingPump] = useState(false);
   const [savingMixer, setSavingMixer] = useState(false);
@@ -126,9 +207,14 @@ export default function WorkAssignmentSelectManager({
     createEmptyMixerAssignmentDraft(dayjs().format("YYYY-MM-DD"))
   );
   // Số lốt theo xe (thứ tự trong hàng đợi lốt trộn hôm nay); 1 xe có thể giữ nhiều lốt.
-  const [lotNumbersByVehicle, setLotNumbersByVehicle] = useState<Map<number, number[]>>(
-    new Map()
-  );
+  const [lotNumbersByVehicle, setLotNumbersByVehicle] = useState<Map<number, number[]>>(new Map());
+  const [latestLotName, setLatestLotName] = useState("");
+  const [lotCaptureOpen, setLotCaptureOpen] = useState(false);
+  const [lotCaptureName, setLotCaptureName] = useState(getDefaultLotCaptureName);
+  const [lotDutyUserId, setLotDutyUserId] = useState<string>(NONE_VALUE);
+  const [lotCaptureItems, setLotCaptureItems] = useState<WorkMixSlotItem[]>([]);
+  const [lotCaptureLoading, setLotCaptureLoading] = useState(false);
+  const [lotCaptureSaving, setLotCaptureSaving] = useState(false);
   const onDirtyChangeRef = useRef(onDirtyChange);
 
   useEffect(() => {
@@ -143,6 +229,16 @@ export default function WorkAssignmentSelectManager({
   useEffect(() => {
     mixerDraftRef.current = mixerDraft;
   }, [mixerDraft]);
+
+  const isDateControlled = controlledSelectedDate != null;
+  const selectedDate = controlledSelectedDate || internalSelectedDate;
+  const setSelectedDate = useCallback(
+    (nextDate: Dayjs) => {
+      if (isDateControlled) onSelectedDateChange?.(nextDate);
+      else setInternalSelectedDate(nextDate);
+    },
+    [isDateControlled, onSelectedDateChange]
+  );
 
   const workDate = selectedDate.format("YYYY-MM-DD");
   const isToday = selectedDate.isSame(dayjs(), "day");
@@ -241,26 +337,141 @@ export default function WorkAssignmentSelectManager({
         map.set(item.vehicle_id, positions);
       });
       setLotNumbersByVehicle(map);
+      setLatestLotName(items.length > 0 ? getLotDisplayName(res) : "");
     } catch (error) {
       console.error("[WorkAssignmentSelectManager] load lots error:", error);
       setLotNumbersByVehicle(new Map());
+      setLatestLotName("");
     }
   }, []);
 
   // Tải khi mở và mỗi lần quay lại trang (lốt đổi theo hàng đợi) — giữ hành vi của khối Lốt trộn cũ.
   useEffect(() => {
-    if (active) void loadLots();
-  }, [active, loadLots]);
+    if (!active) return;
+    if (!isToday) {
+      setLotNumbersByVehicle(new Map());
+      setLatestLotName("");
+      return;
+    }
+    void loadLots();
+  }, [active, isToday, loadLots]);
 
   // Realtime: ai đó Đồng bộ / Apply trực sản xuất → snapshot đổi → tải lại cột Lốt.
   useSocketEventListener(
     "lot_sync:updated",
     () => {
+      if (!isToday) return;
       void loadLots();
     },
     "notifications",
-    active && isConnected
+    active && isConnected && isToday
   );
+
+  const loadLotCaptureItems = useCallback(async () => {
+    setLotCaptureLoading(true);
+    try {
+      const items = await workMixSlotApi.getList();
+      setLotCaptureItems(items);
+      if (items.length === 0) message.warning(t("lotCaptureEmpty"));
+    } catch (error) {
+      const msg = error instanceof Error ? error.message : t("unknownError");
+      message.error(`${t("lotCaptureLoadFailed")}: ${msg}`);
+      setLotCaptureItems([]);
+    } finally {
+      setLotCaptureLoading(false);
+    }
+  }, [t]);
+
+  const openLotCaptureDialog = useCallback(() => {
+    if (!canSyncLots) {
+      message.warning(t("lotCaptureNoPermission"));
+      return;
+    }
+    if (!isToday) return;
+    setLotCaptureName(getDefaultLotCaptureName());
+    setLotDutyUserId(NONE_VALUE);
+    setLotCaptureOpen(true);
+    void loadLotCaptureItems();
+  }, [canSyncLots, isToday, loadLotCaptureItems, t]);
+
+  const moveLotCaptureItem = useCallback((index: number, direction: -1 | 1) => {
+    setLotCaptureItems((current) => {
+      const targetIndex = index + direction;
+      if (targetIndex < 0 || targetIndex >= current.length) return current;
+      const next = [...current];
+      [next[index], next[targetIndex]] = [next[targetIndex], next[index]];
+      return next;
+    });
+  }, []);
+
+  const handleCaptureLots = useCallback(async () => {
+    const lotName = lotCaptureName.trim() || getDefaultLotCaptureName();
+    const dutyUserId = lotDutyUserId === NONE_VALUE ? 0 : Number(lotDutyUserId);
+    const dutyPerson = dutyUserId > 0 ? personnelById.get(dutyUserId) : undefined;
+    const dutyPersonName = getPersonLabel(dutyPerson);
+    const snapshotNote = dutyPersonName
+      ? `${lotName} - ${t("lotDutyPerson")}: ${dutyPersonName}`
+      : lotName;
+    const { maToStt, skipped } = buildLotSyncMap(lotCaptureItems);
+    const lotCount = Object.keys(maToStt).length;
+
+    if (skipped.length > 0) console.warn("[handleCaptureLots] skipped:", skipped);
+    if (lotCount === 0) {
+      message.warning(t("lotCaptureEmpty"));
+      return;
+    }
+
+    setLotCaptureSaving(true);
+
+    const pushToSheet = async () => {
+      const res = await fetch("/api/google-sheets/bo-tri-cv/sync-lot", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ maToStt, lotName }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || "Sync failed");
+      if (data.unmatchedMaX?.length > 0) {
+        console.warn("[handleCaptureLots] mã X không có trong sheet cột H:", data.unmatchedMaX);
+      }
+      return data;
+    };
+
+    try {
+      const [sheetResult, snapshotResult] = await Promise.allSettled([
+        pushToSheet(),
+        systemApi.captureTankerLotSync({
+          lot_name: lotName,
+          duty_user_id: dutyUserId || undefined,
+          duty_user_name: dutyPersonName || undefined,
+          snapshot_note: snapshotNote,
+          multi_description: snapshotNote,
+        }),
+      ]);
+
+      if (sheetResult.status === "fulfilled") {
+        const data = sheetResult.value;
+        message.success(t("lotSyncSuccess", { count: data.updated ?? lotCount }));
+      } else {
+        console.error("[handleCaptureLots] sheet error:", sheetResult.reason);
+        message.error(t("lotSyncFailed"));
+      }
+
+      if (snapshotResult.status === "fulfilled") {
+        message.success(t("lotCaptureSuccess", { name: lotName }));
+        await loadLots();
+      } else {
+        console.error("[handleCaptureLots] snapshot error:", snapshotResult.reason);
+        message.error(t("lotCaptureFailed"));
+      }
+
+      if (sheetResult.status === "fulfilled" || snapshotResult.status === "fulfilled") {
+        setLotCaptureOpen(false);
+      }
+    } finally {
+      setLotCaptureSaving(false);
+    }
+  }, [loadLots, lotCaptureItems, lotCaptureName, lotDutyUserId, personnelById, t]);
 
   useEffect(() => {
     onDirtyChangeRef.current?.(dirty);
@@ -271,14 +482,14 @@ export default function WorkAssignmentSelectManager({
     dirtyRef.current = dirty;
   }, [dirty]);
   const resetToToday = useCallback(() => {
-    setSelectedDate((prev) => (prev.isSame(dayjs(), "day") ? prev : dayjs()));
+    setInternalSelectedDate((prev) => (prev.isSame(dayjs(), "day") ? prev : dayjs()));
   }, []);
   useEffect(() => {
-    if (active && !dirtyRef.current) resetToToday();
-  }, [active, resetToToday]);
+    if (active && !dirtyRef.current && !isDateControlled) resetToToday();
+  }, [active, isDateControlled, resetToToday]);
   useEffect(() => {
-    if (todayOnly) resetToToday();
-  }, [resetToToday, todayOnly]);
+    if (todayOnly && !isDateControlled) resetToToday();
+  }, [isDateControlled, resetToToday, todayOnly]);
   const addPumpVehicle = useCallback(() => {
     const vehicleId = Number(selectedPumpVehicleId);
     if (!vehicleId || assignedPumpVehicleIds.has(vehicleId)) return;
@@ -519,6 +730,13 @@ export default function WorkAssignmentSelectManager({
   useEffect(() => {
     onChupLoadingChange?.(chupLoading);
   }, [chupLoading, onChupLoadingChange]);
+  useEffect(() => {
+    onRegisterLotCapture?.(openLotCaptureDialog);
+    return () => onRegisterLotCapture?.(null);
+  }, [onRegisterLotCapture, openLotCaptureDialog]);
+  useEffect(() => {
+    onLotCaptureLoadingChange?.(lotCaptureLoading || lotCaptureSaving);
+  }, [lotCaptureLoading, lotCaptureSaving, onLotCaptureLoadingChange]);
 
   const dateControls = (
     <div className="flex items-center gap-1">
@@ -569,7 +787,104 @@ export default function WorkAssignmentSelectManager({
 
   return (
     <div className="space-y-3">
-      {!todayOnly && (
+      <Modal
+        open={lotCaptureOpen}
+        onCancel={() => setLotCaptureOpen(false)}
+        onOk={handleCaptureLots}
+        okText={t("lotCaptureConfirm")}
+        cancelText={t("lotCaptureCancel")}
+        confirmLoading={lotCaptureSaving}
+        okButtonProps={{
+          disabled: !canSyncLots || lotCaptureLoading || lotCaptureItems.length === 0,
+        }}
+        title={t("lotCaptureTitle")}
+        width={520}
+      >
+        <div className="space-y-3 pt-1">
+          <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
+            {t("lotCaptureDescription")}
+          </div>
+          <Input
+            value={lotCaptureName}
+            onChange={(event) => setLotCaptureName(event.target.value)}
+            placeholder={t("lotCaptureNamePlaceholder")}
+            className="h-9 rounded-none border-slate-300 bg-white shadow-none focus-visible:ring-teal-500/20"
+          />
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+              <UserRound size={15} className="text-teal-600" />
+              {t("lotDutyPerson")}
+            </div>
+            <AntSelect
+              showSearch
+              allowClear
+              value={lotDutyUserId === NONE_VALUE ? undefined : lotDutyUserId}
+              onChange={(value) => setLotDutyUserId(value || NONE_VALUE)}
+              placeholder={t("lotDutyPersonPlaceholder")}
+              options={personnel.map((person) => ({
+                value: String(person.user_id),
+                label: getPersonLabel(person),
+              }))}
+              filterOption={filterSelectOptionByLabel}
+              className="w-full [&_.ant-select-selector]:!rounded-none"
+            />
+          </div>
+          <div className="rounded-md border border-slate-200">
+            <div className="flex items-center gap-2 border-b border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-800">
+              <FileSpreadsheet size={16} className="text-teal-600" />
+              {t("lotCapturePreview", { count: lotCaptureItems.length })}
+            </div>
+            <div className="max-h-[240px] overflow-y-auto p-2">
+              {lotCaptureLoading ? (
+                <Skeleton active paragraph={{ rows: 4 }} />
+              ) : lotCaptureItems.length === 0 ? (
+                <div className="px-3 py-8 text-center text-sm text-slate-400">
+                  {t("lotCaptureEmpty")}
+                </div>
+              ) : (
+                <div className="space-y-1">
+                  {lotCaptureItems.map((item, index) => (
+                    <div
+                      key={`${item.order_id}-${item.vehicle_id}`}
+                      className="flex items-center gap-3 rounded-md bg-slate-50 px-3 py-2 text-sm"
+                    >
+                      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-200 text-xs font-bold text-slate-700">
+                        {index + 1}
+                      </span>
+                      <span className="min-w-0 flex-1 truncate font-semibold text-slate-900">
+                        {item.vehicle_license_plate} | {item.vehicle_name}
+                      </span>
+                      <Chip tone="teal">{item.label}</Chip>
+                      <div className="flex shrink-0 items-center gap-1">
+                        <button
+                          type="button"
+                          aria-label={t("lotOrderMoveUp")}
+                          disabled={index === 0 || lotCaptureSaving}
+                          onClick={() => moveLotCaptureItem(index, -1)}
+                          className="flex h-7 w-7 items-center justify-center rounded border border-slate-200 bg-white text-slate-500 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          <ChevronUp size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          aria-label={t("lotOrderMoveDown")}
+                          disabled={index === lotCaptureItems.length - 1 || lotCaptureSaving}
+                          onClick={() => moveLotCaptureItem(index, 1)}
+                          className="flex h-7 w-7 items-center justify-center rounded border border-slate-200 bg-white text-slate-500 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                          <ChevronDown size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </Modal>
+
+      {!todayOnly && !hideDateControls && (
         <div className="flex flex-wrap items-center gap-3 border border-slate-300 bg-white px-3 py-1.5">
           {dateControls}
         </div>
@@ -775,7 +1090,7 @@ export default function WorkAssignmentSelectManager({
                   <th className="w-[45%] border border-slate-300 px-2 py-1.5 text-left">
                     {t("mixerDriver")}
                   </th>
-                  <th className="w-[90px] border border-slate-300 px-2 py-1.5 text-center">
+                  <th className="w-[112px] border border-slate-300 px-2 py-1.5 text-center">
                     {t("mixerLot")}
                   </th>
                 </tr>
@@ -796,7 +1111,9 @@ export default function WorkAssignmentSelectManager({
                 ) : (
                   sortedMixerVehicles.map((vehicle, index) => {
                     const driverId = mixerDriverByVehicle.get(vehicle.vehicle_id) || null;
-                    const lotNumbers = lotNumbersByVehicle.get(vehicle.vehicle_id);
+                    const lotNumbers = isToday
+                      ? lotNumbersByVehicle.get(vehicle.vehicle_id)
+                      : undefined;
                     return (
                       <tr key={vehicle.vehicle_id} className="h-10">
                         <td className="border border-slate-200 bg-slate-50 px-2 text-center text-xs font-medium text-slate-500">
@@ -824,7 +1141,17 @@ export default function WorkAssignmentSelectManager({
                         <td className="border border-slate-200 px-2 py-1 text-center">
                           {/* Xe không có lốt thì bỏ trống */}
                           {lotNumbers && lotNumbers.length > 0 && (
-                            <Chip tone="teal">{lotNumbers.join(", ")}</Chip>
+                            <div className="flex min-w-0 flex-col items-center gap-0.5">
+                              {latestLotName && (
+                                <span
+                                  title={latestLotName}
+                                  className="max-w-[96px] truncate text-[11px] font-bold leading-4 text-teal-700"
+                                >
+                                  {latestLotName}
+                                </span>
+                              )}
+                              <Chip tone="teal">{lotNumbers.join(", ")}</Chip>
+                            </div>
                           )}
                         </td>
                       </tr>
