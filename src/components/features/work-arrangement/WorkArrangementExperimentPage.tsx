@@ -7,16 +7,19 @@ import { SIDEBAR } from "@/constants/route";
 import { useNavigationStore } from "@/hooks/use-navigation-store";
 import { usePermissions } from "@/hooks/use-permissions";
 import { convertSolarToLunar } from "@/utils/lunar";
-import { DatePicker } from "antd";
+import { type ChupLichFormat } from "@/utils/exportChupLich";
+import { DatePicker, Dropdown } from "antd";
 import dayjs from "dayjs";
 import {
   Briefcase,
   BriefcaseBusiness,
   CalendarDays,
   Camera,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   FileSpreadsheet,
+  ImageDown,
   Loader2,
   type LucideIcon,
 } from "lucide-react";
@@ -35,7 +38,7 @@ export default function WorkArrangementExperimentPage() {
   const tAssign = useTranslations("WorkAssignmentPage");
   const { hasActionAccess } = usePermissions();
   const setDirty = useNavigationStore((state) => state.setDirty);
-  const chupHandlerRef = useRef<(() => void) | null>(null);
+  const chupHandlerRef = useRef<((format: ChupLichFormat) => void) | null>(null);
   const lotCaptureHandlerRef = useRef<(() => void) | null>(null);
   const [chupLoading, setChupLoading] = useState(false);
   const [lotCaptureLoading, setLotCaptureLoading] = useState(false);
@@ -65,7 +68,7 @@ export default function WorkArrangementExperimentPage() {
 
   useEffect(() => () => setDirty(false), [setDirty]);
 
-  const registerChup = useCallback((fn: (() => void) | null) => {
+  const registerChup = useCallback((fn: ((format: ChupLichFormat) => void) | null) => {
     chupHandlerRef.current = fn;
   }, []);
   const registerLotCapture = useCallback((fn: (() => void) | null) => {
@@ -163,16 +166,37 @@ export default function WorkArrangementExperimentPage() {
                   {tAssign("lotCaptureButton")}
                 </Button>
               )}
-              <Button
-                type="button"
-                size="sm"
-                onClick={() => chupHandlerRef.current?.()}
+              <Dropdown
+                trigger={["click"]}
                 disabled={chupLoading}
-                className="h-8 bg-slate-900 px-3 font-semibold text-white hover:bg-slate-800"
+                menu={{
+                  items: [
+                    {
+                      key: "excel",
+                      icon: <FileSpreadsheet size={14} />,
+                      label: tAssign("chupExcel"),
+                      onClick: () => chupHandlerRef.current?.("excel"),
+                    },
+                    {
+                      key: "image",
+                      icon: <ImageDown size={14} />,
+                      label: tAssign("chupImage"),
+                      onClick: () => chupHandlerRef.current?.("image"),
+                    },
+                  ],
+                }}
               >
-                {chupLoading ? <Loader2 className="size-4 animate-spin" /> : <Camera size={15} />}
-                {tAssign("chupButton")}
-              </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={chupLoading}
+                  className="h-8 bg-slate-900 px-3 font-semibold text-white hover:bg-slate-800"
+                >
+                  {chupLoading ? <Loader2 className="size-4 animate-spin" /> : <Camera size={15} />}
+                  {tAssign("chupButton")}
+                  <ChevronDown size={14} />
+                </Button>
+              </Dropdown>
             </div>
           </div>
         </header>

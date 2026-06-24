@@ -1264,7 +1264,10 @@
     "sectionMixer": "Mixer trucks",
     "sectionWork": "Work tasks",
     "chupSuccess": "Work arrangement exported",
-    "chupFailed": "Unable to export"
+    "chupFailed": "Unable to export",
+    "chupExcel": "Excel",
+    "chupImage": "Image",
+    "chupImageFailed": "Could not create schedule image"
   },
   "WorkArrangementPage": {
     "title": "Work Arrangement",

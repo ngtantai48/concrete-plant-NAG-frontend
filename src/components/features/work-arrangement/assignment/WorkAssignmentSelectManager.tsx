@@ -28,7 +28,14 @@ import type {
 import { useSocket } from "@/context/socket-context";
 import { useSocketEventListener } from "@/hooks/useSocketEventListener";
 import systemApi from "@/services/system.service";
-import { exportChupLichExcel } from "@/utils/exportChupLich";
+import {
+  buildChupLichModel,
+  exportChupLichExcel,
+  type ChupLichFormat,
+  type ChupLichModel,
+} from "@/utils/exportChupLich";
+import { toPng } from "html-to-image";
+import ChupLichSheet from "./ChupLichSheet";
 import { DatePicker, Dropdown, message, Modal, Select as AntSelect, Skeleton } from "antd";
 import dayjs, { type Dayjs } from "dayjs";
 import {
@@ -220,7 +227,7 @@ export default function WorkAssignmentSelectManager({
   onSelectedDateChange?: (date: Dayjs) => void;
   hideDateControls?: boolean;
   onDirtyChange?: (dirty: boolean) => void;
-  onRegisterChup?: (fn: (() => void) | null) => void;
+  onRegisterChup?: (fn: ((format: ChupLichFormat) => void) | null) => void;
   onChupLoadingChange?: (loading: boolean) => void;
   onRegisterLotCapture?: (fn: (() => void) | null) => void;
   onLotCaptureLoadingChange?: (loading: boolean) => void;
@@ -263,6 +270,9 @@ export default function WorkAssignmentSelectManager({
   const [lotCaptureItems, setLotCaptureItems] = useState<WorkMixSlotItem[]>([]);
   const [lotCaptureLoading, setLotCaptureLoading] = useState(false);
   const [lotCaptureSaving, setLotCaptureSaving] = useState(false);
+  // Bản lịch HTML ẩn để chụp ảnh (option "Ảnh" của Chụp lịch).
+  const [chupSheetModel, setChupSheetModel] = useState<ChupLichModel | null>(null);
+  const chupSheetRef = useRef<HTMLDivElement>(null);
   const onDirtyChangeRef = useRef(onDirtyChange);
 
   useEffect(() => {
@@ -730,93 +740,123 @@ export default function WorkAssignmentSelectManager({
   }, [mixerDraft, personnel, t]);
 
   const [chupLoading, setChupLoading] = useState(false);
-  const handleChupLich = useCallback(async () => {
-    if (pumpDirty || mixerDirty) {
-      message.warning(t("chupDirtyWarning"));
-      return;
-    }
-    setChupLoading(true);
-    try {
-      const [taskBootstrap, lotList, offBootstrap] = await Promise.all([
-        workTaskApi.getBootstrap(workDate),
-        workMixSlotApi.getList(),
-        workAttendanceApi.getBootstrap(workDate),
-      ]);
-
-      const hasPump = pumpDraft.pump_assignments.length > 0;
-      const hasMixer = mixerDraft.mixer_assignments.some((item) => item.user_id != null);
-      const hasTask = taskBootstrap.draft.task_assignments.some((task) => task.user_ids.length > 0);
-      const emptyParts: string[] = [];
-      if (!hasPump) emptyParts.push(t("sectionPump"));
-      if (!hasMixer) emptyParts.push(t("sectionMixer"));
-      if (!hasTask) emptyParts.push(t("sectionWork"));
-
-      if (emptyParts.length === 3) {
-        message.warning(`${t("chupEmptyTitle")}: ${emptyParts.join(", ")}`);
+  const handleChup = useCallback(
+    async (format: ChupLichFormat) => {
+      if (pumpDirty || mixerDirty) {
+        message.warning(t("chupDirtyWarning"));
         return;
       }
-      if (emptyParts.length > 0) {
-        const proceed = await new Promise<boolean>((resolve) => {
-          Modal.confirm({
-            title: t("chupPartialTitle"),
-            content: `${t("chupPartialContent")} ${emptyParts.join(", ")}`,
-            okText: t("chupPartialOk"),
-            cancelText: t("chupPartialCancel"),
-            onOk: () => resolve(true),
-            onCancel: () => resolve(false),
+      setChupLoading(true);
+      try {
+        const [taskBootstrap, lotList, offBootstrap] = await Promise.all([
+          workTaskApi.getBootstrap(workDate),
+          workMixSlotApi.getList(),
+          workAttendanceApi.getBootstrap(workDate),
+        ]);
+
+        const hasPump = pumpDraft.pump_assignments.length > 0;
+        const hasMixer = mixerDraft.mixer_assignments.some((item) => item.user_id != null);
+        const hasTask = taskBootstrap.draft.task_assignments.some(
+          (task) => task.user_ids.length > 0
+        );
+        const emptyParts: string[] = [];
+        if (!hasPump) emptyParts.push(t("sectionPump"));
+        if (!hasMixer) emptyParts.push(t("sectionMixer"));
+        if (!hasTask) emptyParts.push(t("sectionWork"));
+
+        if (emptyParts.length === 3) {
+          message.warning(`${t("chupEmptyTitle")}: ${emptyParts.join(", ")}`);
+          return;
+        }
+        if (emptyParts.length > 0) {
+          const proceed = await new Promise<boolean>((resolve) => {
+            Modal.confirm({
+              title: t("chupPartialTitle"),
+              content: `${t("chupPartialContent")} ${emptyParts.join(", ")}`,
+              okText: t("chupPartialOk"),
+              cancelText: t("chupPartialCancel"),
+              onOk: () => resolve(true),
+              onCancel: () => resolve(false),
+            });
           });
+          if (!proceed) return;
+        }
+
+        const offPersonById = new Map(
+          offBootstrap.personnel.map((person) => [person.user_id, person])
+        );
+        const offNote: Record<string, string> = {
+          morning: " (nghỉ sáng)",
+          afternoon: " (nghỉ chiều)",
+        };
+        const offNames = (offBootstrap.draft?.user_statuses || []).map((status) => {
+          const person = offPersonById.get(status.user_id);
+          const name = person?.user_full_name || person?.user_short_name || `#${status.user_id}`;
+          return `${name}${offNote[status.status] || ""}`;
         });
-        if (!proceed) return;
+
+        const chupParams = {
+          workDate,
+          personnel,
+          pumpDraft,
+          pumpVehicles,
+          mixerDraft,
+          mixerVehicles,
+          works: taskBootstrap.works,
+          taskDraft: taskBootstrap.draft,
+          lotLabels: lotList.map((item) => item.label),
+          offNames,
+        };
+
+        if (format === "image") {
+          setChupSheetModel(buildChupLichModel(chupParams));
+          // chờ 2 frame để bản lịch ẩn render xong rồi mới chụp
+          await new Promise<void>((resolve) =>
+            requestAnimationFrame(() => requestAnimationFrame(() => resolve()))
+          );
+          try {
+            const node = chupSheetRef.current;
+            if (!node) throw new Error("Sheet chưa render");
+            const dataUrl = await toPng(node, { backgroundColor: "#ffffff", pixelRatio: 2 });
+            const link = document.createElement("a");
+            link.download = `BO_TRI_CONG_VIEC_${workDate}.png`;
+            link.href = dataUrl;
+            link.click();
+            message.success(t("chupSuccess"));
+          } catch {
+            message.error(t("chupImageFailed"));
+          } finally {
+            setChupSheetModel(null);
+          }
+          return;
+        }
+
+        await exportChupLichExcel(chupParams);
+        message.success(t("chupSuccess"));
+      } catch (error) {
+        const msg = error instanceof Error ? error.message : t("unknownError");
+        message.error(`${t("chupFailed")}: ${msg}`);
+      } finally {
+        setChupLoading(false);
       }
-
-      const offPersonById = new Map(
-        offBootstrap.personnel.map((person) => [person.user_id, person])
-      );
-      const offNote: Record<string, string> = {
-        morning: " (nghỉ sáng)",
-        afternoon: " (nghỉ chiều)",
-      };
-      const offNames = (offBootstrap.draft?.user_statuses || []).map((status) => {
-        const person = offPersonById.get(status.user_id);
-        const name = person?.user_full_name || person?.user_short_name || `#${status.user_id}`;
-        return `${name}${offNote[status.status] || ""}`;
-      });
-
-      await exportChupLichExcel({
-        workDate,
-        personnel,
-        pumpDraft,
-        pumpVehicles,
-        mixerDraft,
-        mixerVehicles,
-        works: taskBootstrap.works,
-        taskDraft: taskBootstrap.draft,
-        lotLabels: lotList.map((item) => item.label),
-        offNames,
-      });
-      message.success(t("chupSuccess"));
-    } catch (error) {
-      const msg = error instanceof Error ? error.message : t("unknownError");
-      message.error(`${t("chupFailed")}: ${msg}`);
-    } finally {
-      setChupLoading(false);
-    }
-  }, [
-    pumpDirty,
-    mixerDirty,
-    workDate,
-    pumpDraft,
-    mixerDraft,
-    personnel,
-    pumpVehicles,
-    mixerVehicles,
-    t,
-  ]);
+    },
+    [
+      pumpDirty,
+      mixerDirty,
+      workDate,
+      pumpDraft,
+      mixerDraft,
+      personnel,
+      pumpVehicles,
+      mixerVehicles,
+      t,
+    ]
+  );
 
   useEffect(() => {
-    onRegisterChup?.(handleChupLich);
+    onRegisterChup?.(handleChup);
     return () => onRegisterChup?.(null);
-  }, [onRegisterChup, handleChupLich]);
+  }, [onRegisterChup, handleChup]);
   useEffect(() => {
     onChupLoadingChange?.(chupLoading);
   }, [chupLoading, onChupLoadingChange]);
@@ -877,6 +917,15 @@ export default function WorkAssignmentSelectManager({
 
   return (
     <div className="space-y-3">
+      {/* Bản lịch ẩn offscreen — chỉ render khi đang chụp ảnh Chụp lịch */}
+      {chupSheetModel && (
+        <div
+          aria-hidden
+          style={{ position: "fixed", left: -99999, top: 0, pointerEvents: "none", zIndex: -1 }}
+        >
+          <ChupLichSheet ref={chupSheetRef} model={chupSheetModel} />
+        </div>
+      )}
       <Modal
         open={lotCaptureOpen}
         onCancel={() => setLotCaptureOpen(false)}

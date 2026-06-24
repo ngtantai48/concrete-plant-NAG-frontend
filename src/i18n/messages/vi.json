@@ -1267,7 +1267,10 @@
     "sectionMixer": "Xe bồn",
     "sectionWork": "Công việc",
     "chupSuccess": "Đã xuất file bố trí công việc",
-    "chupFailed": "Không thể xuất file"
+    "chupFailed": "Không thể xuất file",
+    "chupExcel": "Excel",
+    "chupImage": "Ảnh",
+    "chupImageFailed": "Không tạo được ảnh lịch"
   },
   "WorkArrangementPage": {
     "title": "Bố trí công việc",

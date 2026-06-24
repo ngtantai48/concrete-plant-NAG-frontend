@@ -22,6 +22,8 @@ export interface ChupLichExportParams {
   offNames: string[];
 }
 
+export type ChupLichFormat = "excel" | "image";
+
 const HEADER_FILL = "FFD9E1F2"; // xanh nhạt cho tiêu đề
 const PUMP_FILL: Record<string, string> = {
   B1: "FFFFFF00",
@@ -67,7 +69,32 @@ const getPumpBCode = (vehicle?: WorkVehicle): string | null => {
   return match ? `B${match[1]}` : null;
 };
 
-export async function exportChupLichExcel(params: ChupLichExportParams): Promise<void> {
+// ---- Model dùng chung cho cả Excel và Ảnh (tránh lệch logic) ----
+export interface ChupLichPumpRow {
+  tt: number;
+  label: string;
+  fill: string | null; // ARGB ("FFFFFF00") hoặc null
+  driver: string;
+  operator: string;
+  hose: string;
+}
+
+export interface ChupLichWorkSection {
+  letter: string; // C, D, E...
+  title: string;
+  rows: { tt: number; name: string; people: string }[];
+}
+
+export interface ChupLichModel {
+  title: string;
+  pumpRows: ChupLichPumpRow[];
+  lotLabels: string[];
+  workSections: ChupLichWorkSection[];
+  mixers: { name: string; plate: string; driver: string }[];
+  offNames: string[];
+}
+
+export function buildChupLichModel(params: ChupLichExportParams): ChupLichModel {
   const {
     workDate,
     personnel,
@@ -93,8 +120,80 @@ export async function exportChupLichExcel(params: ChupLichExportParams): Promise
   for (const item of mixerDraft.mixer_assignments) {
     if (item.user_id != null) mixerDriverByVehicle.set(item.vehicle_id, item.user_id);
   }
-
   const worksById = new Map(works.map((work) => [work.work_id, work]));
+
+  const pumpRows: ChupLichPumpRow[] = pumpDraft.pump_assignments.map((assignment, index) => {
+    const vehicle = pumpVehicleById.get(assignment.vehicle_id);
+    const label =
+      [vehicle?.vehicle_license_plate, vehicle?.vehicle_name].filter(Boolean).join(" - ") ||
+      `#${assignment.vehicle_id}`;
+    return {
+      tt: index + 1,
+      label,
+      fill: PUMP_FILL[getPumpBCode(vehicle) || ""] ?? null,
+      driver: joinPeople(assignment.roles.driver || []),
+      operator: joinPeople(assignment.roles.operator || []),
+      hose: joinPeople(assignment.roles.hose || []),
+    };
+  });
+
+  const sectionMap = new Map<number, { parent: Work; rows: { name: string; people: string }[] }>();
+  for (const task of taskDraft.task_assignments) {
+    if (task.user_ids.length === 0) continue;
+    const work = worksById.get(task.work_id);
+    if (!work) continue;
+    const parent = work.work_root ? worksById.get(work.work_root) || work : work;
+    let section = sectionMap.get(parent.work_id);
+    if (!section) {
+      section = { parent, rows: [] };
+      sectionMap.set(parent.work_id, section);
+    }
+    section.rows.push({
+      name: parent.work_id === work.work_id ? "" : work.work_name,
+      people: joinPeople(task.user_ids),
+    });
+  }
+  const workSections: ChupLichWorkSection[] = Array.from(sectionMap.values())
+    .sort((a, b) => a.parent.work_id - b.parent.work_id)
+    .map((section, index) => ({
+      letter: String.fromCharCode(67 + index), // C, D, E...
+      title: section.parent.work_name.toUpperCase(),
+      rows: section.rows.map((row, rowIndex) => ({
+        tt: rowIndex + 1,
+        name: row.name,
+        people: row.people,
+      })),
+    }));
+
+  const sortedMixers = [...mixerVehicles].sort((a, b) =>
+    String(a.vehicle_name || a.vehicle_license_plate || "").localeCompare(
+      String(b.vehicle_name || b.vehicle_license_plate || ""),
+      "en",
+      { numeric: true, sensitivity: "base" }
+    )
+  );
+  const mixers = sortedMixers.map((vehicle) => {
+    const driverId = mixerDriverByVehicle.get(vehicle.vehicle_id);
+    return {
+      name: vehicle.vehicle_name || "",
+      plate: vehicle.vehicle_license_plate || "",
+      driver: driverId != null ? shortName(driverId) : "",
+    };
+  });
+
+  return {
+    title: `CÔNG VIỆC NGÀY ${formatDateTitle(workDate)}`,
+    pumpRows,
+    lotLabels,
+    workSections,
+    mixers,
+    offNames,
+  };
+}
+
+export async function exportChupLichExcel(params: ChupLichExportParams): Promise<void> {
+  const { workDate } = params;
+  const model = buildChupLichModel(params);
 
   const workbook = new ExcelJS.Workbook();
   const ws = workbook.addWorksheet("CHUP LICH", {
@@ -123,7 +222,7 @@ export async function exportChupLichExcel(params: ChupLichExportParams): Promise
   // ----- Tiêu đề -----
   ws.mergeCells(1, 1, 2, 9);
   const titleCell = ws.getCell(1, 1);
-  titleCell.value = `CÔNG VIỆC NGÀY ${formatDateTitle(workDate)}`;
+  titleCell.value = model.title;
   titleCell.alignment = { vertical: "middle", horizontal: "center" };
   titleCell.font = { name: "Arial", size: 18, bold: true };
   ws.getRow(1).height = 22;
@@ -157,28 +256,23 @@ export async function exportChupLichExcel(params: ChupLichExportParams): Promise
   styleCell(ws.getCell(leftRow, 5), { bold: true, fill: HEADER_FILL, align: "center" });
   leftRow += 1;
 
-  pumpDraft.pump_assignments.forEach((assignment, index) => {
-    const vehicle = pumpVehicleById.get(assignment.vehicle_id);
-    const label =
-      [vehicle?.vehicle_license_plate, vehicle?.vehicle_name].filter(Boolean).join(" - ") ||
-      `#${assignment.vehicle_id}`;
-    const fill = PUMP_FILL[getPumpBCode(vehicle) || ""];
-
-    ws.getCell(leftRow, 1).value = index + 1;
+  model.pumpRows.forEach((row) => {
+    const fill = row.fill ?? undefined;
+    ws.getCell(leftRow, 1).value = row.tt;
     styleCell(ws.getCell(leftRow, 1), { align: "center", fill });
-    ws.getCell(leftRow, 2).value = label;
+    ws.getCell(leftRow, 2).value = row.label;
     styleCell(ws.getCell(leftRow, 2), { bold: true, fill });
-    ws.getCell(leftRow, 3).value = joinPeople(assignment.roles.driver || []);
+    ws.getCell(leftRow, 3).value = row.driver;
     styleCell(ws.getCell(leftRow, 3), { align: "center" });
-    ws.getCell(leftRow, 4).value = joinPeople(assignment.roles.operator || []);
+    ws.getCell(leftRow, 4).value = row.operator;
     styleCell(ws.getCell(leftRow, 4), { align: "center" });
-    ws.getCell(leftRow, 5).value = joinPeople(assignment.roles.hose || []);
+    ws.getCell(leftRow, 5).value = row.hose;
     styleCell(ws.getCell(leftRow, 5), { align: "center" });
     leftRow += 1;
   });
 
   // Section B - Lốt trộn
-  if (lotLabels.length > 0) {
+  if (model.lotLabels.length > 0) {
     ws.getCell(leftRow, 1).value = "B";
     styleCell(ws.getCell(leftRow, 1), { bold: true, fill: HEADER_FILL, align: "center" });
     ws.mergeCells(leftRow, 2, leftRow, 5);
@@ -187,38 +281,18 @@ export async function exportChupLichExcel(params: ChupLichExportParams): Promise
     leftRow += 1;
 
     ws.mergeCells(leftRow, 2, leftRow, 5);
-    ws.getCell(leftRow, 2).value = lotLabels.join("; ");
+    ws.getCell(leftRow, 2).value = model.lotLabels.join("; ");
     styleCell(ws.getCell(leftRow, 2), { wrap: true });
     styleCell(ws.getCell(leftRow, 1));
     ws.getRow(leftRow).height = 40;
     leftRow += 1;
   }
 
-  // Section C, D, E... - Công việc (mỗi công việc cha = 1 section)
-  const sectionMap = new Map<number, { parent: Work; rows: { name: string; people: string }[] }>();
-  for (const task of taskDraft.task_assignments) {
-    if (task.user_ids.length === 0) continue;
-    const work = worksById.get(task.work_id);
-    if (!work) continue;
-    const parent = work.work_root ? worksById.get(work.work_root) || work : work;
-    let section = sectionMap.get(parent.work_id);
-    if (!section) {
-      section = { parent, rows: [] };
-      sectionMap.set(parent.work_id, section);
-    }
-    section.rows.push({
-      name: parent.work_id === work.work_id ? "" : work.work_name,
-      people: joinPeople(task.user_ids),
-    });
-  }
-  const workSections = Array.from(sectionMap.values()).sort(
-    (a, b) => a.parent.work_id - b.parent.work_id
-  );
-
-  workSections.forEach((section, index) => {
-    ws.getCell(leftRow, 1).value = String.fromCharCode(67 + index); // C, D, E...
+  // Section C, D, E... - Công việc
+  model.workSections.forEach((section) => {
+    ws.getCell(leftRow, 1).value = section.letter;
     styleCell(ws.getCell(leftRow, 1), { bold: true, fill: HEADER_FILL, align: "center" });
-    ws.getCell(leftRow, 2).value = section.parent.work_name.toUpperCase();
+    ws.getCell(leftRow, 2).value = section.title;
     styleCell(ws.getCell(leftRow, 2), { bold: true, fill: HEADER_FILL, align: "center" });
     ws.mergeCells(leftRow, 3, leftRow, 5);
     ws.getCell(leftRow, 3).value = "NGƯỜI THỰC HIỆN";
@@ -227,8 +301,8 @@ export async function exportChupLichExcel(params: ChupLichExportParams): Promise
     styleCell(ws.getCell(leftRow, 5), { fill: HEADER_FILL });
     leftRow += 1;
 
-    section.rows.forEach((row, rowIndex) => {
-      ws.getCell(leftRow, 1).value = rowIndex + 1;
+    section.rows.forEach((row) => {
+      ws.getCell(leftRow, 1).value = row.tt;
       styleCell(ws.getCell(leftRow, 1), { align: "center" });
       if (row.name) {
         ws.getCell(leftRow, 2).value = row.name;
@@ -255,23 +329,15 @@ export async function exportChupLichExcel(params: ChupLichExportParams): Promise
   styleCell(ws.getCell(rightRow, 9), { bold: true, fill: HEADER_FILL, align: "center" });
   rightRow += 1;
 
-  const sortedMixers = [...mixerVehicles].sort((a, b) =>
-    String(a.vehicle_name || a.vehicle_license_plate || "").localeCompare(
-      String(b.vehicle_name || b.vehicle_license_plate || ""),
-      "en",
-      { numeric: true, sensitivity: "base" }
-    )
-  );
-  for (const vehicle of sortedMixers) {
-    const driverId = mixerDriverByVehicle.get(vehicle.vehicle_id);
-    ws.getCell(rightRow, 7).value = vehicle.vehicle_name || "";
+  model.mixers.forEach((mixer) => {
+    ws.getCell(rightRow, 7).value = mixer.name;
     styleCell(ws.getCell(rightRow, 7), { bold: true, align: "center" });
-    ws.getCell(rightRow, 8).value = vehicle.vehicle_license_plate || "";
+    ws.getCell(rightRow, 8).value = mixer.plate;
     styleCell(ws.getCell(rightRow, 8));
-    ws.getCell(rightRow, 9).value = driverId != null ? shortName(driverId) : "";
+    ws.getCell(rightRow, 9).value = mixer.driver;
     styleCell(ws.getCell(rightRow, 9), { align: "center" });
     rightRow += 1;
-  }
+  });
 
   // Nhân sự nghỉ
   ws.getCell(rightRow, 7).value = "TT";
@@ -281,7 +347,7 @@ export async function exportChupLichExcel(params: ChupLichExportParams): Promise
   styleCell(ws.getCell(rightRow, 8), { bold: true, fill: HEADER_FILL, align: "center" });
   rightRow += 1;
 
-  offNames.forEach((name, index) => {
+  model.offNames.forEach((name, index) => {
     ws.getCell(rightRow, 7).value = index + 1;
     styleCell(ws.getCell(rightRow, 7), { align: "center" });
     ws.mergeCells(rightRow, 8, rightRow, 9);
