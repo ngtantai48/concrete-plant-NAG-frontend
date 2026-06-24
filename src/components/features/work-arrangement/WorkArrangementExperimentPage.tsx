@@ -2,14 +2,21 @@
 
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { PERMISSIONS } from "@/constants/permissions";
+import { SIDEBAR } from "@/constants/route";
 import { useNavigationStore } from "@/hooks/use-navigation-store";
+import { usePermissions } from "@/hooks/use-permissions";
 import { convertSolarToLunar } from "@/utils/lunar";
+import { DatePicker } from "antd";
 import dayjs from "dayjs";
 import {
   Briefcase,
   BriefcaseBusiness,
   CalendarDays,
   Camera,
+  ChevronLeft,
+  ChevronRight,
+  FileSpreadsheet,
   Loader2,
   type LucideIcon,
 } from "lucide-react";
@@ -26,22 +33,31 @@ export default function WorkArrangementExperimentPage() {
   const t = useTranslations("WorkArrangementPage");
   const tAttendance = useTranslations("WorkAttendancePage");
   const tAssign = useTranslations("WorkAssignmentPage");
+  const { hasActionAccess } = usePermissions();
   const setDirty = useNavigationStore((state) => state.setDirty);
   const chupHandlerRef = useRef<(() => void) | null>(null);
+  const lotCaptureHandlerRef = useRef<(() => void) | null>(null);
   const [chupLoading, setChupLoading] = useState(false);
+  const [lotCaptureLoading, setLotCaptureLoading] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(() => dayjs());
   const [dirtyBySection, setDirtyBySection] = useState<Record<TrialSectionKey, boolean>>({
     attendance: false,
     assignment: false,
     worktask: false,
   });
-  const todayLabel = useMemo(() => dayjs().format("DD/MM/YYYY"), []);
+  const dateLabel = useMemo(() => selectedDate.format("DD/MM/YYYY"), [selectedDate]);
+  const isToday = selectedDate.isSame(dayjs(), "day");
   const lunarLabel = useMemo(() => {
-    const today = dayjs();
-    const lunar = convertSolarToLunar(today.date(), today.month() + 1, today.year());
+    const lunar = convertSolarToLunar(
+      selectedDate.date(),
+      selectedDate.month() + 1,
+      selectedDate.year()
+    );
     return `${lunar.day}/${lunar.month}${lunar.leap ? " nhuận" : ""} ÂL`;
-  }, []);
+  }, [selectedDate]);
 
   const hasDirty = useMemo(() => Object.values(dirtyBySection).some(Boolean), [dirtyBySection]);
+  const canSyncLots = hasActionAccess(SIDEBAR.DASHBOARD, PERMISSIONS.DASHBOARD.SYNC_SLOTS);
 
   useEffect(() => {
     setDirty(hasDirty);
@@ -51,6 +67,9 @@ export default function WorkArrangementExperimentPage() {
 
   const registerChup = useCallback((fn: (() => void) | null) => {
     chupHandlerRef.current = fn;
+  }, []);
+  const registerLotCapture = useCallback((fn: (() => void) | null) => {
+    lotCaptureHandlerRef.current = fn;
   }, []);
 
   const updateDirty = useCallback((key: TrialSectionKey, dirty: boolean) => {
@@ -82,7 +101,7 @@ export default function WorkArrangementExperimentPage() {
                 {t("trialTitle")}
               </h1>
               <span className="inline-flex h-6 items-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-xs font-semibold text-slate-600">
-                {todayLabel}
+                {dateLabel}
                 <span className="text-red-600">({lunarLabel})</span>
               </span>
               {hasDirty && (
@@ -92,6 +111,58 @@ export default function WorkArrangementExperimentPage() {
               )}
             </div>
             <div className="ml-auto flex flex-wrap items-center justify-end gap-2">
+              <div className="flex items-center gap-1">
+                <button
+                  type="button"
+                  aria-label={tAssign("prevDay")}
+                  onClick={() => setSelectedDate((date) => date.subtract(1, "day"))}
+                  className="flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-50"
+                >
+                  <ChevronLeft size={16} />
+                </button>
+                <DatePicker
+                  value={selectedDate}
+                  onChange={(value) => value && setSelectedDate(value)}
+                  format="DD/MM/YYYY"
+                  allowClear={false}
+                  className="h-8 w-[134px]"
+                />
+                <button
+                  type="button"
+                  aria-label={tAssign("nextDay")}
+                  onClick={() => setSelectedDate((date) => date.add(1, "day"))}
+                  className="flex h-8 w-8 items-center justify-center rounded-md border border-slate-200 bg-white text-slate-600 transition-colors hover:bg-slate-50"
+                >
+                  <ChevronRight size={16} />
+                </button>
+                {!isToday && (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setSelectedDate(dayjs())}
+                    className="h-8 px-2 text-teal-700 hover:bg-teal-50 hover:text-teal-800"
+                  >
+                    {tAssign("today")}
+                  </Button>
+                )}
+              </div>
+              {canSyncLots && isToday && (
+                <Button
+                  type="button"
+                  size="sm"
+                  onClick={() => lotCaptureHandlerRef.current?.()}
+                  disabled={lotCaptureLoading}
+                  className="h-8 bg-teal-600 px-3 font-semibold text-white hover:bg-teal-700"
+                >
+                  {lotCaptureLoading ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : (
+                    <FileSpreadsheet size={15} />
+                  )}
+                  {tAssign("lotCaptureButton")}
+                </Button>
+              )}
               <Button
                 type="button"
                 size="sm"
@@ -111,10 +182,14 @@ export default function WorkArrangementExperimentPage() {
         <div className="mt-3">
           <WorkAssignmentSelectManager
             active
-            todayOnly
+            selectedDate={selectedDate}
+            onSelectedDateChange={setSelectedDate}
+            hideDateControls
             onDirtyChange={handleAssignmentDirty}
             onRegisterChup={registerChup}
             onChupLoadingChange={setChupLoading}
+            onRegisterLotCapture={registerLotCapture}
+            onLotCaptureLoadingChange={setLotCaptureLoading}
           >
             <WorkbenchSection
               id="trial-work-task"
@@ -123,7 +198,14 @@ export default function WorkArrangementExperimentPage() {
               dirty={dirtyBySection.worktask}
               dirtyLabel={t("dirty")}
             >
-              <WorkTaskSelectManager active compact todayOnly onDirtyChange={handleWorkTaskDirty} />
+              <WorkTaskSelectManager
+                active
+                compact
+                selectedDate={selectedDate}
+                onSelectedDateChange={setSelectedDate}
+                hideDateControls
+                onDirtyChange={handleWorkTaskDirty}
+              />
             </WorkbenchSection>
 
             <WorkbenchSection
@@ -152,7 +234,9 @@ export default function WorkArrangementExperimentPage() {
                   <TabsContent value="daily" className="mt-0">
                     <WorkAttendanceManager
                       compact
-                      todayOnly
+                      selectedDate={selectedDate}
+                      onSelectedDateChange={setSelectedDate}
+                      hideDateControls
                       onDirtyChange={handleAttendanceDirty}
                     />
                   </TabsContent>
@@ -162,7 +246,6 @@ export default function WorkArrangementExperimentPage() {
                 </div>
               </Tabs>
             </WorkbenchSection>
-
           </WorkAssignmentSelectManager>
         </div>
       </div>

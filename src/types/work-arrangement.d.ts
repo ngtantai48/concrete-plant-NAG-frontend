@@ -1,3 +1,4 @@
+import type { Order } from "./order";
 import type { Work } from "./work";
 
 export type WorkAssignmentColumnKey = "pump_vehicle" | "driver" | "operator" | "hose";
@@ -92,6 +93,8 @@ export interface WorkArrangementBootstrap {
 export interface WorkMixSlotItem {
   order_id: number;
   order_number: number;
+  order_status?: Order["order_status"];
+  group?: "pending" | "running" | string;
   user_id: number;
   vehicle_id: number;
   vehicle_name: string | null;

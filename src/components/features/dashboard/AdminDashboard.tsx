@@ -4,7 +4,6 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Card, CardContent } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -37,7 +36,6 @@ import {
   CheckCircle2,
   Clock,
   Ellipsis,
-  FileSpreadsheet,
   Eye,
   EyeOff,
   LayoutGrid,
@@ -375,10 +373,6 @@ export default function AdminDashboard() {
     return orders.filter((o) => o.order_status === "completed");
   }, [orders]);
 
-  const hasUnclosedShift = useMemo(() => {
-    return pendingOrders.some((o) => o.shift_closing?.shift_status === 0);
-  }, [pendingOrders]);
-
   const [isSyncingShift, setIsSyncingShift] = useState(false);
   const [isSyncShiftDialogOpen, setIsSyncShiftDialogOpen] = useState(false);
   const [isSystemSettingsDialogOpen, setIsSystemSettingsDialogOpen] = useState(false);
@@ -447,7 +441,9 @@ export default function AdminDashboard() {
 
       if (sheetResult.status === "fulfilled") {
         const data = sheetResult.value;
-        toast.success(t("syncShiftSuccess", { count: data.updated ?? Object.keys(maToStt).length }));
+        toast.success(
+          t("syncShiftSuccess", { count: data.updated ?? Object.keys(maToStt).length })
+        );
       } else {
         console.error("[handleSyncShift] sheet error:", sheetResult.reason);
         toast.error(t("syncShiftFailed"));
@@ -1030,169 +1026,6 @@ export default function AdminDashboard() {
                       <p>Xem thứ tự lốt xe theo ngày</p>
                     </TooltipContent>
                   </Tooltip>
-                )}
-
-                {!isPastDate && hasUnclosedShift && (
-                  <>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        {hasActionAccess(SIDEBAR.DASHBOARD, PERMISSIONS.DASHBOARD.SYNC_SLOTS) && (
-                          <Button
-                            className="uppercase"
-                            size="sm"
-                            variant="primary"
-                            onClick={() => setIsSyncShiftDialogOpen(true)}
-                            disabled={isSyncingShift}
-                          >
-                            {t("syncShiftAction")}
-                          </Button>
-                        )}
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>
-                          {t("syncShiftAction")} {format(new Date(selectedDate), "dd/MM/yyyy")}
-                        </p>
-                      </TooltipContent>
-                    </Tooltip>
-
-                    <Dialog open={isSyncShiftDialogOpen} onOpenChange={setIsSyncShiftDialogOpen}>
-                      <DialogContent className="max-h-[85vh] flex flex-col">
-                        <DialogHeader>
-                          <DlgTitle>{t("syncShiftPopupTitle")}</DlgTitle>
-                          <DialogDescription>{t("syncShiftPopupDescription")}</DialogDescription>
-                        </DialogHeader>
-
-                        <div className="flex-1 flex flex-col min-h-0 border rounded-xl overflow-hidden bg-slate-50/30">
-                          {/* Header / Select All area */}
-                          <div className="px-4 py-3 bg-white border-b flex items-center gap-3 sticky top-0 z-10 shadow-sm">
-                            <Checkbox
-                              id="select-all-sync"
-                              checked={
-                                sortedActiveFlowOrders.length > 0 &&
-                                selectedSyncOrderIds.length === sortedActiveFlowOrders.length
-                              }
-                              onCheckedChange={(checked) => {
-                                if (checked) {
-                                  setSelectedSyncOrderIds(
-                                    sortedActiveFlowOrders.map((o) => o.order_id)
-                                  );
-                                } else {
-                                  setSelectedSyncOrderIds([]);
-                                }
-                              }}
-                            />
-                            <label
-                              htmlFor="select-all-sync"
-                              className="text-sm font-bold uppercase cursor-pointer select-none flex-1"
-                            >
-                              {t("syncShiftSelectAll")} ({sortedActiveFlowOrders.length})
-                            </label>
-                          </div>
-
-                          {/* List area */}
-                          <div className="flex-1 overflow-y-auto p-2 space-y-1">
-                            {sortedActiveFlowOrders.map((o, idx) => {
-                              const isChecked = selectedSyncOrderIds.includes(o.order_id);
-                              const checkboxId = `sync-order-${o.order_id}`;
-
-                              return (
-                                <div
-                                  key={o.order_id}
-                                  className={cn(
-                                    "group flex items-center gap-8 px-4 py-3 rounded-lg border transition-all cursor-pointer",
-                                    isChecked
-                                      ? "bg-indigo-50/50 border-indigo-200 shadow-sm"
-                                      : "bg-white border-transparent hover:border-slate-200 hover:bg-slate-50"
-                                  )}
-                                  onClick={() => {
-                                    setSelectedSyncOrderIds((prev) =>
-                                      prev.includes(o.order_id)
-                                        ? prev.filter((id) => id !== o.order_id)
-                                        : [...prev, o.order_id]
-                                    );
-                                  }}
-                                >
-                                  <div
-                                    onClick={(e) => e.stopPropagation()}
-                                    className="flex items-center"
-                                  >
-                                    <Checkbox
-                                      id={checkboxId}
-                                      checked={isChecked}
-                                      onCheckedChange={(checked) => {
-                                        setSelectedSyncOrderIds((prev) =>
-                                          checked
-                                            ? [...prev, o.order_id]
-                                            : prev.filter((id) => id !== o.order_id)
-                                        );
-                                      }}
-                                    />
-                                  </div>
-
-                                  <div className="flex items-center gap-10 flex-1 min-w-0">
-                                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-base font-bold text-slate-600 group-hover:bg-indigo-100 group-hover:text-indigo-600 transition-colors">
-                                      {idx + 1}
-                                    </span>
-                                    <div className="flex flex-col min-w-0">
-                                      <span className="font-bold text-slate-900 truncate">
-                                        {o.vehicles?.vehicle_license_plate} |{" "}
-                                        {o.vehicles?.vehicle_name}
-                                      </span>
-                                    </div>
-                                  </div>
-
-                                  {isChecked && (
-                                    <div className="h-2 w-2 rounded-full bg-indigo-500 animate-pulse shrink-0" />
-                                  )}
-                                </div>
-                              );
-                            })}
-
-                            {sortedActiveFlowOrders.length === 0 && (
-                              <div className="flex flex-col items-center justify-center py-12 text-slate-400 space-y-2">
-                                <FileSpreadsheet className="h-8 w-8 opacity-20" />
-                                <p className="text-sm italic">{t("syncShiftEmpty")}</p>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-
-                        <DialogFooter className="sm:justify-between gap-2">
-                          <Button
-                            variant="outline"
-                            onClick={() => setIsSyncShiftDialogOpen(false)}
-                            disabled={isApplyingToEnd || isSyncingShift}
-                          >
-                            {tCommon("cancel")}
-                          </Button>
-                          <div className="flex flex-col-reverse gap-2 sm:flex-row">
-                            <Button
-                              variant="outline"
-                              onClick={handleApplyToEnd}
-                              disabled={isApplyingToEnd || selectedSyncOrderIds.length === 0}
-                            >
-                              {isApplyingToEnd ? <RefreshCw className="animate-spin" /> : null}
-                              {t("syncShiftApplyToEndAction", {
-                                count: selectedSyncOrderIds.length,
-                              })}
-                            </Button>
-                            {hasActionAccess(
-                              SIDEBAR.DASHBOARD,
-                              PERMISSIONS.DASHBOARD.SYNC_SLOTS
-                            ) && (
-                              <Button
-                                variant="primary"
-                                onClick={handleSyncShift}
-                                disabled={isSyncingShift || isApplyingToEnd}
-                              >
-                                {t("syncShiftAction")}
-                              </Button>
-                            )}
-                          </div>
-                        </DialogFooter>
-                      </DialogContent>
-                    </Dialog>
-                  </>
                 )}
 
                 <Dialog open={isQueueHistoryDialogOpen} onOpenChange={setIsQueueHistoryDialogOpen}>

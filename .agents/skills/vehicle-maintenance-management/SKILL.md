@@ -1,6 +1,6 @@
 ---
 name: vehicle-maintenance-management
-description: Use when working on the full vehicle maintenance/repair feature: BE APIs, DB tables, FE list/detail pages, media upload, on-demand OCR, workflow approvals, histories, comments, Redux caching, permissions, and dedicated realtime maintenance notifications.
+description: "Use when working on the full vehicle maintenance/repair feature: BE APIs, DB tables, FE list/detail pages, media upload, on-demand OCR, workflow approvals, histories, comments, Redux caching, permissions, and dedicated realtime maintenance notifications."
 ---
 
 # Vehicle Maintenance Management

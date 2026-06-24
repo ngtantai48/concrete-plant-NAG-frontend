@@ -30,11 +30,17 @@ export default function WorkTaskSelectManager({
   active = true,
   compact = false,
   todayOnly = false,
+  selectedDate: controlledSelectedDate,
+  onSelectedDateChange,
+  hideDateControls = false,
   onDirtyChange,
 }: {
   active?: boolean;
   compact?: boolean;
   todayOnly?: boolean;
+  selectedDate?: Dayjs;
+  onSelectedDateChange?: (date: Dayjs) => void;
+  hideDateControls?: boolean;
   onDirtyChange?: (dirty: boolean) => void;
 }) {
   const t = useTranslations("WorkTaskPage");
@@ -43,7 +49,7 @@ export default function WorkTaskSelectManager({
   const canUpdate = hasActionAccess(SIDEBAR.WORKS, PERMISSIONS.WORKS.UPDATE);
   const canCreate = hasActionAccess(SIDEBAR.WORKS, PERMISSIONS.WORKS.CREATE);
 
-  const [selectedDate, setSelectedDate] = useState<Dayjs>(dayjs());
+  const [internalSelectedDate, setInternalSelectedDate] = useState<Dayjs>(dayjs());
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -69,6 +75,16 @@ export default function WorkTaskSelectManager({
   useEffect(() => {
     draftRef.current = draft;
   }, [draft]);
+
+  const isDateControlled = controlledSelectedDate != null;
+  const selectedDate = controlledSelectedDate || internalSelectedDate;
+  const setSelectedDate = useCallback(
+    (nextDate: Dayjs) => {
+      if (isDateControlled) onSelectedDateChange?.(nextDate);
+      else setInternalSelectedDate(nextDate);
+    },
+    [isDateControlled, onSelectedDateChange]
+  );
 
   const workDate = selectedDate.format("YYYY-MM-DD");
   const isToday = selectedDate.isSame(dayjs(), "day");
@@ -111,14 +127,14 @@ export default function WorkTaskSelectManager({
     dirtyRef.current = dirty;
   }, [dirty]);
   const resetToToday = useCallback(() => {
-    setSelectedDate((prev) => (prev.isSame(dayjs(), "day") ? prev : dayjs()));
+    setInternalSelectedDate((prev) => (prev.isSame(dayjs(), "day") ? prev : dayjs()));
   }, []);
   useEffect(() => {
-    if (active && !dirtyRef.current) resetToToday();
-  }, [active, resetToToday]);
+    if (active && !dirtyRef.current && !isDateControlled) resetToToday();
+  }, [active, isDateControlled, resetToToday]);
   useEffect(() => {
-    if (todayOnly) resetToToday();
-  }, [resetToToday, todayOnly]);
+    if (todayOnly && !isDateControlled) resetToToday();
+  }, [isDateControlled, resetToToday, todayOnly]);
   const worksById = useMemo(() => new Map(works.map((work) => [work.work_id, work])), [works]);
   const parentWorks = useMemo(
     () => works.filter((work) => !work.work_root).sort(sortByName),
@@ -310,7 +326,7 @@ export default function WorkTaskSelectManager({
 
   return (
     <div className="space-y-4">
-      {!todayOnly && (
+      {!todayOnly && !hideDateControls && (
         <div className="flex flex-wrap items-center gap-3 border border-slate-300 bg-white px-3 py-2">
           {dateControls}
         </div>

@@ -72,6 +72,9 @@ export interface TankerLotSyncItem {
 export interface TankerLotSyncData {
   snapshot_date: string;
   snapshot_at: string;
+  lot_name?: string;
+  lot_label?: string;
+  snapshot_note?: string;
   triggered_by: "manual" | "arrange_time";
   total_items: number;
   pending_count: number;
@@ -84,6 +87,7 @@ export interface TankerLotSyncLatestResponse {
   snapshot_date?: string;
   multi_id?: number;
   multi_name?: string;
+  multi_description?: string;
   multi_data: TankerLotSyncData | null;
   created_at?: string;
   created_by?: number;
@@ -91,14 +95,24 @@ export interface TankerLotSyncLatestResponse {
 
 export interface TankerLotSyncCaptureResponse {
   statusCode: number;
+  multi_name?: string;
+  multi_description?: string;
   multi_data: TankerLotSyncData;
 }
 
+export interface TankerLotSyncCapturePayload {
+  lot_name?: string;
+  duty_vehicle_id?: number;
+  duty_vehicle_name?: string;
+  duty_vehicle_license_plate?: string;
+  snapshot_note?: string;
+  multi_description?: string;
+}
+
 const systemApi = {
-  getTransportsRuntime: () => 
-    http.get<TransportsRuntimeResponse>("/multi/transports-runtime"),
-  
-  updateTransportsRuntime: (data: TransportsRuntimeData) => 
+  getTransportsRuntime: () => http.get<TransportsRuntimeResponse>("/multi/transports-runtime"),
+
+  updateTransportsRuntime: (data: TransportsRuntimeData) =>
     http.put<TransportsRuntimeResponse>("/multi/transports-runtime", data),
 
   getTankerQueueSnapshot: (date: string) =>
@@ -106,8 +120,8 @@ const systemApi = {
       params: { date },
     }),
 
-  captureTankerLotSync: () =>
-    http.post<TankerLotSyncCaptureResponse>("/multi/tanker-lot-sync"),
+  captureTankerLotSync: (payload?: TankerLotSyncCapturePayload) =>
+    http.post<TankerLotSyncCaptureResponse>("/multi/tanker-lot-sync", payload ?? {}),
 
   getLatestTankerLotSync: (date: string) =>
     http.get<TankerLotSyncLatestResponse>("/multi/tanker-lot-sync/latest", {
