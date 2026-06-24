@@ -1713,6 +1713,12 @@ export const workTaskApi = {
 // Lốt trộn: cùng nguồn dữ liệu với popup "Đồng bộ lốt xe" ở Dashboard (đơn pending),
 // nhưng hiển thị dạng `tênRútGọn_mã` cho trang Bố trí công việc.
 const MIX_SLOT_EXCLUDED_VEHICLE_STATUSES = new Set(["maintenance", "incident", "other"]);
+const MIX_SLOT_ORDER_STATUSES: Order["order_status"][] = [
+  "pending",
+  "collecting",
+  "transporting",
+  "running",
+];
 
 const getLastNameWord = (value?: string | null) =>
   String(value || "")
@@ -1739,19 +1745,15 @@ const getMixSlotCode = (symbol?: string | null, licensePlate?: string | null) =>
 export const workMixSlotApi = {
   getList: (): Promise<WorkMixSlotItem[]> =>
     dedupeInflight("mix-slot-list", async () => {
-      const [ordersRes, vehicleTypeRes, personnel] = await Promise.all([
-        orderApi.getByStatus("pending"),
+      const [vehicleTypeRes, personnel, ...orderResponses] = await Promise.all([
         getVehicleTypesShared(),
         getPersonnelFallback(),
+        ...MIX_SLOT_ORDER_STATUSES.map((status) => orderApi.getByStatus(status)),
       ]);
 
-      const orders = getArrayFromPayload<Order>(ordersRes.data, [
-        "orders",
-        "data",
-        "items",
-        "results",
-        "rows",
-      ]);
+      const orders = orderResponses.flatMap((ordersRes) =>
+        getArrayFromPayload<Order>(ordersRes.data, ["orders", "data", "items", "results", "rows"])
+      );
       const vehicleTypes = getArrayFromPayload<VehicleType>(vehicleTypeRes.data, [
         "vehicle_types",
         "data",
@@ -1777,7 +1779,16 @@ export const workMixSlotApi = {
           return !status || !MIX_SLOT_EXCLUDED_VEHICLE_STATUSES.has(status);
         })
         .filter((order) => Number(order.vehicles?.vehicle_id) > 0)
-        .sort((a, b) => (a.order_number || 0) - (b.order_number || 0))
+        .filter((order) => {
+          const symbol = symbolByTypeId.get(Number(order.vehicles?.vehicle_type_id));
+          return normalizeWorkType(symbol) === "x";
+        })
+        .sort((a, b) => {
+          const aPending = a.order_status === "pending";
+          const bPending = b.order_status === "pending";
+          if (aPending !== bPending) return aPending ? -1 : 1;
+          return (a.order_number || 0) - (b.order_number || 0);
+        })
         .map((order) => {
           const symbol = symbolByTypeId.get(Number(order.vehicles?.vehicle_type_id)) ?? null;
           const shortName =
@@ -1788,6 +1799,8 @@ export const workMixSlotApi = {
           return {
             order_id: Number(order.order_id),
             order_number: Number(order.order_number) || 0,
+            order_status: order.order_status,
+            group: order.order_status === "pending" ? "pending" : "running",
             user_id: Number(order.users?.user_id) || 0,
             vehicle_id: Number(order.vehicles?.vehicle_id) || 0,
             vehicle_name: order.vehicles?.vehicle_name ?? null,

@@ -72,6 +72,8 @@ export interface TankerLotSyncItem {
 export interface TankerLotSyncData {
   snapshot_date: string;
   snapshot_at: string;
+  lot_name?: string;
+  lot_label?: string;
   snapshot_note?: string;
   triggered_by: "manual" | "arrange_time";
   total_items: number;
@@ -100,8 +102,9 @@ export interface TankerLotSyncCaptureResponse {
 
 export interface TankerLotSyncCapturePayload {
   lot_name?: string;
-  duty_user_id?: number;
-  duty_user_name?: string;
+  duty_vehicle_id?: number;
+  duty_vehicle_name?: string;
+  duty_vehicle_license_plate?: string;
   snapshot_note?: string;
   multi_description?: string;
 }
