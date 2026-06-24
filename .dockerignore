@@ -1,0 +1,40 @@
+# ---- dependencies & build artifacts (rebuilt inside the image) ----
+node_modules
+**/node_modules
+.next
+out
+build
+dist
+.turbo
+
+# ---- version control, CI & agent/editor tooling (huge: .claude worktrees) ----
+.git
+.gitignore
+.gitattributes
+.github
+.claude
+.agents
+.husky
+.vscode
+.idea
+
+# ---- local env overrides & TLS certs (keep .env / .env.production for build) ----
+.env*.local
+certificates
+
+# ---- docs & meta ----
+docs
+*.md
+LICENSE
+
+# ---- docker & misc meta ----
+Dockerfile*
+.dockerignore
+
+# ---- logs, OS junk, caches ----
+*.log
+npm-debug.log*
+pnpm-debug.log*
+.DS_Store
+coverage
+.pnpm-store
