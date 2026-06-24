@@ -142,6 +142,7 @@ Workflow:
 - `POST /vehicle-maintenances/:id/dispatch-reject`
 - `POST /vehicle-maintenances/:id/production-approve`
 - `POST /vehicle-maintenances/:id/production-reject`
+- `POST /vehicle-maintenances/:id/revert-approval`
 
 Documents:
 
@@ -231,6 +232,9 @@ Rules:
 - `Chỉnh sửa` requires confirmation before enabling fields.
 - `Lưu` calls update API, uploads/adds pending documents, then returns to read-only mode.
 - `Xóa` requires confirmation, deletes, then routes back to the list.
+- `Hoàn duyệt` appears for approved tickets when the actor has `/vehicle-maintenances__production_approve`.
+- `Hoàn duyệt` must require a reason and a target status: `reviewing`, `submitted`, or `rejected`.
+- Do not block `Hoàn duyệt` based on `payment_status`; responsibility remains with the reviewer/approver and the history row is the audit trail.
 - `Back` routes to `SIDEBAR.VEHICLE_MAINTENANCES`.
 - Use `SIDEBAR.VEHICLE_MAINTENANCES` from `src/constants/route.ts`; do not hard-code `/vehicle-maintenances`.
 - If there are unsaved edits, Back/menu navigation must show a confirmation dialog before leaving.
@@ -305,6 +309,7 @@ Actions:
 - `dispatch_reject`
 - `production_approve`
 - `production_reject`
+- `revert_approval`
 
 Typical transitions:
 
@@ -313,6 +318,9 @@ Typical transitions:
 - `submitted` -> `rejected`
 - `reviewing` -> `approved`
 - `reviewing` -> `rejected`
+- `approved` -> `reviewing`, `submitted`, or `rejected` via `revert_approval`
+
+`revert_approval` is the "Hoàn duyệt" action. It uses the existing production-approval permission, not a new permission. On success it clears `reviewed_by` and `reviewed_at`; the previous approval remains visible in history.
 
 Every workflow transition should write one history row.
 
@@ -327,9 +335,11 @@ Header buttons:
 - Bell: tooltip `Thông báo lốt xe`, shows notifications where `type !== "vehicle_maintenance"`.
 - Wrench: tooltip `Thông báo bảo trì xe`, shows only notifications where `type === "vehicle_maintenance"`.
 
-Clicking a maintenance notification should mark it as read and navigate to:
+Clicking a normal maintenance notification should mark it as read and navigate to:
 
 `SIDEBAR.VEHICLE_MAINTENANCES/{vehicle_maintenance_id}`
+
+Deleted-ticket notifications are read-only. If `event === "vehicle_maintenance_deleted"` or payload has `read_only: true` / `navigate_to: null`, mark it as read but do not navigate to the detail page.
 
 Do not hard-code `user_id: "all"` when marking as read. Use:
 
@@ -344,6 +354,10 @@ Recipients:
 - `dispatch_reject`: ticket creator
 - `production_approve`: ticket creator
 - `production_reject`: ticket creator
+- `revert_approval` to `reviewing`: users with `/vehicle-maintenances__production_approve`, plus the ticket creator
+- `revert_approval` to `submitted`: users with `/vehicle-maintenances__dispatch_review`, plus the ticket creator
+- `revert_approval` to `rejected`: ticket creator
+- `delete`/`bulk_delete`: remove stale notifications for the deleted ticket, then send one read-only `vehicle_maintenance_deleted` notification to affected users.
 
 Reject/approve notifications should target the concrete ticket creator, not every user with `/vehicle-maintenances__submit`. This avoids notifying unrelated drivers or submit-capable users.
 
@@ -358,6 +372,12 @@ Messages must stay role-neutral:
 - `dispatch_reject`: `Phiếu bảo trì xe {vehicle} đã bị từ chối, cần kiểm tra lại.`
 - `production_approve`: `Phiếu bảo trì xe {vehicle} đã được duyệt.`
 - `production_reject`: `Phiếu bảo trì xe {vehicle} đã bị từ chối, cần kiểm tra lại.`
+- `revert_approval` to `reviewing`: `Phiếu bảo trì xe {vehicle} đã được hoàn duyệt, chờ phê duyệt lại.`
+- `revert_approval` to `submitted`: `Phiếu bảo trì xe {vehicle} đã được hoàn duyệt, cần kiểm tra lại.`
+- `revert_approval` to `rejected`: `Phiếu bảo trì xe {vehicle} đã được hoàn duyệt, cần chỉnh sửa lại.`
+- `vehicle_maintenance_deleted`: `Phiếu bảo trì xe {vehicle} đã bị xóa bởi {actor}.`
+
+When deleting a ticket, stale notifications must be cleaned in BE so users do not keep dead links. FE must still handle not-found detail responses gracefully because old Redis items, race conditions, or manually opened URLs can still happen.
 
 Vehicle label priority:
 

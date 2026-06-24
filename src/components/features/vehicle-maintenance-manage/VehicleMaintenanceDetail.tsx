@@ -29,7 +29,7 @@ import type { Vehicle, VehicleMaintenance, VehicleMaintenanceDocument, VehicleMa
 import type { VtrackingVehicle } from "@/types/vtracking";
 import { Image, Popconfirm, Spin, Tooltip } from "antd";
 import dayjs from "dayjs";
-import { ArrowLeft, Calendar as CalendarIcon, Camera, CheckCircle2, ClipboardList, FileText, History, Pencil, ReceiptText, RefreshCw, Save, ScanText, Send, Trash2, UploadCloud, Wrench, X, XCircle } from "lucide-react";
+import { ArrowLeft, Calendar as CalendarIcon, Camera, CheckCircle2, ClipboardList, FileText, History, Pencil, ReceiptText, RefreshCw, Save, ScanText, Send, Trash2, Undo2, UploadCloud, Wrench, X, XCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -61,6 +61,12 @@ const PAYMENT_STATUS_OPTIONS = [
   { value: "not_required", label: "Không cần thanh toán" },
 ];
 
+const REVERT_APPROVAL_TARGET_OPTIONS = [
+  { value: "reviewing", label: "Chờ phê duyệt lại", description: "Phiếu quay về bước phê duyệt bảo trì." },
+  { value: "submitted", label: "Kiểm tra lại", description: "Phiếu quay về bước kiểm tra bảo trì." },
+  { value: "rejected", label: "Yêu cầu chỉnh sửa", description: "Người tạo phiếu chỉnh sửa rồi gửi lại." },
+] as const;
+
 const RANK_OPTIONS = [
   { value: 1, label: "Thấp" },
   { value: 2, label: "Trung bình" },
@@ -73,6 +79,7 @@ const VTRACKING_DISTANCE_KEY = "distance";
 const EMPTY_HISTORIES: VehicleMaintenanceHistory[] = [];
 
 type VehicleOption = Pick<Vehicle, "vehicle_id" | "vehicle_license_plate" | "vehicle_name">;
+type RevertApprovalTargetStatus = (typeof REVERT_APPROVAL_TARGET_OPTIONS)[number]["value"];
 
 type MaintenanceFormValues = {
   vehicle_id: number;
@@ -312,6 +319,7 @@ function getWorkflowActionLabel(action: string) {
     dispatch_reject: "Kiểm tra bảo trì từ chối",
     production_approve: "Phê duyệt bảo trì",
     production_reject: "Phê duyệt bảo trì từ chối",
+    revert_approval: "Hoàn duyệt",
     delete: "Xóa phiếu",
     bulk_delete: "Xóa hàng loạt",
     ai_classification_applied: "Áp dụng phân loại",
@@ -319,11 +327,18 @@ function getWorkflowActionLabel(action: string) {
   return labels[action] || action;
 }
 
+type WorkflowDialogConfig = {
+  title: string;
+  description: string;
+  confirmLabel: string;
+  requiresReason?: boolean;
+  requiresTargetStatus?: boolean;
+  reasonLabel?: string;
+  reasonPlaceholder?: string;
+};
+
 function getWorkflowDialogText(action: VehicleMaintenanceWorkflowAction) {
-  const config: Record<
-    VehicleMaintenanceWorkflowAction,
-    { title: string; description: string; confirmLabel: string; requiresReason?: boolean }
-  > = {
+  const config: Record<VehicleMaintenanceWorkflowAction, WorkflowDialogConfig> = {
     submit: {
       title: "Gửi phiếu bảo trì?",
       description: "Phiếu sẽ chuyển sang trạng thái chờ kiểm tra bảo trì.",
@@ -351,6 +366,15 @@ function getWorkflowDialogText(action: VehicleMaintenanceWorkflowAction) {
       confirmLabel: "Từ chối phê duyệt",
       requiresReason: true,
     },
+    revert_approval: {
+      title: "Hoàn duyệt phiếu bảo trì?",
+      description: "Phiếu sẽ được trả về bước xử lý đã chọn. Lịch sử xử lý vẫn giữ đầy đủ lần duyệt trước đó.",
+      confirmLabel: "Hoàn duyệt",
+      requiresReason: true,
+      requiresTargetStatus: true,
+      reasonLabel: "Lý do hoàn duyệt",
+      reasonPlaceholder: "Nhập lý do hoàn duyệt để người liên quan biết cần kiểm tra hoặc chỉnh sửa gì",
+    },
   };
   return config[action];
 }
@@ -372,6 +396,23 @@ function getHistoryActorDisplayName(item: VehicleMaintenanceHistory) {
 
 function getHistoryActorRole(item: VehicleMaintenanceHistory) {
   return item.actor?.role_label || item.actor?.role || null;
+}
+
+function isMaintenanceNotFoundError(error: unknown): boolean {
+  const candidate = error as { response?: { status?: number; data?: { message?: string } }; status?: number; message?: string };
+  const status = candidate?.response?.status ?? candidate?.status;
+  if (status === 404) return true;
+
+  const message = [
+    candidate?.response?.data?.message,
+    candidate?.message,
+    typeof error === "string" ? error : "",
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  return message.includes("404") || message.includes("not_found") || message.includes("not found");
 }
 
 function toFormValues(item: VehicleMaintenance): MaintenanceFormValues {
@@ -543,8 +584,10 @@ export default function VehicleMaintenanceDetail({ maintenanceId }: { maintenanc
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [isLeaveDialogOpen, setIsLeaveDialogOpen] = useState(false);
   const [isOcrDetailOpen, setIsOcrDetailOpen] = useState(false);
+  const [notFoundMaintenanceId, setNotFoundMaintenanceId] = useState<number | null>(null);
   const [workflowAction, setWorkflowAction] = useState<VehicleMaintenanceWorkflowAction | null>(null);
   const [workflowNote, setWorkflowNote] = useState("");
+  const [workflowTargetStatus, setWorkflowTargetStatus] = useState<RevertApprovalTargetStatus>("submitted");
   const [ocrLoading, setOcrLoading] = useState(false);
   const [ocrFileName, setOcrFileName] = useState<string | null>(null);
   const [distanceLoading, setDistanceLoading] = useState(false);
@@ -558,7 +601,9 @@ export default function VehicleMaintenanceDetail({ maintenanceId }: { maintenanc
   const workflowActions = maintenance?.workflow_available_actions || [];
   const canEditMaintenance = canUpdate && ["draft", "rejected"].includes(currentStatus);
   const disabled = !isEditing || saving || deleting;
+  const notFound = notFoundMaintenanceId === maintenanceId;
   const workflowDialogText = workflowAction ? getWorkflowDialogText(workflowAction) : null;
+  const selectedRevertTarget = REVERT_APPROVAL_TARGET_OPTIONS.find((item) => item.value === workflowTargetStatus);
   const vehicleSelectOptions = useMemo<VehicleOption[]>(() => {
     const selectedVehicleId = formValues?.vehicle_id;
     if (!selectedVehicleId || vehicles.some((vehicle) => vehicle.vehicle_id === selectedVehicleId)) {
@@ -581,12 +626,20 @@ export default function VehicleMaintenanceDetail({ maintenanceId }: { maintenanc
     return () => setDirty(false);
   }, [maintenanceId, setDirty]);
 
-  const refreshDetail = useCallback(async () => {
-    if (!Number.isFinite(maintenanceId) || maintenanceId <= 0) return;
+  const refreshDetail = useCallback(async (): Promise<boolean> => {
+    if (!Number.isFinite(maintenanceId) || maintenanceId <= 0) return false;
     try {
       await dispatch(fetchVehicleMaintenanceById(maintenanceId)).unwrap();
-    } catch {
+      setNotFoundMaintenanceId((currentId) => (currentId === maintenanceId ? null : currentId));
+      return true;
+    } catch (error) {
+      if (isMaintenanceNotFoundError(error)) {
+        setNotFoundMaintenanceId(maintenanceId);
+        return false;
+      }
+
       toast.error("Không tải được chi tiết phiếu bảo trì");
+      return false;
     }
   }, [dispatch, maintenanceId]);
 
@@ -600,12 +653,18 @@ export default function VehicleMaintenanceDetail({ maintenanceId }: { maintenanc
   }, [dispatch, maintenanceId]);
 
   useEffect(() => {
-    refreshDetail();
-  }, [refreshDetail]);
+    let cancelled = false;
+    void (async () => {
+      const loaded = await refreshDetail();
+      if (!cancelled && loaded) {
+        await refreshHistory();
+      }
+    })();
 
-  useEffect(() => {
-    refreshHistory();
-  }, [refreshHistory]);
+    return () => {
+      cancelled = true;
+    };
+  }, [refreshDetail, refreshHistory]);
 
   const ensureVehicleOptions = useCallback(async () => {
     if (vehicleOptionsLoaded || vehicleOptionsLoading) return;
@@ -865,6 +924,7 @@ export default function VehicleMaintenanceDetail({ maintenanceId }: { maintenanc
 
   const openWorkflowDialog = (action: VehicleMaintenanceWorkflowAction) => {
     setWorkflowAction(action);
+    setWorkflowTargetStatus("submitted");
     const prefill =
       (action === "dispatch_reject" || action === "production_reject")
         ? (maintenance?.ai_insight?.suggested_reject_reason ?? "")
@@ -876,13 +936,14 @@ export default function VehicleMaintenanceDetail({ maintenanceId }: { maintenanc
     if (workflowLoading) return;
     setWorkflowAction(null);
     setWorkflowNote("");
+    setWorkflowTargetStatus("submitted");
   };
 
   const handleWorkflowConfirm = async () => {
     if (!workflowAction || !workflowDialogText) return;
     const note = workflowNote.trim();
     if (workflowDialogText.requiresReason && !note) {
-      toast.error("Vui lòng nhập lý do từ chối");
+      toast.error(workflowAction === "revert_approval" ? "Vui lòng nhập lý do hoàn duyệt" : "Vui lòng nhập lý do từ chối");
       return;
     }
 
@@ -893,6 +954,7 @@ export default function VehicleMaintenanceDetail({ maintenanceId }: { maintenanc
           action: workflowAction,
           note,
           reason: workflowDialogText.requiresReason ? note : undefined,
+          target_status: workflowDialogText.requiresTargetStatus ? workflowTargetStatus : undefined,
         })
       ).unwrap();
       await refreshDetail();
@@ -950,6 +1012,24 @@ export default function VehicleMaintenanceDetail({ maintenanceId }: { maintenanc
       <div className="flex min-h-[420px] items-center justify-center">
         <Spin />
       </div>
+    );
+  }
+
+  if (notFound) {
+    return (
+      <Card className="m-4 rounded-lg p-8 md:m-10">
+        <div className="flex flex-col items-center gap-4 text-center">
+          <Wrench className="size-10 text-slate-300" />
+          <div className="space-y-1">
+            <p className="text-lg font-semibold text-slate-800">Phiếu bảo trì không tồn tại</p>
+            <p className="text-sm text-slate-500">Phiếu này có thể đã bị xóa hoặc bạn không còn quyền xem.</p>
+          </div>
+          <Button variant="outline" onClick={() => router.push(SIDEBAR.VEHICLE_MAINTENANCES)}>
+            <ArrowLeft className="size-4" />
+            Quay lại danh sách
+          </Button>
+        </div>
+      </Card>
     );
   }
 
@@ -1033,6 +1113,17 @@ export default function VehicleMaintenanceDetail({ maintenanceId }: { maintenanc
                 >
                   <CheckCircle2 className="size-4" />
                   Phê duyệt
+                </Button>
+              ) : null}
+              {workflowActions.includes("revert_approval") ? (
+                <Button
+                  variant="outline"
+                  className="border-amber-200 text-amber-700 hover:bg-amber-50"
+                  disabled={workflowLoading || isEditing}
+                  onClick={() => openWorkflowDialog("revert_approval")}
+                >
+                  <Undo2 className="size-4" />
+                  Hoàn duyệt
                 </Button>
               ) : null}
               {workflowActions.includes("dispatch_reject") ? (
@@ -1638,27 +1729,52 @@ export default function VehicleMaintenanceDetail({ maintenanceId }: { maintenanc
             <DialogTitle>{workflowDialogText?.title}</DialogTitle>
             <DialogDescription>{workflowDialogText?.description}</DialogDescription>
           </DialogHeader>
+          {workflowDialogText?.requiresTargetStatus ? (
+            <div className="space-y-2">
+              <Label className="text-slate-700">Trả phiếu về</Label>
+              <Select
+                value={workflowTargetStatus}
+                onValueChange={(value) => setWorkflowTargetStatus(value as RevertApprovalTargetStatus)}
+              >
+                <SelectTrigger className={CONTROL_CLASS}>
+                  <SelectValue placeholder="Chọn bước xử lý" />
+                </SelectTrigger>
+                <SelectContent>
+                  {REVERT_APPROVAL_TARGET_OPTIONS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {selectedRevertTarget?.description ? (
+                <p className="text-xs text-slate-500">{selectedRevertTarget.description}</p>
+              ) : null}
+            </div>
+          ) : null}
           <div className="space-y-2">
             <Label className="text-slate-700">
-              {workflowDialogText?.requiresReason ? "Lý do từ chối" : "Ghi chú"}
+              {workflowDialogText?.reasonLabel || (workflowDialogText?.requiresReason ? "Lý do từ chối" : "Ghi chú")}
             </Label>
             <Textarea
               rows={4}
+              className="bg-white"
               placeholder={
-                workflowDialogText?.requiresReason
+                workflowDialogText?.reasonPlaceholder ||
+                (workflowDialogText?.requiresReason
                   ? "Nhập lý do để người tạo phiếu biết cần bổ sung gì"
-                  : "Ghi chú thêm nếu cần"
+                  : "Ghi chú thêm nếu cần")
               }
               value={workflowNote}
               onChange={(event) => setWorkflowNote(event.target.value)}
             />
           </div>
           <DialogFooter>
-            <Button variant="outline" disabled={workflowLoading} onClick={closeWorkflowDialog}>
+            <Button className="bg-white" variant="outline" disabled={workflowLoading} onClick={closeWorkflowDialog}>
               Hủy
             </Button>
             <Button
-              variant={workflowDialogText?.requiresReason ? "destructive" : "primary"}
+              variant={workflowAction === "revert_approval" ? "primary" : workflowDialogText?.requiresReason ? "destructive" : "primary"}
               disabled={workflowLoading}
               onClick={handleWorkflowConfirm}
             >

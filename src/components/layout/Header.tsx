@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { NOTIFICATION_EVENTS } from "@/constants/notification";
 import { SIDEBAR } from "@/constants/route";
 import { useSocket } from "@/context/socket-context";
 import { useAppSelector } from "@/hooks/use-app-selector";
@@ -25,6 +26,15 @@ type AppHeaderProps = {
   onProfileClick?: () => void;
   onLogout?: () => void;
 };
+
+function isReadOnlyMaintenanceNotification(notification: Notification): boolean {
+  return (
+    notification.type === "vehicle_maintenance" &&
+    (notification.event === NOTIFICATION_EVENTS.VEHICLE_MAINTENANCE_DELETED ||
+      notification.read_only === true ||
+      notification.navigate_to === null)
+  );
+}
 
 const AppHeader: React.FC<AppHeaderProps> = ({
   statusColor = "#52c41a",
@@ -94,6 +104,8 @@ const AppHeader: React.FC<AppHeaderProps> = ({
 
   const handleMaintenanceNotificationClick = (notification: Notification) => {
     markAsRead(notification.id);
+    if (isReadOnlyMaintenanceNotification(notification)) return;
+
     setIsMaintenancePopoverOpen(false);
     const maintenanceId = notification.vehicle_maintenance_id;
     if (typeof maintenanceId === "number" || typeof maintenanceId === "string") {

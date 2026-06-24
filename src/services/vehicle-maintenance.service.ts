@@ -124,7 +124,7 @@ const vehicleMaintenanceApi = {
   runWorkflowAction: async (
     id: number,
     action: VehicleMaintenanceWorkflowAction,
-    payload?: { note?: string | null; reason?: string | null }
+    payload?: { note?: string | null; reason?: string | null; target_status?: string | null }
   ) => {
     const endpointByAction: Record<VehicleMaintenanceWorkflowAction, string> = {
       submit: "submit",
@@ -132,12 +132,18 @@ const vehicleMaintenanceApi = {
       dispatch_reject: "dispatch-reject",
       production_approve: "production-approve",
       production_reject: "production-reject",
+      revert_approval: "revert-approval",
     };
     const endpoint = endpointByAction[action];
     const body =
       action === "dispatch_reject" || action === "production_reject"
         ? { reason: payload?.reason || payload?.note || "" }
-        : { note: payload?.note || null };
+        : action === "revert_approval"
+          ? {
+              target_status: payload?.target_status || "submitted",
+              reason: payload?.reason || payload?.note || "",
+            }
+          : { note: payload?.note || null };
     const response = await http.post<ApiPayload<VehicleMaintenance>>(
       `/vehicle-maintenances/${id}/${endpoint}`,
       body

@@ -156,7 +156,13 @@ export function getNotificationText(
   locale?: string | null
 ): string {
   const resolvedLocale = getNotificationLocale(locale);
-  const event = typeof notification.event === "string" ? notification.event : undefined;
+  const event =
+    typeof notification.event === "string" ? notification.event : undefined;
+  const message = getStringValue(notification.message);
+  if (event === NOTIFICATION_EVENTS.VEHICLE_MAINTENANCE_DELETED && message) {
+    return message;
+  }
+
   const template = event ? NOTIFICATION_TEXT_TEMPLATES[resolvedLocale][event] : undefined;
 
   if (template) {
@@ -178,7 +184,6 @@ export function getNotificationText(
     });
   }
 
-  const message = getStringValue(notification.message);
   if (message) {
     return message;
   }
