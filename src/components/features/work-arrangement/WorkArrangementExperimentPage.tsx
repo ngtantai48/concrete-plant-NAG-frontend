@@ -2,10 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { PERMISSIONS } from "@/constants/permissions";
-import { SIDEBAR } from "@/constants/route";
 import { useNavigationStore } from "@/hooks/use-navigation-store";
-import { usePermissions } from "@/hooks/use-permissions";
 import { convertSolarToLunar } from "@/utils/lunar";
 import { type ChupLichFormat } from "@/utils/exportChupLich";
 import { DatePicker, Dropdown } from "antd";
@@ -36,12 +33,9 @@ export default function WorkArrangementExperimentPage() {
   const t = useTranslations("WorkArrangementPage");
   const tAttendance = useTranslations("WorkAttendancePage");
   const tAssign = useTranslations("WorkAssignmentPage");
-  const { hasActionAccess } = usePermissions();
   const setDirty = useNavigationStore((state) => state.setDirty);
   const chupHandlerRef = useRef<((format: ChupLichFormat) => void) | null>(null);
-  const lotCaptureHandlerRef = useRef<(() => void) | null>(null);
   const [chupLoading, setChupLoading] = useState(false);
-  const [lotCaptureLoading, setLotCaptureLoading] = useState(false);
   const [selectedDate, setSelectedDate] = useState(() => dayjs());
   const [dirtyBySection, setDirtyBySection] = useState<Record<TrialSectionKey, boolean>>({
     attendance: false,
@@ -60,7 +54,6 @@ export default function WorkArrangementExperimentPage() {
   }, [selectedDate]);
 
   const hasDirty = useMemo(() => Object.values(dirtyBySection).some(Boolean), [dirtyBySection]);
-  const canSyncLots = hasActionAccess(SIDEBAR.DASHBOARD, PERMISSIONS.DASHBOARD.SYNC_SLOTS);
 
   useEffect(() => {
     setDirty(hasDirty);
@@ -70,9 +63,6 @@ export default function WorkArrangementExperimentPage() {
 
   const registerChup = useCallback((fn: ((format: ChupLichFormat) => void) | null) => {
     chupHandlerRef.current = fn;
-  }, []);
-  const registerLotCapture = useCallback((fn: (() => void) | null) => {
-    lotCaptureHandlerRef.current = fn;
   }, []);
 
   const updateDirty = useCallback((key: TrialSectionKey, dirty: boolean) => {
@@ -150,22 +140,6 @@ export default function WorkArrangementExperimentPage() {
                   </Button>
                 )}
               </div>
-              {canSyncLots && isToday && (
-                <Button
-                  type="button"
-                  size="sm"
-                  onClick={() => lotCaptureHandlerRef.current?.()}
-                  disabled={lotCaptureLoading}
-                  className="h-8 bg-teal-600 px-3 font-semibold text-white hover:bg-teal-700"
-                >
-                  {lotCaptureLoading ? (
-                    <Loader2 className="size-4 animate-spin" />
-                  ) : (
-                    <FileSpreadsheet size={15} />
-                  )}
-                  {tAssign("lotCaptureButton")}
-                </Button>
-              )}
               <Dropdown
                 trigger={["click"]}
                 disabled={chupLoading}
@@ -212,8 +186,6 @@ export default function WorkArrangementExperimentPage() {
             onDirtyChange={handleAssignmentDirty}
             onRegisterChup={registerChup}
             onChupLoadingChange={setChupLoading}
-            onRegisterLotCapture={registerLotCapture}
-            onLotCaptureLoadingChange={setLotCaptureLoading}
           >
             <WorkbenchSection
               id="trial-work-task"

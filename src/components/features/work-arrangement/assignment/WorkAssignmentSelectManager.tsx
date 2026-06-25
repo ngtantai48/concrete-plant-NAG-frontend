@@ -35,7 +35,6 @@ import {
 } from "@/utils/exportChupLich";
 import { toPng } from "html-to-image";
 import ChupLichSheet from "./ChupLichSheet";
-import LotCaptureModal from "./LotCaptureModal";
 import { DatePicker, message, Modal, Select as AntSelect, Skeleton } from "antd";
 import dayjs, { type Dayjs } from "dayjs";
 import {
@@ -154,8 +153,6 @@ export default function WorkAssignmentSelectManager({
   onDirtyChange,
   onRegisterChup,
   onChupLoadingChange,
-  onRegisterLotCapture,
-  onLotCaptureLoadingChange,
   children,
 }: {
   active?: boolean;
@@ -166,8 +163,6 @@ export default function WorkAssignmentSelectManager({
   onDirtyChange?: (dirty: boolean) => void;
   onRegisterChup?: (fn: ((format: ChupLichFormat) => void) | null) => void;
   onChupLoadingChange?: (loading: boolean) => void;
-  onRegisterLotCapture?: (fn: (() => void) | null) => void;
-  onLotCaptureLoadingChange?: (loading: boolean) => void;
   /** Các khối hiển thị bên dưới bảng Xe bơm (cột phải): Công việc, Chấm công, Lốt trộn... */
   children?: ReactNode;
 }) {
@@ -178,7 +173,6 @@ export default function WorkAssignmentSelectManager({
     SIDEBAR.WORK_ARRANGEMENTS,
     PERMISSIONS.WORK_ARRANGEMENTS.UPDATE
   );
-  const canSyncLots = hasActionAccess(SIDEBAR.DASHBOARD, PERMISSIONS.DASHBOARD.SYNC_SLOTS);
 
   const [internalSelectedDate, setInternalSelectedDate] = useState<Dayjs>(dayjs());
   const [loading, setLoading] = useState(false);
@@ -201,7 +195,6 @@ export default function WorkAssignmentSelectManager({
   // Số lốt theo xe (thứ tự trong hàng đợi lốt trộn hôm nay); 1 xe có thể giữ nhiều lốt.
   const [lotNumbersByVehicle, setLotNumbersByVehicle] = useState<Map<number, number[]>>(new Map());
   const [latestLotName, setLatestLotName] = useState("");
-  const [lotCaptureOpen, setLotCaptureOpen] = useState(false);
   // Bản lịch HTML ẩn để chụp ảnh (option "Ảnh" của Chụp lịch).
   const [chupSheetModel, setChupSheetModel] = useState<ChupLichModel | null>(null);
   const chupSheetRef = useRef<HTMLDivElement>(null);
@@ -258,22 +251,6 @@ export default function WorkAssignmentSelectManager({
     }
     return map;
   }, [mixerDraft.mixer_assignments]);
-
-  const personnelById = useMemo(
-    () => new Map(personnel.map((person) => [Number(person.user_id), person])),
-    [personnel]
-  );
-
-  // Tên tài xế theo xe bồn (cho chip trong modal Chụp lốt) — lấy từ bố trí đã tải sẵn.
-  const driverNameByVehicleId = useMemo(() => {
-    const map = new Map<number, string>();
-    mixerDriverByVehicle.forEach((userId, vehicleId) => {
-      const person = personnelById.get(userId);
-      const name = person?.user_full_name?.trim() || person?.user_short_name?.trim() || "";
-      if (name) map.set(vehicleId, name);
-    });
-    return map;
-  }, [mixerDriverByVehicle, personnelById]);
 
   // Xe bồn xếp theo tên tự nhiên X1 → cuối (X1, X2, ... X10), không theo thứ tự backend.
   const sortedMixerVehicles = useMemo(
@@ -373,15 +350,6 @@ export default function WorkAssignmentSelectManager({
     "notifications",
     active && isConnected && isToday
   );
-
-  const openLotCaptureDialog = useCallback(() => {
-    if (!canSyncLots) {
-      message.warning(t("lotCaptureNoPermission"));
-      return;
-    }
-    if (!isToday) return;
-    setLotCaptureOpen(true);
-  }, [canSyncLots, isToday, t]);
 
   useEffect(() => {
     onDirtyChangeRef.current?.(dirty);
@@ -670,10 +638,6 @@ export default function WorkAssignmentSelectManager({
   useEffect(() => {
     onChupLoadingChange?.(chupLoading);
   }, [chupLoading, onChupLoadingChange]);
-  useEffect(() => {
-    onRegisterLotCapture?.(openLotCaptureDialog);
-    return () => onRegisterLotCapture?.(null);
-  }, [onRegisterLotCapture, openLotCaptureDialog]);
 
   const dateControls = (
     <div className="flex items-center gap-1">
@@ -733,19 +697,6 @@ export default function WorkAssignmentSelectManager({
           <ChupLichSheet ref={chupSheetRef} model={chupSheetModel} />
         </div>
       )}
-      <LotCaptureModal
-        open={lotCaptureOpen}
-        onClose={() => setLotCaptureOpen(false)}
-        workDate={workDate}
-        canSync={canSyncLots}
-        driverNameByVehicleId={driverNameByVehicleId}
-        onLoadingChange={onLotCaptureLoadingChange}
-        onCaptured={async (lotName) => {
-          const captured = setStoredLotDisplayName(formatLocalDate(new Date()), lotName);
-          await loadLots();
-          if (captured) setLatestLotName(captured);
-        }}
-      />
 
       {!todayOnly && !hideDateControls && (
         <div className="flex flex-wrap items-center gap-3 border border-slate-300 bg-white px-3 py-1.5">
