@@ -36,6 +36,7 @@ import {
   CheckCircle2,
   Clock,
   Ellipsis,
+  FileSpreadsheet,
   Eye,
   EyeOff,
   LayoutGrid,
@@ -64,6 +65,7 @@ import VehicleLocationDialog from "./VehicleLocationDialog";
 import VehicleStatusChange from "./VehicleStatusChange";
 import EndOfDayModal from "./EndOfDayModal";
 import SystemSettingsForm from "../system-settings/SystemSettingsForm";
+import LotCaptureModal from "../work-arrangement/assignment/LotCaptureModal";
 import { SIDEBAR } from "@/constants/route";
 import { PERMISSIONS } from "@/constants/permissions";
 
@@ -159,6 +161,8 @@ export default function AdminDashboard() {
   const [isDatePickerOpen, setIsDatePickerOpen] = useState(false);
   const [isEndOfDayModalOpen, setIsEndOfDayModalOpen] = useState(false);
   const isPastDate = selectedDate < getTodayDate();
+  const isToday = selectedDate === getTodayDate();
+  const canSyncLots = hasActionAccess(SIDEBAR.DASHBOARD, PERMISSIONS.DASHBOARD.SYNC_SLOTS);
 
   const handleToggleYardEntryTime = useCallback(() => {
     window.localStorage.setItem(YARD_ENTRY_TIME_VISIBILITY_STORAGE_KEY, String(!showYardEntryTime));
@@ -373,8 +377,7 @@ export default function AdminDashboard() {
     return orders.filter((o) => o.order_status === "completed");
   }, [orders]);
 
-  const [isSyncingShift, setIsSyncingShift] = useState(false);
-  const [isSyncShiftDialogOpen, setIsSyncShiftDialogOpen] = useState(false);
+  const [isLotCaptureOpen, setIsLotCaptureOpen] = useState(false);
   const [isSystemSettingsDialogOpen, setIsSystemSettingsDialogOpen] = useState(false);
   const [isQueueHistoryDialogOpen, setIsQueueHistoryDialogOpen] = useState(false);
   const [queueHistoryDate, setQueueHistoryDate] = useState(() => getYesterdayDate());
@@ -385,80 +388,6 @@ export default function AdminDashboard() {
     const parsed = new Date(queueHistoryDate);
     return Number.isNaN(parsed.getTime()) ? queueHistoryDate : format(parsed, "dd/MM/yyyy");
   }, [queueHistoryDate]);
-
-  const handleSyncShift = useCallback(async () => {
-    setIsSyncShiftDialogOpen(false);
-    setIsSyncingShift(true);
-
-    const sorted = [...activeFlowOrders].sort(
-      (a, b) => (a.order_number || 0) - (b.order_number || 0)
-    );
-    const maToStt: Record<string, number> = {};
-    const skipped: { order_number: number; reason: string; raw: unknown }[] = [];
-    let stt = 1;
-    for (const o of sorted) {
-      const raw = o.vehicles?.vehicle_name;
-      if (!raw) {
-        skipped.push({ order_number: o.order_number, reason: "no_vehicle_name", raw });
-        continue;
-      }
-      const upper = String(raw).trim().toUpperCase().replace(/\s+/g, "");
-      const m = upper.match(/^X0*(\d+)$/);
-      const maX = m ? `X${m[1]}` : upper;
-      if (!/^X\d+$/.test(maX)) {
-        skipped.push({ order_number: o.order_number, reason: "invalid_format", raw });
-        continue;
-      }
-      if (maX in maToStt) {
-        skipped.push({ order_number: o.order_number, reason: "duplicate", raw: maX });
-        continue;
-      }
-      maToStt[maX] = stt++;
-    }
-
-    if (skipped.length > 0) console.log("[handleSyncShift] skipped:", skipped);
-
-    // Đẩy STT lên Google Sheet (giữ nguyên hành vi cũ).
-    const pushToSheet = async () => {
-      const res = await fetch("/api/google-sheets/bo-tri-cv/sync-lot", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ maToStt }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || "Sync failed");
-      if (data.unmatchedMaX?.length > 0) {
-        console.warn("[handleSyncShift] mã X không có trong sheet cột H:", data.unmatchedMaX);
-      }
-      return data;
-    };
-
-    try {
-      const [sheetResult, snapshotResult] = await Promise.allSettled([
-        pushToSheet(),
-        systemApi.captureTankerLotSync(),
-      ]);
-
-      if (sheetResult.status === "fulfilled") {
-        const data = sheetResult.value;
-        toast.success(
-          t("syncShiftSuccess", { count: data.updated ?? Object.keys(maToStt).length })
-        );
-      } else {
-        console.error("[handleSyncShift] sheet error:", sheetResult.reason);
-        toast.error(t("syncShiftFailed"));
-      }
-
-      if (snapshotResult.status === "fulfilled") {
-        toast.success(t("syncSnapshotSuccess"));
-      } else {
-        console.error("[handleSyncShift] snapshot error:", snapshotResult.reason);
-        toast.error(t("syncSnapshotFailed"));
-      }
-    } finally {
-      setIsSyncingShift(false);
-    }
-  }, [activeFlowOrders, t]);
 
   const fetchQueueHistory = useCallback(async (targetDate: string) => {
     if (!targetDate) return;
@@ -498,48 +427,6 @@ export default function AdminDashboard() {
     setIsQueueHistoryDialogOpen(true);
     await fetchQueueHistory(defaultHistoryDate);
   }, [fetchQueueHistory]);
-
-  const [selectedSyncOrderIds, setSelectedSyncOrderIds] = useState<number[]>([]);
-  const [isApplyingToEnd, setIsApplyingToEnd] = useState(false);
-
-  const sortedActiveFlowOrders = useMemo(() => {
-    return [...activeFlowOrders].sort((a, b) => (a.order_number || 0) - (b.order_number || 0));
-  }, [activeFlowOrders]);
-
-  useEffect(() => {
-    if (!isSyncShiftDialogOpen) {
-      setSelectedSyncOrderIds([]);
-    }
-  }, [isSyncShiftDialogOpen]);
-
-  const handleApplyToEnd = useCallback(async () => {
-    if (selectedSyncOrderIds.length === 0) {
-      toast.error(t("syncShiftNoSelection"));
-      return;
-    }
-    setIsApplyingToEnd(true);
-    try {
-      const vehicleIds = activeFlowOrders
-        .filter((o) => selectedSyncOrderIds.includes(o.order_id))
-        .map((o) => o.vehicles?.vehicle_id)
-        .filter((id): id is number => typeof id === "number");
-
-      if (vehicleIds.length === 0) {
-        toast.error(t("syncShiftApplyToEndFailed"));
-        return;
-      }
-
-      await orderApi.arrangeTime({ vehicle_ids: vehicleIds });
-      await fetchAll();
-      setSelectedSyncOrderIds([]);
-      toast.success(t("syncShiftApplyToEndSuccess", { count: vehicleIds.length }));
-    } catch (err) {
-      console.error("[handleApplyToEnd] error:", err);
-      toast.error(t("syncShiftApplyToEndFailed"));
-    } finally {
-      setIsApplyingToEnd(false);
-    }
-  }, [selectedSyncOrderIds, activeFlowOrders, t, fetchAll]);
 
   const [dispatchMode, setDispatchMode] = useState<DispatchMode>("auto");
   const [showMap, setShowMap] = useState(false);
@@ -989,7 +876,7 @@ export default function AdminDashboard() {
                 </PopoverContent>
               </Popover>
 
-              {/* Action buttons: Nhật ký vận hành, Lịch sử, Đồng bộ ca */}
+              {/* Action buttons: Nhật ký vận hành, Lịch sử, Chụp lốt */}
               <div className="border-l border-slate-200 pl-2 flex items-center gap-2">
                 {hasActionAccess(SIDEBAR.DASHBOARD, PERMISSIONS.DASHBOARD.CHECKLOG) && (
                   <Tooltip>
@@ -1024,6 +911,24 @@ export default function AdminDashboard() {
                     </TooltipTrigger>
                     <TooltipContent>
                       <p>Xem thứ tự lốt xe theo ngày</p>
+                    </TooltipContent>
+                  </Tooltip>
+                )}
+
+                {canSyncLots && isToday && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => setIsLotCaptureOpen(true)}
+                        className="uppercase border-teal-200 text-teal-700 hover:bg-teal-50"
+                      >
+                        <FileSpreadsheet /> Chụp lốt
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Chụp lốt xe {format(new Date(selectedDate), "dd/MM/yyyy")}</p>
                     </TooltipContent>
                   </Tooltip>
                 )}
@@ -2383,6 +2288,13 @@ export default function AdminDashboard() {
           t={t}
         />
       )}
+
+      <LotCaptureModal
+        open={isLotCaptureOpen}
+        onClose={() => setIsLotCaptureOpen(false)}
+        workDate={selectedDate}
+        canSync={canSyncLots}
+      />
 
       <EndOfDayModal
         open={isEndOfDayModalOpen}
