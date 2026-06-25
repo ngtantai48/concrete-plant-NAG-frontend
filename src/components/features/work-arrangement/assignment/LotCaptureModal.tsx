@@ -13,8 +13,6 @@ import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Chip, filterSelectOptionByLabel } from "./shared";
 
-const NONE_VALUE = "__none__";
-
 const getDefaultLotCaptureName = () => `Lốt ${dayjs().format("H")}H`;
 
 const normalizeLotVehicleName = (raw: unknown) => {
@@ -68,11 +66,13 @@ const sortLotItemsByPendingStatus = (items: WorkMixSlotItem[]) =>
     return (a.order_number || 0) - (b.order_number || 0);
   });
 
-const moveDutyVehicleToEnd = (items: WorkMixSlotItem[], dutyVehicleId: number) => {
-  if (!dutyVehicleId) return items;
-  const dutyItems = items.filter((item) => Number(item.vehicle_id) === dutyVehicleId);
+// Đưa toàn bộ xe trực ca (có thể nhiều) xuống cuối lốt, giữ thứ tự hiện tại giữa chúng.
+const moveDutyVehiclesToEnd = (items: WorkMixSlotItem[], dutyVehicleIds: number[]) => {
+  if (dutyVehicleIds.length === 0) return items;
+  const dutySet = new Set(dutyVehicleIds);
+  const dutyItems = items.filter((item) => dutySet.has(Number(item.vehicle_id)));
   if (dutyItems.length === 0) return items;
-  return [...items.filter((item) => Number(item.vehicle_id) !== dutyVehicleId), ...dutyItems];
+  return [...items.filter((item) => !dutySet.has(Number(item.vehicle_id))), ...dutyItems];
 };
 
 export type LotCaptureModalProps = {
@@ -102,24 +102,22 @@ export default function LotCaptureModal({
   const t = useTranslations("WorkAssignmentPage");
 
   const [lotCaptureName, setLotCaptureName] = useState(getDefaultLotCaptureName);
-  const [lotDutyVehicleId, setLotDutyVehicleId] = useState<string>(NONE_VALUE);
+  const [lotDutyVehicleIds, setLotDutyVehicleIds] = useState<number[]>([]);
   const [lotCaptureItems, setLotCaptureItems] = useState<WorkMixSlotItem[]>([]);
   const [lotCaptureLoading, setLotCaptureLoading] = useState(false);
   const [lotCaptureSaving, setLotCaptureSaving] = useState(false);
   const [fetchedDriverNames, setFetchedDriverNames] = useState<Map<number, string>>(new Map());
 
   const driverNames = driverNameByVehicleId ?? fetchedDriverNames;
+  const dutyVehicleIdSet = useMemo(() => new Set(lotDutyVehicleIds), [lotDutyVehicleIds]);
 
   const loadLotCaptureItems = useCallback(
-    async (nextDutyVehicleId: string) => {
+    async (nextDutyVehicleIds: number[]) => {
       setLotCaptureLoading(true);
       try {
         const items = await workMixSlotApi.getList();
         setLotCaptureItems(
-          moveDutyVehicleToEnd(
-            sortLotItemsByPendingStatus(items),
-            nextDutyVehicleId === NONE_VALUE ? 0 : Number(nextDutyVehicleId)
-          )
+          moveDutyVehiclesToEnd(sortLotItemsByPendingStatus(items), nextDutyVehicleIds)
         );
         if (items.length === 0) message.warning(t("lotCaptureEmpty"));
       } catch (error) {
@@ -157,8 +155,8 @@ export default function LotCaptureModal({
   useEffect(() => {
     if (!open) return;
     setLotCaptureName(getDefaultLotCaptureName());
-    setLotDutyVehicleId(NONE_VALUE);
-    void loadLotCaptureItems(NONE_VALUE);
+    setLotDutyVehicleIds([]);
+    void loadLotCaptureItems([]);
     if (!driverNameByVehicleId) void loadDriverNames();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
@@ -197,17 +195,19 @@ export default function LotCaptureModal({
   }, []);
 
   const applyDutyVehicleToEnd = useCallback(() => {
-    if (lotDutyVehicleId === NONE_VALUE) return;
-    setLotCaptureItems((current) => moveDutyVehicleToEnd(current, Number(lotDutyVehicleId)));
-  }, [lotDutyVehicleId]);
+    if (lotDutyVehicleIds.length === 0) return;
+    setLotCaptureItems((current) => moveDutyVehiclesToEnd(current, lotDutyVehicleIds));
+  }, [lotDutyVehicleIds]);
 
   const handleCaptureLots = useCallback(async () => {
     const lotName = lotCaptureName.trim() || getDefaultLotCaptureName();
-    const dutyVehicleId = lotDutyVehicleId === NONE_VALUE ? 0 : Number(lotDutyVehicleId);
-    const dutyVehicle = lotCaptureItems.find((item) => Number(item.vehicle_id) === dutyVehicleId);
-    const dutyVehicleName = getLotVehicleLabel(dutyVehicle);
-    const snapshotNote = dutyVehicleName
-      ? `${lotName} - ${t("lotDutyVehicle")}: ${dutyVehicleName}`
+    const dutyVehicles = lotCaptureItems.filter((item) =>
+      dutyVehicleIdSet.has(Number(item.vehicle_id))
+    );
+    const dutyVehicleLabels = dutyVehicles.map((item) => getLotVehicleLabel(item)).filter(Boolean);
+    const primaryDutyVehicle = dutyVehicles[0];
+    const snapshotNote = dutyVehicleLabels.length
+      ? `${lotName} - ${t("lotDutyVehicle")}: ${dutyVehicleLabels.join(", ")}`
       : lotName;
     const { maToStt, skipped } = buildLotSyncMap(lotCaptureItems);
     const lotCount = Object.keys(maToStt).length;
@@ -239,9 +239,9 @@ export default function LotCaptureModal({
         pushToSheet(),
         systemApi.captureTankerLotSync({
           lot_name: lotName,
-          duty_vehicle_id: dutyVehicleId || undefined,
-          duty_vehicle_name: dutyVehicle?.vehicle_name || undefined,
-          duty_vehicle_license_plate: dutyVehicle?.vehicle_license_plate || undefined,
+          duty_vehicle_id: primaryDutyVehicle ? Number(primaryDutyVehicle.vehicle_id) : undefined,
+          duty_vehicle_name: primaryDutyVehicle?.vehicle_name || undefined,
+          duty_vehicle_license_plate: primaryDutyVehicle?.vehicle_license_plate || undefined,
           snapshot_note: snapshotNote,
           multi_description: snapshotNote,
         }),
@@ -269,14 +269,14 @@ export default function LotCaptureModal({
     } finally {
       setLotCaptureSaving(false);
     }
-  }, [lotCaptureItems, lotCaptureName, lotDutyVehicleId, onCaptured, onClose, t]);
+  }, [dutyVehicleIdSet, lotCaptureItems, lotCaptureName, onCaptured, onClose, t]);
 
   const dutyVehicleOptions = useMemo(
     () =>
       Array.from(
         new Map(lotCaptureItems.map((item) => [Number(item.vehicle_id), item])).values()
       ).map((item) => ({
-        value: String(item.vehicle_id),
+        value: Number(item.vehicle_id),
         label: getLotVehicleLabel(item),
       })),
     [lotCaptureItems]
@@ -314,11 +314,12 @@ export default function LotCaptureModal({
           <div className="flex items-center gap-2">
             <div className="min-w-0 flex-1">
               <AntSelect
+                mode="multiple"
                 showSearch
                 allowClear
                 disabled={lotCaptureLoading}
-                value={lotDutyVehicleId === NONE_VALUE ? undefined : lotDutyVehicleId}
-                onChange={(value) => setLotDutyVehicleId(value || NONE_VALUE)}
+                value={lotDutyVehicleIds}
+                onChange={(value) => setLotDutyVehicleIds(value as number[])}
                 placeholder={t("lotDutyVehiclePlaceholder")}
                 options={dutyVehicleOptions}
                 filterOption={filterSelectOptionByLabel}
@@ -329,7 +330,7 @@ export default function LotCaptureModal({
               type="button"
               size="sm"
               onClick={applyDutyVehicleToEnd}
-              disabled={lotCaptureLoading || lotCaptureSaving || lotDutyVehicleId === NONE_VALUE}
+              disabled={lotCaptureLoading || lotCaptureSaving || lotDutyVehicleIds.length === 0}
               title={t("lotDutyApplyHint")}
               className="h-9 shrink-0 bg-teal-600 text-white hover:bg-teal-700"
             >
@@ -352,9 +353,7 @@ export default function LotCaptureModal({
             ) : (
               <div className="space-y-1">
                 {lotCaptureItems.map((item, index) => {
-                  const isDutyVehicle =
-                    lotDutyVehicleId !== NONE_VALUE &&
-                    Number(item.vehicle_id) === Number(lotDutyVehicleId);
+                  const isDutyVehicle = dutyVehicleIdSet.has(Number(item.vehicle_id));
                   const canReorderTo = !lotCaptureSaving && lotCaptureItems.length > 1;
                   const driverName = driverNames.get(Number(item.vehicle_id)) || "";
                   const hasPersonnel = driverName !== "";
