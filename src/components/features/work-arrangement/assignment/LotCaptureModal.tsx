@@ -3,14 +3,23 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import orderApi from "@/services/order.service";
 import systemApi from "@/services/system.service";
 import { workAssignmentApi, workMixSlotApi } from "@/services/work-arrangement.service";
 import type { WorkMixSlotItem } from "@/types/work-arrangement";
-import { Dropdown, message, Modal, Select as AntSelect, Skeleton } from "antd";
+import { message, Modal, Select as AntSelect, Skeleton } from "antd";
 import dayjs from "dayjs";
-import { ArrowUpDown, ChevronDown, ChevronUp, FileSpreadsheet, Truck } from "lucide-react";
+import { ChevronDown, ChevronUp, FileSpreadsheet, Truck } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  getLotItemKey,
+  getPersistedLotOrderPosition,
+  getPersistedLotOrderUpdates,
+  isPersistedLotOrderItem,
+  moveLotItemByDirection,
+  moveLotItemToPosition,
+} from "./lot-capture-order";
 import { Chip, filterSelectOptionByLabel } from "./shared";
 
 const getDefaultLotCaptureName = () => `Lốt ${dayjs().format("H")}H`;
@@ -70,9 +79,15 @@ const sortLotItemsByPendingStatus = (items: WorkMixSlotItem[]) =>
 const moveDutyVehiclesToEnd = (items: WorkMixSlotItem[], dutyVehicleIds: number[]) => {
   if (dutyVehicleIds.length === 0) return items;
   const dutySet = new Set(dutyVehicleIds);
-  const dutyItems = items.filter((item) => dutySet.has(Number(item.vehicle_id)));
+  const persistedItems = items.filter(isPersistedLotOrderItem);
+  const otherItems = items.filter((item) => !isPersistedLotOrderItem(item));
+  const dutyItems = persistedItems.filter((item) => dutySet.has(Number(item.vehicle_id)));
   if (dutyItems.length === 0) return items;
-  return [...items.filter((item) => !dutySet.has(Number(item.vehicle_id))), ...dutyItems];
+  return [
+    ...persistedItems.filter((item) => !dutySet.has(Number(item.vehicle_id))),
+    ...dutyItems,
+    ...otherItems,
+  ];
 };
 
 export type LotCaptureModalProps = {
@@ -106,6 +121,7 @@ export default function LotCaptureModal({
   const [lotCaptureItems, setLotCaptureItems] = useState<WorkMixSlotItem[]>([]);
   const [lotCaptureLoading, setLotCaptureLoading] = useState(false);
   const [lotCaptureSaving, setLotCaptureSaving] = useState(false);
+  const [lotOrderSaving, setLotOrderSaving] = useState(false);
   const [fetchedDriverNames, setFetchedDriverNames] = useState<Map<number, string>>(new Map());
 
   const driverNames = driverNameByVehicleId ?? fetchedDriverNames;
@@ -115,7 +131,7 @@ export default function LotCaptureModal({
     async (nextDutyVehicleIds: number[]) => {
       setLotCaptureLoading(true);
       try {
-        const items = await workMixSlotApi.getList();
+        const items = await workMixSlotApi.getList({ includeAllMixerVehicles: true });
         setLotCaptureItems(
           moveDutyVehiclesToEnd(sortLotItemsByPendingStatus(items), nextDutyVehicleIds)
         );
@@ -162,42 +178,63 @@ export default function LotCaptureModal({
   }, [open]);
 
   useEffect(() => {
-    onLoadingChange?.(lotCaptureLoading || lotCaptureSaving);
-  }, [lotCaptureLoading, lotCaptureSaving, onLoadingChange]);
+    onLoadingChange?.(lotCaptureLoading || lotCaptureSaving || lotOrderSaving);
+  }, [lotCaptureLoading, lotCaptureSaving, lotOrderSaving, onLoadingChange]);
 
-  const moveLotCaptureItem = useCallback((index: number, direction: -1 | 1) => {
-    setLotCaptureItems((current) => {
-      const targetIndex = index + direction;
-      if (targetIndex < 0 || targetIndex >= current.length) return current;
-      const next = [...current];
-      [next[index], next[targetIndex]] = [next[targetIndex], next[index]];
-      return next;
-    });
-  }, []);
+  const persistLotOrderChanges = useCallback(
+    async (itemKeys: string[], nextItems: WorkMixSlotItem[], previousItems: WorkMixSlotItem[]) => {
+      const updates = getPersistedLotOrderUpdates(nextItems, itemKeys);
+      if (updates.length === 0) return;
 
-  const moveLotCaptureItemTo = useCallback((fromIndex: number, toPosition: number) => {
-    setLotCaptureItems((current) => {
-      const toIndex = toPosition - 1;
-      if (
-        fromIndex < 0 ||
-        fromIndex >= current.length ||
-        toIndex < 0 ||
-        toIndex >= current.length ||
-        toIndex === fromIndex
-      ) {
-        return current;
+      setLotOrderSaving(true);
+      try {
+        for (const update of updates) {
+          await orderApi.update(update.orderId, { order_number: update.targetPosition });
+        }
+      } catch (error) {
+        console.error("[LotCaptureModal] order reorder error:", error);
+        setLotCaptureItems(previousItems);
+        message.error(t("lotOrderSyncFailed"));
+      } finally {
+        setLotOrderSaving(false);
       }
-      const next = [...current];
-      const [moved] = next.splice(fromIndex, 1);
-      next.splice(toIndex, 0, moved);
-      return next;
-    });
-  }, []);
+    },
+    [t]
+  );
+
+  const moveLotCaptureItem = useCallback(
+    (itemKey: string, direction: -1 | 1) => {
+      const nextItems = moveLotItemByDirection(lotCaptureItems, itemKey, direction);
+      if (nextItems === lotCaptureItems) return;
+
+      setLotCaptureItems(nextItems);
+      void persistLotOrderChanges([itemKey], nextItems, lotCaptureItems);
+    },
+    [lotCaptureItems, persistLotOrderChanges]
+  );
+
+  const moveLotCaptureItemTo = useCallback(
+    (itemKey: string, toPosition: number) => {
+      const nextItems = moveLotItemToPosition(lotCaptureItems, itemKey, toPosition);
+      if (nextItems === lotCaptureItems) return;
+
+      setLotCaptureItems(nextItems);
+      void persistLotOrderChanges([itemKey], nextItems, lotCaptureItems);
+    },
+    [lotCaptureItems, persistLotOrderChanges]
+  );
 
   const applyDutyVehicleToEnd = useCallback(() => {
     if (lotDutyVehicleIds.length === 0) return;
-    setLotCaptureItems((current) => moveDutyVehiclesToEnd(current, lotDutyVehicleIds));
-  }, [lotDutyVehicleIds]);
+    const nextItems = moveDutyVehiclesToEnd(lotCaptureItems, lotDutyVehicleIds);
+    if (nextItems === lotCaptureItems) return;
+
+    const dutyItemKeys = nextItems
+      .filter((item) => lotDutyVehicleIds.includes(Number(item.vehicle_id)))
+      .map(getLotItemKey);
+    setLotCaptureItems(nextItems);
+    void persistLotOrderChanges(dutyItemKeys, nextItems, lotCaptureItems);
+  }, [lotCaptureItems, lotDutyVehicleIds, persistLotOrderChanges]);
 
   const handleCaptureLots = useCallback(async () => {
     const lotName = lotCaptureName.trim() || getDefaultLotCaptureName();
@@ -282,6 +319,18 @@ export default function LotCaptureModal({
     [lotCaptureItems]
   );
 
+  const lotPositionOptions = useMemo(
+    () =>
+      Array.from(
+        { length: lotCaptureItems.filter(isPersistedLotOrderItem).length },
+        (_, position) => ({
+          value: position + 1,
+          label: String(position + 1),
+        })
+      ),
+    [lotCaptureItems]
+  );
+
   return (
     <Modal
       open={open}
@@ -291,7 +340,7 @@ export default function LotCaptureModal({
       cancelText={t("lotCaptureCancel")}
       confirmLoading={lotCaptureSaving}
       okButtonProps={{
-        disabled: !canSync || lotCaptureLoading || lotCaptureItems.length === 0,
+        disabled: !canSync || lotCaptureLoading || lotOrderSaving || lotCaptureItems.length === 0,
       }}
       title={t("lotCaptureTitle")}
       width={520}
@@ -330,7 +379,12 @@ export default function LotCaptureModal({
               type="button"
               size="sm"
               onClick={applyDutyVehicleToEnd}
-              disabled={lotCaptureLoading || lotCaptureSaving || lotDutyVehicleIds.length === 0}
+              disabled={
+                lotCaptureLoading ||
+                lotCaptureSaving ||
+                lotOrderSaving ||
+                lotDutyVehicleIds.length === 0
+              }
               title={t("lotDutyApplyHint")}
               className="h-9 shrink-0 bg-teal-600 text-white hover:bg-teal-700"
             >
@@ -353,8 +407,20 @@ export default function LotCaptureModal({
             ) : (
               <div className="space-y-1">
                 {lotCaptureItems.map((item, index) => {
+                  const itemKey = getLotItemKey(item);
+                  const isPersistedOrder = isPersistedLotOrderItem(item);
+                  const persistedOrderPosition = getPersistedLotOrderPosition(
+                    lotCaptureItems,
+                    itemKey
+                  );
                   const isDutyVehicle = dutyVehicleIdSet.has(Number(item.vehicle_id));
-                  const canReorderTo = !lotCaptureSaving && lotCaptureItems.length > 1;
+                  const isUnreturnedVehicle = item.group === "unreturned";
+                  const persistedOrderCount = lotPositionOptions.length;
+                  const canReorderTo =
+                    isPersistedOrder &&
+                    !lotCaptureSaving &&
+                    !lotOrderSaving &&
+                    persistedOrderCount > 1;
                   const driverName = driverNames.get(Number(item.vehicle_id)) || "";
                   const hasPersonnel = driverName !== "";
                   return (
@@ -372,11 +438,19 @@ export default function LotCaptureModal({
                         {item.vehicle_license_plate} | {item.vehicle_name}
                       </span>
                       <Chip
-                        tone={isDutyVehicle ? "amber" : hasPersonnel ? "teal" : "slate"}
+                        tone={
+                          isDutyVehicle || isUnreturnedVehicle
+                            ? "amber"
+                            : hasPersonnel
+                              ? "teal"
+                              : "slate"
+                        }
                         title={hasPersonnel ? driverName : undefined}
                       >
                         {isDutyVehicle ? (
                           t("lotDutyVehicleShort")
+                        ) : isUnreturnedVehicle ? (
+                          t("lotNotReturned")
                         ) : hasPersonnel ? (
                           <span className="block max-w-[160px] truncate">{driverName}</span>
                         ) : (
@@ -387,8 +461,8 @@ export default function LotCaptureModal({
                         <button
                           type="button"
                           aria-label={t("lotOrderMoveUp")}
-                          disabled={index === 0 || lotCaptureSaving}
-                          onClick={() => moveLotCaptureItem(index, -1)}
+                          disabled={!canReorderTo || persistedOrderPosition <= 1}
+                          onClick={() => moveLotCaptureItem(itemKey, -1)}
                           className="flex h-7 w-7 items-center justify-center rounded border border-slate-200 bg-white text-slate-500 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
                         >
                           <ChevronUp size={14} />
@@ -396,46 +470,22 @@ export default function LotCaptureModal({
                         <button
                           type="button"
                           aria-label={t("lotOrderMoveDown")}
-                          disabled={index === lotCaptureItems.length - 1 || lotCaptureSaving}
-                          onClick={() => moveLotCaptureItem(index, 1)}
+                          disabled={!canReorderTo || persistedOrderPosition >= persistedOrderCount}
+                          onClick={() => moveLotCaptureItem(itemKey, 1)}
                           className="flex h-7 w-7 items-center justify-center rounded border border-slate-200 bg-white text-slate-500 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
                         >
                           <ChevronDown size={14} />
                         </button>
-                        <Dropdown
-                          trigger={["click"]}
+                        <AntSelect
+                          aria-label={t("lotOrderMoveTo")}
                           disabled={!canReorderTo}
-                          placement="bottomRight"
-                          menu={{
-                            selectable: true,
-                            selectedKeys: [String(index + 1)],
-                            style: { maxHeight: 280, overflowY: "auto" },
-                            items: [
-                              {
-                                type: "group",
-                                label: t("lotOrderMoveToTitle"),
-                                children: Array.from(
-                                  { length: lotCaptureItems.length },
-                                  (_, position) => ({
-                                    key: String(position + 1),
-                                    label: String(position + 1),
-                                    disabled: position === index,
-                                  })
-                                ),
-                              },
-                            ],
-                            onClick: ({ key }) => moveLotCaptureItemTo(index, Number(key)),
-                          }}
-                        >
-                          <button
-                            type="button"
-                            aria-label={t("lotOrderMoveTo")}
-                            disabled={!canReorderTo}
-                            className="flex h-7 w-7 items-center justify-center rounded border border-slate-200 bg-white text-slate-500 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
-                          >
-                            <ArrowUpDown size={14} />
-                          </button>
-                        </Dropdown>
+                          options={lotPositionOptions}
+                          size="small"
+                          title={t("lotOrderMoveToTitle")}
+                          value={isPersistedOrder ? persistedOrderPosition : undefined}
+                          onChange={(value) => moveLotCaptureItemTo(itemKey, Number(value))}
+                          className="w-[58px] [&_.ant-select-selector]:!h-7 [&_.ant-select-selector]:!rounded [&_.ant-select-selector]:!border-slate-200 [&_.ant-select-selection-item]:!text-xs"
+                        />
                       </div>
                     </div>
                   );

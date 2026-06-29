@@ -4,6 +4,7 @@ import { workApi } from "@/services/work.service";
 import { userAssignmentApi } from "@/services/user-assignment.service";
 import vehicleApi from "@/services/vehicle.service";
 import vehicleTypeApi from "@/services/vehicle-type.service";
+import { buildWorkMixSlotItems, getDisplayShortName } from "@/services/work-mix-slot-utils";
 import type {
   WorkArrangementBootstrap,
   WorkAssignmentColumnKey,
@@ -1712,7 +1713,6 @@ export const workTaskApi = {
 
 // Lốt trộn: cùng nguồn dữ liệu với popup "Đồng bộ lốt xe" ở Dashboard (đơn pending),
 // nhưng hiển thị dạng `tênRútGọn_mã` cho trang Bố trí công việc.
-const MIX_SLOT_EXCLUDED_VEHICLE_STATUSES = new Set(["maintenance", "incident", "other"]);
 const MIX_SLOT_ORDER_STATUSES: Order["order_status"][] = [
   "pending",
   "collecting",
@@ -1720,96 +1720,51 @@ const MIX_SLOT_ORDER_STATUSES: Order["order_status"][] = [
   "running",
 ];
 
-const getLastNameWord = (value?: string | null) =>
-  String(value || "")
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean)
-    .pop() || "";
-
-const getDisplayShortName = (fullName?: string | null, shortName?: string | null) => {
-  const short = String(shortName || "").trim();
-  if (short) return short;
-  return getLastNameWord(fullName) || String(fullName || "").trim();
-};
-
-// Xe bồn (ký hiệu X) -> 3 số cuối biển số; còn lại (xe bơm...) -> "XB".
-const getMixSlotCode = (symbol?: string | null, licensePlate?: string | null) => {
-  if (normalizeWorkType(symbol) === "x") {
-    const digits = String(licensePlate || "").replace(/\D/g, "");
-    return digits.slice(-3) || String(licensePlate || "").trim();
-  }
-  return "XB";
-};
-
+// Popup "Chụp lốt" bật includeAllMixerVehicles để thêm đủ xe X chưa nằm trong lệnh hiện tại.
 export const workMixSlotApi = {
-  getList: (): Promise<WorkMixSlotItem[]> =>
-    dedupeInflight("mix-slot-list", async () => {
-      const [vehicleTypeRes, personnel, ...orderResponses] = await Promise.all([
-        getVehicleTypesShared(),
-        getPersonnelFallback(),
-        ...MIX_SLOT_ORDER_STATUSES.map((status) => orderApi.getByStatus(status)),
-      ]);
+  getList: (options?: { includeAllMixerVehicles?: boolean }): Promise<WorkMixSlotItem[]> =>
+    dedupeInflight(
+      `mix-slot-list:${options?.includeAllMixerVehicles ? "all-mixers" : "active-orders"}`,
+      async () => {
+        const includeAllMixerVehicles = options?.includeAllMixerVehicles === true;
+        const [vehicleTypeRes, personnel, vehicles, ...orderResponses] = await Promise.all([
+          getVehicleTypesShared(),
+          getPersonnelFallback(),
+          includeAllMixerVehicles ? getAllVehicles() : Promise.resolve([]),
+          ...MIX_SLOT_ORDER_STATUSES.map((status) => orderApi.getByStatus(status)),
+        ]);
 
-      const orders = orderResponses.flatMap((ordersRes) =>
-        getArrayFromPayload<Order>(ordersRes.data, ["orders", "data", "items", "results", "rows"])
-      );
-      const vehicleTypes = getArrayFromPayload<VehicleType>(vehicleTypeRes.data, [
-        "vehicle_types",
-        "data",
-        "items",
-        "results",
-        "rows",
-      ]);
+        const orders = orderResponses.flatMap((ordersRes) =>
+          getArrayFromPayload<Order>(ordersRes.data, ["orders", "data", "items", "results", "rows"])
+        );
+        const vehicleTypes = getArrayFromPayload<VehicleType>(vehicleTypeRes.data, [
+          "vehicle_types",
+          "data",
+          "items",
+          "results",
+          "rows",
+        ]);
 
-      const symbolByTypeId = new Map(
-        vehicleTypes.map((type) => [Number(type.vehicle_type_id), type.vehicle_type_symbol ?? null])
-      );
-      const shortNameByUserId = new Map(
-        personnel.map((person) => [
-          Number(person.user_id),
-          getDisplayShortName(person.user_full_name, person.user_short_name),
-        ])
-      );
+        const symbolByTypeId = new Map(
+          vehicleTypes.map((type) => [
+            Number(type.vehicle_type_id),
+            type.vehicle_type_symbol ?? null,
+          ])
+        );
+        const shortNameByUserId = new Map(
+          personnel.map((person) => [
+            Number(person.user_id),
+            getDisplayShortName(person.user_full_name, person.user_short_name),
+          ])
+        );
 
-      return orders
-        .filter((order) => order.shift_closing?.shift_status !== 1)
-        .filter((order) => {
-          const status = order.vehicles?.vehicle_status?.toLowerCase();
-          return !status || !MIX_SLOT_EXCLUDED_VEHICLE_STATUSES.has(status);
-        })
-        .filter((order) => Number(order.vehicles?.vehicle_id) > 0)
-        .filter((order) => {
-          const symbol = symbolByTypeId.get(Number(order.vehicles?.vehicle_type_id));
-          return normalizeWorkType(symbol) === "x";
-        })
-        .sort((a, b) => {
-          const aPending = a.order_status === "pending";
-          const bPending = b.order_status === "pending";
-          if (aPending !== bPending) return aPending ? -1 : 1;
-          return (a.order_number || 0) - (b.order_number || 0);
-        })
-        .map((order) => {
-          const symbol = symbolByTypeId.get(Number(order.vehicles?.vehicle_type_id)) ?? null;
-          const shortName =
-            shortNameByUserId.get(Number(order.users?.user_id)) ??
-            getDisplayShortName(order.users?.user_full_name, null);
-          const code = getMixSlotCode(symbol, order.vehicles?.vehicle_license_plate);
-
-          return {
-            order_id: Number(order.order_id),
-            order_number: Number(order.order_number) || 0,
-            order_status: order.order_status,
-            group: order.order_status === "pending" ? "pending" : "running",
-            user_id: Number(order.users?.user_id) || 0,
-            vehicle_id: Number(order.vehicles?.vehicle_id) || 0,
-            vehicle_name: order.vehicles?.vehicle_name ?? null,
-            vehicle_license_plate: order.vehicles?.vehicle_license_plate || "",
-            vehicle_type_symbol: symbol,
-            short_name: shortName,
-            code,
-            label: `${shortName}_${code}`,
-          };
+        return buildWorkMixSlotItems({
+          orders,
+          vehicles,
+          symbolByTypeId,
+          shortNameByUserId,
+          includeAllMixerVehicles,
         });
-    }),
+      }
+    ),
 };
