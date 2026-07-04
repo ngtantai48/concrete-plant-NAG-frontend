@@ -9,11 +9,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
+import type { VehicleDayTag } from "@/services/vehicle-day-tag-utils";
 import type { WorkPersonnel, WorkVehicle } from "@/types/work-arrangement";
 import { useDraggable, useDroppable } from "@dnd-kit/core";
 import { Empty } from "antd";
 import { GripVertical, PanelLeftClose, PanelLeftOpen, Search, X } from "lucide-react";
-import type { ReactNode } from "react";
+import { useTranslations } from "next-intl";
+import { useMemo, type ReactNode } from "react";
 
 export const PERSONNEL_POOL_ID = "personnel_pool";
 export const VEHICLE_DRAG_PREFIX = "vehicle:";
@@ -52,6 +54,36 @@ export const filterSelectOptionByLabel = (input: string, option?: { label?: unkn
   normalizeSearchText(option?.label).includes(normalizeSearchText(input));
 
 export type ChipTone = "slate" | "teal" | "amber" | "emerald" | "sky" | "violet" | "indigo";
+
+/** Màu chip cho tag trạng thái xe theo ngày (dùng ở bảng Xe bồn + modal Chụp lốt). */
+export const VEHICLE_DAY_TAG_CHIP_TONES: Record<VehicleDayTag, ChipTone> = {
+  ve_som: "emerald",
+  sua_chua: "amber",
+  du_be_tong: "sky",
+  keo_bom_tinh: "violet",
+  truc_san_xuat: "teal",
+  chay_bom: "indigo",
+  lam_viec_khac: "slate",
+  nghi: "amber",
+};
+
+/** Nhãn i18n cho tag trạng thái xe theo ngày. */
+export function useVehicleDayTagLabels(): Record<VehicleDayTag, string> {
+  const t = useTranslations("WorkAssignmentPage");
+  return useMemo(
+    () => ({
+      ve_som: t("dayTagVeSom"),
+      sua_chua: t("dayTagSuaChua"),
+      du_be_tong: t("dayTagDuBeTong"),
+      keo_bom_tinh: t("dayTagKeoBomTinh"),
+      truc_san_xuat: t("dayTagTrucSanXuat"),
+      chay_bom: t("dayTagChayBom"),
+      lam_viec_khac: t("dayTagLamViecKhac"),
+      nghi: t("dayTagNghi"),
+    }),
+    [t]
+  );
+}
 
 export function Chip({
   children,

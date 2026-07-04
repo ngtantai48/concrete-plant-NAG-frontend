@@ -4,6 +4,12 @@ import { workApi } from "@/services/work.service";
 import { userAssignmentApi } from "@/services/user-assignment.service";
 import vehicleApi from "@/services/vehicle.service";
 import vehicleTypeApi from "@/services/vehicle-type.service";
+import {
+  buildMixerItemNote,
+  isVehicleDayTag,
+  parseMixerItemNoteTag,
+  type VehicleDayTag,
+} from "@/services/vehicle-day-tag-utils";
 import { buildWorkMixSlotItems, getDisplayShortName } from "@/services/work-mix-slot-utils";
 import type {
   WorkArrangementBootstrap,
@@ -334,6 +340,7 @@ const getLocalMixerDraft = (workDate: string): WorkMixerAssignmentDraft | null =
         assignment_id: a.assignment_id || `mixer:${a.vehicle_id}`,
         vehicle_id: Number(a.vehicle_id),
         user_id: a.user_id != null ? Number(a.user_id) : null,
+        day_tag: isVehicleDayTag(a.day_tag) ? a.day_tag : null,
       })),
     updated_at: raw.updated_at,
   };
@@ -1061,6 +1068,7 @@ const buildMixerDraftFromBackend = async (
       assignment_id: `item:${itemId}`,
       vehicle_id: vehicleId,
       user_id: driver ? Number(driver.user_id) : null,
+      day_tag: parseMixerItemNoteTag(item.item_note),
     });
   }
 
@@ -1209,7 +1217,8 @@ const syncPumpArrangementItems = async (
 const createMixerArrangementItem = async (
   dayId: number,
   vehicleId: number,
-  displayOrder: number
+  displayOrder: number,
+  dayTag: VehicleDayTag | null
 ) => {
   const res = await http.post("/work-arrangement-items", {
     work_arrangement_day_id: dayId,
@@ -1217,7 +1226,7 @@ const createMixerArrangementItem = async (
     work_type: MIXER_WORK_TYPE,
     department_id: null,
     skill_id: null,
-    item_note: MIXER_WORK_TYPE,
+    item_note: buildMixerItemNote(MIXER_WORK_TYPE, dayTag),
     display_order: displayOrder,
   });
   return getItemFromPayload<BackendArrangementItem>(res.data);
@@ -1227,7 +1236,8 @@ const updateMixerArrangementItem = async (
   itemId: number,
   dayId: number,
   vehicleId: number,
-  displayOrder: number
+  displayOrder: number,
+  dayTag: VehicleDayTag | null
 ) => {
   const res = await http.put(`/work-arrangement-items/${itemId}`, {
     work_arrangement_day_id: dayId,
@@ -1235,7 +1245,7 @@ const updateMixerArrangementItem = async (
     work_type: MIXER_WORK_TYPE,
     department_id: null,
     skill_id: null,
-    item_note: MIXER_WORK_TYPE,
+    item_note: buildMixerItemNote(MIXER_WORK_TYPE, dayTag),
     display_order: displayOrder,
   });
   return getItemFromPayload<BackendArrangementItem>(res.data);
@@ -1246,7 +1256,8 @@ const syncMixerArrangementItems = async (
   draft: WorkMixerAssignmentDraft,
   personnelById: Map<number, WorkPersonnel>
 ) => {
-  const desired = draft.mixer_assignments.filter((a) => a.user_id != null);
+  // Giữ cả xe chỉ có tag (chưa/không gán tài xế) để tag không bị vòng cleanup xóa mất.
+  const desired = draft.mixer_assignments.filter((a) => a.user_id != null || a.day_tag != null);
   const desiredVehicleIds = new Set(desired.map((a) => a.vehicle_id));
 
   const existingItems = (await listArrangementItems(dayId)).filter(
@@ -1262,27 +1273,36 @@ const syncMixerArrangementItems = async (
 
   for (const [index, assignment] of desired.entries()) {
     const person = assignment.user_id != null ? personnelById.get(assignment.user_id) : undefined;
-    if (!person) continue;
+    if (assignment.user_id != null && !person) continue;
 
     const existing = existingByVehicleId.get(assignment.vehicle_id);
     const existingId = existing ? getArrangementItemId(existing) : 0;
+    const dayTag = assignment.day_tag ?? null;
     const item = existingId
-      ? await updateMixerArrangementItem(existingId, dayId, assignment.vehicle_id, index + 1)
-      : await createMixerArrangementItem(dayId, assignment.vehicle_id, index + 1);
+      ? await updateMixerArrangementItem(
+          existingId,
+          dayId,
+          assignment.vehicle_id,
+          index + 1,
+          dayTag
+        )
+      : await createMixerArrangementItem(dayId, assignment.vehicle_id, index + 1, dayTag);
     const itemId = getArrangementItemId(item);
 
     if (itemId) {
-      // mỗi xe bồn chỉ 1 tài xế → đồng bộ đúng 1 personnel role "LÁI XE"
+      // mỗi xe bồn chỉ 1 tài xế → đồng bộ đúng 1 personnel role "LÁI XE"; xe chỉ có tag thì xóa hết người
       const existingPeople = await listArrangementPersonnel(itemId);
       for (const record of existingPeople) {
         const recordId = getArrangementPersonnelId(record);
-        if (recordId && Number(record.user_id) !== person.user_id) {
+        if (recordId && (!person || Number(record.user_id) !== person.user_id)) {
           await deleteArrangementPersonnel(recordId);
         }
       }
-      const already = existingPeople.find((r) => Number(r.user_id) === person.user_id);
-      if (!already) {
-        await createArrangementPersonnel(itemId, person, MIXER_DRIVER_ROLE);
+      if (person) {
+        const already = existingPeople.find((r) => Number(r.user_id) === person.user_id);
+        if (!already) {
+          await createArrangementPersonnel(itemId, person, MIXER_DRIVER_ROLE);
+        }
       }
     }
   }

@@ -55,6 +55,54 @@ export const getPersistedLotOrderPosition = <T extends LotOrderItem>(
   return persistedIndex >= 0 ? persistedIndex + 1 : 0;
 };
 
+/**
+ * Xếp lốt theo nhóm tag (nhóm nhỏ đứng trước): stable sort — trong cùng nhóm giữ nguyên
+ * thứ tự hiện tại; item không persist (Chưa về) giữ nguyên ở cuối. Không đổi gì → trả lại
+ * đúng mảng cũ để caller bỏ qua persist.
+ */
+export const sortLotItemsByGroup = <T extends LotOrderItem>(
+  items: T[],
+  groupByVehicleId: Map<number, number>,
+  defaultGroup = 2
+): T[] => {
+  const persistedItems = items.filter(isPersistedLotOrderItem);
+  const otherItems = items.filter((item) => !isPersistedLotOrderItem(item));
+  const sortedPersisted = [...persistedItems].sort((a, b) => {
+    const groupA = groupByVehicleId.get(Number(a.vehicle_id)) ?? defaultGroup;
+    const groupB = groupByVehicleId.get(Number(b.vehicle_id)) ?? defaultGroup;
+    return groupA - groupB;
+  });
+
+  const changed = sortedPersisted.some((item, index) => item !== persistedItems[index]);
+  return changed ? [...sortedPersisted, ...otherItems] : items;
+};
+
+export type LotOrderMoveUpdate = { itemKey: string; orderId: number; targetPosition: number };
+
+/**
+ * Chuỗi lệnh "chuyển tới vị trí" tuần tự (mô phỏng thao tác tay từng xe, từ vị trí 1 trở đi)
+ * để biến previousItems → nextItems. Backend xử lý mỗi PUT như một lần rút-chèn nên áp dụng
+ * theo thứ tự tăng dần vị trí đích sẽ ra đúng thứ tự cuối cùng.
+ */
+export const getLotOrderMoveUpdates = <T extends LotOrderItem>(
+  previousItems: T[],
+  nextItems: T[]
+): LotOrderMoveUpdate[] => {
+  const workingKeys = previousItems.filter(isPersistedLotOrderItem).map(getLotItemKey);
+  const updates: LotOrderMoveUpdate[] = [];
+
+  nextItems.filter(isPersistedLotOrderItem).forEach((item, index) => {
+    const itemKey = getLotItemKey(item);
+    const fromIndex = workingKeys.indexOf(itemKey);
+    if (fromIndex < 0 || fromIndex === index) return;
+    workingKeys.splice(fromIndex, 1);
+    workingKeys.splice(index, 0, itemKey);
+    updates.push({ itemKey, orderId: Number(item.order_id), targetPosition: index + 1 });
+  });
+
+  return updates;
+};
+
 export const getPersistedLotOrderUpdates = <T extends LotOrderItem>(
   items: T[],
   itemKeys: string[]
