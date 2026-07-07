@@ -63,7 +63,7 @@ export const getPersistedLotOrderPosition = <T extends LotOrderItem>(
 export const sortLotItemsByGroup = <T extends LotOrderItem>(
   items: T[],
   groupByVehicleId: Map<number, number>,
-  defaultGroup = 2
+  defaultGroup = 20
 ): T[] => {
   const persistedItems = items.filter(isPersistedLotOrderItem);
   const otherItems = items.filter((item) => !isPersistedLotOrderItem(item));

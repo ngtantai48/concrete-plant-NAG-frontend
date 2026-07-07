@@ -12,6 +12,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { navigationConfig, NavItem } from "@/config/navigation";
+import { findBestMenuRouteMatch } from "@/components/layout/sidebar-route-match";
 import { useAppSelector } from "@/hooks/use-app-selector";
 import { useNavigationStore } from "@/hooks/use-navigation-store";
 import { usePermissions } from "@/hooks/use-permissions";
@@ -22,7 +23,7 @@ import { User } from "lucide-react";
 import { useTranslations } from "next-intl";
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import reportApi from "@/services/report.service";
 
@@ -76,7 +77,6 @@ export default function Sidebar() {
   const t = useTranslations("Sidebar");
   const pathname = usePathname();
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [collapsed, setCollapsed] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [showUnsavedDialog, setShowUnsavedDialog] = useState(false);
@@ -95,11 +95,6 @@ export default function Sidebar() {
   );
 
   const { role, roleLabel, fullName, authLoading } = useAppSelector(selectAuth);
-
-  const fullPath = useMemo(() => {
-    const query = searchParams.toString();
-    return query ? `${pathname}?${query}` : pathname;
-  }, [pathname, searchParams]);
 
   const baseMenuItems = useMemo(() => {
     const translateItems = (items: NavItem[]): NavItem[] => {
@@ -182,34 +177,13 @@ export default function Sidebar() {
     [isDirty]
   );
 
-  const selectedKey = useMemo(() => {
-    const findMatchedKey = (items: NavItem[]): string | null => {
-      for (const item of items) {
-        if (item.children) {
-          const childMatch = findMatchedKey(item.children);
-          if (childMatch) return childMatch;
-        }
-        if (fullPath === item.key || fullPath.startsWith(item.key)) {
-          return item.key;
-        }
-      }
-      return null;
-    };
-    return findMatchedKey(menuItems) || fullPath;
-  }, [fullPath, menuItems]);
+  const menuRouteMatch = useMemo(
+    () => findBestMenuRouteMatch(menuItems, pathname),
+    [pathname, menuItems]
+  );
 
-  const openKeys = useMemo(() => {
-    for (const item of menuItems) {
-      if (item.children) {
-        for (const child of item.children) {
-          if (fullPath === child.key || fullPath.startsWith(child.key)) {
-            return [item.key];
-          }
-        }
-      }
-    }
-    return [];
-  }, [fullPath, menuItems]);
+  const selectedKey = menuRouteMatch?.key || pathname;
+  const openKeys = menuRouteMatch?.parentKeys ?? [];
 
   const toggleCollapsed = useCallback(() => setCollapsed(!collapsed), [collapsed]);
 

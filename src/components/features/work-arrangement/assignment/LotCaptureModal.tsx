@@ -3,9 +3,10 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import lotTagApi, { type LotTag } from "@/services/lot-tag.service";
 import orderApi from "@/services/order.service";
 import systemApi from "@/services/system.service";
-import { getVehicleDayTagGroup, type VehicleDayTag } from "@/services/vehicle-day-tag-utils";
+import { DEFAULT_LOT_TAG_GROUP, type VehicleDayTag } from "@/services/vehicle-day-tag-utils";
 import { workAssignmentApi, workMixSlotApi } from "@/services/work-arrangement.service";
 import type { WorkMixSlotItem } from "@/types/work-arrangement";
 import { message, Modal, Select as AntSelect, Skeleton } from "antd";
@@ -24,15 +25,7 @@ import {
   sortLotItemsByGroup,
   type LotOrderMoveUpdate,
 } from "./lot-capture-order";
-import {
-  Chip,
-  filterSelectOptionByLabel,
-  VEHICLE_DAY_TAG_CHIP_TONES,
-  useVehicleDayTagLabels,
-} from "./shared";
-
-// Xe trực ca chọn tay trong modal được coi như tag "trực sản xuất" (nhóm 3) khi xếp theo tag.
-const DUTY_TAG_GROUP = getVehicleDayTagGroup("truc_san_xuat");
+import { Chip, filterSelectOptionByLabel, getVehicleDayTagChipTone } from "./shared";
 
 const getDefaultLotCaptureName = () => `Lốt ${dayjs().format("H")}H`;
 
@@ -136,9 +129,20 @@ export default function LotCaptureModal({
   const [lotOrderSaving, setLotOrderSaving] = useState(false);
   const [fetchedDriverNames, setFetchedDriverNames] = useState<Map<number, string>>(new Map());
   const [dayTagByVehicleId, setDayTagByVehicleId] = useState<Map<number, VehicleDayTag>>(new Map());
+  const [lotTagsByKey, setLotTagsByKey] = useState<Map<string, LotTag>>(new Map());
   const dutyPrefilledRef = useRef(false);
 
-  const dayTagLabels = useVehicleDayTagLabels();
+  const getTagDisplayName = useCallback(
+    (key: VehicleDayTag) => lotTagsByKey.get(key)?.lot_tag_name ?? "",
+    [lotTagsByKey]
+  );
+  const catalogDayTagByVehicleId = useMemo(() => {
+    const map = new Map<number, VehicleDayTag>();
+    for (const [vehicleId, tag] of dayTagByVehicleId) {
+      if (lotTagsByKey.has(tag)) map.set(vehicleId, tag);
+    }
+    return map;
+  }, [dayTagByVehicleId, lotTagsByKey]);
   const driverNames = driverNameByVehicleId ?? fetchedDriverNames;
   const dutyVehicleIdSet = useMemo(() => new Set(lotDutyVehicleIds), [lotDutyVehicleIds]);
 
@@ -189,7 +193,18 @@ export default function LotCaptureModal({
     }
   }, [workDate]);
 
-  // Mỗi lần mở: reset tên + xe trực ca, tải hàng đợi và bố trí (tài xế + tag) trong ngày.
+  // Danh mục tag động (tên + luật sắp xếp cho LLM) từ bảng lot_tags.
+  const loadLotTagCatalog = useCallback(async () => {
+    try {
+      const list = await lotTagApi.list();
+      setLotTagsByKey(new Map(list.map((tag) => [tag.lot_tag_key, tag])));
+    } catch (error) {
+      console.error("[LotCaptureModal] load lot tag catalog error:", error);
+      setLotTagsByKey(new Map());
+    }
+  }, []);
+
+  // Mỗi lần mở: reset tên + xe trực ca, tải hàng đợi, bố trí (tài xế + tag) và danh mục tag.
   useEffect(() => {
     if (!open) return;
     setLotCaptureName(getDefaultLotCaptureName());
@@ -198,19 +213,20 @@ export default function LotCaptureModal({
     dutyPrefilledRef.current = false;
     void loadLotCaptureItems([]);
     void loadArrangementInfo();
+    void loadLotTagCatalog();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
   // Gợi ý sẵn xe trực ca = các xe được tag "trực sản xuất" ở Bố trí công việc (vẫn sửa tay được).
   useEffect(() => {
-    if (!open || dutyPrefilledRef.current || dayTagByVehicleId.size === 0) return;
-    const taggedDutyIds = Array.from(dayTagByVehicleId.entries())
+    if (!open || dutyPrefilledRef.current || catalogDayTagByVehicleId.size === 0) return;
+    const taggedDutyIds = Array.from(catalogDayTagByVehicleId.entries())
       .filter(([, tag]) => tag === "truc_san_xuat")
       .map(([vehicleId]) => vehicleId);
     if (taggedDutyIds.length === 0) return;
     dutyPrefilledRef.current = true;
     setLotDutyVehicleIds((current) => (current.length > 0 ? current : taggedDutyIds));
-  }, [open, dayTagByVehicleId]);
+  }, [open, catalogDayTagByVehicleId]);
 
   useEffect(() => {
     onLoadingChange?.(lotCaptureLoading || lotCaptureSaving || lotOrderSaving);
@@ -265,15 +281,25 @@ export default function LotCaptureModal({
     [lotCaptureItems, persistLotOrderChanges]
   );
 
-  // Xếp theo tag: về sớm → đầu; trực sản xuất → chạy bơm → việc khác → nghỉ dồn cuối;
-  // xe trực ca chọn tay (chưa có tag) tính như trực sản xuất.
+  // Xếp theo tag: chỉ dùng CÔNG THỨC sort_group đã chốt trong danh mục lot_tags.
+  // Catalog rỗng thì không dùng lại bộ tag seed cũ.
   const applyRuleSort = useCallback(() => {
+    const groupForTag = (key: VehicleDayTag) => {
+      const tag = lotTagsByKey.get(key);
+      if (!tag) return null;
+      return tag.sort_group ?? DEFAULT_LOT_TAG_GROUP;
+    };
+    const dutyGroup = groupForTag("truc_san_xuat");
+
     const groupByVehicleId = new Map<number, number>();
-    for (const [vehicleId, tag] of dayTagByVehicleId) {
-      groupByVehicleId.set(vehicleId, getVehicleDayTagGroup(tag));
+    for (const [vehicleId, tag] of catalogDayTagByVehicleId) {
+      const group = groupForTag(tag);
+      if (group != null) groupByVehicleId.set(vehicleId, group);
     }
-    for (const vehicleId of lotDutyVehicleIds) {
-      if (!groupByVehicleId.has(vehicleId)) groupByVehicleId.set(vehicleId, DUTY_TAG_GROUP);
+    if (dutyGroup != null) {
+      for (const vehicleId of lotDutyVehicleIds) {
+        if (!groupByVehicleId.has(vehicleId)) groupByVehicleId.set(vehicleId, dutyGroup);
+      }
     }
 
     const nextItems = sortLotItemsByGroup(lotCaptureItems, groupByVehicleId);
@@ -285,7 +311,14 @@ export default function LotCaptureModal({
     const updates = getLotOrderMoveUpdates(lotCaptureItems, nextItems);
     setLotCaptureItems(nextItems);
     void runLotOrderUpdates(updates, lotCaptureItems);
-  }, [dayTagByVehicleId, lotCaptureItems, lotDutyVehicleIds, runLotOrderUpdates, t]);
+  }, [
+    catalogDayTagByVehicleId,
+    lotCaptureItems,
+    lotDutyVehicleIds,
+    lotTagsByKey,
+    runLotOrderUpdates,
+    t,
+  ]);
 
   const applyDutyVehicleToEnd = useCallback(() => {
     if (lotDutyVehicleIds.length === 0) return;
@@ -312,8 +345,10 @@ export default function LotCaptureModal({
     // Ghi lại tag của từng xe vào mô tả snapshot để lịch sử tra được vì sao xe đứng vị trí đó.
     const tagSummary = lotCaptureItems
       .map((item) => {
-        const tag = dayTagByVehicleId.get(Number(item.vehicle_id));
-        return tag ? `${item.vehicle_name || item.vehicle_license_plate}=${dayTagLabels[tag]}` : "";
+        const tag = catalogDayTagByVehicleId.get(Number(item.vehicle_id));
+        return tag
+          ? `${item.vehicle_name || item.vehicle_license_plate}=${getTagDisplayName(tag)}`
+          : "";
       })
       .filter(Boolean)
       .join(", ");
@@ -379,8 +414,8 @@ export default function LotCaptureModal({
       setLotCaptureSaving(false);
     }
   }, [
-    dayTagByVehicleId,
-    dayTagLabels,
+    catalogDayTagByVehicleId,
+    getTagDisplayName,
     dutyVehicleIdSet,
     lotCaptureItems,
     lotCaptureName,
@@ -516,7 +551,7 @@ export default function LotCaptureModal({
                     persistedOrderCount > 1;
                   const driverName = driverNames.get(Number(item.vehicle_id)) || "";
                   const hasPersonnel = driverName !== "";
-                  const dayTag = dayTagByVehicleId.get(Number(item.vehicle_id));
+                  const dayTag = catalogDayTagByVehicleId.get(Number(item.vehicle_id));
                   return (
                     <div
                       key={`${item.order_id}-${item.vehicle_id}`}
@@ -532,8 +567,8 @@ export default function LotCaptureModal({
                         {item.vehicle_license_plate} | {item.vehicle_name}
                       </span>
                       {dayTag && (
-                        <Chip tone={VEHICLE_DAY_TAG_CHIP_TONES[dayTag]}>
-                          {dayTagLabels[dayTag]}
+                        <Chip tone={getVehicleDayTagChipTone(dayTag)}>
+                          {getTagDisplayName(dayTag)}
                         </Chip>
                       )}
                       <Chip

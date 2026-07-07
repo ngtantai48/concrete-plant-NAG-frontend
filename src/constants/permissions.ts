@@ -26,13 +26,13 @@ export const PERMISSIONS = {
   },
 
   VEHICLE_MAINTENANCES: {
-    VIEW: 'view',
-    CREATE: 'create',
-    UPDATE: 'update',
-    DELETE: 'delete',
-    SUBMIT: 'submit',
-    DISPATCH_REVIEW: 'dispatch_review',
-    PRODUCTION_APPROVE: 'production_approve',
+    VIEW: "view",
+    CREATE: "create",
+    UPDATE: "update",
+    DELETE: "delete",
+    SUBMIT: "submit",
+    DISPATCH_REVIEW: "dispatch_review",
+    PRODUCTION_APPROVE: "production_approve",
   },
 
   VEHICLE_TYPES: {
@@ -78,6 +78,13 @@ export const PERMISSIONS = {
     DELETE: "delete",
   },
 
+  LOT_TAGS: {
+    VIEW: "view",
+    CREATE: "create",
+    UPDATE: "update",
+    DELETE: "delete",
+  },
+
   CALENDAR: {
     VIEW: "view",
   },
@@ -90,6 +97,13 @@ export const PERMISSIONS = {
   WORK_ARRANGEMENTS: {
     VIEW: "view",
     UPDATE: "update",
+  },
+
+  LOT_TAG_REQUESTS: {
+    VIEW: "view",
+    CREATE: "create",
+    REVIEW: "review",
+    CANCEL: "cancel",
   },
 
   PERMISSIONS_MANAGE: {

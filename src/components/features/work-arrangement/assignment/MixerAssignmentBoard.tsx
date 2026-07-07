@@ -5,6 +5,8 @@ import { Input as ShadcnInput } from "@/components/ui/input";
 import { PERMISSIONS } from "@/constants/permissions";
 import { SIDEBAR } from "@/constants/route";
 import { usePermissions } from "@/hooks/use-permissions";
+import lotTagApi, { type LotTag } from "@/services/lot-tag.service";
+import type { VehicleDayTag } from "@/services/vehicle-day-tag-utils";
 import type {
   WorkMixerAssignmentDraft,
   WorkPersonnel,
@@ -19,7 +21,7 @@ import {
   useSensors,
   type DragEndEvent,
 } from "@dnd-kit/core";
-import { Empty } from "antd";
+import { Empty, Select as AntSelect } from "antd";
 import { ChevronDown, ChevronRight, Loader2, Save, Search, Truck } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -27,6 +29,7 @@ import {
   Chip,
   CollapsedSidebar,
   DragPersonPreview,
+  filterSelectOptionByLabel,
   getVehicleLabel,
   normalizeSearchText,
   parseDragId,
@@ -75,8 +78,31 @@ export default function MixerAssignmentBoard({
   const [statusFilter, setStatusFilter] = useState<string | "all">("all");
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
   const [personnelPoolCollapsed, setPersonnelPoolCollapsed] = useState(false);
+  const [lotTags, setLotTags] = useState<LotTag[]>([]);
 
   const personnelById = useMemo(() => new Map(personnel.map((p) => [p.user_id, p])), [personnel]);
+
+  useEffect(() => {
+    let cancelled = false;
+    lotTagApi
+      .list()
+      .then((list) => {
+        if (!cancelled) setLotTags(list);
+      })
+      .catch((error) => {
+        console.error("[MixerAssignmentBoard] load lot tags error:", error);
+        if (!cancelled) setLotTags([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const dayTagOptions = useMemo(
+    () => lotTags.map((tag) => ({ value: tag.lot_tag_key, label: tag.lot_tag_name })),
+    [lotTags]
+  );
+  const lotTagKeySet = useMemo(() => new Set(lotTags.map((tag) => tag.lot_tag_key)), [lotTags]);
 
   const driverByVehicle = useMemo(() => {
     const map = new Map<number, number>();
@@ -85,6 +111,14 @@ export default function MixerAssignmentBoard({
     }
     return map;
   }, [draft.mixer_assignments]);
+
+  const dayTagByVehicle = useMemo(() => {
+    const map = new Map<number, VehicleDayTag>();
+    for (const a of draft.mixer_assignments) {
+      if (a.day_tag != null && lotTagKeySet.has(a.day_tag)) map.set(a.vehicle_id, a.day_tag);
+    }
+    return map;
+  }, [draft.mixer_assignments, lotTagKeySet]);
 
   const availablePersonnel = useMemo(
     () => personnel.filter((p) => !assignedUserIds.has(p.user_id)),
@@ -128,14 +162,21 @@ export default function MixerAssignmentBoard({
   const assignDriver = useCallback(
     (vehicleId: number, userId: number) => {
       onChangeDraft((current) => {
-        const others = current.mixer_assignments.filter(
-          (a) => a.user_id !== userId && a.vehicle_id !== vehicleId
-        );
+        const currentAssignment = current.mixer_assignments.find((a) => a.vehicle_id === vehicleId);
         return {
           ...current,
           mixer_assignments: [
-            ...others,
-            { assignment_id: `mixer:${vehicleId}`, vehicle_id: vehicleId, user_id: userId },
+            ...current.mixer_assignments.flatMap((a) => {
+              if (a.vehicle_id === vehicleId) return [];
+              if (a.user_id !== userId) return [a];
+              return a.day_tag != null ? [{ ...a, user_id: null }] : [];
+            }),
+            {
+              assignment_id: currentAssignment?.assignment_id || `mixer:${vehicleId}`,
+              vehicle_id: vehicleId,
+              user_id: userId,
+              day_tag: currentAssignment?.day_tag ?? null,
+            },
           ],
         };
       });
@@ -147,10 +188,49 @@ export default function MixerAssignmentBoard({
     (userId: number) => {
       onChangeDraft((current) => ({
         ...current,
-        mixer_assignments: current.mixer_assignments.filter((a) => a.user_id !== userId),
+        mixer_assignments: current.mixer_assignments.flatMap((a) => {
+          if (a.user_id !== userId) return [a];
+          return a.day_tag != null ? [{ ...a, user_id: null }] : [];
+        }),
       }));
     },
     [onChangeDraft]
+  );
+
+  const setVehicleDayTag = useCallback(
+    (vehicleId: number, tag: VehicleDayTag | null) => {
+      const existing = draft.mixer_assignments.find((a) => a.vehicle_id === vehicleId);
+      if ((existing?.day_tag ?? null) === tag) return;
+
+      onChangeDraft((current) => {
+        const currentAssignment = current.mixer_assignments.find((a) => a.vehicle_id === vehicleId);
+        if (!currentAssignment) {
+          if (tag == null) return current;
+          return {
+            ...current,
+            mixer_assignments: [
+              ...current.mixer_assignments,
+              {
+                assignment_id: `mixer:${vehicleId}`,
+                vehicle_id: vehicleId,
+                user_id: null,
+                day_tag: tag,
+              },
+            ],
+          };
+        }
+
+        const nextAssignments =
+          tag == null && currentAssignment.user_id == null
+            ? current.mixer_assignments.filter((a) => a.vehicle_id !== vehicleId)
+            : current.mixer_assignments.map((a) =>
+                a.vehicle_id === vehicleId ? { ...a, day_tag: tag } : a
+              );
+
+        return { ...current, mixer_assignments: nextAssignments };
+      });
+    },
+    [draft.mixer_assignments, onChangeDraft]
   );
 
   const handleDragEnd = useCallback(
@@ -309,10 +389,14 @@ export default function MixerAssignmentBoard({
                           : undefined
                       }
                       halfDaySet={halfDaySet}
+                      dayTag={dayTagByVehicle.get(vehicle.vehicle_id) ?? null}
+                      dayTagOptions={dayTagOptions}
+                      dayTagPlaceholder={t("dayTagPlaceholder")}
                       disabled={disabled}
                       driverLabel={t("mixerDriver")}
                       dropHint={t("mixerDropHint")}
                       onRemoveDriver={unassignUser}
+                      onChangeDayTag={(tag) => setVehicleDayTag(vehicle.vehicle_id, tag)}
                     />
                   ))}
                 </div>
@@ -331,18 +415,26 @@ function MixerVehicleRow({
   vehicle,
   driver,
   halfDaySet,
+  dayTag,
+  dayTagOptions,
+  dayTagPlaceholder,
   disabled,
   driverLabel,
   dropHint,
   onRemoveDriver,
+  onChangeDayTag,
 }: {
   vehicle: WorkVehicle;
   driver?: WorkPersonnel;
   halfDaySet: Set<number>;
+  dayTag: VehicleDayTag | null;
+  dayTagOptions: { value: VehicleDayTag; label: string }[];
+  dayTagPlaceholder: string;
   disabled: boolean;
   driverLabel: string;
   dropHint: string;
   onRemoveDriver: (userId: number) => void;
+  onChangeDayTag: (tag: VehicleDayTag | null) => void;
 }) {
   // Xe đã có tài xế → tự thu gọn (kéo gán xong là co lại); gỡ tài xế → tự mở để sẵn sàng thả tiếp.
   const driverId = driver?.user_id;
@@ -373,7 +465,22 @@ function MixerVehicleRow({
             <Chip tone="emerald">{driver.user_short_name || driver.user_full_name}</Chip>
           )}
         </div>
-        {vehicle.vehicle_status && <Chip tone="slate">{vehicle.vehicle_status}</Chip>}
+        <div className="ml-auto flex shrink-0 flex-wrap items-center justify-end gap-1.5">
+          <AntSelect
+            size="small"
+            allowClear
+            showSearch
+            disabled={disabled}
+            popupMatchSelectWidth={false}
+            placeholder={dayTagPlaceholder}
+            options={dayTagOptions}
+            filterOption={filterSelectOptionByLabel}
+            value={dayTag ?? undefined}
+            onChange={(value) => onChangeDayTag((value as VehicleDayTag | undefined) ?? null)}
+            className="w-[150px]"
+          />
+          {vehicle.vehicle_status && <Chip tone="slate">{vehicle.vehicle_status}</Chip>}
+        </div>
       </div>
 
       {!collapsed && (

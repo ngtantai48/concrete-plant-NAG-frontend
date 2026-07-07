@@ -17,7 +17,8 @@ import {
   workTaskApi,
   WORK_PUMP_ROLES,
 } from "@/services/work-arrangement.service";
-import { VEHICLE_DAY_TAGS, type VehicleDayTag } from "@/services/vehicle-day-tag-utils";
+import lotTagApi, { type LotTag } from "@/services/lot-tag.service";
+import type { VehicleDayTag } from "@/services/vehicle-day-tag-utils";
 import type {
   WorkAssignmentDraft,
   WorkMixerAssignmentDraft,
@@ -35,6 +36,7 @@ import {
   type ChupLichModel,
 } from "@/utils/exportChupLich";
 import { toPng } from "html-to-image";
+import { useRouter } from "next/navigation";
 import ChupLichSheet from "./ChupLichSheet";
 import { DatePicker, message, Modal, Select as AntSelect, Skeleton } from "antd";
 import dayjs, { type Dayjs } from "dayjs";
@@ -42,6 +44,7 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ClipboardCheck,
   Loader2,
   Plus,
   Save,
@@ -58,7 +61,6 @@ import {
   filterSelectOptionByLabel,
   getVehicleLabel,
   normalizeSearchText,
-  useVehicleDayTagLabels,
 } from "./shared";
 
 const formatLocalDate = (d: Date): string =>
@@ -169,12 +171,15 @@ export default function WorkAssignmentSelectManager({
   children?: ReactNode;
 }) {
   const t = useTranslations("WorkAssignmentPage");
+  const tLotTagRequest = useTranslations("LotTagRequestPage");
+  const router = useRouter();
   const { isConnected } = useSocket();
-  const { hasActionAccess } = usePermissions();
+  const { hasActionAccess, hasPageAccess } = usePermissions();
   const canUpdate = hasActionAccess(
     SIDEBAR.WORK_ARRANGEMENTS,
     PERMISSIONS.WORK_ARRANGEMENTS.UPDATE
   );
+  const canViewLotTagRequests = hasPageAccess(SIDEBAR.LOT_TAG_REQUESTS);
 
   const [internalSelectedDate, setInternalSelectedDate] = useState<Dayjs>(dayjs());
   const [loading, setLoading] = useState(false);
@@ -262,11 +267,27 @@ export default function WorkAssignmentSelectManager({
     return map;
   }, [mixerDraft.mixer_assignments]);
 
-  const dayTagLabels = useVehicleDayTagLabels();
+  const [lotTags, setLotTags] = useState<LotTag[]>([]);
+
+  const loadLotTags = useCallback(async () => {
+    try {
+      setLotTags(await lotTagApi.list());
+    } catch (error) {
+      console.error("[WorkAssignmentSelectManager] load lot tags error:", error);
+      setLotTags([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!active) return;
+    void loadLotTags();
+  }, [active, loadLotTags]);
+
   const dayTagOptions = useMemo(
-    () => VEHICLE_DAY_TAGS.map((tag) => ({ value: tag, label: dayTagLabels[tag] })),
-    [dayTagLabels]
+    () => lotTags.map((tag) => ({ value: tag.lot_tag_key, label: tag.lot_tag_name })),
+    [lotTags]
   );
+  const lotTagKeySet = useMemo(() => new Set(lotTags.map((tag) => tag.lot_tag_key)), [lotTags]);
 
   // Xe bồn xếp theo tên tự nhiên X1 → cuối (X1, X2, ... X10), không theo thứ tự backend.
   const sortedMixerVehicles = useMemo(
@@ -930,12 +951,28 @@ export default function WorkAssignmentSelectManager({
             <Chip tone={mixerDriverByVehicle.size > 0 ? "teal" : "slate"}>
               {mixerDriverByVehicle.size}/{mixerVehicles.length}
             </Chip>
+            {canViewLotTagRequests && (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => router.push(SIDEBAR.LOT_TAG_REQUESTS)}
+                title={tLotTagRequest("subtitle")}
+                className="ml-auto h-8 gap-1 rounded-none border-slate-300 font-semibold text-slate-600 hover:border-amber-500 hover:text-amber-700"
+              >
+                <ClipboardCheck size={15} />
+                {tLotTagRequest("entryButton")}
+              </Button>
+            )}
             <Button
               type="button"
               size="sm"
               onClick={handleSaveMixer}
               disabled={!canUpdate || savingMixer}
-              className="ml-auto h-8 rounded-none bg-teal-600 font-semibold text-white hover:bg-teal-700"
+              className={cn(
+                "h-8 rounded-none bg-teal-600 font-semibold text-white hover:bg-teal-700",
+                !canViewLotTagRequests && "ml-auto"
+              )}
             >
               {savingMixer ? <Loader2 className="size-4 animate-spin" /> : <Save size={15} />}
               {t("save")}
@@ -999,6 +1036,8 @@ export default function WorkAssignmentSelectManager({
                 ) : (
                   sortedMixerVehicles.map((vehicle) => {
                     const driverId = mixerDriverByVehicle.get(vehicle.vehicle_id) || null;
+                    const dayTag = mixerTagByVehicle.get(vehicle.vehicle_id);
+                    const visibleDayTag = dayTag && lotTagKeySet.has(dayTag) ? dayTag : undefined;
                     const lotNumbers = isToday
                       ? lotNumbersByVehicle.get(vehicle.vehicle_id)
                       : undefined;
@@ -1033,7 +1072,7 @@ export default function WorkAssignmentSelectManager({
                             placeholder={t("dayTagPlaceholder")}
                             options={dayTagOptions}
                             filterOption={filterSelectOptionByLabel}
-                            value={mixerTagByVehicle.get(vehicle.vehicle_id) ?? undefined}
+                            value={visibleDayTag}
                             onChange={(value) =>
                               setMixerDayTag(vehicle.vehicle_id, (value as VehicleDayTag) ?? null)
                             }

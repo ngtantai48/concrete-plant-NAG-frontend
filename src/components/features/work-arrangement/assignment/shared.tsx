@@ -55,8 +55,8 @@ export const filterSelectOptionByLabel = (input: string, option?: { label?: unkn
 
 export type ChipTone = "slate" | "teal" | "amber" | "emerald" | "sky" | "violet" | "indigo";
 
-/** Màu chip cho tag trạng thái xe theo ngày (dùng ở bảng Xe bồn + modal Chụp lốt). */
-export const VEHICLE_DAY_TAG_CHIP_TONES: Record<VehicleDayTag, ChipTone> = {
+/** Màu chip cho 8 tag gốc; tag mới do người dùng tạo → dùng getVehicleDayTagChipTone (fallback sky). */
+export const VEHICLE_DAY_TAG_CHIP_TONES: Partial<Record<VehicleDayTag, ChipTone>> = {
   ve_som: "emerald",
   sua_chua: "amber",
   du_be_tong: "sky",
@@ -67,7 +67,10 @@ export const VEHICLE_DAY_TAG_CHIP_TONES: Record<VehicleDayTag, ChipTone> = {
   nghi: "amber",
 };
 
-/** Nhãn i18n cho tag trạng thái xe theo ngày. */
+export const getVehicleDayTagChipTone = (tag: VehicleDayTag): ChipTone =>
+  VEHICLE_DAY_TAG_CHIP_TONES[tag] ?? "sky";
+
+/** Nhãn i18n cho 8 tag gốc — fallback khi chưa tải được danh mục lot_tags từ DB. */
 export function useVehicleDayTagLabels(): Record<VehicleDayTag, string> {
   const t = useTranslations("WorkAssignmentPage");
   return useMemo(

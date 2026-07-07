@@ -18,10 +18,10 @@ const makeItems = () => [
 const labels = (items) => items.map((item) => item.label);
 
 test("moves tagged vehicles into their groups while keeping in-group order", () => {
-  // X3 về sớm (nhóm 1), X1 nghỉ (nhóm 6), X2/X4 không tag (nhóm 2, giữ thứ tự).
+  // X3 về sớm (nhóm 10), X1 nghỉ (nhóm 60), X2/X4 không tag (nhóm 20, giữ thứ tự).
   const groups = new Map([
-    [103, 1],
-    [101, 6],
+    [103, 10],
+    [101, 60],
   ]);
   const next = sortLotItemsByGroup(makeItems(), groups);
 
@@ -38,11 +38,11 @@ test("orders the tail groups: trực sản xuất → chạy bơm → việc kh�
     { order_id: 6, vehicle_id: 6, label: "ve_som" },
   ];
   const groups = new Map([
-    [1, 6],
-    [2, 4],
-    [4, 5],
-    [5, 3],
-    [6, 1],
+    [1, 60],
+    [2, 40],
+    [4, 50],
+    [5, 30],
+    [6, 10],
   ]);
 
   assert.deepEqual(labels(sortLotItemsByGroup(items, groups)), [
@@ -58,11 +58,11 @@ test("orders the tail groups: trực sản xuất → chạy bơm → việc kh�
 test("returns the same array reference when nothing moves", () => {
   const items = makeItems();
   assert.strictEqual(sortLotItemsByGroup(items, new Map()), items);
-  assert.strictEqual(sortLotItemsByGroup(items, new Map([[101, 1]])), items);
+  assert.strictEqual(sortLotItemsByGroup(items, new Map([[101, 10]])), items);
 });
 
 test("keeps unreturned vehicles pinned at the end", () => {
-  const groups = new Map([[205, 1]]); // tag trên xe chưa về không được kéo lên đầu
+  const groups = new Map([[205, 10]]); // tag trên xe chưa về không được kéo lên đầu
   const items = makeItems();
   assert.strictEqual(sortLotItemsByGroup(items, groups), items);
 });
@@ -70,8 +70,8 @@ test("keeps unreturned vehicles pinned at the end", () => {
 test("computes sequential move updates that replay previous → next", () => {
   const previous = makeItems();
   const groups = new Map([
-    [103, 1],
-    [101, 6],
+    [103, 10],
+    [101, 60],
   ]);
   const next = sortLotItemsByGroup(previous, groups);
   const updates = getLotOrderMoveUpdates(previous, next);
