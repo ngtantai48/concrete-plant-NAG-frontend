@@ -17,6 +17,8 @@ import {
   workTaskApi,
   WORK_PUMP_ROLES,
 } from "@/services/work-arrangement.service";
+import lotTagApi, { type LotTag } from "@/services/lot-tag.service";
+import type { VehicleDayTag } from "@/services/vehicle-day-tag-utils";
 import type {
   WorkAssignmentDraft,
   WorkMixerAssignmentDraft,
@@ -34,6 +36,7 @@ import {
   type ChupLichModel,
 } from "@/utils/exportChupLich";
 import { toPng } from "html-to-image";
+import { useRouter } from "next/navigation";
 import ChupLichSheet from "./ChupLichSheet";
 import { DatePicker, message, Modal, Select as AntSelect, Skeleton } from "antd";
 import dayjs, { type Dayjs } from "dayjs";
@@ -41,6 +44,7 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ClipboardCheck,
   Loader2,
   Plus,
   Save,
@@ -167,12 +171,15 @@ export default function WorkAssignmentSelectManager({
   children?: ReactNode;
 }) {
   const t = useTranslations("WorkAssignmentPage");
+  const tLotTagRequest = useTranslations("LotTagRequestPage");
+  const router = useRouter();
   const { isConnected } = useSocket();
-  const { hasActionAccess } = usePermissions();
+  const { hasActionAccess, hasPageAccess } = usePermissions();
   const canUpdate = hasActionAccess(
     SIDEBAR.WORK_ARRANGEMENTS,
     PERMISSIONS.WORK_ARRANGEMENTS.UPDATE
   );
+  const canViewLotTagRequests = hasPageAccess(SIDEBAR.LOT_TAG_REQUESTS);
 
   const [internalSelectedDate, setInternalSelectedDate] = useState<Dayjs>(dayjs());
   const [loading, setLoading] = useState(false);
@@ -251,6 +258,36 @@ export default function WorkAssignmentSelectManager({
     }
     return map;
   }, [mixerDraft.mixer_assignments]);
+
+  const mixerTagByVehicle = useMemo(() => {
+    const map = new Map<number, VehicleDayTag>();
+    for (const assignment of mixerDraft.mixer_assignments) {
+      if (assignment.day_tag != null) map.set(assignment.vehicle_id, assignment.day_tag);
+    }
+    return map;
+  }, [mixerDraft.mixer_assignments]);
+
+  const [lotTags, setLotTags] = useState<LotTag[]>([]);
+
+  const loadLotTags = useCallback(async () => {
+    try {
+      setLotTags(await lotTagApi.list());
+    } catch (error) {
+      console.error("[WorkAssignmentSelectManager] load lot tags error:", error);
+      setLotTags([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!active) return;
+    void loadLotTags();
+  }, [active, loadLotTags]);
+
+  const dayTagOptions = useMemo(
+    () => lotTags.map((tag) => ({ value: tag.lot_tag_key, label: tag.lot_tag_name })),
+    [lotTags]
+  );
+  const lotTagKeySet = useMemo(() => new Set(lotTags.map((tag) => tag.lot_tag_key)), [lotTags]);
 
   // Xe bồn xếp theo tên tự nhiên X1 → cuối (X1, X2, ... X10), không theo thứ tự backend.
   const sortedMixerVehicles = useMemo(
@@ -449,18 +486,21 @@ export default function WorkAssignmentSelectManager({
 
   const setMixerDriver = useCallback((vehicleId: number, userId: number | null) => {
     const currentMixer = mixerDraftRef.current;
-    const currentDriver = currentMixer.mixer_assignments.find(
+    const currentAssignment = currentMixer.mixer_assignments.find(
       (assignment) => assignment.vehicle_id === vehicleId
-    )?.user_id;
+    );
+    const currentDriver = currentAssignment?.user_id;
 
     if (currentDriver === userId) return;
 
     if (userId == null) {
+      // Bỏ tài xế nhưng giữ dòng nếu xe còn tag ngày.
       setMixerDraft({
         ...currentMixer,
-        mixer_assignments: currentMixer.mixer_assignments.filter(
-          (assignment) => assignment.vehicle_id !== vehicleId
-        ),
+        mixer_assignments: currentMixer.mixer_assignments.flatMap((assignment) => {
+          if (assignment.vehicle_id !== vehicleId) return [assignment];
+          return assignment.day_tag != null ? [{ ...assignment, user_id: null }] : [];
+        }),
       });
       setMixerDirty(true);
       return;
@@ -478,12 +518,58 @@ export default function WorkAssignmentSelectManager({
     setMixerDraft({
       ...currentMixer,
       mixer_assignments: [
-        ...currentMixer.mixer_assignments.filter(
-          (assignment) => assignment.vehicle_id !== vehicleId && assignment.user_id !== userId
-        ),
-        { assignment_id: `mixer:${vehicleId}`, vehicle_id: vehicleId, user_id: userId },
+        ...currentMixer.mixer_assignments.flatMap((assignment) => {
+          if (assignment.vehicle_id === vehicleId) return []; // thêm lại bên dưới, giữ tag
+          if (assignment.user_id !== userId) return [assignment];
+          // Tài xế bị chuyển sang xe khác: xe cũ giữ dòng nếu còn tag.
+          return assignment.day_tag != null ? [{ ...assignment, user_id: null }] : [];
+        }),
+        {
+          assignment_id: `mixer:${vehicleId}`,
+          vehicle_id: vehicleId,
+          user_id: userId,
+          day_tag: currentAssignment?.day_tag ?? null,
+        },
       ],
     });
+    setMixerDirty(true);
+  }, []);
+
+  const setMixerDayTag = useCallback((vehicleId: number, tag: VehicleDayTag | null) => {
+    const currentMixer = mixerDraftRef.current;
+    const existing = currentMixer.mixer_assignments.find(
+      (assignment) => assignment.vehicle_id === vehicleId
+    );
+
+    if ((existing?.day_tag ?? null) === tag) return;
+
+    if (!existing) {
+      if (tag == null) return;
+      setMixerDraft({
+        ...currentMixer,
+        mixer_assignments: [
+          ...currentMixer.mixer_assignments,
+          {
+            assignment_id: `mixer:${vehicleId}`,
+            vehicle_id: vehicleId,
+            user_id: null,
+            day_tag: tag,
+          },
+        ],
+      });
+      setMixerDirty(true);
+      return;
+    }
+
+    // Bỏ tag trên xe chưa gán tài xế → xóa hẳn dòng; còn lại chỉ cập nhật tag.
+    const nextAssignments =
+      tag == null && existing.user_id == null
+        ? currentMixer.mixer_assignments.filter((assignment) => assignment.vehicle_id !== vehicleId)
+        : currentMixer.mixer_assignments.map((assignment) =>
+            assignment.vehicle_id === vehicleId ? { ...assignment, day_tag: tag } : assignment
+          );
+
+    setMixerDraft({ ...currentMixer, mixer_assignments: nextAssignments });
     setMixerDirty(true);
   }, []);
 
@@ -865,12 +951,28 @@ export default function WorkAssignmentSelectManager({
             <Chip tone={mixerDriverByVehicle.size > 0 ? "teal" : "slate"}>
               {mixerDriverByVehicle.size}/{mixerVehicles.length}
             </Chip>
+            {canViewLotTagRequests && (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => router.push(SIDEBAR.LOT_TAG_REQUESTS)}
+                title={tLotTagRequest("subtitle")}
+                className="ml-auto h-8 gap-1 rounded-none border-slate-300 font-semibold text-slate-600 hover:border-amber-500 hover:text-amber-700"
+              >
+                <ClipboardCheck size={15} />
+                {tLotTagRequest("entryButton")}
+              </Button>
+            )}
             <Button
               type="button"
               size="sm"
               onClick={handleSaveMixer}
               disabled={!canUpdate || savingMixer}
-              className="ml-auto h-8 rounded-none bg-teal-600 font-semibold text-white hover:bg-teal-700"
+              className={cn(
+                "h-8 rounded-none bg-teal-600 font-semibold text-white hover:bg-teal-700",
+                !canViewLotTagRequests && "ml-auto"
+              )}
             >
               {savingMixer ? <Loader2 className="size-4 animate-spin" /> : <Save size={15} />}
               {t("save")}
@@ -894,15 +996,17 @@ export default function WorkAssignmentSelectManager({
           </div>
 
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[420px] border-collapse text-sm">
+            <table className="w-full min-w-[500px] border-collapse text-sm">
               <thead>
                 <tr className="bg-slate-100 text-xs uppercase tracking-wide text-slate-600">
-                  <th className="w-12 border border-slate-300 px-2 py-1.5 text-center">#</th>
                   <th className="border border-slate-300 px-2 py-1.5 text-left">
                     {t("sectionMixer")}
                   </th>
-                  <th className="w-[45%] border border-slate-300 px-2 py-1.5 text-left">
+                  <th className="w-[38%] border border-slate-300 px-2 py-1.5 text-left">
                     {t("mixerDriver")}
+                  </th>
+                  <th className="w-[132px] border border-slate-300 px-2 py-1.5 text-center">
+                    {t("dayTagColumn")}
                   </th>
                   <th className="w-[112px] border border-slate-300 px-2 py-1.5 text-center">
                     <div className="flex min-w-0 items-center justify-center gap-1.5">
@@ -922,27 +1026,23 @@ export default function WorkAssignmentSelectManager({
               <tbody>
                 {mixerVehicles.length === 0 ? (
                   <tr>
-                    <td className="border border-slate-200 px-2 py-3 text-center text-slate-400">
-                      1
-                    </td>
                     <td
-                      colSpan={3}
+                      colSpan={4}
                       className="border border-slate-200 px-3 py-3 text-sm text-slate-400"
                     >
                       {t("mixerEmptyVehicles")}
                     </td>
                   </tr>
                 ) : (
-                  sortedMixerVehicles.map((vehicle, index) => {
+                  sortedMixerVehicles.map((vehicle) => {
                     const driverId = mixerDriverByVehicle.get(vehicle.vehicle_id) || null;
+                    const dayTag = mixerTagByVehicle.get(vehicle.vehicle_id);
+                    const visibleDayTag = dayTag && lotTagKeySet.has(dayTag) ? dayTag : undefined;
                     const lotNumbers = isToday
                       ? lotNumbersByVehicle.get(vehicle.vehicle_id)
                       : undefined;
                     return (
                       <tr key={vehicle.vehicle_id} className="h-10">
-                        <td className="border border-slate-200 bg-slate-50 px-2 text-center text-xs font-medium text-slate-500">
-                          {index + 1}
-                        </td>
                         <td className="border border-slate-200 px-2 py-1">
                           <div className="flex min-w-0 items-center gap-2 font-semibold text-slate-900">
                             <Chip tone="indigo">{vehicle.vehicle_type_symbol || "X"}</Chip>
@@ -960,6 +1060,23 @@ export default function WorkAssignmentSelectManager({
                             placeholder={t("selectPersonnel")}
                             emptyLabel={t("noPersonnelOptions")}
                             onChange={(ids) => setMixerDriver(vehicle.vehicle_id, ids[0] || null)}
+                          />
+                        </td>
+                        <td className="border border-slate-200 p-0">
+                          <AntSelect
+                            variant="borderless"
+                            allowClear
+                            showSearch
+                            disabled={!canUpdate}
+                            popupMatchSelectWidth={false}
+                            placeholder={t("dayTagPlaceholder")}
+                            options={dayTagOptions}
+                            filterOption={filterSelectOptionByLabel}
+                            value={visibleDayTag}
+                            onChange={(value) =>
+                              setMixerDayTag(vehicle.vehicle_id, (value as VehicleDayTag) ?? null)
+                            }
+                            className="w-full [&_.ant-select-selection-placeholder]:!text-slate-400"
                           />
                         </td>
                         <td className="border border-slate-200 px-2 py-1 text-center">

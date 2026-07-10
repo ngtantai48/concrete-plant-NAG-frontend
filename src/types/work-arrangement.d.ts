@@ -1,5 +1,8 @@
+import type { VehicleDayTag } from "@/services/vehicle-day-tag-utils";
 import type { Order } from "./order";
 import type { Work } from "./work";
+
+export type { VehicleDayTag };
 
 export type WorkAssignmentColumnKey = "pump_vehicle" | "driver" | "operator" | "hose";
 export type WorkPumpRoleKey = "driver" | "operator" | "hose";
@@ -73,6 +76,7 @@ export interface WorkMixerAssignmentDraft {
     assignment_id: string;
     vehicle_id: number;
     user_id: number | null; // 1 tài xế / xe; null = chưa gán
+    day_tag?: VehicleDayTag | null; // tag trạng thái trong ngày (về sớm, nghỉ, chạy bơm...)
   }[];
   prefilled_from_date?: string;
   updated_at?: string;

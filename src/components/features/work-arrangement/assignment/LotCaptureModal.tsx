@@ -3,15 +3,29 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import lotTagApi, { type LotTag } from "@/services/lot-tag.service";
+import orderApi from "@/services/order.service";
 import systemApi from "@/services/system.service";
+import { DEFAULT_LOT_TAG_GROUP, type VehicleDayTag } from "@/services/vehicle-day-tag-utils";
 import { workAssignmentApi, workMixSlotApi } from "@/services/work-arrangement.service";
 import type { WorkMixSlotItem } from "@/types/work-arrangement";
-import { Dropdown, message, Modal, Select as AntSelect, Skeleton } from "antd";
+import { message, Modal, Select as AntSelect, Skeleton } from "antd";
 import dayjs from "dayjs";
-import { ArrowUpDown, ChevronDown, ChevronUp, FileSpreadsheet, Truck } from "lucide-react";
+import { ArrowDownUp, ChevronDown, ChevronUp, FileSpreadsheet, Truck } from "lucide-react";
 import { useTranslations } from "next-intl";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { Chip, filterSelectOptionByLabel } from "./shared";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  getLotItemKey,
+  getLotOrderMoveUpdates,
+  getPersistedLotOrderPosition,
+  getPersistedLotOrderUpdates,
+  isPersistedLotOrderItem,
+  moveLotItemByDirection,
+  moveLotItemToPosition,
+  sortLotItemsByGroup,
+  type LotOrderMoveUpdate,
+} from "./lot-capture-order";
+import { Chip, filterSelectOptionByLabel, getVehicleDayTagChipTone } from "./shared";
 
 const getDefaultLotCaptureName = () => `Lốt ${dayjs().format("H")}H`;
 
@@ -70,9 +84,15 @@ const sortLotItemsByPendingStatus = (items: WorkMixSlotItem[]) =>
 const moveDutyVehiclesToEnd = (items: WorkMixSlotItem[], dutyVehicleIds: number[]) => {
   if (dutyVehicleIds.length === 0) return items;
   const dutySet = new Set(dutyVehicleIds);
-  const dutyItems = items.filter((item) => dutySet.has(Number(item.vehicle_id)));
+  const persistedItems = items.filter(isPersistedLotOrderItem);
+  const otherItems = items.filter((item) => !isPersistedLotOrderItem(item));
+  const dutyItems = persistedItems.filter((item) => dutySet.has(Number(item.vehicle_id)));
   if (dutyItems.length === 0) return items;
-  return [...items.filter((item) => !dutySet.has(Number(item.vehicle_id))), ...dutyItems];
+  return [
+    ...persistedItems.filter((item) => !dutySet.has(Number(item.vehicle_id))),
+    ...dutyItems,
+    ...otherItems,
+  ];
 };
 
 export type LotCaptureModalProps = {
@@ -106,8 +126,23 @@ export default function LotCaptureModal({
   const [lotCaptureItems, setLotCaptureItems] = useState<WorkMixSlotItem[]>([]);
   const [lotCaptureLoading, setLotCaptureLoading] = useState(false);
   const [lotCaptureSaving, setLotCaptureSaving] = useState(false);
+  const [lotOrderSaving, setLotOrderSaving] = useState(false);
   const [fetchedDriverNames, setFetchedDriverNames] = useState<Map<number, string>>(new Map());
+  const [dayTagByVehicleId, setDayTagByVehicleId] = useState<Map<number, VehicleDayTag>>(new Map());
+  const [lotTagsByKey, setLotTagsByKey] = useState<Map<string, LotTag>>(new Map());
+  const dutyPrefilledRef = useRef(false);
 
+  const getTagDisplayName = useCallback(
+    (key: VehicleDayTag) => lotTagsByKey.get(key)?.lot_tag_name ?? "",
+    [lotTagsByKey]
+  );
+  const catalogDayTagByVehicleId = useMemo(() => {
+    const map = new Map<number, VehicleDayTag>();
+    for (const [vehicleId, tag] of dayTagByVehicleId) {
+      if (lotTagsByKey.has(tag)) map.set(vehicleId, tag);
+    }
+    return map;
+  }, [dayTagByVehicleId, lotTagsByKey]);
   const driverNames = driverNameByVehicleId ?? fetchedDriverNames;
   const dutyVehicleIdSet = useMemo(() => new Set(lotDutyVehicleIds), [lotDutyVehicleIds]);
 
@@ -115,7 +150,7 @@ export default function LotCaptureModal({
     async (nextDutyVehicleIds: number[]) => {
       setLotCaptureLoading(true);
       try {
-        const items = await workMixSlotApi.getList();
+        const items = await workMixSlotApi.getList({ includeAllMixerVehicles: true });
         setLotCaptureItems(
           moveDutyVehiclesToEnd(sortLotItemsByPendingStatus(items), nextDutyVehicleIds)
         );
@@ -131,73 +166,171 @@ export default function LotCaptureModal({
     [t]
   );
 
-  const loadDriverNames = useCallback(async () => {
+  // Đọc bố trí xe bồn trong ngày: tên tài xế (khi không được truyền vào) + tag trạng thái xe.
+  const loadArrangementInfo = useCallback(async () => {
     try {
       const bootstrap = await workAssignmentApi.getBootstrap(workDate);
       const personById = new Map(
         bootstrap.personnel.map((person) => [Number(person.user_id), person])
       );
-      const map = new Map<number, string>();
+      const nameMap = new Map<number, string>();
+      const tagMap = new Map<number, VehicleDayTag>();
       for (const assignment of bootstrap.mixer.draft.mixer_assignments) {
+        if (assignment.day_tag != null) {
+          tagMap.set(Number(assignment.vehicle_id), assignment.day_tag);
+        }
         if (assignment.user_id == null) continue;
         const person = personById.get(Number(assignment.user_id));
         const name = person?.user_full_name?.trim() || person?.user_short_name?.trim() || "";
-        if (name) map.set(Number(assignment.vehicle_id), name);
+        if (name) nameMap.set(Number(assignment.vehicle_id), name);
       }
-      setFetchedDriverNames(map);
+      setFetchedDriverNames(nameMap);
+      setDayTagByVehicleId(tagMap);
     } catch (error) {
-      console.error("[LotCaptureModal] load driver names error:", error);
+      console.error("[LotCaptureModal] load arrangement info error:", error);
       setFetchedDriverNames(new Map());
+      setDayTagByVehicleId(new Map());
     }
   }, [workDate]);
 
-  // Mỗi lần mở: reset tên + xe trực ca, tải hàng đợi (và tên tài xế nếu không được truyền vào).
+  // Danh mục tag động (tên + luật sắp xếp cho LLM) từ bảng lot_tags.
+  const loadLotTagCatalog = useCallback(async () => {
+    try {
+      const list = await lotTagApi.list();
+      setLotTagsByKey(new Map(list.map((tag) => [tag.lot_tag_key, tag])));
+    } catch (error) {
+      console.error("[LotCaptureModal] load lot tag catalog error:", error);
+      setLotTagsByKey(new Map());
+    }
+  }, []);
+
+  // Mỗi lần mở: reset tên + xe trực ca, tải hàng đợi, bố trí (tài xế + tag) và danh mục tag.
   useEffect(() => {
     if (!open) return;
     setLotCaptureName(getDefaultLotCaptureName());
     setLotDutyVehicleIds([]);
+    setDayTagByVehicleId(new Map());
+    dutyPrefilledRef.current = false;
     void loadLotCaptureItems([]);
-    if (!driverNameByVehicleId) void loadDriverNames();
+    void loadArrangementInfo();
+    void loadLotTagCatalog();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
 
+  // Gợi ý sẵn xe trực ca = các xe được tag "trực sản xuất" ở Bố trí công việc (vẫn sửa tay được).
   useEffect(() => {
-    onLoadingChange?.(lotCaptureLoading || lotCaptureSaving);
-  }, [lotCaptureLoading, lotCaptureSaving, onLoadingChange]);
+    if (!open || dutyPrefilledRef.current || catalogDayTagByVehicleId.size === 0) return;
+    const taggedDutyIds = Array.from(catalogDayTagByVehicleId.entries())
+      .filter(([, tag]) => tag === "truc_san_xuat")
+      .map(([vehicleId]) => vehicleId);
+    if (taggedDutyIds.length === 0) return;
+    dutyPrefilledRef.current = true;
+    setLotDutyVehicleIds((current) => (current.length > 0 ? current : taggedDutyIds));
+  }, [open, catalogDayTagByVehicleId]);
 
-  const moveLotCaptureItem = useCallback((index: number, direction: -1 | 1) => {
-    setLotCaptureItems((current) => {
-      const targetIndex = index + direction;
-      if (targetIndex < 0 || targetIndex >= current.length) return current;
-      const next = [...current];
-      [next[index], next[targetIndex]] = [next[targetIndex], next[index]];
-      return next;
-    });
-  }, []);
+  useEffect(() => {
+    onLoadingChange?.(lotCaptureLoading || lotCaptureSaving || lotOrderSaving);
+  }, [lotCaptureLoading, lotCaptureSaving, lotOrderSaving, onLoadingChange]);
 
-  const moveLotCaptureItemTo = useCallback((fromIndex: number, toPosition: number) => {
-    setLotCaptureItems((current) => {
-      const toIndex = toPosition - 1;
-      if (
-        fromIndex < 0 ||
-        fromIndex >= current.length ||
-        toIndex < 0 ||
-        toIndex >= current.length ||
-        toIndex === fromIndex
-      ) {
-        return current;
+  const runLotOrderUpdates = useCallback(
+    async (updates: LotOrderMoveUpdate[], previousItems: WorkMixSlotItem[]) => {
+      if (updates.length === 0) return;
+
+      setLotOrderSaving(true);
+      try {
+        for (const update of updates) {
+          await orderApi.update(update.orderId, { order_number: update.targetPosition });
+        }
+      } catch (error) {
+        console.error("[LotCaptureModal] order reorder error:", error);
+        setLotCaptureItems(previousItems);
+        message.error(t("lotOrderSyncFailed"));
+      } finally {
+        setLotOrderSaving(false);
       }
-      const next = [...current];
-      const [moved] = next.splice(fromIndex, 1);
-      next.splice(toIndex, 0, moved);
-      return next;
-    });
-  }, []);
+    },
+    [t]
+  );
+
+  const persistLotOrderChanges = useCallback(
+    async (itemKeys: string[], nextItems: WorkMixSlotItem[], previousItems: WorkMixSlotItem[]) => {
+      await runLotOrderUpdates(getPersistedLotOrderUpdates(nextItems, itemKeys), previousItems);
+    },
+    [runLotOrderUpdates]
+  );
+
+  const moveLotCaptureItem = useCallback(
+    (itemKey: string, direction: -1 | 1) => {
+      const nextItems = moveLotItemByDirection(lotCaptureItems, itemKey, direction);
+      if (nextItems === lotCaptureItems) return;
+
+      setLotCaptureItems(nextItems);
+      void persistLotOrderChanges([itemKey], nextItems, lotCaptureItems);
+    },
+    [lotCaptureItems, persistLotOrderChanges]
+  );
+
+  const moveLotCaptureItemTo = useCallback(
+    (itemKey: string, toPosition: number) => {
+      const nextItems = moveLotItemToPosition(lotCaptureItems, itemKey, toPosition);
+      if (nextItems === lotCaptureItems) return;
+
+      setLotCaptureItems(nextItems);
+      void persistLotOrderChanges([itemKey], nextItems, lotCaptureItems);
+    },
+    [lotCaptureItems, persistLotOrderChanges]
+  );
+
+  // Xếp theo tag: chỉ dùng CÔNG THỨC sort_group đã chốt trong danh mục lot_tags.
+  // Catalog rỗng thì không dùng lại bộ tag seed cũ.
+  const applyRuleSort = useCallback(() => {
+    const groupForTag = (key: VehicleDayTag) => {
+      const tag = lotTagsByKey.get(key);
+      if (!tag) return null;
+      return tag.sort_group ?? DEFAULT_LOT_TAG_GROUP;
+    };
+    const dutyGroup = groupForTag("truc_san_xuat");
+
+    const groupByVehicleId = new Map<number, number>();
+    for (const [vehicleId, tag] of catalogDayTagByVehicleId) {
+      const group = groupForTag(tag);
+      if (group != null) groupByVehicleId.set(vehicleId, group);
+    }
+    if (dutyGroup != null) {
+      for (const vehicleId of lotDutyVehicleIds) {
+        if (!groupByVehicleId.has(vehicleId)) groupByVehicleId.set(vehicleId, dutyGroup);
+      }
+    }
+
+    const nextItems = sortLotItemsByGroup(lotCaptureItems, groupByVehicleId);
+    if (nextItems === lotCaptureItems) {
+      message.info(t("lotRuleSortNoChange"));
+      return;
+    }
+
+    const updates = getLotOrderMoveUpdates(lotCaptureItems, nextItems);
+    setLotCaptureItems(nextItems);
+    void runLotOrderUpdates(updates, lotCaptureItems);
+  }, [
+    catalogDayTagByVehicleId,
+    lotCaptureItems,
+    lotDutyVehicleIds,
+    lotTagsByKey,
+    runLotOrderUpdates,
+    t,
+  ]);
 
   const applyDutyVehicleToEnd = useCallback(() => {
     if (lotDutyVehicleIds.length === 0) return;
-    setLotCaptureItems((current) => moveDutyVehiclesToEnd(current, lotDutyVehicleIds));
-  }, [lotDutyVehicleIds]);
+    const nextItems = moveDutyVehiclesToEnd(lotCaptureItems, lotDutyVehicleIds);
+    if (nextItems === lotCaptureItems) return;
+
+    const dutyItemKeys = nextItems
+      .filter((item) => lotDutyVehicleIds.includes(Number(item.vehicle_id)))
+      .map(getLotItemKey);
+    setLotCaptureItems(nextItems);
+    void persistLotOrderChanges(dutyItemKeys, nextItems, lotCaptureItems);
+  }, [lotCaptureItems, lotDutyVehicleIds, persistLotOrderChanges]);
 
   const handleCaptureLots = useCallback(async () => {
     const lotName = lotCaptureName.trim() || getDefaultLotCaptureName();
@@ -209,6 +342,17 @@ export default function LotCaptureModal({
     const snapshotNote = dutyVehicleLabels.length
       ? `${lotName} - ${t("lotDutyVehicle")}: ${dutyVehicleLabels.join(", ")}`
       : lotName;
+    // Ghi lại tag của từng xe vào mô tả snapshot để lịch sử tra được vì sao xe đứng vị trí đó.
+    const tagSummary = lotCaptureItems
+      .map((item) => {
+        const tag = catalogDayTagByVehicleId.get(Number(item.vehicle_id));
+        return tag
+          ? `${item.vehicle_name || item.vehicle_license_plate}=${getTagDisplayName(tag)}`
+          : "";
+      })
+      .filter(Boolean)
+      .join(", ");
+    const snapshotDescription = tagSummary ? `${snapshotNote} | Tag: ${tagSummary}` : snapshotNote;
     const { maToStt, skipped } = buildLotSyncMap(lotCaptureItems);
     const lotCount = Object.keys(maToStt).length;
 
@@ -243,7 +387,7 @@ export default function LotCaptureModal({
           duty_vehicle_name: primaryDutyVehicle?.vehicle_name || undefined,
           duty_vehicle_license_plate: primaryDutyVehicle?.vehicle_license_plate || undefined,
           snapshot_note: snapshotNote,
-          multi_description: snapshotNote,
+          multi_description: snapshotDescription,
         }),
       ]);
 
@@ -269,7 +413,16 @@ export default function LotCaptureModal({
     } finally {
       setLotCaptureSaving(false);
     }
-  }, [dutyVehicleIdSet, lotCaptureItems, lotCaptureName, onCaptured, onClose, t]);
+  }, [
+    catalogDayTagByVehicleId,
+    getTagDisplayName,
+    dutyVehicleIdSet,
+    lotCaptureItems,
+    lotCaptureName,
+    onCaptured,
+    onClose,
+    t,
+  ]);
 
   const dutyVehicleOptions = useMemo(
     () =>
@@ -282,6 +435,18 @@ export default function LotCaptureModal({
     [lotCaptureItems]
   );
 
+  const lotPositionOptions = useMemo(
+    () =>
+      Array.from(
+        { length: lotCaptureItems.filter(isPersistedLotOrderItem).length },
+        (_, position) => ({
+          value: position + 1,
+          label: String(position + 1),
+        })
+      ),
+    [lotCaptureItems]
+  );
+
   return (
     <Modal
       open={open}
@@ -291,7 +456,7 @@ export default function LotCaptureModal({
       cancelText={t("lotCaptureCancel")}
       confirmLoading={lotCaptureSaving}
       okButtonProps={{
-        disabled: !canSync || lotCaptureLoading || lotCaptureItems.length === 0,
+        disabled: !canSync || lotCaptureLoading || lotOrderSaving || lotCaptureItems.length === 0,
       }}
       title={t("lotCaptureTitle")}
       width={520}
@@ -330,7 +495,12 @@ export default function LotCaptureModal({
               type="button"
               size="sm"
               onClick={applyDutyVehicleToEnd}
-              disabled={lotCaptureLoading || lotCaptureSaving || lotDutyVehicleIds.length === 0}
+              disabled={
+                lotCaptureLoading ||
+                lotCaptureSaving ||
+                lotOrderSaving ||
+                lotDutyVehicleIds.length === 0
+              }
               title={t("lotDutyApplyHint")}
               className="h-9 shrink-0 bg-teal-600 text-white hover:bg-teal-700"
             >
@@ -342,6 +512,18 @@ export default function LotCaptureModal({
           <div className="flex items-center gap-2 border-b border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-800">
             <FileSpreadsheet size={16} className="text-teal-600" />
             {t("lotCapturePreview", { count: lotCaptureItems.length })}
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={applyRuleSort}
+              disabled={lotCaptureLoading || lotCaptureSaving || lotOrderSaving}
+              title={t("lotRuleSortHint")}
+              className="ml-auto h-7 gap-1 border-teal-600 px-2 text-xs font-semibold text-teal-700 hover:bg-teal-50"
+            >
+              <ArrowDownUp size={13} />
+              {t("lotRuleSort")}
+            </Button>
           </div>
           <div className="max-h-[240px] overflow-y-auto p-2">
             {lotCaptureLoading ? (
@@ -353,10 +535,23 @@ export default function LotCaptureModal({
             ) : (
               <div className="space-y-1">
                 {lotCaptureItems.map((item, index) => {
+                  const itemKey = getLotItemKey(item);
+                  const isPersistedOrder = isPersistedLotOrderItem(item);
+                  const persistedOrderPosition = getPersistedLotOrderPosition(
+                    lotCaptureItems,
+                    itemKey
+                  );
                   const isDutyVehicle = dutyVehicleIdSet.has(Number(item.vehicle_id));
-                  const canReorderTo = !lotCaptureSaving && lotCaptureItems.length > 1;
+                  const isUnreturnedVehicle = item.group === "unreturned";
+                  const persistedOrderCount = lotPositionOptions.length;
+                  const canReorderTo =
+                    isPersistedOrder &&
+                    !lotCaptureSaving &&
+                    !lotOrderSaving &&
+                    persistedOrderCount > 1;
                   const driverName = driverNames.get(Number(item.vehicle_id)) || "";
                   const hasPersonnel = driverName !== "";
+                  const dayTag = catalogDayTagByVehicleId.get(Number(item.vehicle_id));
                   return (
                     <div
                       key={`${item.order_id}-${item.vehicle_id}`}
@@ -371,12 +566,25 @@ export default function LotCaptureModal({
                       <span className="min-w-0 flex-1 truncate font-semibold text-slate-900">
                         {item.vehicle_license_plate} | {item.vehicle_name}
                       </span>
+                      {dayTag && (
+                        <Chip tone={getVehicleDayTagChipTone(dayTag)}>
+                          {getTagDisplayName(dayTag)}
+                        </Chip>
+                      )}
                       <Chip
-                        tone={isDutyVehicle ? "amber" : hasPersonnel ? "teal" : "slate"}
+                        tone={
+                          isDutyVehicle || isUnreturnedVehicle
+                            ? "amber"
+                            : hasPersonnel
+                              ? "teal"
+                              : "slate"
+                        }
                         title={hasPersonnel ? driverName : undefined}
                       >
                         {isDutyVehicle ? (
                           t("lotDutyVehicleShort")
+                        ) : isUnreturnedVehicle ? (
+                          t("lotNotReturned")
                         ) : hasPersonnel ? (
                           <span className="block max-w-[160px] truncate">{driverName}</span>
                         ) : (
@@ -387,8 +595,8 @@ export default function LotCaptureModal({
                         <button
                           type="button"
                           aria-label={t("lotOrderMoveUp")}
-                          disabled={index === 0 || lotCaptureSaving}
-                          onClick={() => moveLotCaptureItem(index, -1)}
+                          disabled={!canReorderTo || persistedOrderPosition <= 1}
+                          onClick={() => moveLotCaptureItem(itemKey, -1)}
                           className="flex h-7 w-7 items-center justify-center rounded border border-slate-200 bg-white text-slate-500 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
                         >
                           <ChevronUp size={14} />
@@ -396,46 +604,22 @@ export default function LotCaptureModal({
                         <button
                           type="button"
                           aria-label={t("lotOrderMoveDown")}
-                          disabled={index === lotCaptureItems.length - 1 || lotCaptureSaving}
-                          onClick={() => moveLotCaptureItem(index, 1)}
+                          disabled={!canReorderTo || persistedOrderPosition >= persistedOrderCount}
+                          onClick={() => moveLotCaptureItem(itemKey, 1)}
                           className="flex h-7 w-7 items-center justify-center rounded border border-slate-200 bg-white text-slate-500 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
                         >
                           <ChevronDown size={14} />
                         </button>
-                        <Dropdown
-                          trigger={["click"]}
+                        <AntSelect
+                          aria-label={t("lotOrderMoveTo")}
                           disabled={!canReorderTo}
-                          placement="bottomRight"
-                          menu={{
-                            selectable: true,
-                            selectedKeys: [String(index + 1)],
-                            style: { maxHeight: 280, overflowY: "auto" },
-                            items: [
-                              {
-                                type: "group",
-                                label: t("lotOrderMoveToTitle"),
-                                children: Array.from(
-                                  { length: lotCaptureItems.length },
-                                  (_, position) => ({
-                                    key: String(position + 1),
-                                    label: String(position + 1),
-                                    disabled: position === index,
-                                  })
-                                ),
-                              },
-                            ],
-                            onClick: ({ key }) => moveLotCaptureItemTo(index, Number(key)),
-                          }}
-                        >
-                          <button
-                            type="button"
-                            aria-label={t("lotOrderMoveTo")}
-                            disabled={!canReorderTo}
-                            className="flex h-7 w-7 items-center justify-center rounded border border-slate-200 bg-white text-slate-500 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
-                          >
-                            <ArrowUpDown size={14} />
-                          </button>
-                        </Dropdown>
+                          options={lotPositionOptions}
+                          size="small"
+                          title={t("lotOrderMoveToTitle")}
+                          value={isPersistedOrder ? persistedOrderPosition : undefined}
+                          onChange={(value) => moveLotCaptureItemTo(itemKey, Number(value))}
+                          className="w-[58px] [&_.ant-select-selector]:!h-7 [&_.ant-select-selector]:!rounded [&_.ant-select-selector]:!border-slate-200 [&_.ant-select-selection-item]:!text-xs"
+                        />
                       </div>
                     </div>
                   );

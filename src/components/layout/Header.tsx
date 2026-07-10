@@ -7,16 +7,25 @@ import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { NOTIFICATION_EVENTS } from "@/constants/notification";
+import { PERMISSIONS } from "@/constants/permissions";
 import { SIDEBAR } from "@/constants/route";
 import { useSocket } from "@/context/socket-context";
 import { useAppSelector } from "@/hooks/use-app-selector";
+import { usePermissions } from "@/hooks/use-permissions";
+import {
+  getLotTagRequestId,
+  getNotificationCategory,
+  isLotTagRequestInvalidTransition,
+} from "@/lib/notification-category";
+import lotTagRequestApi from "@/services/lot-tag-request.service";
 import type { Notification } from "@/types/notification";
 import { UserOutlined } from "@ant-design/icons";
 import { Avatar, Dropdown, Layout, MenuProps, Space } from "antd";
-import { BellRing, Volume2, VolumeX, Wrench } from "lucide-react";
+import { BellRing, Check, ClipboardCheck, Loader2, Volume2, VolumeX, Wrench } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import React, { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 
 const { Header } = Layout;
 
@@ -43,21 +52,34 @@ const AppHeader: React.FC<AppHeaderProps> = ({
   onLogout,
 }) => {
   const t = useTranslations("Header");
+  const tLotTagRequest = useTranslations("LotTagRequestPage");
   const router = useRouter();
+  const { hasActionAccess } = usePermissions();
 
   const reduxUserName = useAppSelector((state: any) => state.auth.user?.fullName);
   const authLoading = useAppSelector((state: any) => state.auth.loading);
   const [localUserName, setLocalUserName] = useState<string | undefined>(userName);
   const [isGeneralPopoverOpen, setIsGeneralPopoverOpen] = useState(false);
   const [isMaintenancePopoverOpen, setIsMaintenancePopoverOpen] = useState(false);
+  const [isLotTagRequestPopoverOpen, setIsLotTagRequestPopoverOpen] = useState(false);
+  const [approvingLotTagRequestId, setApprovingLotTagRequestId] = useState<number | null>(null);
   const { notifications, markAsRead, isMuted, toggleMute } = useSocket();
 
+  const canReviewLotTagRequests = hasActionAccess(
+    SIDEBAR.LOT_TAG_REQUESTS,
+    PERMISSIONS.LOT_TAG_REQUESTS.REVIEW
+  );
+
   const maintenanceNotifications = useMemo(
-    () => notifications.filter((item) => item.type === "vehicle_maintenance"),
+    () => notifications.filter((item) => getNotificationCategory(item) === "maintenance"),
+    [notifications]
+  );
+  const lotTagRequestNotifications = useMemo(
+    () => notifications.filter((item) => getNotificationCategory(item) === "lotTagRequest"),
     [notifications]
   );
   const generalNotifications = useMemo(
-    () => notifications.filter((item) => item.type !== "vehicle_maintenance"),
+    () => notifications.filter((item) => getNotificationCategory(item) === "general"),
     [notifications]
   );
   const generalUnreadCount = useMemo(
@@ -67,6 +89,10 @@ const AppHeader: React.FC<AppHeaderProps> = ({
   const maintenanceUnreadCount = useMemo(
     () => maintenanceNotifications.filter((item) => !item.read).length,
     [maintenanceNotifications]
+  );
+  const lotTagRequestUnreadCount = useMemo(
+    () => lotTagRequestNotifications.filter((item) => !item.read).length,
+    [lotTagRequestNotifications]
   );
 
   useEffect(() => {
@@ -110,6 +136,37 @@ const AppHeader: React.FC<AppHeaderProps> = ({
     const maintenanceId = notification.vehicle_maintenance_id;
     if (typeof maintenanceId === "number" || typeof maintenanceId === "string") {
       router.push(`${SIDEBAR.VEHICLE_MAINTENANCES}/${maintenanceId}`);
+    }
+  };
+
+  const handleLotTagRequestNotificationClick = (notification: Notification) => {
+    markAsRead(notification.id);
+    setIsLotTagRequestPopoverOpen(false);
+    router.push(SIDEBAR.LOT_TAG_REQUESTS);
+  };
+
+  const handleApproveLotTagRequest = async (notification: Notification) => {
+    const requestId = getLotTagRequestId(notification);
+    if (!requestId || approvingLotTagRequestId !== null) return;
+
+    setApprovingLotTagRequestId(requestId);
+    try {
+      await lotTagRequestApi.approve(requestId);
+      markAsRead(notification.id);
+      toast.success(tLotTagRequest("approveSuccess"));
+    } catch (error) {
+      const description =
+        (error as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+        (error as Error)?.message ||
+        tLotTagRequest("actionFailed");
+      if (isLotTagRequestInvalidTransition(description)) {
+        markAsRead(notification.id);
+        toast.info(tLotTagRequest("alreadyProcessed"));
+        return;
+      }
+      toast.error(tLotTagRequest("actionFailed"), { description });
+    } finally {
+      setApprovingLotTagRequestId(null);
     }
   };
 
@@ -172,6 +229,71 @@ const AppHeader: React.FC<AppHeaderProps> = ({
                 </Popover>
                 <TooltipContent>
                   <p>Thông báo bảo trì xe</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+
+            <TooltipProvider delayDuration={300}>
+              <Tooltip>
+                <Popover
+                  open={isLotTagRequestPopoverOpen}
+                  onOpenChange={setIsLotTagRequestPopoverOpen}
+                >
+                  <TooltipTrigger asChild>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="relative hover:bg-gray-300"
+                        aria-label={t("lotTagRequestNotifications")}
+                      >
+                        <ClipboardCheck />
+                        {lotTagRequestUnreadCount > 0 && (
+                          <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 rounded-full bg-red-500 text-[10px] ring-2 ring-white">
+                            {lotTagRequestUnreadCount > 99 ? "99+" : lotTagRequestUnreadCount}
+                          </Badge>
+                        )}
+                      </Button>
+                    </PopoverTrigger>
+                  </TooltipTrigger>
+                  <PopoverContent
+                    align="end"
+                    className="z-1000 p-0 w-[360px] shadow-lg border-none"
+                    sideOffset={5}
+                  >
+                    <NotificationList
+                      notifications={lotTagRequestNotifications}
+                      onMarkAsRead={markAsRead}
+                      onMarkAllAsRead={() => markNotificationsAsRead(lotTagRequestNotifications)}
+                      onNotificationClick={handleLotTagRequestNotificationClick}
+                      renderNotificationActions={(notification) => {
+                        const requestId = getLotTagRequestId(notification);
+                        if (!canReviewLotTagRequests || !requestId) return null;
+
+                        const isApproving = approvingLotTagRequestId === requestId;
+                        return (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            disabled={approvingLotTagRequestId !== null}
+                            onClick={() => void handleApproveLotTagRequest(notification)}
+                            className="h-7 border-emerald-600 px-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800"
+                          >
+                            {isApproving ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <Check className="h-3.5 w-3.5" />
+                            )}
+                            {tLotTagRequest("approve")}
+                          </Button>
+                        );
+                      }}
+                    />
+                  </PopoverContent>
+                </Popover>
+                <TooltipContent>
+                  <p>{t("lotTagRequestNotifications")}</p>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>

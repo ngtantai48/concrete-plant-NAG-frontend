@@ -1,0 +1,490 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Hướng dẫn chức năng Đơn xin bận</title>
+    <style>
+      :root {
+        --red: #d71920;
+        --red-dark: #9f1118;
+        --ink: #1f2937;
+        --muted: #6b7280;
+        --line: #e5e7eb;
+        --soft: #fff4f4;
+        --paper: #ffffff;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        color: var(--ink);
+        background: #f6f7f9;
+        font-family:
+          Inter,
+          Arial,
+          "Helvetica Neue",
+          sans-serif;
+        line-height: 1.55;
+      }
+
+      .page {
+        width: min(1180px, calc(100% - 40px));
+        margin: 0 auto;
+        padding: 34px 0 48px;
+      }
+
+      .hero {
+        display: grid;
+        grid-template-columns: 1.1fr 0.9fr;
+        gap: 26px;
+        align-items: stretch;
+        border-radius: 0;
+        background: var(--paper);
+        border: 1px solid var(--line);
+        overflow: hidden;
+        box-shadow: 0 18px 45px rgba(31, 41, 55, 0.1);
+      }
+
+      .hero-copy {
+        padding: 34px;
+        border-top: 8px solid var(--red);
+      }
+
+      .eyebrow {
+        margin: 0 0 10px;
+        color: var(--red);
+        font-size: 13px;
+        font-weight: 800;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      h1 {
+        margin: 0;
+        color: #111827;
+        font-size: 38px;
+        line-height: 1.08;
+        letter-spacing: 0;
+      }
+
+      .lead {
+        margin: 18px 0 0;
+        max-width: 680px;
+        color: #4b5563;
+        font-size: 16px;
+      }
+
+      .hero-panel {
+        display: grid;
+        align-content: center;
+        gap: 12px;
+        padding: 34px;
+        color: #ffffff;
+        background: linear-gradient(135deg, var(--red), var(--red-dark));
+      }
+
+      .hero-panel strong {
+        font-size: 18px;
+      }
+
+      .hero-panel span {
+        color: rgba(255, 255, 255, 0.86);
+      }
+
+      .content {
+        display: grid;
+        grid-template-columns: 330px 1fr;
+        gap: 24px;
+        margin-top: 24px;
+      }
+
+      .toc,
+      .section,
+      .screenshot-block {
+        background: var(--paper);
+        border: 1px solid var(--line);
+      }
+
+      .toc {
+        position: sticky;
+        top: 20px;
+        align-self: start;
+        padding: 22px;
+      }
+
+      .toc h2,
+      .section h2,
+      .screenshot-block h2 {
+        margin: 0 0 14px;
+        color: #111827;
+        font-size: 20px;
+        line-height: 1.25;
+      }
+
+      .toc ol {
+        margin: 0;
+        padding-left: 20px;
+      }
+
+      .toc li {
+        margin: 10px 0;
+        color: #4b5563;
+        font-weight: 700;
+      }
+
+      .section {
+        padding: 26px;
+        margin-bottom: 20px;
+      }
+
+      .step-list {
+        display: grid;
+        gap: 14px;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      .step {
+        display: grid;
+        grid-template-columns: 42px 1fr;
+        gap: 14px;
+        align-items: start;
+        padding: 16px;
+        border: 1px solid #f0d6d8;
+        background: var(--soft);
+      }
+
+      .badge {
+        display: grid;
+        place-items: center;
+        width: 42px;
+        height: 42px;
+        color: #ffffff;
+        background: var(--red);
+        font-size: 18px;
+        font-weight: 900;
+      }
+
+      .step h3 {
+        margin: 0 0 4px;
+        font-size: 16px;
+      }
+
+      .step p {
+        margin: 0;
+        color: #4b5563;
+      }
+
+      .note {
+        margin-top: 14px;
+        padding: 14px 16px;
+        border-left: 5px solid var(--red);
+        background: #fffafa;
+        color: #4b5563;
+      }
+
+      .screenshot-block {
+        margin-bottom: 20px;
+        overflow: hidden;
+      }
+
+      .screenshot-head {
+        display: flex;
+        gap: 14px;
+        align-items: center;
+        justify-content: space-between;
+        padding: 22px 26px;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .screen-wrap {
+        position: relative;
+        padding: 18px;
+        background: #111827;
+      }
+
+      .screen-wrap img {
+        display: block;
+        width: 100%;
+        height: auto;
+        border: 6px solid #ffffff;
+      }
+
+      .callout {
+        position: absolute;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        max-width: 230px;
+        padding: 10px 12px;
+        color: #ffffff;
+        background: var(--red);
+        font-size: 13px;
+        font-weight: 800;
+        box-shadow: 0 10px 20px rgba(0, 0, 0, 0.22);
+      }
+
+      .callout::before {
+        content: "";
+        width: 10px;
+        height: 10px;
+        flex: 0 0 auto;
+        background: #ffffff;
+      }
+
+      .callout-menu {
+        left: 30px;
+        bottom: 205px;
+      }
+
+      .callout-create {
+        right: 130px;
+        top: 44px;
+      }
+
+      .callout-filter {
+        left: 285px;
+        top: 150px;
+      }
+
+      .table {
+        width: 100%;
+        border-collapse: collapse;
+        overflow: hidden;
+        border: 1px solid var(--line);
+      }
+
+      .table th,
+      .table td {
+        padding: 13px 14px;
+        border-bottom: 1px solid var(--line);
+        text-align: left;
+        vertical-align: top;
+      }
+
+      .table th {
+        color: #ffffff;
+        background: var(--red);
+      }
+
+      .table td {
+        background: #ffffff;
+      }
+
+      .footer {
+        margin-top: 24px;
+        padding: 18px 22px;
+        color: #ffffff;
+        background: #111827;
+      }
+
+      @media (max-width: 900px) {
+        .hero,
+        .content {
+          grid-template-columns: 1fr;
+        }
+
+        .toc {
+          position: static;
+        }
+
+        .callout {
+          position: static;
+          margin: 8px 18px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="page">
+      <section class="hero">
+        <div class="hero-copy">
+          <p class="eyebrow">Nguyên Anh Group · Hướng dẫn thao tác</p>
+          <h1>Chức năng Đơn xin bận</h1>
+          <p class="lead">
+            Tài liệu này hướng dẫn cách mở trang, tạo đơn xin bận và theo dõi trạng thái duyệt.
+            Giao diện được trình bày theo layout đỏ - trắng để dùng nhanh cho đào tạo nội bộ.
+          </p>
+        </div>
+        <aside class="hero-panel">
+          <strong>Mục tiêu chức năng</strong>
+          <span>
+            Tài xế gửi yêu cầu bận theo ngày và xe. Người phụ trách xem, duyệt hoặc từ chối để
+            cập nhật trạng thái sắp xếp lốt.
+          </span>
+        </aside>
+      </section>
+
+      <div class="content">
+        <aside class="toc">
+          <h2>Nội dung</h2>
+          <ol>
+            <li>Mở trang Đơn xin bận</li>
+            <li>Tạo đơn mới</li>
+            <li>Theo dõi và lọc trạng thái</li>
+            <li>Duyệt, từ chối hoặc hủy đơn</li>
+            <li>Quyền sử dụng</li>
+          </ol>
+        </aside>
+
+        <div>
+          <section class="screenshot-block">
+            <div class="screenshot-head">
+              <h2>Ảnh chụp trang đang sử dụng</h2>
+              <span>Trang: Duyệt đơn xin bận</span>
+            </div>
+            <div class="screen-wrap">
+              <img src="assets/don-xin-ban-main.png" alt="Ảnh chụp màn hình Đơn xin bận" />
+              <div class="callout callout-menu">Menu Đơn xin bận đang được chọn</div>
+              <div class="callout callout-create">Bấm Tạo đơn để gửi yêu cầu mới</div>
+              <div class="callout callout-filter">Lọc theo trạng thái hoặc ngày</div>
+            </div>
+          </section>
+
+          <section class="section">
+            <h2>1. Mở trang Đơn xin bận</h2>
+            <ul class="step-list">
+              <li class="step">
+                <div class="badge">1</div>
+                <div>
+                  <h3>Vào nhóm Công cụ</h3>
+                  <p>Trên thanh menu bên trái, mở nhóm Công cụ.</p>
+                </div>
+              </li>
+              <li class="step">
+                <div class="badge">2</div>
+                <div>
+                  <h3>Chọn Đơn xin bận</h3>
+                  <p>Nhấn mục Đơn xin bận để mở danh sách đơn theo ngày làm việc.</p>
+                </div>
+              </li>
+            </ul>
+          </section>
+
+          <section class="section">
+            <h2>2. Tạo đơn mới</h2>
+            <ul class="step-list">
+              <li class="step">
+                <div class="badge">1</div>
+                <div>
+                  <h3>Bấm Tạo đơn</h3>
+                  <p>Nút Tạo đơn nằm ở phần đầu trang, bên phải tiêu đề.</p>
+                </div>
+              </li>
+              <li class="step">
+                <div class="badge">2</div>
+                <div>
+                  <h3>Nhập thông tin</h3>
+                  <p>Chọn ngày, xe, tag phù hợp và nhập lý do xin bận.</p>
+                </div>
+              </li>
+              <li class="step">
+                <div class="badge">3</div>
+                <div>
+                  <h3>Gửi đơn</h3>
+                  <p>Sau khi kiểm tra thông tin, bấm Gửi đơn. Đơn mới sẽ vào trạng thái Chờ duyệt.</p>
+                </div>
+              </li>
+            </ul>
+          </section>
+
+          <section class="section">
+            <h2>3. Theo dõi trạng thái</h2>
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>Tab</th>
+                  <th>Ý nghĩa</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Chờ duyệt</td>
+                  <td>Các đơn mới gửi, đang chờ người phụ trách xử lý.</td>
+                </tr>
+                <tr>
+                  <td>Đã duyệt</td>
+                  <td>Các đơn đã được chấp thuận và áp dụng vào bố trí/xếp lốt.</td>
+                </tr>
+                <tr>
+                  <td>Từ chối</td>
+                  <td>Các đơn không được chấp thuận, thường có ghi chú lý do.</td>
+                </tr>
+                <tr>
+                  <td>Đã hủy</td>
+                  <td>Các đơn do người gửi hoặc người phụ trách hủy trước khi xử lý.</td>
+                </tr>
+              </tbody>
+            </table>
+            <div class="note">
+              Có thể dùng bộ chọn ngày để xem đơn đúng ngày làm việc cần kiểm tra.
+            </div>
+          </section>
+
+          <section class="section">
+            <h2>4. Duyệt, từ chối hoặc hủy đơn</h2>
+            <ul class="step-list">
+              <li class="step">
+                <div class="badge">1</div>
+                <div>
+                  <h3>Duyệt đơn</h3>
+                  <p>Khi duyệt, hệ thống ghi nhận tag của xe cho ngày làm việc tương ứng.</p>
+                </div>
+              </li>
+              <li class="step">
+                <div class="badge">2</div>
+                <div>
+                  <h3>Từ chối đơn</h3>
+                  <p>Nhập lý do từ chối để người gửi biết vì sao đơn không được chấp thuận.</p>
+                </div>
+              </li>
+              <li class="step">
+                <div class="badge">3</div>
+                <div>
+                  <h3>Hủy đơn</h3>
+                  <p>Chỉ hủy khi đơn còn đang chờ duyệt hoặc theo đúng quyền được cấp.</p>
+                </div>
+              </li>
+            </ul>
+          </section>
+
+          <section class="section">
+            <h2>5. Quyền sử dụng</h2>
+            <table class="table">
+              <thead>
+                <tr>
+                  <th>Vai trò</th>
+                  <th>Thao tác thường dùng</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Tài xế</td>
+                  <td>Xem danh sách đơn của mình, tạo đơn và hủy đơn đang chờ duyệt.</td>
+                </tr>
+                <tr>
+                  <td>Điều phối/Quản lý</td>
+                  <td>Xem danh sách đơn, duyệt hoặc từ chối đơn.</td>
+                </tr>
+                <tr>
+                  <td>Admin</td>
+                  <td>Có toàn quyền theo cơ chế phân quyền hệ thống.</td>
+                </tr>
+              </tbody>
+            </table>
+          </section>
+        </div>
+      </div>
+
+      <footer class="footer">
+        Tài liệu dùng cho hướng dẫn nội bộ. Khi giao diện thay đổi, chụp lại ảnh màn hình và cập
+        nhật nội dung tương ứng.
+      </footer>
+    </main>
+  </body>
+</html>

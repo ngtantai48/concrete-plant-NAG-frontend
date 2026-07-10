@@ -1,8 +1,29 @@
 import { PERMISSIONS } from "@/constants/permissions";
 import { SIDEBAR } from "@/constants/route";
 import {
-  ArrowRightLeft, Award, Bot, Briefcase, BriefcaseBusiness, Building2, CalendarDays, Car, ClipboardList,
-  Fuel, Gauge, Layers, Link2, MapPin, Package, Settings2, ShieldCheck, UserCog, UsersRound, UtensilsCrossed, Wrench
+  ArrowRightLeft,
+  Award,
+  Bot,
+  Briefcase,
+  BriefcaseBusiness,
+  Building2,
+  CalendarDays,
+  Car,
+  ClipboardCheck,
+  ClipboardList,
+  Fuel,
+  Gauge,
+  Layers,
+  Link2,
+  MapPin,
+  Package,
+  Settings2,
+  ShieldCheck,
+  Tags,
+  UserCog,
+  UsersRound,
+  UtensilsCrossed,
+  Wrench,
 } from "lucide-react";
 import React from "react";
 
@@ -152,6 +173,18 @@ export const navigationConfig: NavItem[] = [
           { key: PERMISSIONS.WORK_ARRANGEMENTS.UPDATE, label: "Cập nhật phân công" },
         ],
       },
+      {
+        key: SIDEBAR.LOT_TAG_REQUESTS,
+        label: "lotTagRequests",
+        icon: <ClipboardCheck size={18} />,
+        actions: [
+          { key: PERMISSIONS.LOT_TAG_REQUESTS.VIEW, label: "Xem đơn xin bận" },
+          { key: PERMISSIONS.LOT_TAG_REQUESTS.CREATE, label: "Tạo đơn xin bận" },
+          { key: PERMISSIONS.LOT_TAG_REQUESTS.REVIEW, label: "Duyệt/từ chối đơn xin bận" },
+          { key: PERMISSIONS.LOT_TAG_REQUESTS.CANCEL, label: "Hủy đơn xin bận" },
+          { key: PERMISSIONS.LOT_TAG_REQUESTS.DELETE, label: "Xóa đơn xin bận" },
+        ],
+      },
     ],
   },
   {
@@ -219,6 +252,17 @@ export const navigationConfig: NavItem[] = [
           { key: PERMISSIONS.WORKS.CREATE, label: "Thêm công việc" },
           { key: PERMISSIONS.WORKS.UPDATE, label: "Sửa công việc" },
           { key: PERMISSIONS.WORKS.DELETE, label: "Xóa công việc" },
+        ],
+      },
+      {
+        key: SIDEBAR.LOT_TAGS,
+        label: "lotTags",
+        icon: <Tags size={18} />,
+        actions: [
+          { key: PERMISSIONS.LOT_TAGS.VIEW, label: "Xem danh sách tag lốt" },
+          { key: PERMISSIONS.LOT_TAGS.CREATE, label: "Thêm tag lốt" },
+          { key: PERMISSIONS.LOT_TAGS.UPDATE, label: "Sửa tag lốt" },
+          { key: PERMISSIONS.LOT_TAGS.DELETE, label: "Xóa tag lốt" },
         ],
       },
     ],

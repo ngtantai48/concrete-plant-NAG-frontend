@@ -22,6 +22,7 @@ type NotificationLike = {
   elapsed_minutes?: unknown;
   license_plate?: unknown;
   vehicle_maintenance_id?: unknown;
+  lot_tag_request_id?: unknown;
 };
 
 const NOTIFICATION_TEXT_TEMPLATES: Record<NotificationLocale, Record<string, string>> = {
@@ -44,6 +45,7 @@ const NOTIFICATION_TEXT_TEMPLATES: Record<NotificationLocale, Record<string, str
     [NOTIFICATION_EVENTS.VEHICLE_MAINTENANCE_REJECTED]:
       "Phiếu bảo trì xe {vehicle} đã bị từ chối, cần kiểm tra lại.",
     [NOTIFICATION_EVENTS.VEHICLE_MAINTENANCE_APPROVED]: "Phiếu bảo trì xe {vehicle} đã được duyệt.",
+    [NOTIFICATION_EVENTS.LOT_TAG_REQUEST_SUBMITTED]: "Đơn xin bận của xe {vehicle} cần duyệt.",
     [NOTIFICATION_EVENTS.TANKER_LOT_SYNC]: "Đã chụp và đồng bộ lốt xe bồn",
   },
   en: {
@@ -67,6 +69,8 @@ const NOTIFICATION_TEXT_TEMPLATES: Record<NotificationLocale, Record<string, str
       "Vehicle maintenance ticket for {vehicle} was rejected and needs review.",
     [NOTIFICATION_EVENTS.VEHICLE_MAINTENANCE_APPROVED]:
       "Vehicle maintenance ticket for {vehicle} was approved.",
+    [NOTIFICATION_EVENTS.LOT_TAG_REQUEST_SUBMITTED]:
+      "Busy request for vehicle {vehicle} needs review.",
     [NOTIFICATION_EVENTS.TANKER_LOT_SYNC]: "Tanker lot snapshot was captured and synced",
   },
 };
@@ -98,7 +102,7 @@ function getVehicleDisplayValue(notification: NotificationLike): string {
   const type = getStringValue(notification.type);
   const name = getStringValue(notification.vehicle_name);
 
-  if (type === "vehicle_maintenance") {
+  if (type === "vehicle_maintenance" || type === "lot_tag_request") {
     if (licensePlate && name) return `${licensePlate} | ${name}`;
     if (licensePlate) return licensePlate;
     if (name) return name;

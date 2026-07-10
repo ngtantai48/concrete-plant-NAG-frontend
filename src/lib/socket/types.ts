@@ -26,6 +26,8 @@ export interface NotificationPayload {
   reader_list?: (string | number)[];
   order_id?: string | number;
   vehicle_maintenance_id?: string | number;
+  lot_tag_request_id?: string | number;
+  work_date?: string;
   vehicle_id?: string | number;
   vehicle_name?: string;
   vehicle_license_plate?: string;

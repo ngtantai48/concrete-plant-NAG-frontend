@@ -15,6 +15,8 @@ export interface Notification {
     order_id?: number;
     order_number?: number;
     vehicle_maintenance_id?: number | string;
+    lot_tag_request_id?: number | string;
+    work_date?: string;
     vehicle_id?: number;
     vehicle_name?: string;
     vehicle_license_plate?: string;

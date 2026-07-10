@@ -12,6 +12,7 @@ export const NOTIFICATION_EVENTS = {
   VEHICLE_MAINTENANCE_REJECTED: "vehicle_maintenance_rejected",
   VEHICLE_MAINTENANCE_APPROVED: "vehicle_maintenance_approved",
   VEHICLE_MAINTENANCE_DELETED: "vehicle_maintenance_deleted",
+  LOT_TAG_REQUEST_SUBMITTED: "lot_tag_request_submitted",
   TANKER_LOT_SYNC: "tanker_lot_sync",
 } as const;
 
@@ -32,5 +33,6 @@ export const NOTIFICATION_EVENT_TRANSLATION_KEYS = {
   [NOTIFICATION_EVENTS.VEHICLE_MAINTENANCE_REJECTED]: "vehicle_maintenance_rejected",
   [NOTIFICATION_EVENTS.VEHICLE_MAINTENANCE_APPROVED]: "vehicle_maintenance_approved",
   [NOTIFICATION_EVENTS.VEHICLE_MAINTENANCE_DELETED]: "vehicle_maintenance_deleted",
+  [NOTIFICATION_EVENTS.LOT_TAG_REQUEST_SUBMITTED]: "lot_tag_request_submitted",
   [NOTIFICATION_EVENTS.TANKER_LOT_SYNC]: "tanker_lot_sync",
 } as const;
