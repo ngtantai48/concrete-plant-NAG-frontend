@@ -12,7 +12,11 @@ import { SIDEBAR } from "@/constants/route";
 import { useSocket } from "@/context/socket-context";
 import { useAppSelector } from "@/hooks/use-app-selector";
 import { usePermissions } from "@/hooks/use-permissions";
-import { getLotTagRequestId, getNotificationCategory } from "@/lib/notification-category";
+import {
+  getLotTagRequestId,
+  getNotificationCategory,
+  isLotTagRequestInvalidTransition,
+} from "@/lib/notification-category";
 import lotTagRequestApi from "@/services/lot-tag-request.service";
 import type { Notification } from "@/types/notification";
 import { UserOutlined } from "@ant-design/icons";
@@ -155,6 +159,11 @@ const AppHeader: React.FC<AppHeaderProps> = ({
         (error as { response?: { data?: { message?: string } } })?.response?.data?.message ||
         (error as Error)?.message ||
         tLotTagRequest("actionFailed");
+      if (isLotTagRequestInvalidTransition(description)) {
+        markAsRead(notification.id);
+        toast.info(tLotTagRequest("alreadyProcessed"));
+        return;
+      }
       toast.error(tLotTagRequest("actionFailed"), { description });
     } finally {
       setApprovingLotTagRequestId(null);

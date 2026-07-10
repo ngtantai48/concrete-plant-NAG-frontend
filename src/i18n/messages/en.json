@@ -1234,6 +1234,7 @@
     "actionTitleCancel": "Cancel busy request",
     "actionTitleDelete": "Delete busy request",
     "approveSuccess": "Request approved",
+    "alreadyProcessed": "This request has already been processed",
     "rejectSuccess": "Request rejected",
     "cancelSuccess": "Request canceled",
     "deleteSuccess": "Request deleted",

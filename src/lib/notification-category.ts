@@ -17,3 +17,7 @@ export function getLotTagRequestId(notification: NotificationCategoryInput): num
   const requestId = Number(notification.lot_tag_request_id);
   return Number.isInteger(requestId) && requestId > 0 ? requestId : null;
 }
+
+export function isLotTagRequestInvalidTransition(message: unknown): boolean {
+  return typeof message === "string" && message.includes("INVALID_TRANSITION");
+}

@@ -1237,6 +1237,7 @@
     "actionTitleCancel": "Hủy đơn xin bận",
     "actionTitleDelete": "Xóa đơn xin bận",
     "approveSuccess": "Đã duyệt đơn",
+    "alreadyProcessed": "Đơn này đã được xử lý trước đó",
     "rejectSuccess": "Đã từ chối đơn",
     "cancelSuccess": "Đã hủy đơn",
     "deleteSuccess": "Đã xóa đơn",
