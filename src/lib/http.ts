@@ -3,6 +3,7 @@ import type { RootState, Store } from "@/store";
 import { loginSuccess, logoutSuccess } from "@/store/slices/authSlice";
 import axios, { InternalAxiosRequestConfig } from "axios";
 import { jwtDecode } from "jwt-decode";
+import { resolveHttpBaseUrl } from "./http-base-url";
 import { handleHttpError } from "./http-error";
 
 let storeInstance: Store | null = null;
@@ -35,7 +36,11 @@ const serializeParams = (params: Record<string, unknown>): string => {
 };
 
 const http = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL,
+  baseURL: resolveHttpBaseUrl(
+    process.env.NEXT_PUBLIC_API_URL,
+    typeof window === "undefined" ? undefined : window.location.origin,
+    process.env.NEXT_PUBLIC_API_SAME_ORIGIN === "true"
+  ),
   headers: { "Content-Type": "application/json" },
   withCredentials: true,
   paramsSerializer: (params) => serializeParams(params as Record<string, unknown>),
