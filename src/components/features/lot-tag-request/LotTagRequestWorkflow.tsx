@@ -33,7 +33,18 @@ import {
 } from "antd";
 import type { ColumnsType } from "antd/es/table";
 import dayjs, { type Dayjs } from "dayjs";
-import { Ban, Check, ClipboardCheck, Loader2, Plus, RefreshCw, Tags, Truck, X } from "lucide-react";
+import {
+  Ban,
+  Check,
+  ClipboardCheck,
+  Loader2,
+  Plus,
+  RefreshCw,
+  Tags,
+  Trash2,
+  Truck,
+  X,
+} from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
@@ -111,6 +122,7 @@ export default function LotTagRequestWorkflow() {
   const canCreate = hasActionAccess(SIDEBAR.LOT_TAG_REQUESTS, PERMISSIONS.LOT_TAG_REQUESTS.CREATE);
   const canReview = hasActionAccess(SIDEBAR.LOT_TAG_REQUESTS, PERMISSIONS.LOT_TAG_REQUESTS.REVIEW);
   const canCancel = hasActionAccess(SIDEBAR.LOT_TAG_REQUESTS, PERMISSIONS.LOT_TAG_REQUESTS.CANCEL);
+  const canDelete = hasActionAccess(SIDEBAR.LOT_TAG_REQUESTS, PERMISSIONS.LOT_TAG_REQUESTS.DELETE);
 
   const [createForm] = Form.useForm<CreateFormValues>();
   const [requests, setRequests] = useState<LotTagRequest[]>([]);
@@ -344,9 +356,12 @@ export default function LotTagRequestWorkflow() {
       } else if (action === "reject") {
         await lotTagRequestApi.reject(request.lot_tag_request_id, { reason: trimmedNote });
         toast.success(t("rejectSuccess"));
-      } else {
+      } else if (action === "cancel") {
         await lotTagRequestApi.cancel(request.lot_tag_request_id, { reason: trimmedNote });
         toast.success(t("cancelSuccess"));
+      } else {
+        await lotTagRequestApi.remove(request.lot_tag_request_id);
+        toast.success(t("deleteSuccess"));
       }
       setActionTarget(null);
       void fetchRequests();
@@ -445,6 +460,7 @@ export default function LotTagRequestWorkflow() {
           const actions = getLotTagRequestAvailableActions(record, {
             canReview,
             canCancel,
+            canDelete,
           });
           if (actions.length === 0) return <span className="text-slate-400">-</span>;
 
@@ -494,12 +510,25 @@ export default function LotTagRequestWorkflow() {
                   </Button>
                 </Tooltip>
               )}
+              {actions.includes("delete") && (
+                <Tooltip title={t("delete")}>
+                  <Button
+                    type="button"
+                    size="iconSquare"
+                    variant="outline"
+                    disabled={isProcessing}
+                    onClick={() => openActionDialog(record, "delete")}
+                  >
+                    <Trash2 className="size-4 text-red-600" />
+                  </Button>
+                </Tooltip>
+              )}
             </Space>
           );
         },
       },
     ],
-    [canCancel, canReview, currentPage, pageSize, processingId, statusLabel, t]
+    [canCancel, canDelete, canReview, currentPage, pageSize, processingId, statusLabel, t]
   );
 
   const actionTitle = actionTarget
@@ -508,7 +537,9 @@ export default function LotTagRequestWorkflow() {
           ? "actionTitleApprove"
           : actionTarget.action === "reject"
             ? "actionTitleReject"
-            : "actionTitleCancel"
+            : actionTarget.action === "cancel"
+              ? "actionTitleCancel"
+              : "actionTitleDelete"
       )
     : "";
   const actionPlaceholder =
@@ -728,7 +759,11 @@ export default function LotTagRequestWorkflow() {
             </Button>
             <Button
               type="button"
-              variant={actionTarget?.action === "reject" ? "destructive" : "primary"}
+              variant={
+                actionTarget?.action === "reject" || actionTarget?.action === "delete"
+                  ? "destructive"
+                  : "primary"
+              }
               onClick={handleWorkflowAction}
               disabled={processingId != null}
             >
@@ -737,7 +772,9 @@ export default function LotTagRequestWorkflow() {
                 ? t("approve")
                 : actionTarget?.action === "reject"
                   ? t("reject")
-                  : t("cancel")}
+                  : actionTarget?.action === "cancel"
+                    ? t("cancel")
+                    : t("delete")}
             </Button>
           </div>
         }
@@ -758,13 +795,17 @@ export default function LotTagRequestWorkflow() {
               </div>
             </div>
           )}
-          <Input.TextArea
-            rows={3}
-            maxLength={500}
-            value={actionNote}
-            onChange={(event) => setActionNote(event.target.value)}
-            placeholder={actionPlaceholder}
-          />
+          {actionTarget?.action === "delete" ? (
+            <Alert type="warning" showIcon message={t("deleteWarning")} />
+          ) : (
+            <Input.TextArea
+              rows={3}
+              maxLength={500}
+              value={actionNote}
+              onChange={(event) => setActionNote(event.target.value)}
+              placeholder={actionPlaceholder}
+            />
+          )}
         </div>
       </Modal>
     </>

@@ -182,6 +182,7 @@ export const navigationConfig: NavItem[] = [
           { key: PERMISSIONS.LOT_TAG_REQUESTS.CREATE, label: "Tạo đơn xin bận" },
           { key: PERMISSIONS.LOT_TAG_REQUESTS.REVIEW, label: "Duyệt/từ chối đơn xin bận" },
           { key: PERMISSIONS.LOT_TAG_REQUESTS.CANCEL, label: "Hủy đơn xin bận" },
+          { key: PERMISSIONS.LOT_TAG_REQUESTS.DELETE, label: "Xóa đơn xin bận" },
         ],
       },
     ],

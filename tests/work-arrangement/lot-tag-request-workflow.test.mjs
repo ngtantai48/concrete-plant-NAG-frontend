@@ -27,16 +27,23 @@ test("derives default workflow actions by status and permission", () => {
   assert.deepEqual(
     getLotTagRequestAvailableActions(
       { request_status: "approved" },
-      { canReview: true, canCancel: true }
+      { canReview: true, canCancel: true, canDelete: true }
     ),
-    []
+    ["delete"]
+  );
+  assert.deepEqual(
+    getLotTagRequestAvailableActions(
+      { request_status: "pending" },
+      { canReview: true, canCancel: true, canDelete: true }
+    ),
+    ["approve", "reject", "cancel", "delete"]
   );
 });
 
 test("intersects backend workflow actions with the current user permissions", () => {
   const request = {
     request_status: "pending",
-    workflow_available_actions: ["approve", "reject", "cancel"],
+    workflow_available_actions: ["approve", "reject", "cancel", "delete"],
   };
 
   assert.deepEqual(getLotTagRequestAvailableActions(request, { canReview: true }), [
@@ -44,6 +51,7 @@ test("intersects backend workflow actions with the current user permissions", ()
     "reject",
   ]);
   assert.deepEqual(getLotTagRequestAvailableActions(request, { canCancel: true }), ["cancel"]);
+  assert.deepEqual(getLotTagRequestAvailableActions(request, { canDelete: true }), ["delete"]);
 });
 
 test("normalizes lot-tag request list payloads from common API wrappers", () => {

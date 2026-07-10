@@ -1,5 +1,5 @@
 export type LotTagRequestStatus = "pending" | "approved" | "rejected" | "canceled";
-export type LotTagRequestWorkflowAction = "approve" | "reject" | "cancel";
+export type LotTagRequestWorkflowAction = "approve" | "reject" | "cancel" | "delete";
 
 export interface LotTagRequestVehicle {
   vehicle_id: number;
@@ -83,14 +83,13 @@ export const isLotTagRequestTerminal = (status?: string | null) =>
   TERMINAL_STATUSES.has(normalizeLotTagRequestStatus(status));
 
 const isWorkflowAction = (action: string): action is LotTagRequestWorkflowAction =>
-  action === "approve" || action === "reject" || action === "cancel";
+  action === "approve" || action === "reject" || action === "cancel" || action === "delete";
 
 export const getLotTagRequestAvailableActions = (
   request: LotTagRequestWorkflowLike,
-  options: { canReview?: boolean; canCancel?: boolean } = {}
+  options: { canReview?: boolean; canCancel?: boolean; canDelete?: boolean } = {}
 ): LotTagRequestWorkflowAction[] => {
   const status = normalizeLotTagRequestStatus(request.request_status ?? request.status);
-  if (isLotTagRequestTerminal(status)) return [];
 
   const backendActions =
     request.workflow_available_actions
@@ -103,10 +102,16 @@ export const getLotTagRequestAvailableActions = (
   const baseActions =
     backendActions.length > 0
       ? backendActions
-      : (["approve", "reject", "cancel"] as LotTagRequestWorkflowAction[]);
+      : isLotTagRequestTerminal(status)
+        ? (["delete"] as LotTagRequestWorkflowAction[])
+        : (["approve", "reject", "cancel", "delete"] as LotTagRequestWorkflowAction[]);
 
   return baseActions.filter((action) =>
-    action === "cancel" ? Boolean(options.canCancel) : Boolean(options.canReview)
+    action === "delete"
+      ? Boolean(options.canDelete)
+      : action === "cancel"
+        ? Boolean(options.canCancel)
+        : Boolean(options.canReview)
   );
 };
 

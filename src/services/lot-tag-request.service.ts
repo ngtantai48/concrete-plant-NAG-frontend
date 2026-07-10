@@ -88,6 +88,10 @@ const lotTagRequestApi = {
     });
     return normalizeItemPayload(res.data);
   },
+
+  remove: async (requestId: number): Promise<void> => {
+    await http.delete(`${LOT_TAG_REQUESTS_ENDPOINT}/${requestId}`);
+  },
 };
 
 export default lotTagRequestApi;

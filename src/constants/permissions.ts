@@ -104,6 +104,7 @@ export const PERMISSIONS = {
     CREATE: "create",
     REVIEW: "review",
     CANCEL: "cancel",
+    DELETE: "delete",
   },
 
   PERMISSIONS_MANAGE: {
