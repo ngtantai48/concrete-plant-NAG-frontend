@@ -7,17 +7,21 @@ import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { NOTIFICATION_EVENTS } from "@/constants/notification";
+import { PERMISSIONS } from "@/constants/permissions";
 import { SIDEBAR } from "@/constants/route";
 import { useSocket } from "@/context/socket-context";
 import { useAppSelector } from "@/hooks/use-app-selector";
-import { getNotificationCategory } from "@/lib/notification-category";
+import { usePermissions } from "@/hooks/use-permissions";
+import { getLotTagRequestId, getNotificationCategory } from "@/lib/notification-category";
+import lotTagRequestApi from "@/services/lot-tag-request.service";
 import type { Notification } from "@/types/notification";
 import { UserOutlined } from "@ant-design/icons";
 import { Avatar, Dropdown, Layout, MenuProps, Space } from "antd";
-import { BellRing, ClipboardCheck, Volume2, VolumeX, Wrench } from "lucide-react";
+import { BellRing, Check, ClipboardCheck, Loader2, Volume2, VolumeX, Wrench } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import React, { useEffect, useMemo, useState } from "react";
+import { toast } from "sonner";
 
 const { Header } = Layout;
 
@@ -44,7 +48,9 @@ const AppHeader: React.FC<AppHeaderProps> = ({
   onLogout,
 }) => {
   const t = useTranslations("Header");
+  const tLotTagRequest = useTranslations("LotTagRequestPage");
   const router = useRouter();
+  const { hasActionAccess } = usePermissions();
 
   const reduxUserName = useAppSelector((state: any) => state.auth.user?.fullName);
   const authLoading = useAppSelector((state: any) => state.auth.loading);
@@ -52,7 +58,13 @@ const AppHeader: React.FC<AppHeaderProps> = ({
   const [isGeneralPopoverOpen, setIsGeneralPopoverOpen] = useState(false);
   const [isMaintenancePopoverOpen, setIsMaintenancePopoverOpen] = useState(false);
   const [isLotTagRequestPopoverOpen, setIsLotTagRequestPopoverOpen] = useState(false);
+  const [approvingLotTagRequestId, setApprovingLotTagRequestId] = useState<number | null>(null);
   const { notifications, markAsRead, isMuted, toggleMute } = useSocket();
+
+  const canReviewLotTagRequests = hasActionAccess(
+    SIDEBAR.LOT_TAG_REQUESTS,
+    PERMISSIONS.LOT_TAG_REQUESTS.REVIEW
+  );
 
   const maintenanceNotifications = useMemo(
     () => notifications.filter((item) => getNotificationCategory(item) === "maintenance"),
@@ -127,6 +139,26 @@ const AppHeader: React.FC<AppHeaderProps> = ({
     markAsRead(notification.id);
     setIsLotTagRequestPopoverOpen(false);
     router.push(SIDEBAR.LOT_TAG_REQUESTS);
+  };
+
+  const handleApproveLotTagRequest = async (notification: Notification) => {
+    const requestId = getLotTagRequestId(notification);
+    if (!requestId || approvingLotTagRequestId !== null) return;
+
+    setApprovingLotTagRequestId(requestId);
+    try {
+      await lotTagRequestApi.approve(requestId);
+      markAsRead(notification.id);
+      toast.success(tLotTagRequest("approveSuccess"));
+    } catch (error) {
+      const description =
+        (error as { response?: { data?: { message?: string } } })?.response?.data?.message ||
+        (error as Error)?.message ||
+        tLotTagRequest("actionFailed");
+      toast.error(tLotTagRequest("actionFailed"), { description });
+    } finally {
+      setApprovingLotTagRequestId(null);
+    }
   };
 
   return (
@@ -225,6 +257,29 @@ const AppHeader: React.FC<AppHeaderProps> = ({
                       onMarkAsRead={markAsRead}
                       onMarkAllAsRead={() => markNotificationsAsRead(lotTagRequestNotifications)}
                       onNotificationClick={handleLotTagRequestNotificationClick}
+                      renderNotificationActions={(notification) => {
+                        const requestId = getLotTagRequestId(notification);
+                        if (!canReviewLotTagRequests || !requestId) return null;
+
+                        const isApproving = approvingLotTagRequestId === requestId;
+                        return (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            disabled={approvingLotTagRequestId !== null}
+                            onClick={() => void handleApproveLotTagRequest(notification)}
+                            className="h-7 border-emerald-600 px-2 text-xs font-semibold text-emerald-700 hover:bg-emerald-50 hover:text-emerald-800"
+                          >
+                            {isApproving ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              <Check className="h-3.5 w-3.5" />
+                            )}
+                            {tLotTagRequest("approve")}
+                          </Button>
+                        );
+                      }}
                     />
                   </PopoverContent>
                 </Popover>

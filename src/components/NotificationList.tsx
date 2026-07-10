@@ -5,13 +5,14 @@ import { cn } from "@/lib/utils";
 import { Notification } from "@/types/notification";
 import { Bell, CheckCheck, Circle, Clock, Search, X } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
-import { useMemo, useState } from "react";
+import { type ReactNode, useMemo, useState } from "react";
 
 interface NotificationListProps {
   notifications: Notification[];
   onMarkAsRead: (id: string | number) => void;
   onMarkAllAsRead?: () => void;
   onNotificationClick?: (notification: Notification) => void;
+  renderNotificationActions?: (notification: Notification) => ReactNode;
 }
 
 export default function NotificationList({
@@ -19,6 +20,7 @@ export default function NotificationList({
   onMarkAsRead,
   onMarkAllAsRead,
   onNotificationClick,
+  renderNotificationActions,
 }: NotificationListProps) {
   const t = useTranslations("Notification");
   const locale = useLocale();
@@ -58,6 +60,20 @@ export default function NotificationList({
       month: "2-digit",
       year: "numeric",
     }).format(date);
+  };
+
+  const renderActions = (item: Notification) => {
+    const actions = renderNotificationActions?.(item);
+    if (!actions) return null;
+
+    return (
+      <div
+        className="mt-2 flex items-center gap-2"
+        onClick={(event) => event.stopPropagation()}
+      >
+        {actions}
+      </div>
+    );
   };
 
   return (
@@ -174,6 +190,7 @@ export default function NotificationList({
                       {formatTimestamp(item)}
                     </span>
                   </div>
+                  {renderActions(item)}
                 </div>
               </div>
             ))}
