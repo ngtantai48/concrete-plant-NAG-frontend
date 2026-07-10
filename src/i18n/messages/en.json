@@ -117,7 +117,8 @@
     },
     "profile": "Profile",
     "settings": "Settings",
-    "logout": "Logout"
+    "logout": "Logout",
+    "lotTagRequestNotifications": "Busy request notifications"
   },
   "Notification": {
     "notification": "Notification",
@@ -130,6 +131,7 @@
     "vehicle_check_out": "Vehicle {vehicle} has left the yard",
     "parking_idle_engine_warning": "Warning: Vehicle {vehicle} has been idling for {elapsed_minutes} minutes",
     "parking_idle_engine_warning_resolved": "Vehicle {vehicle} engine turned off in the yard",
+    "lot_tag_request_submitted": "Busy request for vehicle {vehicle} needs review.",
     "tanker_lot_sync": "Tanker lot snapshot was captured and synced"
   },
   "Dashboard": {

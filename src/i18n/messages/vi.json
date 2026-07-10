@@ -118,7 +118,8 @@
     },
     "profile": "Tài khoản",
     "settings": "Cài đặt",
-    "logout": "Đăng xuất"
+    "logout": "Đăng xuất",
+    "lotTagRequestNotifications": "Thông báo đơn xin bận"
   },
   "Notification": {
     "notification": "Thông báo",
@@ -131,6 +132,7 @@
     "vehicle_check_out": "Xe {vehicle} đã vào bãi",
     "parking_idle_engine_warning": "Cảnh báo xe {vehicle} nổ máy trong bãi đã {elapsed_minutes} phút",
     "parking_idle_engine_warning_resolved": "Xe {vehicle} đã tắt máy trong bãi",
+    "lot_tag_request_submitted": "Đơn xin bận của xe {vehicle} cần duyệt.",
     "tanker_lot_sync": "Đã chụp và đồng bộ lốt xe bồn"
   },
   "Dashboard": {

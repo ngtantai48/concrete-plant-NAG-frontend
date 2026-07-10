@@ -10,10 +10,11 @@ import { NOTIFICATION_EVENTS } from "@/constants/notification";
 import { SIDEBAR } from "@/constants/route";
 import { useSocket } from "@/context/socket-context";
 import { useAppSelector } from "@/hooks/use-app-selector";
+import { getNotificationCategory } from "@/lib/notification-category";
 import type { Notification } from "@/types/notification";
 import { UserOutlined } from "@ant-design/icons";
 import { Avatar, Dropdown, Layout, MenuProps, Space } from "antd";
-import { BellRing, Volume2, VolumeX, Wrench } from "lucide-react";
+import { BellRing, ClipboardCheck, Volume2, VolumeX, Wrench } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import React, { useEffect, useMemo, useState } from "react";
@@ -50,14 +51,19 @@ const AppHeader: React.FC<AppHeaderProps> = ({
   const [localUserName, setLocalUserName] = useState<string | undefined>(userName);
   const [isGeneralPopoverOpen, setIsGeneralPopoverOpen] = useState(false);
   const [isMaintenancePopoverOpen, setIsMaintenancePopoverOpen] = useState(false);
+  const [isLotTagRequestPopoverOpen, setIsLotTagRequestPopoverOpen] = useState(false);
   const { notifications, markAsRead, isMuted, toggleMute } = useSocket();
 
   const maintenanceNotifications = useMemo(
-    () => notifications.filter((item) => item.type === "vehicle_maintenance"),
+    () => notifications.filter((item) => getNotificationCategory(item) === "maintenance"),
+    [notifications]
+  );
+  const lotTagRequestNotifications = useMemo(
+    () => notifications.filter((item) => getNotificationCategory(item) === "lotTagRequest"),
     [notifications]
   );
   const generalNotifications = useMemo(
-    () => notifications.filter((item) => item.type !== "vehicle_maintenance"),
+    () => notifications.filter((item) => getNotificationCategory(item) === "general"),
     [notifications]
   );
   const generalUnreadCount = useMemo(
@@ -67,6 +73,10 @@ const AppHeader: React.FC<AppHeaderProps> = ({
   const maintenanceUnreadCount = useMemo(
     () => maintenanceNotifications.filter((item) => !item.read).length,
     [maintenanceNotifications]
+  );
+  const lotTagRequestUnreadCount = useMemo(
+    () => lotTagRequestNotifications.filter((item) => !item.read).length,
+    [lotTagRequestNotifications]
   );
 
   useEffect(() => {
@@ -111,6 +121,12 @@ const AppHeader: React.FC<AppHeaderProps> = ({
     if (typeof maintenanceId === "number" || typeof maintenanceId === "string") {
       router.push(`${SIDEBAR.VEHICLE_MAINTENANCES}/${maintenanceId}`);
     }
+  };
+
+  const handleLotTagRequestNotificationClick = (notification: Notification) => {
+    markAsRead(notification.id);
+    setIsLotTagRequestPopoverOpen(false);
+    router.push(SIDEBAR.LOT_TAG_REQUESTS);
   };
 
   return (
@@ -172,6 +188,48 @@ const AppHeader: React.FC<AppHeaderProps> = ({
                 </Popover>
                 <TooltipContent>
                   <p>Thông báo bảo trì xe</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+
+            <TooltipProvider delayDuration={300}>
+              <Tooltip>
+                <Popover
+                  open={isLotTagRequestPopoverOpen}
+                  onOpenChange={setIsLotTagRequestPopoverOpen}
+                >
+                  <TooltipTrigger asChild>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="relative hover:bg-gray-300"
+                        aria-label={t("lotTagRequestNotifications")}
+                      >
+                        <ClipboardCheck />
+                        {lotTagRequestUnreadCount > 0 && (
+                          <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 rounded-full bg-red-500 text-[10px] ring-2 ring-white">
+                            {lotTagRequestUnreadCount > 99 ? "99+" : lotTagRequestUnreadCount}
+                          </Badge>
+                        )}
+                      </Button>
+                    </PopoverTrigger>
+                  </TooltipTrigger>
+                  <PopoverContent
+                    align="end"
+                    className="z-1000 p-0 w-[360px] shadow-lg border-none"
+                    sideOffset={5}
+                  >
+                    <NotificationList
+                      notifications={lotTagRequestNotifications}
+                      onMarkAsRead={markAsRead}
+                      onMarkAllAsRead={() => markNotificationsAsRead(lotTagRequestNotifications)}
+                      onNotificationClick={handleLotTagRequestNotificationClick}
+                    />
+                  </PopoverContent>
+                </Popover>
+                <TooltipContent>
+                  <p>{t("lotTagRequestNotifications")}</p>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
