@@ -12,6 +12,7 @@ import { SIDEBAR } from "@/constants/route";
 import { useSocket } from "@/context/socket-context";
 import { useAppSelector } from "@/hooks/use-app-selector";
 import { usePermissions } from "@/hooks/use-permissions";
+import { getNotificationText } from "@/lib/notification";
 import {
   getLotTagRequestId,
   getNotificationCategory,
@@ -21,13 +22,14 @@ import lotTagRequestApi from "@/services/lot-tag-request.service";
 import type { Notification } from "@/types/notification";
 import { UserOutlined } from "@ant-design/icons";
 import { Avatar, Dropdown, Layout, MenuProps, Space } from "antd";
-import { BellRing, Check, ClipboardCheck, Loader2, Volume2, VolumeX, Wrench } from "lucide-react";
+import { BellRing, Check, ClipboardCheck, Loader2, Volume2, VolumeX, Wrench, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 const { Header } = Layout;
+const LOT_TAG_REQUEST_DOCK_DURATION_MS = 5 * 60 * 1000;
 
 type AppHeaderProps = {
   statusColor?: string;
@@ -63,12 +65,69 @@ const AppHeader: React.FC<AppHeaderProps> = ({
   const [isMaintenancePopoverOpen, setIsMaintenancePopoverOpen] = useState(false);
   const [isLotTagRequestPopoverOpen, setIsLotTagRequestPopoverOpen] = useState(false);
   const [approvingLotTagRequestId, setApprovingLotTagRequestId] = useState<number | null>(null);
-  const { notifications, markAsRead, isMuted, toggleMute } = useSocket();
+  const { notifications, markAsRead, isMuted, toggleMute, onSocketEvent } = useSocket();
+  const [lotTagRequestDock, setLotTagRequestDock] = useState<Notification | null>(null);
+  const dockTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastDockedRequestIdRef = useRef<number | null>(null);
 
   const canReviewLotTagRequests = hasActionAccess(
     SIDEBAR.LOT_TAG_REQUESTS,
     PERMISSIONS.LOT_TAG_REQUESTS.REVIEW
   );
+
+  useEffect(() => {
+    if (!canReviewLotTagRequests) return;
+
+    const unsubscribe = onSocketEvent((eventName, ...args) => {
+      if (eventName !== "notification:new") return;
+      const payload = args[0];
+      if (!payload || typeof payload !== "object") return;
+
+      const notification = payload as Notification;
+      if (
+        notification.type !== "lot_tag_request" ||
+        notification.event !== NOTIFICATION_EVENTS.LOT_TAG_REQUEST_SUBMITTED ||
+        !getLotTagRequestId(notification)
+      ) return;
+
+      setLotTagRequestDock(notification);
+      if (dockTimerRef.current) clearTimeout(dockTimerRef.current);
+      dockTimerRef.current = setTimeout(
+        () => setLotTagRequestDock(null),
+        LOT_TAG_REQUEST_DOCK_DURATION_MS
+      );
+    });
+
+    return () => {
+      unsubscribe();
+      if (dockTimerRef.current) clearTimeout(dockTimerRef.current);
+    };
+  }, [canReviewLotTagRequests, onSocketEvent]);
+
+  // Backend refreshes the notification list after a targeted notification.
+  // Catch the new unread request here as well as notification:new.
+  useEffect(() => {
+    if (!canReviewLotTagRequests) return;
+
+    const latestRequest = notifications.find(
+      (notification) =>
+        !notification.read &&
+        notification.type === "lot_tag_request" &&
+        notification.event === NOTIFICATION_EVENTS.LOT_TAG_REQUEST_SUBMITTED &&
+        getLotTagRequestId(notification)
+    );
+    const requestId = latestRequest ? getLotTagRequestId(latestRequest) : null;
+
+    if (!latestRequest || !requestId || lastDockedRequestIdRef.current === requestId) return;
+
+    lastDockedRequestIdRef.current = requestId;
+    setLotTagRequestDock(latestRequest);
+    if (dockTimerRef.current) clearTimeout(dockTimerRef.current);
+    dockTimerRef.current = setTimeout(
+      () => setLotTagRequestDock(null),
+      LOT_TAG_REQUEST_DOCK_DURATION_MS
+    );
+  }, [canReviewLotTagRequests, notifications]);
 
   const maintenanceNotifications = useMemo(
     () => notifications.filter((item) => getNotificationCategory(item) === "maintenance"),
@@ -153,6 +212,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({
     try {
       await lotTagRequestApi.approve(requestId);
       markAsRead(notification.id);
+      setLotTagRequestDock(null);
       toast.success(tLotTagRequest("approveSuccess"));
     } catch (error) {
       const description =
@@ -161,6 +221,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({
         tLotTagRequest("actionFailed");
       if (isLotTagRequestInvalidTransition(description)) {
         markAsRead(notification.id);
+        setLotTagRequestDock(null);
         toast.info(tLotTagRequest("alreadyProcessed"));
         return;
       }
@@ -171,6 +232,7 @@ const AppHeader: React.FC<AppHeaderProps> = ({
   };
 
   return (
+    <>
     <Header
       className="sticky top-0 z-10 flex items-center justify-between flex-wrap gap-y-3 min-h-16 w-full border-b border-gray-200 shadow-md"
       style={{ background: "#fff", padding: "0 16px" }}
@@ -359,6 +421,54 @@ const AppHeader: React.FC<AppHeaderProps> = ({
         )}
       </div>
     </Header>
+    {lotTagRequestDock && (
+      <div className="fixed bottom-6 right-6 z-[180] w-[min(360px,calc(100vw-2rem))] overflow-hidden rounded-lg border border-amber-200 bg-white shadow-2xl ring-1 ring-black/5">
+        <div className="flex items-start gap-3 border-b border-amber-100 bg-amber-50 px-4 py-3">
+          <ClipboardCheck className="mt-0.5 size-5 shrink-0 text-amber-600" />
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-bold text-amber-900">Có đơn xin bận mới cần duyệt</p>
+            <p className="mt-1 text-xs text-amber-800">
+              {getNotificationText(lotTagRequestDock, "vi")}
+            </p>
+          </div>
+          <button
+            type="button"
+            aria-label="Đóng thông báo"
+            className="rounded p-1 text-amber-700 hover:bg-amber-100"
+            onClick={() => setLotTagRequestDock(null)}
+          >
+            <X className="size-4" />
+          </button>
+        </div>
+        <div className="flex items-center justify-end gap-2 px-4 py-3">
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() => {
+              setLotTagRequestDock(null);
+              router.push(SIDEBAR.LOT_TAG_REQUESTS);
+            }}
+          >
+            Xem danh sách
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            onClick={() => void handleApproveLotTagRequest(lotTagRequestDock)}
+            disabled={approvingLotTagRequestId !== null}
+          >
+            {approvingLotTagRequestId === getLotTagRequestId(lotTagRequestDock) ? (
+              <Loader2 className="size-4 animate-spin" />
+            ) : (
+              <Check className="size-4" />
+            )}
+            Duyệt ngay
+          </Button>
+        </div>
+      </div>
+    )}
+    </>
   );
 };
 

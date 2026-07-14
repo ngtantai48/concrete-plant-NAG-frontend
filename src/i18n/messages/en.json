@@ -1185,11 +1185,12 @@
   },
   "LotTagRequestPage": {
     "title": "Busy request approval",
-    "subtitle": "Driver busy requests by work date",
+    "subtitle": "Driver busy requests, filter by date when needed",
     "entryButton": "Busy requests",
     "createButton": "New request",
     "createDialogTitle": "Create busy request",
     "dateLabel": "Date",
+    "dateFilterPlaceholder": "All dates",
     "vehicleLabel": "Vehicle",
     "tagLabel": "Tag",
     "reasonLabel": "Reason",

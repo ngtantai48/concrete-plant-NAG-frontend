@@ -58,6 +58,8 @@ export const navigationConfig: NavItem[] = [
       { key: PERMISSIONS.DASHBOARD.CHECKLOG, label: "Xem nhật ký vận hành" },
       { key: PERMISSIONS.DASHBOARD.MANUAL_SORT, label: "Thao tác sắp xếp thứ tự lốt xe" },
       { key: PERMISSIONS.DASHBOARD.VIEW_MAP, label: "Xem bản đồ" },
+      { key: PERMISSIONS.DASHBOARD.VIEW_YARD_VEHICLES, label: "Xem xe trong bãi" },
+      { key: PERMISSIONS.DASHBOARD.VIEW_LOT_ORDER, label: "Xem thứ tự lốt xe" },
       {
         key: PERMISSIONS.DASHBOARD.MANUAL_CAMERA_FALLBACK,
         label: "Thao tác cho xe vào/xuất trạm (camera sự cố)",

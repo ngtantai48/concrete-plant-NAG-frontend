@@ -1188,11 +1188,12 @@
   },
   "LotTagRequestPage": {
     "title": "Duyệt đơn xin bận",
-    "subtitle": "Đơn xin bận của tài xế theo ngày",
+    "subtitle": "Đơn xin bận của tài xế, lọc theo ngày khi cần",
     "entryButton": "Đơn xin bận",
     "createButton": "Tạo đơn",
     "createDialogTitle": "Tạo đơn xin bận",
     "dateLabel": "Ngày",
+    "dateFilterPlaceholder": "Tất cả ngày",
     "vehicleLabel": "Xe",
     "tagLabel": "Tag",
     "reasonLabel": "Lý do",
