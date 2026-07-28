@@ -15,6 +15,7 @@ import { ArrowDownUp, ChevronDown, ChevronUp, FileSpreadsheet, Truck } from "luc
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  getFullLotOrderUpdates,
   getLotItemKey,
   getLotOrderMoveUpdates,
   getPersistedLotOrderPosition,
@@ -364,6 +365,10 @@ export default function LotCaptureModal({
 
     setLotCaptureSaving(true);
 
+    // Ép order_number trên backend khớp thứ tự lốt đang hiển thị (kể cả khi không bấm nút sắp
+    // xếp từng xe) trước khi chụp, để bảng lốt ở dashboard trùng với sheet ngay sau khi chụp.
+    await runLotOrderUpdates(getFullLotOrderUpdates(lotCaptureItems), lotCaptureItems);
+
     const pushToSheet = async () => {
       const res = await fetch("/api/google-sheets/bo-tri-cv/sync-lot", {
         method: "POST",
@@ -421,6 +426,7 @@ export default function LotCaptureModal({
     lotCaptureName,
     onCaptured,
     onClose,
+    runLotOrderUpdates,
     t,
   ]);
 

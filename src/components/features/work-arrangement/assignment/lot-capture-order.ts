@@ -2,12 +2,21 @@ type LotOrderItem = {
   order_id: number | string;
   vehicle_id: number | string;
   group?: string;
+  order_status?: string;
 };
 
 export const getLotItemKey = (item: LotOrderItem) => `${item.order_id}:${item.vehicle_id}`;
 
 export const isPersistedLotOrderItem = (item: LotOrderItem) =>
   Number(item.order_id) > 0 && item.group !== "unreturned";
+
+// Đơn thực sự đang "chờ lốt": chỉ nhóm pending mới nằm trong hàng đợi rút-chèn của backend.
+// Xe đang chạy (running/transporting) hay chưa về (unreturned) không tính vào vị trí lốt.
+export const isPendingLotOrderItem = (item: LotOrderItem) => {
+  if (!isPersistedLotOrderItem(item)) return false;
+  const status = String(item.order_status ?? item.group ?? "").toLowerCase();
+  return status === "pending";
+};
 
 const moveLotItemToIndex = <T>(items: T[], fromIndex: number, toIndex: number) => {
   if (
@@ -102,6 +111,21 @@ export const getLotOrderMoveUpdates = <T extends LotOrderItem>(
 
   return updates;
 };
+
+/**
+ * Chuỗi lệnh "chuyển tới vị trí" cho TOÀN BỘ đơn pending theo đúng thứ tự đang hiển thị
+ * (vị trí 1 → hết). Dùng khi "Chụp lốt" để ép order_number trên backend khớp thứ tự đã sắp,
+ * kể cả khi người dùng không bấm nút sắp xếp từng xe. Áp dụng tăng dần vị trí đích nên mỗi
+ * PUT rút-chèn cố định dần phần đầu, hội tụ đúng thứ tự cuối.
+ */
+export const getFullLotOrderUpdates = <T extends LotOrderItem>(
+  items: T[]
+): LotOrderMoveUpdate[] =>
+  items.filter(isPendingLotOrderItem).map((item, index) => ({
+    itemKey: getLotItemKey(item),
+    orderId: Number(item.order_id),
+    targetPosition: index + 1,
+  }));
 
 export const getPersistedLotOrderUpdates = <T extends LotOrderItem>(
   items: T[],
