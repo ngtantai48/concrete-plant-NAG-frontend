@@ -11,7 +11,7 @@ import { workAssignmentApi, workMixSlotApi } from "@/services/work-arrangement.s
 import type { WorkMixSlotItem } from "@/types/work-arrangement";
 import { message, Modal, Select as AntSelect, Skeleton } from "antd";
 import dayjs from "dayjs";
-import { ArrowDownUp, ChevronDown, ChevronUp, ListOrdered, Truck } from "lucide-react";
+import { ArrowDownUp, ChevronDown, ChevronUp, FileSpreadsheet, Truck } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -29,6 +29,39 @@ import {
 import { Chip, filterSelectOptionByLabel, getVehicleDayTagChipTone } from "./shared";
 
 const getDefaultLotCaptureName = () => `Lốt ${dayjs().format("H")}H`;
+
+const normalizeLotVehicleName = (raw: unknown) => {
+  const upper = String(raw || "")
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, "");
+  const match = upper.match(/^X0*(\d+)$/);
+  return match ? `X${match[1]}` : upper;
+};
+
+const buildLotSyncMap = (items: WorkMixSlotItem[]) => {
+  const maToStt: Record<string, number> = {};
+  const skipped: { order_number: number; reason: string; raw: unknown }[] = [];
+
+  items.forEach((item, index) => {
+    const maX = normalizeLotVehicleName(item.vehicle_name);
+    if (!/^X\d+$/.test(maX)) {
+      skipped.push({
+        order_number: item.order_number,
+        reason: "invalid_vehicle_name",
+        raw: item.vehicle_name,
+      });
+      return;
+    }
+    if (maX in maToStt) {
+      skipped.push({ order_number: item.order_number, reason: "duplicate", raw: maX });
+      return;
+    }
+    maToStt[maX] = index + 1;
+  });
+
+  return { maToStt, skipped };
+};
 
 const isPendingLotItem = (item: WorkMixSlotItem) => {
   const status = String(item.order_status || item.group || "").toLowerCase();
@@ -301,11 +334,6 @@ export default function LotCaptureModal({
   }, [lotCaptureItems, lotDutyVehicleIds, persistLotOrderChanges]);
 
   const handleCaptureLots = useCallback(async () => {
-    if (lotCaptureItems.length === 0) {
-      message.warning(t("lotCaptureEmpty"));
-      return;
-    }
-
     const lotName = lotCaptureName.trim() || getDefaultLotCaptureName();
     const dutyVehicles = lotCaptureItems.filter((item) =>
       dutyVehicleIdSet.has(Number(item.vehicle_id))
@@ -326,28 +354,67 @@ export default function LotCaptureModal({
       .filter(Boolean)
       .join(", ");
     const snapshotDescription = tagSummary ? `${snapshotNote} | Tag: ${tagSummary}` : snapshotNote;
+    const { maToStt, skipped } = buildLotSyncMap(lotCaptureItems);
+    const lotCount = Object.keys(maToStt).length;
+
+    if (skipped.length > 0) console.warn("[LotCaptureModal] skipped:", skipped);
+    if (lotCount === 0) {
+      message.warning(t("lotCaptureEmpty"));
+      return;
+    }
 
     setLotCaptureSaving(true);
 
     // Ép order_number trên backend khớp thứ tự lốt đang hiển thị (kể cả khi không bấm nút sắp
-    // xếp từng xe) trước khi chụp, để bảng lốt ở dashboard trùng snapshot ngay sau khi chụp.
+    // xếp từng xe) trước khi chụp, để bảng lốt ở dashboard trùng với sheet ngay sau khi chụp.
     await runLotOrderUpdates(getFullLotOrderUpdates(lotCaptureItems), lotCaptureItems);
 
-    try {
-      await systemApi.captureTankerLotSync({
-        lot_name: lotName,
-        duty_vehicle_id: primaryDutyVehicle ? Number(primaryDutyVehicle.vehicle_id) : undefined,
-        duty_vehicle_name: primaryDutyVehicle?.vehicle_name || undefined,
-        duty_vehicle_license_plate: primaryDutyVehicle?.vehicle_license_plate || undefined,
-        snapshot_note: snapshotNote,
-        multi_description: snapshotDescription,
+    const pushToSheet = async () => {
+      const res = await fetch("/api/google-sheets/bo-tri-cv/sync-lot", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ maToStt, lotName }),
       });
-      message.success(t("lotCaptureSuccess", { name: lotName }));
-      onCaptured?.(lotName);
-      onClose();
-    } catch (error) {
-      console.error("[LotCaptureModal] snapshot error:", error);
-      message.error(t("lotCaptureFailed"));
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || "Sync failed");
+      if (data.unmatchedMaX?.length > 0) {
+        console.warn("[LotCaptureModal] mã X không có trong sheet cột H:", data.unmatchedMaX);
+      }
+      return data;
+    };
+
+    try {
+      const [sheetResult, snapshotResult] = await Promise.allSettled([
+        pushToSheet(),
+        systemApi.captureTankerLotSync({
+          lot_name: lotName,
+          duty_vehicle_id: primaryDutyVehicle ? Number(primaryDutyVehicle.vehicle_id) : undefined,
+          duty_vehicle_name: primaryDutyVehicle?.vehicle_name || undefined,
+          duty_vehicle_license_plate: primaryDutyVehicle?.vehicle_license_plate || undefined,
+          snapshot_note: snapshotNote,
+          multi_description: snapshotDescription,
+        }),
+      ]);
+
+      if (sheetResult.status === "fulfilled") {
+        const data = sheetResult.value;
+        message.success(t("lotSyncSuccess", { count: data.updated ?? lotCount }));
+      } else {
+        console.error("[LotCaptureModal] sheet error:", sheetResult.reason);
+        message.error(t("lotSyncFailed"));
+      }
+
+      if (snapshotResult.status === "fulfilled") {
+        message.success(t("lotCaptureSuccess", { name: lotName }));
+        onCaptured?.(lotName);
+      } else {
+        console.error("[LotCaptureModal] snapshot error:", snapshotResult.reason);
+        message.error(t("lotCaptureFailed"));
+      }
+
+      if (sheetResult.status === "fulfilled" || snapshotResult.status === "fulfilled") {
+        onClose();
+      }
     } finally {
       setLotCaptureSaving(false);
     }
@@ -449,7 +516,7 @@ export default function LotCaptureModal({
         </div>
         <div className="rounded-md border border-slate-200">
           <div className="flex items-center gap-2 border-b border-slate-200 bg-white px-3 py-2 text-sm font-bold text-slate-800">
-            <ListOrdered size={16} className="text-teal-600" />
+            <FileSpreadsheet size={16} className="text-teal-600" />
             {t("lotCapturePreview", { count: lotCaptureItems.length })}
             <Button
               type="button"
