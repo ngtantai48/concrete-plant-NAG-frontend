@@ -8,6 +8,8 @@ export const PERMISSIONS = {
     MANUAL_SORT: "manual_sort",
     MANUAL_CAMERA_FALLBACK: "manual_camera_fallback",
     VIEW_MAP: "view_map",
+    VIEW_YARD_VEHICLES: "view_yard_vehicles",
+    VIEW_LOT_ORDER: "view_lot_order",
     SYSTEM_SETTINGS: "system_settings",
   },
 
@@ -110,6 +112,10 @@ export const PERMISSIONS = {
   PERMISSIONS_MANAGE: {
     VIEW: "view",
     UPDATE: "update",
+  },
+
+  AUDIT_LOGS: {
+    VIEW: "view",
   },
 
   REPORTS: {

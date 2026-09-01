@@ -1080,6 +1080,16 @@ const hasWorkAssignmentDraftData = (
   mixerDraft: WorkMixerAssignmentDraft
 ) => pumpDraft.pump_assignments.length > 0 || mixerDraft.mixer_assignments.length > 0;
 
+// Map bố trí ngày cũ sang ngày mới: chỉ kế thừa xe + tài xế. Tag ngày (đơn xin bận, nghỉ,
+// sửa chữa…) là trạng thái riêng của ngày cũ nên bỏ; dòng chỉ có tag mà không có tài xế
+// cũng không map sang ngày mới.
+const withoutMixerDayTags = (draft: WorkMixerAssignmentDraft): WorkMixerAssignmentDraft => ({
+  ...draft,
+  mixer_assignments: draft.mixer_assignments
+    .filter((assignment) => assignment.user_id != null)
+    .map((assignment) => ({ ...assignment, day_tag: null })),
+});
+
 const withPrefilledFromDate = <T extends { prefilled_from_date?: string }>(
   draft: T,
   sourceDate: string
@@ -1452,10 +1462,11 @@ export const workAssignmentApi = {
       if (!hasWorkAssignmentDraftData(pumpDraft, mixerDraft)) {
         const previousDay = await getPreviousArrangementDay(workDate);
         if (previousDay && previousDate) {
-          const [previousPumpDraft, previousMixerDraft] = await Promise.all([
+          const [previousPumpDraft, previousMixerDraftRaw] = await Promise.all([
             buildDraftFromBackend(workDate, previousDay),
             buildMixerDraftFromBackend(workDate, previousDay),
           ]);
+          const previousMixerDraft = withoutMixerDayTags(previousMixerDraftRaw);
 
           if (hasWorkAssignmentDraftData(previousPumpDraft, previousMixerDraft)) {
             pumpDraft = previousPumpDraft.pump_assignments.length

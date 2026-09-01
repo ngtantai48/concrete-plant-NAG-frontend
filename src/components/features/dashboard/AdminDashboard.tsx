@@ -163,6 +163,11 @@ export default function AdminDashboard() {
   const isPastDate = selectedDate < getTodayDate();
   const isToday = selectedDate === getTodayDate();
   const canSyncLots = hasActionAccess(SIDEBAR.DASHBOARD, PERMISSIONS.DASHBOARD.SYNC_SLOTS);
+  const canViewYardVehicles = hasActionAccess(
+    SIDEBAR.DASHBOARD,
+    PERMISSIONS.DASHBOARD.VIEW_YARD_VEHICLES
+  );
+  const canViewLotOrder = hasActionAccess(SIDEBAR.DASHBOARD, PERMISSIONS.DASHBOARD.VIEW_LOT_ORDER);
 
   const handleToggleYardEntryTime = useCallback(() => {
     window.localStorage.setItem(YARD_ENTRY_TIME_VISIBILITY_STORAGE_KEY, String(!showYardEntryTime));
@@ -1077,6 +1082,7 @@ export default function AdminDashboard() {
               {/* Vehicles + Dispatch side by side */}
               <div className="flex gap-2 flex-1 min-h-0">
                 {/* Vehicles Column: Xe trong bãi + Dừng/Bảo trì stacked vertically */}
+                {canViewYardVehicles && (
                 <div className="flex flex-col gap-1.5 shrink-0 min-h-0" style={{ width: "350px" }}>
                   {/* Ready Vehicles */}
                   <div
@@ -1261,9 +1267,10 @@ export default function AdminDashboard() {
                     </div>
                   </div>
                 </div>
+                )}
 
                 {/* Dispatch Center */}
-                <div
+                {canViewLotOrder && <div
                   className="flex flex-1 flex-col h-full min-h-0 dd-card overflow-hidden"
                   style={{
                     boxShadow: "0 0 20px rgba(14, 165, 233, 0.05)",
@@ -1359,7 +1366,7 @@ export default function AdminDashboard() {
                       </div>
                     </div>
                   </div>
-                </div>
+                </div>}
                 {/* end: Vehicles + Dispatch side by side */}
               </div>
             </div>

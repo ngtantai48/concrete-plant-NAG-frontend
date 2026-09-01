@@ -2,9 +2,11 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  getFullLotOrderUpdates,
   getLotItemKey,
   getPersistedLotOrderPosition,
   getPersistedLotOrderUpdates,
+  isPendingLotOrderItem,
   isPersistedLotOrderItem,
   moveLotItemByDirection,
   moveLotItemToPosition,
@@ -83,4 +85,44 @@ test("returns backend order updates in descending target position order", () => 
       { itemKey: getLotItemKey(items[1]), orderId: 1, targetPosition: 2 },
     ]
   );
+});
+
+test("classifies only pending orders as pending lot items", () => {
+  assert.equal(isPendingLotOrderItem({ order_id: 1, vehicle_id: 101, group: "pending" }), true);
+  assert.equal(
+    isPendingLotOrderItem({ order_id: 1, vehicle_id: 101, order_status: "pending" }),
+    true
+  );
+  assert.equal(isPendingLotOrderItem({ order_id: 2, vehicle_id: 102, group: "running" }), false);
+  assert.equal(
+    isPendingLotOrderItem({ order_id: -3, vehicle_id: 103, group: "unreturned" }),
+    false
+  );
+  // Persisted item with no status/group is not assumed pending (running orders may omit it).
+  assert.equal(isPendingLotOrderItem({ order_id: 4, vehicle_id: 104 }), false);
+});
+
+test("builds a full pending reindex in ascending position, skipping running/unreturned", () => {
+  const items = [
+    { order_id: 10, vehicle_id: 101, group: "pending", label: "A" },
+    { order_id: 11, vehicle_id: 102, group: "pending", label: "B" },
+    { order_id: 12, vehicle_id: 103, group: "running", label: "R" },
+    { order_id: -201, vehicle_id: 201, group: "unreturned", label: "U" },
+    { order_id: 13, vehicle_id: 104, group: "pending", label: "C" },
+  ];
+
+  assert.deepEqual(getFullLotOrderUpdates(items), [
+    { itemKey: getLotItemKey(items[0]), orderId: 10, targetPosition: 1 },
+    { itemKey: getLotItemKey(items[1]), orderId: 11, targetPosition: 2 },
+    { itemKey: getLotItemKey(items[4]), orderId: 13, targetPosition: 3 },
+  ]);
+});
+
+test("full pending reindex is empty when there are no pending orders", () => {
+  const items = [
+    { order_id: 12, vehicle_id: 103, group: "running", label: "R" },
+    { order_id: -201, vehicle_id: 201, group: "unreturned", label: "U" },
+  ];
+
+  assert.deepEqual(getFullLotOrderUpdates(items), []);
 });
