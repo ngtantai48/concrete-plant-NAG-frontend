@@ -114,6 +114,10 @@ export const PERMISSIONS = {
     UPDATE: "update",
   },
 
+  AUDIT_LOGS: {
+    VIEW: "view",
+  },
+
   REPORTS: {
     VIEW: "view",
   },

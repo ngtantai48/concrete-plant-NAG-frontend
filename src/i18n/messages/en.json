@@ -41,6 +41,7 @@
     "uploadImage": "Image management",
     "userManagement": "User Management",
     "rolePermissions": "Role Permissions",
+    "auditLogs": "Audit Logs",
     "allUsers": "All Users",
     "staffManagement": "Staff management",
     "tools": "Tools",
@@ -84,6 +85,27 @@
       "driver": "Driver",
       "user": "User"
     }
+  },
+  "AuditLogsPage": {
+    "title": "Audit Logs",
+    "subtitle": "Track create, update, delete and data-changing actions across the system.",
+    "refresh": "Refresh",
+    "searchPlaceholder": "Search path or user...",
+    "time": "Time",
+    "user": "User",
+    "action": "Action",
+    "module": "Module",
+    "target": "Target",
+    "method": "Method",
+    "status": "Status",
+    "path": "Path",
+    "body": "Request body",
+    "ip": "IP",
+    "duration": "Duration",
+    "success": "Success",
+    "failed": "Failed",
+    "total": "Total",
+    "loadFailed": "Unable to load audit logs"
   },
   "CalendarToolPage": {
     "title": "Calendar",

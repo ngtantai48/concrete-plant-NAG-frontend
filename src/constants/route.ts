@@ -26,6 +26,7 @@ export const SIDEBAR = {
   LOT_TAGS: "/configuration/lot-tags",
   USER_MANAGE: "/user-manage",
   ROLE_PERMISSIONS: "/role-permissions",
+  AUDIT_LOGS: "/audit-logs",
   PARKING_IDLE_ENGINE: "/parking-idle-engine",
 };
 
